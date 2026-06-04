@@ -318,9 +318,9 @@ function recordInWeek(fechaStr, offsetWeeks=0){
 // ════════════════════════════════════════════════════════════
 const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles:'gdv_roles5'};
 
-function load(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch(e){return def;}}
-async function saveK(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch(e){}}
-
+function load(key,def){return def;}
+async function saveK(key,val){try{const ref=doc(db,key.split('_')[0],key);await setDoc(ref,{data:val});}catch(e){console.error('saveK',e);}}
+async function loadFS(key,def){try{const ref=doc(db,key.split('_')[0],key);const snap=await getDoc(ref);return snap.exists()?snap.data().data:def;}catch(e){return def;}}
 // ════════════════════════════════════════════════════════════
 // DEFAULT DATA — GdV
 // ════════════════════════════════════════════════════════════
@@ -487,13 +487,12 @@ let gdvCharts={};
 // HELPERS
 // ════════════════════════════════════════════════════════════
 async function initStorage(){
-  S.users  =load(SK.users,  DEFAULT_USERS);
-  S.groups =load(SK.groups, DEFAULT_GROUPS);
-  S.records=load(SK.records,[]);
-  S.members=load(SK.members,DEFAULT_MEMBERS);
-  S.roles  =load(SK.roles,  DEFAULT_ROLES);
+  S.users  =await loadFS(SK.users,  DEFAULT_USERS);
+  S.groups =await loadFS(SK.groups, DEFAULT_GROUPS);
+  S.records=await loadFS(SK.records,[]);
+  S.members=await loadFS(SK.members,DEFAULT_MEMBERS);
+  S.roles  =await loadFS(SK.roles,  DEFAULT_ROLES);
 }
-
 function today(){return new Date().toISOString().split('T')[0];}
 function fmt(d){if(!d)return'';const p=String(d).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:d;}
 function initials(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();}

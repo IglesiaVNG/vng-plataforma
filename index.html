@@ -207,8 +207,13 @@ tr:hover td{background:#F9FAFB}
       </div>
       <button class="btn btn-sm" onclick="doLogout()">Salir</button>
     </div>
+    <!-- PRÓXIMOS CUMPLEAÑOS -->
+    <div id="home-cumple-wrap" style="margin-bottom:1.25rem"></div>
     <div class="home-section-title">Módulos disponibles</div>
     <div class="modules-grid" id="modules-grid"></div>
+
+    <!-- EXPORTAR / IMPORTAR — rendered by JS in showHome() -->
+    <div id="home-export-wrap"></div>
     <div style="font-size:12px;color:#9CA3AF;text-align:center;margin-top:1rem">
       Más módulos próximamente · VNG Plataforma Ministerial
     </div>
@@ -217,6 +222,54 @@ tr:hover td{background:#F9FAFB}
 
 <!-- Export/Import feedback -->
 <div id="exp-toast" style="display:none;position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1F4E79;color:#fff;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:500;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.2)"></div>
+
+<!-- MODAL GLOBAL: Nuevo Contacto desde Facilitador -->
+<div id="gdv-nc-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:400;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div style="font-size:15px;font-weight:700;color:#1F4E79">🌱 Registrar Nuevo Contacto</div>
+      <button class="btn btn-sm" onclick="document.getElementById('gdv-nc-overlay').style.display='none'">✕</button>
+    </div>
+    <div style="background:#F0FDF4;border-radius:8px;padding:8px 12px;font-size:12px;color:#166534;margin-bottom:1rem">
+      Esta persona quedará en <strong>Nuevos Contactos</strong> para que el equipo pastoral haga el seguimiento.
+    </div>
+    <div id="gdv-nc-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Nombre *</label>
+        <input type="text" id="gdv-nc-nombre" placeholder="Nombre"></div>
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Apellido *</label>
+        <input type="text" id="gdv-nc-apellido" placeholder="Apellido"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
+        <input type="tel" id="gdv-nc-cel" placeholder="11 1234-5678"></div>
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Edad</label>
+        <input type="number" id="gdv-nc-edad" placeholder="Edad" min="1" max="120"></div>
+    </div>
+    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad</label>
+      <input type="text" id="gdv-nc-barrio" placeholder="Desde donde nos escribe..."></div>
+    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conociste?</label>
+      <select id="gdv-nc-como">
+        <option value="">— Seleccioná —</option>
+        <option>Por un amigo o familiar</option>
+        <option>Instagram (@iglesiavng)</option>
+        <option>YouTube</option>
+        <option>Pasé por la iglesia</option>
+        <option>Google / Internet</option>
+        <option>Volante o folleto</option>
+        <option>Contacto en las calles</option>
+        <option>Otro</option>
+      </select>
+    </div>
+    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Motivo <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+      <textarea id="gdv-nc-motivo" placeholder="Situación especial, motivo de contacto..." style="width:100%;padding:8px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;min-height:60px;resize:vertical"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn" onclick="document.getElementById('gdv-nc-overlay').style.display='none'">Cancelar</button>
+      <button class="btn btn-primary" onclick="gdvGuardarNuevoContacto()">Guardar y agregar</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL GLOBAL: Editar/Nuevo Rol -->
 <div id="role-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;padding:1rem">
@@ -285,6 +338,85 @@ const HOY=new Date(), ANO=HOY.getFullYear();
 function gs(k,def){try{return JSON.parse(localStorage.getItem(k)||def);}catch(e){return JSON.parse(def);}}
 function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 
+// ── Permission Matrix ────────────────────────────────────
+const MODULES_PERM=[
+  {key:'gdv', label:'Grupos de Vida', icon:'🏘️', screens:[
+    {key:'gdv_dashboard', label:'Dashboard y estadísticas'},
+    {key:'gdv_cargar',    label:'Cargar asistencia'},
+    {key:'gdv_registros', label:'Ver registros'},
+  ]},
+  {key:'miembros', label:'Miembros', icon:'👥', screens:[
+    {key:'miembros_ver',   label:'Ver base de miembros'},
+    {key:'miembros_editar',label:'Editar y agregar miembros'},
+  ]},
+  {key:'nuevos', label:'Nuevos Contactos', icon:'🌱', screens:[
+    {key:'nuevos', label:'Gestión de nuevos contactos'},
+  ]},
+  {key:'of', label:'Orientación Familiar', icon:'👨‍👩‍👧', screens:[
+    {key:'of', label:'Módulo completo'},
+  ]},
+  {key:'disc', label:'Discipulado', icon:'📖', screens:[
+    {key:'disc_dashboard', label:'Dashboard y progreso'},
+    {key:'disc_cargar',    label:'Cargar asistencia'},
+    {key:'disc_registros', label:'Ver registros'},
+    {key:'disc_pasos',     label:'Configurar Pasos (Admin)'},
+  ]},
+  {key:'config', label:'Configuración', icon:'⚙️', screens:[
+    {key:'config', label:'Acceso completo al sistema'},
+  ]},
+];
+
+// Flat SCREENS list for backward compatibility
+const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
+
+// Default permission matrix
+const DEFAULT_PERMISOS={
+  pastor:     {gdv_dashboard:'consulta',gdv_cargar:'ninguno',gdv_registros:'consulta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno'},
+  lider:      {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno'},
+  facilitador:{gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno'},
+  admin_gdv:  {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno'},
+  admin_of:   {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno'},
+  disc_n1:    {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno'},
+};
+
+let PERMISOS={};
+
+function loadPermisos(){
+  try{
+    const saved=localStorage.getItem('gdv_permisos');
+    PERMISOS=saved?JSON.parse(saved):JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
+  }catch(e){
+    PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
+  }
+}
+
+function savePermisos(){
+  localStorage.setItem('gdv_permisos',JSON.stringify(PERMISOS));
+}
+
+function getPerm(roleId, screen){
+  // Super admin always ejecuta everything
+  if(hasRole('super_admin')) return 'ejecuta';
+  const roles=userRoles();
+  // Check all roles the user has and return highest permission
+  let best='ninguno';
+  const order={ninguno:0,consulta:1,ejecuta:2};
+  roles.forEach(function(r){
+    const p=PERMISOS[r]?PERMISOS[r][screen]:'ninguno';
+    if((order[p]||0)>(order[best]||0)) best=p;
+  });
+  // Also check by system role
+  const sr=currentUser.role;
+  if(PERMISOS[sr]){
+    const p=PERMISOS[sr][screen]||'ninguno';
+    if((order[p]||0)>(order[best]||0)) best=p;
+  }
+  return best;
+}
+
+function canScreen(screen){  return getPerm(null,screen)!=='ninguno'; }
+function canEjecutar(screen){ return getPerm(null,screen)==='ejecuta'; }
+
 // ── Week helpers ──────────────────────────────────────────
 function getWeekDates(offsetWeeks=0){
   // Week: Sunday → Saturday
@@ -316,11 +448,24 @@ function recordInWeek(fechaStr, offsetWeeks=0){
 // ════════════════════════════════════════════════════════════
 // STORAGE
 // ════════════════════════════════════════════════════════════
-const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles:'gdv_roles5'};
+const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles:'gdv_roles5',
+  discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records'};
 
-function load(key,def){return def;}
-async function saveK(key,val){try{const ref=window._doc(window.db,key.split('_')[0],key);await window._setDoc(ref,{data:val});}catch(e){console.error('saveK',e);}}
-async function loadFS(key,def){try{const ref=window._doc(window.db,key.split('_')[0],key);const snap=await window._getDoc(ref);return snap.exists()?snap.data().data:def;}catch(e){return def;}}
+const DEFAULT_DISC_PASOS=[
+  {id:1,nombre:'Discipulado N1',nivel:'Inicial',roleId:'disc_n1',estado:'Activo',discipuladorId:null,miembros:[],completados:{},
+   capitulos:['Cap 1 — Introducción a la fe','Cap 2 — La Biblia','Cap 3 — La oración',
+              'Cap 4 — La iglesia','Cap 5 — El bautismo']},
+  {id:2,nombre:'Discipulado N2',nivel:'Intermedio',roleId:'disc_n2',estado:'Activo',discipuladorId:null,miembros:[],completados:{},
+   capitulos:['Cap 1 — Madurez espiritual','Cap 2 — El Espíritu Santo','Cap 3 — La mayordomía',
+              'Cap 4 — El servicio','Cap 5 — Evangelismo']},
+  {id:3,nombre:'Discipulado N3',nivel:'Avanzado',roleId:'disc_n3',estado:'Activo',discipuladorId:null,miembros:[],completados:{},
+   capitulos:['Cap 1 — Liderazgo cristiano','Cap 2 — Reproducción','Cap 3 — Visión',
+              'Cap 4 — Plantación','Cap 5 — Misión']},
+];
+
+function load(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch(e){return def;}}
+async function saveK(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch(e){}}
+
 // ════════════════════════════════════════════════════════════
 // DEFAULT DATA — GdV
 // ════════════════════════════════════════════════════════════
@@ -487,12 +632,16 @@ let gdvCharts={};
 // HELPERS
 // ════════════════════════════════════════════════════════════
 async function initStorage(){
-  S.users  =await loadFS(SK.users,  DEFAULT_USERS);
-  S.groups =await loadFS(SK.groups, DEFAULT_GROUPS);
-  S.records=await loadFS(SK.records,[]);
-  S.members=await loadFS(SK.members,DEFAULT_MEMBERS);
-  S.roles  =await loadFS(SK.roles,  DEFAULT_ROLES);
+  S.users      =load(SK.users,      DEFAULT_USERS);
+  S.groups     =load(SK.groups,     DEFAULT_GROUPS);
+  S.records    =load(SK.records,    []);
+  S.members    =load(SK.members,    DEFAULT_MEMBERS);
+  S.roles      =load(SK.roles,      DEFAULT_ROLES);
+  S.discPasos  =load(SK.discPasos,  DEFAULT_DISC_PASOS);
+  S.discRecords=load(SK.discRecords,[]);
+  loadPermisos();
 }
+
 function today(){return new Date().toISOString().split('T')[0];}
 function fmt(d){if(!d)return'';const p=String(d).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:d;}
 function initials(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();}
@@ -511,47 +660,49 @@ function roleChips(roles){
 // ROLE PERMISSIONS
 // ════════════════════════════════════════════════════════════
 function canAccessMiembros(){
-  const linked=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
-  const roles=linked?linked.roles:[];
-  return currentUser.role==='super_admin'||
-    roles.includes('super_admin')||roles.includes('pastor');
+  return hasRole('super_admin') || canScreen('miembros_ver') || canScreen('miembros_editar');
+}
+function canEditMiembros(){
+  return hasRole('super_admin') || canEjecutar('miembros_editar');
 }
 
 function canAccessNuevos(){
-  const linked=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
-  const roles=linked?linked.roles:[];
-  return currentUser.role==='super_admin'||currentUser.role==='admin'||
-    roles.includes('super_admin')||roles.includes('pastor')||
-    roles.includes('lider')||roles.includes('admin_gdv');
+  return hasRole('super_admin') || canScreen('nuevos');
 }
 
 function canAccessConfig(){
-  const linked=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
-  const roles=linked?linked.roles:[];
-  return currentUser.role==='super_admin'||roles.includes('super_admin');
+  return hasRole('super_admin');
+}
+function canCargarAsistencia(){
+  return hasRole('super_admin') || canEjecutar('gdv_cargar');
 }
 
-function canAccessGdV(){
+// ── Role helper ────────────────────────────────────────────
+function userRoles(){
   const linked=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
-  const roles=linked?linked.roles:[];
-  // Admin OF NO ve GdV. Admin GdV SÍ ve GdV.
-  if(currentUser.role==='admin_of') return false;
-  return currentUser.role==='super_admin'||currentUser.role==='admin'||
-    roles.includes('super_admin')||roles.includes('admin_gdv')||
-    roles.includes('facilitador')||roles.includes('pastor')||roles.includes('lider');
+  return linked?linked.roles:[];
+}
+function hasRole(...rols){ const r=userRoles(); return rols.some(x=>r.includes(x)||currentUser.role===x); }
+
+// ── Permission functions ────────────────────────────────────
+// SUPER ADMIN: todo
+// PASTOR: GdV (ver, no cargar), Miembros (ver+editar), Nuevos, OF — NO Config, NO cargar asistencia
+// ADMIN GdV: GdV completo, Miembros (solo ver), Nuevos — NO Config, NO OF
+// FACILITADOR: solo su grupo GdV (cargar+ver) — nada más
+// LIDER: GdV (ver todos), Nuevos — nada más
+
+function canAccessGdV(){
+  // At least one GdV screen must be accessible
+  return hasRole('super_admin') || 
+    canScreen('gdv_dashboard') || canScreen('gdv_cargar') || canScreen('gdv_registros');
 }
 
 function canAccessOF(){
-  const linked=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
-  const roles=linked?linked.roles:[];
-  return currentUser.role==='super_admin'||currentUser.role==='admin_of'||
-    roles.includes('super_admin')||roles.includes('admin_of')||roles.includes('pastor');
+  return hasRole('super_admin') || canScreen('of');
 }
 
 function isGdVAdmin(){
-  const linked=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
-  const roles=linked?linked.roles:[];
-  return currentUser.role==='super_admin'||roles.includes('super_admin')||roles.includes('admin_gdv');
+  return hasRole('super_admin','admin_gdv');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -622,11 +773,11 @@ function showHome(){
     tag:'Módulo activo',tagClass:'tag-green',
     action:'openNuevos'
   });
-  modules.push({
+  if(canAccessDisc()) modules.push({
     icon:'📖',name:'Discipulado',
-    desc:'Seguimiento de niveles de discipulado. Próximamente disponible.',
-    tag:'Próximamente',tagClass:'tag-green',
-    action:null,comingSoon:true
+    desc:'Seguimiento de niveles de discipulado. Pasos N1, N2 y N3 con asistencia y capítulos.',
+    tag:'Módulo activo',tagClass:'tag-green',
+    action:'openDiscipulado'
   });
 
   document.getElementById('modules-grid').innerHTML=modules.map(m=>`
@@ -636,6 +787,22 @@ function showHome(){
       <div class="module-desc">${m.desc}</div>
       <span class="module-tag ${m.tagClass}">${m.tag}</span>
     </div>`).join('');
+  // Render upcoming birthdays
+  setTimeout(renderHomeCumples, 50);
+  // Render Export/Import only for Super Admin
+  var exportWrap=document.getElementById('home-export-wrap');
+  if(exportWrap){
+    if(isSuperAdmin()){
+      exportWrap.innerHTML=
+        '<div style="display:flex;gap:10px;justify-content:center;margin-top:1.5rem;flex-wrap:wrap">'+
+        '<button class="btn btn-sm" onclick="exportarTodo()" style="background:#EFF6FF;border-color:#BFDBFE;color:#1E40AF;font-weight:600">💾 Exportar datos</button>'+
+        '<button class="btn btn-sm" onclick="document.getElementById(\"imp-file\").click()" style="background:#F0FDF4;border-color:#BBF7D0;color:#166534;font-weight:600">📂 Importar datos</button>'+
+        '<input type="file" id="imp-file" accept=".json" style="display:none" onchange="importarTodo(this)">'+
+        '</div>';
+    } else {
+      exportWrap.innerHTML='';
+    }
+  }
 }
 
 function goHome(){
@@ -673,11 +840,12 @@ function openMiembros(){
 
 function buildMiembrosHTML(){
   return `<div class="gdv-app">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
       <span style="font-size:14px;font-weight:600;color:#1F4E79">Base de Miembros (<span id="sa-member-count">0</span>)</span>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-sm" onclick="exportMiembrosExcel()" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">📥 Exportar Excel</button>
-        <button class="btn btn-primary btn-sm" onclick="saOpenNewMember()">+ Nuevo miembro</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="saShowActualizarQR()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">📱 QR Actualizar datos</button>
+        <button class="btn btn-sm" onclick="exportMiembrosExcel()" style="background:#F0FDF4;border-color:#86EFAC;color:#166634;font-weight:600">📥 Exportar Excel</button>
+        ${canEditMiembros()?`<button class="btn btn-primary btn-sm" onclick="saOpenNewMember()">+ Nuevo miembro</button>`:''}
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
@@ -720,7 +888,7 @@ function buildMiembrosHTML(){
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
         <div style="font-size:14px;font-weight:600;color:#1F4E79" id="sa-detail-name">—</div>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-primary btn-sm" onclick="saEditFromDetail()">✏️ Editar</button>
+          ${canEditMiembros()?`<button class="btn btn-primary btn-sm" onclick="saEditFromDetail()">✏️ Editar</button>`:''}
           <button class="btn btn-sm" onclick="saCloseDetail()">✕</button>
         </div>
       </div>
@@ -787,6 +955,33 @@ function saCondicionBadge(condicion){
   return `<span style="background:${s.bg};color:${s.color};font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;white-space:nowrap">${condicion||'—'}</span>`;
 }
 
+function saShowActualizarQR(){
+  var baseUrl=window.location.origin+window.location.pathname;
+  var url=baseUrl+'?form=actualizar';
+  var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent(url);
+  var overlay=document.getElementById('sa-qr-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='sa-qr-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML=`<div style="background:#fff;border-radius:16px;padding:2rem;max-width:420px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div style="font-size:15px;font-weight:700;color:#1F4E79">📱 QR — Actualizar datos</div>
+      <button onclick="document.getElementById('sa-qr-overlay').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div style="background:#F9FAFB;border-radius:12px;padding:1.5rem;margin-bottom:1rem">
+      <img src="${qrUrl}" alt="QR" style="width:200px;height:200px;display:block;margin:0 auto 1rem">
+      <div style="font-size:13px;color:#6B7280">Cada miembro escanea este QR, busca su nombre y completa: Celular, Fecha de nacimiento y Dirección</div>
+    </div>
+    <div style="font-size:12px;color:#6B7280;background:#FEF9C3;border-radius:8px;padding:8px">
+      💡 Los datos se guardan en el mismo navegador. Recomendamos que lo hagan desde la misma computadora donde está la app.
+    </div>
+  </div>`;
+  overlay.style.display='flex';
+}
+
 function saCalcEdad(fnac){
   if(!fnac) return '—';
   const hoy=new Date();
@@ -804,6 +999,15 @@ function saFmtDate(d){
 }
 
 function renderMiembrosStandalone(){
+  // Populate role filter dynamically from S.roles
+  const rolFilter=document.getElementById('sa-mfil-rol');
+  if(rolFilter&&rolFilter.options.length<=1){
+    S.roles.forEach(r=>{
+      const opt=document.createElement('option');
+      opt.value=r.id; opt.textContent=r.name;
+      rolFilter.appendChild(opt);
+    });
+  }
   const search=(document.getElementById('sa-member-search')?.value||'').toLowerCase();
   const fGrupo=parseInt(document.getElementById('sa-mfil-grupo')?.value)||null;
   const fGen=document.getElementById('sa-mfil-gen')?.value||'';
@@ -854,13 +1058,13 @@ function renderMiembrosStandalone(){
     const isBaja=m.estado==='Baja';
     const rowStyle=isBaja?'opacity:0.55;background:#FEF2F2':'';
     return `<tr style="${rowStyle}">
-      <td>
-        <span style="cursor:pointer;color:#1F4E79;font-weight:600;text-decoration:underline dotted" onclick="saShowDetail(${m.id},event)">${fullName(m)}</span>
+      <td style="max-width:160px">
+        <span style="cursor:pointer;color:#1F4E79;font-weight:600;text-decoration:underline dotted;word-break:break-word" onclick="saShowDetail(${m.id},event)">${fullName(m)}</span>
         ${isBaja?`<div style="font-size:11px;color:#DC2626;margin-top:2px">Baja: ${saFmtDate(m.fechaBaja||'')}</div>`:''}
       </td>
       <td><span style="background:${genBg};color:${genColor};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${m.genero}</span></td>
       <td style="color:#6B7280;font-size:12px">${g?g.name:'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
-      <td>${roleChips(m.roles||[])}</td>
+      <td style="max-width:180px"><div style="display:flex;flex-wrap:wrap;gap:3px;max-height:52px;overflow:hidden">${roleChips(m.roles||[])}</div></td>
       <td>${saCondicionBadge(m.condicion)}</td>
       <td><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></td>
 
@@ -897,7 +1101,13 @@ function saShowDetail(id,event){
     const scrollX=window.scrollX||0;
     let top=rect.bottom+scrollY+6;
     let left=rect.left+scrollX;
+    // Keep within viewport horizontally
     if(left+390>window.innerWidth) left=Math.max(8,window.innerWidth-395);
+    // Keep within viewport vertically - if too low, show above the click
+    const panelH=380;
+    if(rect.bottom+panelH>window.innerHeight){
+      top=Math.max(scrollY+8, rect.top+scrollY-panelH-6);
+    }
     panel.style.top=top+'px';
     panel.style.left=left+'px';
   }
@@ -996,9 +1206,14 @@ async function saSaveMember(){
 async function saDarDeBaja(id){
   const m=S.members.find(x=>x.id===id);
   if(!m) return;
-  if(!confirm(`¿Dar de baja a ${fullName(m)}?\n\nNo se elimina — quedará registrado con fecha de baja y podrá reactivarse.`)) return;
+  var motivo=prompt('Motivo de baja para '+fullName(m)+' (mínimo 10 caracteres):','');
+  if(motivo===null) return; // cancelled
+  if(!motivo||motivo.trim().length<10){
+    alert('El motivo de baja es obligatorio y debe tener al menos 10 caracteres.');
+    return;
+  }
   const hoy=new Date().toISOString().split('T')[0];
-  Object.assign(m,{estado:'Baja',fechaBaja:hoy});
+  Object.assign(m,{estado:'Baja',fechaBaja:hoy,motivoBaja:motivo.trim()});
   await saveK(SK.members,S.members);
   saCloseDetail();
   renderMiembrosStandalone();
@@ -1028,7 +1243,7 @@ function openConfig(){
   document.getElementById('app-topbar-title').textContent='⚙️ Configuración';
   document.getElementById('app-topbar-user').textContent=currentUser.name;
   document.getElementById('app-content').innerHTML=buildConfigHTML();
-  configTab('grupos', document.getElementById('cfg-tab-grupos'));
+  // Don't auto-select any tab - show prompt to select
 }
 
 function buildConfigHTML(){
@@ -1040,14 +1255,21 @@ function buildConfigHTML(){
       <button class="btn btn-primary btn-sm" id="cfg-tab-grupos" onclick="configTab('grupos',this)">🏘 Grupos</button>
       <button class="btn btn-sm" id="cfg-tab-usuarios" onclick="configTab('usuarios',this)">👤 Usuarios</button>
       <button class="btn btn-sm" id="cfg-tab-roles" onclick="configTab('roles',this)">🎭 Roles</button>
+      <button class="btn btn-sm" id="cfg-tab-permisos" onclick="configTab('permisos',this)">🔐 Permisos</button>
+      <button class="btn btn-sm" id="cfg-tab-exportar" onclick="configTab('exportar',this)">💾 Datos</button>
     </div>
-    <div id="cfg-content"></div>
+    <div id="cfg-content">
+      <div id="cfg-placeholder" style="text-align:center;padding:2rem;color:#9CA3AF;font-size:14px">
+        ← Seleccioná una sección para ver su contenido
+      </div></div>
   </div>`;
 }
 
 function configTab(sub, btn){
   document.querySelectorAll('[id^="cfg-tab-"]').forEach(b=>{b.className='btn btn-sm';});
   if(btn) btn.className='btn btn-primary btn-sm';
+  const placeholder=document.getElementById('cfg-placeholder');
+  if(placeholder) placeholder.style.display='none';
   const wrap=document.getElementById('cfg-content');
   if(!wrap) return;
   if(sub==='grupos'){
@@ -1080,33 +1302,35 @@ function configTab(sub, btn){
       <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 14px;font-size:13px;color:#1E40AF;margin-bottom:1rem">
         ℹ️ <strong>Usuarios</strong> son las cuentas de login (usuario + contraseña + acceso al sistema). Son diferentes a los <strong>Miembros</strong>, que son las personas de la iglesia.
       </div>
-      <div id="cfg-users-list"></div>
-      <div id="cfg-user-form" class="card hidden">
+      <div id="cfg-user-form" class="card" style="display:none;margin-bottom:1rem">
         <div class="card-title" id="cfg-uf-title">Nuevo usuario</div>
         <div class="form-row">
-          <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre completo</label><input type="text" id="cfg-uf-name"></div>
+          <div style="grid-column:1/-1">
+            <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Miembro asociado *</label>
+            <div style="font-size:12px;color:#6B7280;margin-bottom:6px">El usuario debe ser un miembro existente en la base</div>
+            <select id="cfg-uf-member" onchange="cfgUserMemberSelected()" style="width:100%;margin-bottom:0">
+              <option value="">— Seleccioná un miembro —</option>
+            </select>
+            <input type="hidden" id="cfg-uf-name">
+          </div>
           <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Usuario (login)</label><input type="text" id="cfg-uf-user"></div>
         </div>
+        <div id="cfg-uf-info" style="display:none;background:#EFF6FF;border-radius:8px;padding:8px 12px;font-size:13px;color:#1E40AF;margin-top:8px"></div>
         <div class="form-row" style="margin-top:10px">
           <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Contraseña</label><input type="password" id="cfg-uf-pass"></div>
           <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Rol de acceso</label>
-            <select id="cfg-uf-role" onchange="cfgToggleGroupSel()">
-              <option value="facilitador">Facilitador</option>
-              <option value="admin">Admin</option>
-              <option value="super_admin">Super Admin</option>
-              <option value="admin_of">Admin OF</option>
+            <select id="cfg-uf-role">
+              <option value="">— Seleccioná un rol —</option>
             </select>
           </div>
         </div>
-        <div id="cfg-uf-group-row" style="margin-top:10px">
-          <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo asignado</label>
-          <select id="cfg-uf-group"></select>
-        </div>
+        <!-- Grupo asignado removed - members already have their group -->
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
           <button class="btn" onclick="cfgCloseUserForm()">Cancelar</button>
           <button class="btn btn-primary" onclick="cfgSaveUser()">Guardar</button>
         </div>
-      </div>`;
+      </div>
+      <div id="cfg-users-list"></div>`;
     cfgRenderUsuarios();
   } else if(sub==='roles'){
     wrap.innerHTML=`
@@ -1139,6 +1363,33 @@ function configTab(sub, btn){
         </div>
       </div>`;
     cfgRenderRoles();
+  } else if(sub==='permisos'){
+    wrap.innerHTML=`
+      <div style="font-size:13px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#FEF9C3;border-radius:8px">
+        ⚡ <strong>Super Admin</strong> siempre tiene acceso total — no se puede modificar desde acá.
+      </div>
+      <div id="cfg-permisos-wrap" style="overflow-x:auto"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
+        <button class="btn" onclick="cfgResetPermisos()">↺ Restaurar valores por defecto</button>
+        <button class="btn btn-primary" onclick="cfgSavePermisos()">💾 Guardar permisos</button>
+      </div>`;
+    cfgRenderPermisosTabla();
+  } else if(sub==='exportar'){
+    wrap.innerHTML=
+      '<div style="display:flex;flex-direction:column;gap:1rem;max-width:400px;margin:1rem auto">'+
+      '<div class="card" style="text-align:center;padding:1.5rem">'+
+      '<div style="font-size:2.5rem;margin-bottom:.75rem">💾</div>'+
+      '<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">Exportar todos los datos</div>'+
+      '<div style="font-size:13px;color:#6B7280;margin-bottom:1rem">Descarga un archivo JSON con todos los datos de la plataforma como respaldo.</div>'+
+      '<button class="btn btn-primary" style="width:100%" onclick="exportarTodo()">💾 Exportar datos</button>'+
+      '</div>'+
+      '<div class="card" style="text-align:center;padding:1.5rem">'+
+      '<div style="font-size:2.5rem;margin-bottom:.75rem">📂</div>'+
+      '<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">Importar datos</div>'+
+      '<div style="font-size:13px;color:#6B7280;margin-bottom:1rem">Carga un archivo JSON previamente exportado para restaurar los datos.</div>'+
+      '<button class="btn btn-primary" style="width:100%" onclick="document.getElementById(\"cfg-imp2\").click()">📂 Importar datos</button>'+
+      '<input type="file" id="cfg-imp2" accept=".json" style="display:none" onchange="importarTodo(this)">'+
+      '</div></div>';
   }
 }
 
@@ -1213,6 +1464,34 @@ let cfgEditingUserId=null;
 function cfgRenderUsuarios(){
   const ugSel=document.getElementById('cfg-uf-group');
   if(ugSel) ugSel.innerHTML='<option value="">Sin grupo</option>'+S.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+
+  // Populate member selector — always fresh
+  const memSel=document.getElementById('cfg-uf-member');
+  if(memSel){
+    const existingNames=S.users.map(u=>u.name.toLowerCase());
+    memSel.innerHTML='<option value="">— Seleccioná un miembro —</option>';
+    S.members
+      .filter(m=>m.estado!=='Baja'&&!existingNames.includes(fullName(m).toLowerCase()))
+      .sort((a,b)=>fullName(a).localeCompare(fullName(b)))
+      .forEach(m=>{
+        const g=S.groups.find(x=>x.id===m.grupoId);
+        const opt=document.createElement('option');
+        opt.value=m.id;
+        opt.textContent=fullName(m)+(g?' — '+g.name:'');
+        memSel.appendChild(opt);
+      });
+  }
+
+  // Populate role selector — always fresh from S.roles
+  const rolSel=document.getElementById('cfg-uf-role');
+  if(rolSel&&rolSel.options.length<=1){
+    S.roles.forEach(r=>{
+      const opt=document.createElement('option');
+      opt.value=r.id; opt.textContent=r.name;
+      rolSel.appendChild(opt);
+    });
+  }
+
   const wrap=document.getElementById('cfg-users-list');
   if(!wrap) return;
   wrap.innerHTML=S.users.map(u=>{
@@ -1230,14 +1509,30 @@ function cfgRenderUsuarios(){
     </div>`;
   }).join('');
 }
+function cfgUserMemberSelected(){
+  var sel=document.getElementById('cfg-uf-member');
+  var memberId=parseInt(sel.value)||null;
+  var m=memberId?S.members.find(function(x){return x.id===memberId;}):null;
+  var nameInput=document.getElementById('cfg-uf-name');
+  var userInput=document.getElementById('cfg-uf-user');
+  if(m){
+    if(nameInput) nameInput.value=fullName(m);
+    if(userInput&&!userInput.value){
+      var suggested=(m.nombre+'.'+m.apellido).toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'.');
+      userInput.value=suggested;
+    }
+  } else {
+    if(nameInput) nameInput.value='';
+  }
+}
+
 function cfgOpenNewUser(){
   cfgEditingUserId=null;
   document.getElementById('cfg-uf-title').textContent='Nuevo usuario';
   ['cfg-uf-name','cfg-uf-user','cfg-uf-pass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('cfg-uf-role').value='facilitador';
-  document.getElementById('cfg-uf-group').value='';
-  document.getElementById('cfg-uf-group-row').style.display='block';
-  document.getElementById('cfg-user-form').classList.remove('hidden');
+  document.getElementById('cfg-user-form').style.display='block';
 }
 function cfgEditUser(id){
   const u=S.users.find(x=>x.id===id);
@@ -1247,21 +1542,18 @@ function cfgEditUser(id){
   document.getElementById('cfg-uf-user').value=u.user;
   document.getElementById('cfg-uf-pass').value=u.pass;
   document.getElementById('cfg-uf-role').value=u.role;
-  document.getElementById('cfg-uf-group').value=u.groupId||'';
   cfgToggleGroupSel();
-  document.getElementById('cfg-user-form').classList.remove('hidden');
+  document.getElementById('cfg-user-form').style.display='block';
 }
 function cfgToggleGroupSel(){
-  const r=document.getElementById('cfg-uf-role')?.value;
-  const row=document.getElementById('cfg-uf-group-row');
-  if(row) row.style.display=r==='facilitador'?'block':'none';
+  // Group row removed - members have their group assigned already
 }
 async function cfgSaveUser(){
   const name=document.getElementById('cfg-uf-name').value.trim();
   const user=document.getElementById('cfg-uf-user').value.trim();
   const pass=document.getElementById('cfg-uf-pass').value;
   const role=document.getElementById('cfg-uf-role').value;
-  const groupId=parseInt(document.getElementById('cfg-uf-group').value)||null;
+  const groupId=parseInt(document.getElementById('cfg-uf-group')?.value)||null;
   if(!name||!user||!pass){alert('Completá todos los campos');return;}
   if(cfgEditingUserId) Object.assign(S.users.find(x=>x.id===cfgEditingUserId),{name,user,pass,role,groupId});
   else S.users.push({id:Date.now(),name,user,pass,role,groupId});
@@ -1407,9 +1699,11 @@ function buildGdVHTML(){
       <div class="card">
         <div class="card-title">📅 Nuevo encuentro</div>
         <div id="gdv-admin-sel" class="hidden"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Seleccioná el grupo</label><select id="gdv-grupo-sel" onchange="gdvAdminGroupChanged()" style="margin-bottom:12px"></select></div>
-        <div id="gdv-group-info" style="font-size:13px;color:#1E40AF;padding:8px;background:#EFF6FF;border-radius:6px;margin-bottom:12px"></div>
+        <div id="gdv-group-info" style="font-size:13px;color:#1E40AF;padding:8px;background:#EFF6FF;border-radius:6px;margin-bottom:8px"></div>
+        <div id="gdv-pending-alert" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px;color:#92400E"></div>
+        <div id="gdv-duplicate-alert" style="display:none;border:1px solid;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px"></div>
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha</label>
-        <input type="date" id="gdv-fecha">
+        <input type="date" id="gdv-fecha" onchange="gdvCheckDuplicateWeekOnDateChange()">
         <div style="margin-top:14px;padding:12px;background:#FFF9C4;border:1px solid #FCD34D;border-radius:10px">
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:500;color:#92400E">
             <input type="checkbox" id="gdv-sin-encuentro" onchange="gdvToggleSinEncuentro()" style="width:18px;height:18px;cursor:pointer">
@@ -1422,8 +1716,27 @@ function buildGdVHTML(){
         </div>
       </div>
       <div class="card" id="gdv-asistencia-card"><div class="card-title">✅ Asistencia</div><div style="font-size:12px;color:#6B7280;margin-bottom:10px">Tocá para cambiar estado</div><div id="gdv-members"></div></div>
-      <div class="card gdv-visit-card"><div class="card-title">👥 Visitas de otro grupo</div><div id="gdv-vtags-other" style="margin-bottom:8px"></div><div style="display:flex;gap:8px"><input type="text" id="gdv-vinp-other" placeholder="Nombre" style="flex:1"><button class="btn btn-sm" onclick="gdvAddVisit('other')">+ Agregar</button></div></div>
-      <div class="card gdv-visit-card"><div class="card-title">🆕 Personas nuevas</div><div id="gdv-vtags-new" style="margin-bottom:8px"></div><div style="display:flex;gap:8px"><input type="text" id="gdv-vinp-new" placeholder="Nombre" style="flex:1"><button class="btn btn-sm" onclick="gdvAddVisit('new')">+ Agregar</button></div></div>
+      <div class="card gdv-visit-card">
+        <div class="card-title">👥 Visitas de otro grupo</div>
+        <div style="font-size:12px;color:#6B7280;margin-bottom:8px">Solo miembros existentes en la base</div>
+        <div id="gdv-vtags-other" style="margin-bottom:8px"></div>
+        <div style="position:relative">
+          <input type="text" id="gdv-vinp-other" placeholder="Escribí el nombre..." style="width:100%" oninput="gdvAutoComplete('other',this.value)" autocomplete="off">
+          <div id="gdv-ac-other" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:100;max-height:180px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div class="card gdv-visit-card">
+        <div class="card-title">🆕 Personas nuevas</div>
+        <div style="font-size:12px;color:#6B7280;margin-bottom:8px">Buscá en la base o registrá como nuevo contacto</div>
+        <div id="gdv-vtags-new" style="margin-bottom:8px"></div>
+        <div style="position:relative">
+          <input type="text" id="gdv-vinp-new" placeholder="Escribí el nombre..." style="width:100%" oninput="gdvAutoComplete('new',this.value)" autocomplete="off">
+          <div id="gdv-ac-new" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:100;max-height:180px;overflow-y:auto"></div>
+        </div>
+        <button class="btn btn-sm" onclick="gdvAbrirFormNuevoContacto()" style="margin-top:10px;width:100%;background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">
+          ➕ No está en la lista — Registrar como Nuevo Contacto
+        </button>
+      </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:1.5rem">
         <button class="btn" onclick="gdvInitFacForm()">Limpiar</button>
         <button class="btn btn-primary" onclick="gdvSaveRecord()">💾 Guardar</button>
@@ -1594,6 +1907,92 @@ function initGdV(){
 }
 
 // GdV: Cargar
+function gdvCheckPendingWeeks(grupoId){
+  var alert=document.getElementById('gdv-pending-alert');
+  if(!alert) return;
+
+  // Get last record date for this group
+  var groupRecs=S.records.filter(function(r){return r.grupoId===grupoId;});
+  if(!groupRecs.length){
+    alert.style.display='none';
+    return;
+  }
+
+  // Find most recent record
+  var lastRec=groupRecs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
+  var lastFecha=new Date(lastRec.fecha);
+  var lastWeek=getISOWeek(lastRec.fecha);
+
+  // Current week
+  var hoy=new Date();
+  var thisWeek=getISOWeek(dateToStr(hoy));
+  var weeksDiff=thisWeek-lastWeek;
+
+  // Adjust for year boundary
+  if(hoy.getFullYear()>lastFecha.getFullYear()) weeksDiff+=52;
+
+  if(weeksDiff>1){
+    // Has pending weeks
+    var pendingWeek=lastWeek+1;
+    // Calculate the date for that pending week (Monday)
+    var pendingDate=new Date(lastFecha);
+    pendingDate.setDate(pendingDate.getDate()+7);
+    var pendingStr=dateToStr(pendingDate);
+
+    alert.style.display='block';
+    alert.innerHTML='⚠️ <strong>Tenés '+( weeksDiff-1)+' semana'+(weeksDiff-1>1?'s':'')+' sin registrar.</strong> '+
+      'Cargá primero la Semana '+pendingWeek+' antes de la semana actual. '+
+      '<button class="btn btn-sm" style="margin-left:8px;font-size:11px" onclick="gdvSetPendingDate(\'' + pendingStr + '\')">'+
+      '&#8594; Ir a Semana ' + pendingWeek + '</button>';
+
+    // Auto-set date to the pending week
+    var fechaInput=document.getElementById('gdv-fecha');
+    if(fechaInput&&!fechaInput.value){
+      fechaInput.value=pendingStr;
+    }
+  } else {
+    alert.style.display='none';
+  }
+}
+
+function gdvSetPendingDate(fecha){
+  var input=document.getElementById('gdv-fecha');
+  if(input) input.value=fecha;
+  document.getElementById('gdv-pending-alert').style.display='none';
+}
+
+function gdvCheckDuplicateWeek(gid){
+  var alert=document.getElementById('gdv-duplicate-alert');
+  if(!alert) return;
+  var fecha=document.getElementById('gdv-fecha')?.value;
+  if(!gid||!fecha){alert.style.display='none';return;}
+  var semana=getISOWeek(fecha);
+  var anio=new Date(fecha).getFullYear();
+  var existe=S.records.find(function(r){
+    if(r.grupoId!==gid) return false;
+    return getISOWeek(r.fecha)===semana && new Date(r.fecha).getFullYear()===anio;
+  });
+  if(existe){
+    alert.style.display='block';
+    if(isGdVAdmin()){
+      alert.innerHTML='⚠️ Ya existe un registro para la <strong>Semana '+semana+'</strong>. Como Admin podés guardar igual para corregir errores.';
+      alert.style.background='#FEF3C7';alert.style.borderColor='#FCD34D';alert.style.color='#92400E';
+    } else {
+      alert.innerHTML='🚫 Ya existe un registro para la <strong>Semana '+semana+'</strong>. No podés cargar la misma semana dos veces. Contactá al Admin GdV si hay un error.';
+      alert.style.background='#FEF2F2';alert.style.borderColor='#FCA5A5';alert.style.color='#991B1B';
+    }
+  } else {
+    alert.style.display='none';
+  }
+}
+
+function gdvCheckDuplicateWeekOnDateChange(){
+  var sel=document.getElementById('gdv-grupo-sel');
+  var gid=parseInt(sel?.value)||null;
+  if(!gid) gid=currentUser.groupId;
+  if(gid) gdvCheckDuplicateWeek(gid);
+}
+
 function gdvToggleSinEncuentro(){
   const checked=document.getElementById('gdv-sin-encuentro').checked;
   document.getElementById('gdv-motivo-wrap').style.display=checked?'block':'none';
@@ -1673,11 +2072,119 @@ function gdvToggleFac(id,btn){
   btn.textContent=n==='presente'?'Presente':'Ausente';
 }
 
+function gdvAutoComplete(type, query){
+  const dropdown=document.getElementById('gdv-ac-'+type);
+  if(!dropdown) return;
+  if(query.length<2){dropdown.style.display='none';return;}
+
+  // Get already added names to exclude
+  const added=type==='other'?gdvVisitsOther:gdvVisitsNew;
+
+  // For 'new': only show members with grupoId=null (truly without a group)
+  // For 'other': show members from OTHER groups
+  let pool=S.members.filter(function(m){ return m.estado!=='Baja'; });
+  if(type==='other'){
+    const curGrupo=currentUser.groupId||parseInt(document.getElementById('gdv-grupo-sel')?.value)||null;
+    if(curGrupo) pool=pool.filter(function(m){ return m.grupoId!==curGrupo; });
+  } else if(type==='new'){
+    // Solo personas SIN grupo asignado — si ya tienen grupo, son Visitas
+    pool=pool.filter(function(m){ return !m.grupoId; });
+  }
+
+  const q=query.toLowerCase();
+  const results=pool.filter(function(m){
+    return fullName(m).toLowerCase().includes(q) && !added.includes(fullName(m));
+  }).slice(0,8);
+
+  if(!results.length){
+    if(type==='new'){
+      var msg=q.length>1
+        ?'No encontrado sin grupo asignado. Si ya tiene grupo, cargalo como Visita. Si es nuevo, registralo abajo.'
+        :'Escribí el nombre para buscar...';
+      dropdown.innerHTML='<div style="padding:10px 12px;font-size:13px;color:#9CA3AF">'+msg+'</div>';
+      dropdown.style.display='block';
+    } else {
+      dropdown.style.display='none';
+    }
+    return;
+  }
+
+  dropdown.innerHTML=results.map(function(m){
+    const g=S.groups.find(function(x){return x.id===m.grupoId;});
+    var safeName=fullName(m).replace(/'/g,"&#39;");
+    return '<div class="gdv-ac-item" onclick="gdvSelectFromAC(\"'+type+'\",\"'+safeName+'\")">' +
+      '<span style="font-weight:600">'+fullName(m)+'</span><br>' +
+      '<span style="font-size:11px;color:#6B7280">'+(g?g.name:'Sin grupo')+'</span>' +
+      '</div>';
+  }).join('');
+  dropdown.style.display='block';
+}
+
+function gdvSelectFromAC(type, nombre){
+  var decoded=nombre.replace(/&#39;/g,"'");
+  if(type==='other') gdvVisitsOther.push(decoded);
+  else gdvVisitsNew.push(decoded);
+  document.getElementById('gdv-vinp-'+type).value='';
+  document.getElementById('gdv-ac-'+type).style.display='none';
+  gdvRenderVisitTags();
+}
+
 function gdvAddVisit(type){
-  const inp=document.getElementById(`gdv-vinp-${type}`);
-  const v=inp.value.trim();if(!v)return;
-  if(type==='other')gdvVisitsOther.push(v);else gdvVisitsNew.push(v);
-  inp.value='';gdvRenderVisitTags();
+  // Legacy - now handled by autocomplete
+  const inp=document.getElementById('gdv-vinp-'+type);
+  if(inp) inp.value='';
+}
+
+function gdvAbrirFormNuevoContacto(){
+  // Open simplified new contact form (no roles, no seguimiento)
+  const overlay=document.getElementById('gdv-nc-overlay');
+  if(overlay){
+    ['gdv-nc-nombre','gdv-nc-apellido','gdv-nc-cel','gdv-nc-barrio','gdv-nc-motivo'].forEach(function(id){
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    const edad=document.getElementById('gdv-nc-edad'); if(edad) edad.value='';
+    const como=document.getElementById('gdv-nc-como'); if(como) como.value='';
+    overlay.style.display='flex';
+  }
+}
+
+async function gdvGuardarNuevoContacto(){
+  const nombre=document.getElementById('gdv-nc-nombre').value.trim();
+  const apellido=document.getElementById('gdv-nc-apellido').value.trim();
+  const cel=document.getElementById('gdv-nc-cel').value.trim();
+  const edad=document.getElementById('gdv-nc-edad').value.trim();
+  const barrio=document.getElementById('gdv-nc-barrio').value.trim();
+  const como=document.getElementById('gdv-nc-como').value;
+  const motivo=document.getElementById('gdv-nc-motivo').value.trim();
+  const err=document.getElementById('gdv-nc-error');
+
+  if(!nombre||!apellido||!cel){
+    if(err){err.textContent='Nombre, Apellido y Celular son obligatorios';err.style.display='block';}
+    return;
+  }
+  if(err) err.style.display='none';
+
+  const nuevo={
+    id:Date.now(), nombre, apellido,
+    tel:cel, genero:'', grupoId:null,
+    condicion:'Nuevo', estado:'Activo',
+    dir:barrio, fnac:'', roles:[],
+    edadDeclarada:edad, comoNosConocio:como,
+    motivoContacto:motivo,
+    fechaRegistro:new Date().toLocaleDateString('es-AR'),
+    origen:'Carga por Facilitador'
+  };
+  S.members.push(nuevo);
+  await saveK(SK.members, S.members);
+
+  // Add to visitsNew list
+  const nombreCompleto=nombre+' '+apellido;
+  gdvVisitsNew.push(nombreCompleto);
+  gdvRenderVisitTags();
+
+  // Close modal
+  document.getElementById('gdv-nc-overlay').style.display='none';
+  showToast('✅ '+nombreCompleto+' registrado como Nuevo Contacto','#16A34A');
 }
 function gdvRemoveVisit(type,i){if(type==='other')gdvVisitsOther.splice(i,1);else gdvVisitsNew.splice(i,1);gdvRenderVisitTags();}
 function gdvRenderVisitTags(){
@@ -1703,6 +2210,29 @@ async function gdvSaveRecord(){
   const minStr=minDate.toISOString().split('T')[0];
   if(fecha>hoyStr){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+hoyStr+').');return;}
   if(fecha<minStr){alert('No podés cargar fechas de más de 14 días atrás. La fecha mínima es '+minStr+'.');return;}
+
+  // ── Control de duplicados por semana ──
+  const semanaFecha=getISOWeek(fecha);
+  const anioFecha=new Date(fecha).getFullYear();
+  const yaExiste=S.records.find(function(r){
+    if(r.grupoId!==gid) return false;
+    const sem=getISOWeek(r.fecha);
+    const anio=new Date(r.fecha).getFullYear();
+    return sem===semanaFecha && anio===anioFecha;
+  });
+  if(yaExiste){
+    if(!isGdVAdmin()){
+      // Facilitador: bloquear completamente
+      alert('Ya existe un registro para la Semana '+semanaFecha+'. Contacta al Admin GdV para corregirlo.');
+      return;
+    } else {
+      // Admin GdV / Super Admin: advertir pero permitir
+      if(!confirm('Ya existe un registro para la Semana '+semanaFecha+'. Como Admin podés cargar igual para corregir errores?')){
+        return;
+      }
+    }
+  }
+
   if(!sinEncuentro&&!Object.keys(gdvFacAtt).length){alert('El grupo no tiene miembros cargados');return;}
   const rec={id:Date.now(),grupoId:g.id,grupoName:g.name,groupType:g.type,
     facId:currentUser.id,facName:currentUser.name,fecha,
@@ -1713,6 +2243,20 @@ async function gdvSaveRecord(){
     ts:new Date().toISOString()};
   S.records.push(rec);
   await saveK(SK.records,S.records);
+
+  // ── Auto-assign group to "Nuevos" so they appear in next encounter ──
+  var membersUpdated=false;
+  gdvVisitsNew.forEach(function(nombre){
+    var m=S.members.find(function(x){
+      return fullName(x).toLowerCase()===nombre.toLowerCase();
+    });
+    if(m&&!m.grupoId){
+      m.grupoId=gid; // Assign to this group
+      membersUpdated=true;
+    }
+  });
+  if(membersUpdated) await saveK(SK.members,S.members);
+
   const al=document.getElementById('gdv-fac-alert');
   al.textContent=sinEncuentro
     ?`⏸ Encuentro del ${fmt(fecha)} registrado como Sin encuentro.`
@@ -1777,11 +2321,20 @@ function gdvToggleGruposPicker(event){
   if(p) p.style.display=p.style.display==='none'?'block':'none';
 }
 document.addEventListener('click', function(e){
+  // Close group picker
   const wrap=document.getElementById('gdv-fil-grupos-wrap');
   const picker=document.getElementById('gdv-grupos-picker');
   if(wrap&&picker&&!wrap.contains(e.target)){
     picker.style.display='none';
   }
+  // Close autocomplete dropdowns
+  ['other','new'].forEach(function(type){
+    const inp=document.getElementById('gdv-vinp-'+type);
+    const dd=document.getElementById('gdv-ac-'+type);
+    if(dd&&inp&&!inp.contains(e.target)&&!dd.contains(e.target)){
+      dd.style.display='none';
+    }
+  });
 });
 
 function gdvToggleAllGrupos(checked){
@@ -1844,28 +2397,78 @@ function gdvGetFilteredRecords(){
 function gdvRenderDashboard(){
   gdvInitFilters();
   const recs=gdvGetFilteredRecords();
-  let totH=0,totM=0,totVis=0,totNew=0;
+
+  // ── Gender resolver: use group type as fallback for unknown gender ──
+  function resolveGenero(v, grupoId){
+    if(v.genero==='H'||v.genero==='M') return v.genero;
+    const g=S.groups.find(x=>x.id===grupoId);
+    if(!g) return '';
+    if(g.type==='Hombres') return 'H';
+    if(g.type==='Mujeres') return 'M';
+    return '';
+  }
+
+  let totH=0,totM=0,totVis=0,totNewH=0,totNewM=0;
   recs.forEach(r=>{
+    const g=S.groups.find(x=>x.id===r.grupoId);
     Object.values(r.asistencia).forEach(v=>{
       if(v.state!=='presente') return;
-      if(gdvFilSexo&&v.genero!==gdvFilSexo) return;
-      if(v.genero==='H') totH++; else totM++;
+      const gen=resolveGenero(v, r.grupoId);
+      if(gdvFilSexo&&gen!==gdvFilSexo) return;
+      if(gen==='H') totH++; else if(gen==='M') totM++;
     });
     totVis+=(r.visitsOther||[]).length;
-    totNew+=(r.visitsNew||[]).length;
+    // Split new persons by group type
+    const gType=g?g.type:'';
+    const newList=r.visitsNew||[];
+    newList.forEach(name=>{
+      // Try to find in members to get gender
+      const m=S.members.find(x=>fullName(x).toLowerCase()===name.toLowerCase());
+      const gen=m?resolveGenero({genero:m.genero},r.grupoId):(gType==='Hombres'?'H':gType==='Mujeres'?'M':'');
+      if(!gdvFilSexo||gen===gdvFilSexo){
+        if(gen==='H') totNewH++; else if(gen==='M') totNewM++; else totNewH++; // default to H for mixed if unknown
+      }
+    });
   });
+
   const totPres=(gdvFilSexo==='H'?totH:gdvFilSexo==='M'?totM:totH+totM);
-  const totAct=S.members.filter(m=>m.estado!=='Baja').length;
+  const totNew=totNewH+totNewM;
+
+  // ── Grupos count respecting gender filter ──
+  let gruposCount;
+  if(gdvFilGrupos){
+    gruposCount=gdvFilGrupos.size;
+  } else if(gdvFilSexo){
+    // Count groups that match the gender filter
+    gruposCount=S.groups.filter(g=>{
+      if(gdvFilSexo==='H') return g.type==='Hombres'||g.type==='Mixto';
+      if(gdvFilSexo==='M') return g.type==='Mujeres'||g.type==='Mixto';
+      return true;
+    }).length;
+  } else {
+    gruposCount=S.groups.length;
+  }
+
+  // ── Miembros activos respecting gender filter ──
+  let miembrosAct=S.members.filter(m=>{
+    if(m.estado==='Baja') return false;
+    if(!gdvFilSexo) return true;
+    const gen=resolveGenero({genero:m.genero},m.grupoId);
+    return gen===gdvFilSexo;
+  }).length;
+
   const sinEncTot=S.records.filter(r=>r.sinEncuentro&&
     (!gdvFilDesde||r.fecha>=gdvFilDesde)&&(!gdvFilHasta||r.fecha<=gdvFilHasta)&&
     (!gdvFilGrupos||gdvFilGrupos.has(r.grupoId))).length;
+
   document.getElementById('gdv-stats').innerHTML=`
-    <div class="stat"><span class="stat-val">${gdvFilGrupos?gdvFilGrupos.size:S.groups.length}</span><span class="stat-lbl">Grupos</span></div>
-    <div class="stat"><span class="stat-val">${totAct}</span><span class="stat-lbl">Miembros activos</span></div>
-    <div class="stat"><span class="stat-val" style="color:#1565C0">${totH}</span><span class="stat-lbl">Hombres pres.</span></div>
-    <div class="stat"><span class="stat-val" style="color:#C0006A">${totM}</span><span class="stat-lbl">Mujeres pres.</span></div>
+    <div class="stat"><span class="stat-val">${gruposCount}</span><span class="stat-lbl">Grupos</span></div>
+    <div class="stat"><span class="stat-val">${miembrosAct}</span><span class="stat-lbl">Miembros activos</span></div>
+    ${!gdvFilSexo||gdvFilSexo==='H'?`<div class="stat"><span class="stat-val" style="color:#1565C0">${totH}</span><span class="stat-lbl">Hombres pres.</span></div>`:''}
+    ${!gdvFilSexo||gdvFilSexo==='M'?`<div class="stat"><span class="stat-val" style="color:#C0006A">${totM}</span><span class="stat-lbl">Mujeres pres.</span></div>`:''}
     <div class="stat"><span class="stat-val" style="color:#1F4E79">${totPres}</span><span class="stat-lbl">Total presentes</span></div>
-    <div class="stat"><span class="stat-val" style="color:#16A34A">${totNew}</span><span class="stat-lbl">Personas nuevas</span></div>
+    ${!gdvFilSexo||gdvFilSexo==='H'?`<div class="stat"><span class="stat-val" style="color:#1565C0">${totNewH}</span><span class="stat-lbl">Hombres nuevos</span></div>`:''}
+    ${!gdvFilSexo||gdvFilSexo==='M'?`<div class="stat"><span class="stat-val" style="color:#C0006A">${totNewM}</span><span class="stat-lbl">Mujeres nuevas</span></div>`:''}
     ${sinEncTot?`<div class="stat"><span class="stat-val" style="color:#D97706;font-size:20px">${sinEncTot}</span><span class="stat-lbl">Sin encuentro</span></div>`:''} `;
   // Render each section independently so one failure doesn't block others
   try{gdvRenderWeeklyStatus();}catch(e){console.error('Weekly status error:',e);}
@@ -2065,25 +2668,27 @@ function gdvChangeWeek(offset){
 
 
 function gdvRenderAdmChartFiltered(recs){
-  const byDate={};
-  recs.forEach(r=>{
-    if(!byDate[r.fecha]) byDate[r.fecha]={h:0,m:0};
-    Object.values(r.asistencia||{}).forEach(v=>{
+  // Group by ISO week number
+  const byWeek={};
+  recs.forEach(function(r){
+    var semana=getISOWeek(r.fecha);
+    var anio=r.fecha.substring(0,4);
+    var key=anio+'-S'+String(semana).padStart(2,'0');
+    if(!byWeek[key]) byWeek[key]={h:0,m:0,semana:semana,anio:anio};
+    Object.values(r.asistencia||{}).forEach(function(v){
       if(!v||v.state!=='presente') return;
       if(gdvFilSexo&&v.genero!==gdvFilSexo) return;
-      if(v.genero==='H') byDate[r.fecha].h++; else byDate[r.fecha].m++;
+      if(v.genero==='H') byWeek[key].h++; else byWeek[key].m++;
     });
   });
-  const sorted=Object.keys(byDate).sort();
-  const wrap=document.getElementById('gdv-chart-adm-wrap');
+  var sorted=Object.keys(byWeek).sort();
+  var wrap=document.getElementById('gdv-chart-adm-wrap');
   if(!wrap) return;
 
-  // Destroy existing chart if any
-  const existingChart=Chart.getChart?Chart.getChart('gdv-chart-adm'):null;
+  var existingChart=Chart.getChart?Chart.getChart('gdv-chart-adm'):null;
   if(existingChart) existingChart.destroy();
   if(gdvCharts.adm){try{gdvCharts.adm.destroy();}catch(e){} gdvCharts.adm=null;}
 
-  // Always recreate canvas fresh
   wrap.innerHTML='<canvas id="gdv-chart-adm"></canvas>';
 
   if(!sorted.length){
@@ -2091,22 +2696,23 @@ function gdvRenderAdmChartFiltered(recs){
     return;
   }
 
-  const canvas=document.getElementById('gdv-chart-adm');
+  var canvas=document.getElementById('gdv-chart-adm');
   if(!canvas) return;
 
-  const datasets=[];
+  var labels=sorted.map(function(k){ return 'Semana '+byWeek[k].semana; });
+  var datasets=[];
   if(!gdvFilSexo||gdvFilSexo==='H') datasets.push({
-    label:'Hombres',data:sorted.map(d=>byDate[d].h),
-    borderColor:'#1565C0',backgroundColor:'rgba(21,101,192,0.1)',tension:0.3,fill:true,pointRadius:4
+    label:'Hombres',data:sorted.map(function(k){return byWeek[k].h;}),
+    borderColor:'#1565C0',backgroundColor:'rgba(21,101,192,0.1)',tension:0.3,fill:true,pointRadius:5
   });
   if(!gdvFilSexo||gdvFilSexo==='M') datasets.push({
-    label:'Mujeres',data:sorted.map(d=>byDate[d].m),
-    borderColor:'#C0006A',backgroundColor:'rgba(192,0,106,0.1)',tension:0.3,fill:true,pointRadius:4
+    label:'Mujeres',data:sorted.map(function(k){return byWeek[k].m;}),
+    borderColor:'#C0006A',backgroundColor:'rgba(192,0,106,0.1)',tension:0.3,fill:true,pointRadius:5
   });
 
   gdvCharts.adm=new Chart(canvas,{
     type:'line',
-    data:{labels:sorted.map(fmt),datasets},
+    data:{labels:labels,datasets:datasets},
     options:{
       responsive:true,
       maintainAspectRatio:false,
@@ -2519,8 +3125,7 @@ function openOF(){
   document.getElementById('screen-app').classList.add('show');
   document.getElementById('app-topbar-title').textContent='👨‍👩‍👧 Orientación Familiar';
   document.getElementById('app-topbar-user').textContent=currentUser.name;
-  document.getElementById('app-content').innerHTML=buildOFHTML();
-  // Reload fresh from localStorage
+  // Reload data first
   ofAlumnos     = gs('of5_alumnos','[]');
   ofPagos       = gs('of5_pagos','{}');
   ofEncuentros  = gs('of5_encuentros','{}');
@@ -2529,7 +3134,19 @@ function openOF(){
   ofObsPart     = gs('of5_obspart','{}');
   ofObsPago     = gs('of5_obspago','{}');
   ofMaterias    = gs('of5_materias','[]');
-  setTimeout(()=>ofRender(), 50);
+  ofCurrentTab  = 'alumnos';
+  // Build HTML and render
+  document.getElementById('app-content').innerHTML=buildOFHTML();
+  ofRender();
+  // Hide pagos tab for non-super-admin
+  if(!isSuperAdmin()){
+    var pagosBtn=document.getElementById('oftab-pagos');
+    if(pagosBtn) pagosBtn.style.display='none';
+    var pagosSec=document.getElementById('of-sec-pagos');
+    if(pagosSec) pagosSec.style.display='none';
+  }
+  // Force alumnos tab explicitly after render
+  ofSwitchTab('alumnos', document.getElementById('oftab-alumnos'));
 }
 
 function buildOFHTML(){
@@ -2546,7 +3163,7 @@ function buildOFHTML(){
       <button class="of-tab active" id="oftab-alumnos"    onclick="ofSwitchTab('alumnos',this)">👥 Alumnos</button>
       <button class="of-tab"        id="oftab-materias"   onclick="ofSwitchTab('materias',this)">📚 Materias</button>
       <button class="of-tab"        id="oftab-participacion" onclick="ofSwitchTab('participacion',this)">🔄 Participación</button>
-      <button class="of-tab"        id="oftab-pagos"      onclick="ofSwitchTab('pagos',this)">💰 Pagos</button>
+      <button class="of-tab" id="oftab-pagos" onclick="ofSwitchTab('pagos',this)">💰 Pagos</button>
       <button class="of-tab"        id="oftab-asistencia" onclick="ofSwitchTab('asistencia',this)">✅ Asistencia</button>
     </div>
 
@@ -2619,9 +3236,7 @@ function buildOFHTML(){
 
     <!-- PARTICIPACIÓN -->
     <div class="of-section" id="of-sec-participacion">
-      <div class="of-info-box">ℹ Activá o desactivá la participación mes a mes. Los alumnos <strong>inactivos</strong> no generan pago ni asistencia ese mes.</div>
-      <div class="month-pills" id="of-pillsPart"></div>
-      <div id="of-part-lista"></div>
+      <div id="of-dashboard-wrap"></div>
     </div>
 
     <!-- PAGOS -->
@@ -2638,11 +3253,20 @@ function buildOFHTML(){
 
     <!-- ASISTENCIA -->
     <div class="of-section" id="of-sec-asistencia">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-        <div class="month-pills" id="of-pillsAsist" style="margin-bottom:0"></div>
-        <button class="btn-of btn-of-sm btn-of-primary" onclick="ofAbrirModalEnc()">+ Nuevo encuentro</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+        <span style="font-size:14px;font-weight:600;color:#1F4E79">Encuentros y Asistencia</span>
+        <button class="btn btn-primary btn-sm" onclick="ofAbrirModalEnc()">+ Nuevo encuentro</button>
       </div>
-      <div id="of-enc-lista-mes" style="margin-bottom:1rem"></div>
+      <!-- Filtros estilo GdV -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+        <select id="of-asist-materia-fil" onchange="ofRenderAsistencia()" style="flex:1;min-width:150px">
+          <option value="">Todas las materias</option>
+        </select>
+        <input type="date" id="of-asist-fecha-fil" onchange="ofRenderAsistencia()" style="flex:1;min-width:130px">
+        <button class="btn btn-sm" onclick="ofClearAsistFil()">↺ Limpiar</button>
+      </div>
+      <div id="of-enc-lista-mes" style="margin-bottom:.5rem"></div>
+      <div id="of-asist-tabla"></div>
       <div class="of-card" style="padding:0.75rem 1.25rem">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
           <span class="of-card-title" id="of-asist-title">Asistencia</span>
@@ -2761,15 +3385,15 @@ function ofSwitchTab(t,btn){
 
 function ofRender(){
   const sub=document.getElementById('of-sub');
-  if(sub) sub.textContent=`Panel de administración — ${ANO}`;
-  ofPopulateSelectors();
-  ofRenderStats();
-  ofRenderPills();
-  ofRenderAlumnos();
-  ofRenderMaterias();
-  ofRenderParticipacion();
-  ofRenderPagos();
-  ofRenderAsistencia();
+  if(sub) sub.textContent='Panel de administración — '+ANO;
+  try{ofPopulateSelectors();}catch(e){console.error('ofPopulateSelectors',e);}
+  try{ofRenderStats();}catch(e){console.error('ofRenderStats',e);}
+  try{ofRenderPills();}catch(e){console.error('ofRenderPills',e);}
+  try{ofRenderAlumnos();}catch(e){console.error('ofRenderAlumnos',e);}
+  try{ofRenderMaterias();}catch(e){console.error('ofRenderMaterias',e);}
+  try{ofRenderParticipacion();}catch(e){console.error('ofRenderParticipacion',e);}
+  try{ofRenderPagos();}catch(e){console.error('ofRenderPagos',e);}
+  try{ofRenderAsistencia();}catch(e){console.error('ofRenderAsistencia',e);}
 }
 
 function ofPopulateSelectors(){
@@ -2877,6 +3501,7 @@ function ofOpenNewMateria(){
   document.getElementById('of-mf-hasta').value='';
   ofPopulateSelectors();
   document.getElementById('of-mf-profesor').value='';
+  ofPopulateMatAlumnos([]);
   document.getElementById('of-materia-form').style.display='block';
 }
 
@@ -2892,7 +3517,28 @@ function ofEditMateria(id){
   document.getElementById('of-mf-hasta').value=mat.hasta||'';
   ofPopulateSelectors();
   document.getElementById('of-mf-profesor').value=mat.profesor||'';
+  ofPopulateMatAlumnos(mat.alumnos||[]);
   document.getElementById('of-materia-form').style.display='block';
+}
+
+function ofPopulateMatAlumnos(selected){
+  const wrap=document.getElementById('of-mat-alum-list');
+  if(!wrap) return;
+  wrap.innerHTML=ofAlumnos.map(a=>{
+    const checked=selected.includes(a.id);
+    return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB">
+      <input type="checkbox" class="of-mat-alum-cb" value="${a.id}" ${checked?'checked':''}
+        style="width:15px;height:15px;flex-shrink:0;cursor:pointer">
+      <span style="font-size:13px;font-weight:500">${a.nombre} ${a.apellido}</span>
+    </label>`;
+  }).join('');
+}
+
+function ofFilterMatAlumnos(q){
+  const qL=q.toLowerCase();
+  document.querySelectorAll('#of-mat-alum-list label').forEach(lbl=>{
+    lbl.style.display=lbl.textContent.toLowerCase().includes(qL)?'':'none';
+  });
 }
 
 function ofSaveMateria(){
@@ -2900,16 +3546,25 @@ function ofSaveMateria(){
   if(!nombre){alert('Ingresá el nombre de la materia');return;}
   const capitulos=document.getElementById('of-mf-temario').value
     .split('\n').map(t=>t.trim()).filter(Boolean);
+  // Get alumnos selections
+  const alumSels=[...document.querySelectorAll('.of-mat-alum-cb:checked')].map(cb=>parseInt(cb.value));
   const data={
     nombre,
     estado:document.getElementById('of-mf-estado').value,
     profesor:document.getElementById('of-mf-profesor').value,
     desde:document.getElementById('of-mf-desde').value,
     hasta:document.getElementById('of-mf-hasta').value,
-    capitulos
+    capitulos,
+    alumnos:alumSels
   };
-  if(ofEditMatId) Object.assign(ofMaterias.find(x=>x.id===ofEditMatId),data);
-  else ofMaterias.push({id:Date.now(),...data});
+  if(ofEditMatId){
+    const mat=ofMaterias.find(x=>x.id===ofEditMatId);
+    // Preserve completados when editing
+    data.completados=mat.completados||{};
+    Object.assign(mat,data);
+  } else {
+    ofMaterias.push({id:Date.now(),...data,completados:{}});
+  }
   ofSave(); ofCloseMateria(); ofRenderMaterias();
 }
 
@@ -2946,33 +3601,34 @@ function ofRenderMaterias(){
   }
   wrap.innerHTML=ofMaterias.map(mat=>{
     const isActivo=mat.estado==='Activo';
-    const encCount=Object.keys(ofEncuentros).reduce((s,k)=>{
-      return s+(ofEncuentros[k]||[]).filter(e=>e.materiaId===mat.id).length;
-    },0);
-    return `<div class="panel-alumno" style="margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <div style="flex:1">
-          <div style="font-weight:600;font-size:14px;color:#1F2937">${mat.nombre}</div>
-          <div style="font-size:12px;color:#666;margin-top:3px">
-            👨‍🏫 ${ofProfesorNombre(mat.profesor)}
-            ${mat.desde?` · Desde: ${ofFmtDate(mat.desde)}`:''}
-            ${mat.hasta?` · Hasta: ${ofFmtDate(mat.hasta)}`:''}
-            · ${encCount} encuentro${encCount!==1?'s':''}
+    const alums=(mat.alumnos||[]).length;
+    const encCount=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]).filter(e=>String(e.materia||e.materiaId)===String(mat.id)).length;
+    const completados=Object.values(mat.completados||{}).filter(Boolean).length;
+    const caps=(mat.capitulos||[]).length;
+    const borderColor=isActivo?'#7C3AED':'#9CA3AF';
+    return `<div class="card" style="margin-bottom:.75rem;border-left:4px solid ${borderColor}">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between">
+        <div>
+          <div style="font-weight:700;font-size:14px;color:#1F2937">${mat.nombre}</div>
+          <div style="font-size:12px;color:#6B7280;margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
+            ${mat.profesor?`<span>👤 ${mat.profesor}</span>`:''}
+            ${mat.desde?`<span>📅 ${fmt(mat.desde)}${mat.hasta?' → '+fmt(mat.hasta):''}</span>`:''}
+            <span>📚 ${caps} cap.</span>
+            <span>👥 ${alums} alumno${alums!==1?'s':''}</span>
+            <span>🗓 ${encCount} encuentro${encCount!==1?'s':''}</span>
+            ${alums?`<span style="color:#16A34A;font-weight:600">✅ ${completados}/${alums} completados</span>`:''}
           </div>
         </div>
-        <span style="background:${isActivo?'#dcfce7':'#F3F4F6'};color:${isActivo?'#15803d':'#6B7280'};font-size:11px;padding:3px 10px;border-radius:99px;font-weight:600">${mat.estado}</span>
-        <button class="btn-of btn-of-sm" onclick="ofEditMateria(${mat.id})">✏️ Editar</button>
-        <button class="btn-of btn-of-sm btn-of-danger" onclick="ofDeleteMateria(${mat.id})">🗑</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="badge ${isActivo?'b-ok':'b-muted'}">${isActivo?'Activo':'Inactivo'}</span>
+          <button class="btn-of btn-of-sm" onclick="ofEditMateria(${mat.id})">✏️ Editar</button>
+          <button class="btn-of btn-of-sm btn-of-danger" onclick="ofDeleteMateria(${mat.id})">🗑</button>
+        </div>
       </div>
-      ${(mat.capitulos||[]).length?`
-        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
-          ${mat.capitulos.map(c=>`<span class="tema-tag">${c}</span>`).join('')}
-        </div>`:''}
+      ${caps?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${(mat.capitulos||[]).map((c,i)=>`<span style="background:#F3E8FF;color:#6D28D9;font-size:11px;padding:1px 8px;border-radius:4px">${c}</span>`).join('')}</div>`:''}
     </div>`;
   }).join('');
 }
-
-// ── ESTADÍSTICAS ───────────────────────────────────────────
 function ofRenderStats(){
   const el=document.getElementById('of-statsGrid');
   if(!el) return;
@@ -2998,7 +3654,8 @@ function ofRenderStats(){
 
 // ── PILLS ──────────────────────────────────────────────────
 function ofRenderPills(){
-  [['of-pillsPart',ofMesPart,'ofSelPart'],['of-pillsPago',ofMesPago,'ofSelPago'],['of-pillsAsist',ofMesAsist,'ofSelAsist']].forEach(([id,mes,fn])=>{
+  // Only Pagos still uses month pills
+  [['of-pillsPago',ofMesPago,'ofSelPago']].forEach(([id,mes,fn])=>{
     const el=document.getElementById(id);if(!el)return;
     el.innerHTML=MESES.map((m,i)=>`<button class="mpill${mes===i?' sel':''}" onclick="${fn}(${i})">${m.slice(0,3)}</button>`).join('');
   });
@@ -3026,38 +3683,82 @@ function ofTogglePart(aid,mes,val){
   ofRenderParticipacion();ofRenderPagos();ofRenderAsistencia();ofRenderStats();
 }
 function ofRenderParticipacion(){
-  const el=document.getElementById('of-part-lista');if(!el)return;
-  if(!ofAlumnos.length){el.innerHTML='<div style="text-align:center;padding:2rem;color:#666">No hay alumnos</div>';return;}
-  el.innerHTML=ofAlumnos.map(a=>{
-    const act=ofIsActivo(a.id,ofMesPart);
-    const obs=ofObsPart[`${a.id}_${ofMesPart}`]||'';
-    const hist=MESES.map((m,i)=>{
-      const a2=ofIsActivo(a.id,i);
-      return `<div class="hist-mes ${a2?'activo':'inactivo'}" title="${m}"><span>${m.slice(0,3)}</span>${a2?'✓':'—'}</div>`;
-    }).join('');
-    const tipoBadge=a.tipo==='miembro'
-      ?'<span style="background:#EEEDFE;color:#3C3489;font-size:10px;padding:1px 6px;border-radius:4px">Miembro</span>'
-      :'<span style="background:#FEF3C7;color:#92400E;font-size:10px;padding:1px 6px;border-radius:4px">Externo</span>';
-    return `<div class="panel-alumno">
-      <div class="panel-alumno-header">
-        <div class="of-avatar${act?'':' inact'}" style="flex-shrink:0">${ofIni(a.nombre,a.apellido)}</div>
-        <div class="panel-alumno-name">${a.nombre} ${a.apellido} ${tipoBadge}</div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span class="of-badge ${act?'of-b-activo':'of-b-inactivo'}">${act?'Activo':'Inactivo'}</span>
-          <div class="toggle-part">
-            <button class="${act?'on-act':''}" onclick="ofTogglePart(${a.id},${ofMesPart},true)">✓ Activo</button>
-            <button class="${!act?'on-inact':''}" onclick="ofTogglePart(${a.id},${ofMesPart},false)">— Inactivo</button>
-          </div>
-          <button class="btn-of btn-of-sm" onclick="ofAbrirModalObs(${a.id},${ofMesPart})" title="Observación">💬${obs?'<span style="color:#3C3489">●</span>':''}</button>
-        </div>
-      </div>
-      ${obs?`<div class="obs-nota">💬 ${obs}</div>`:''}
-      <div class="hist-row">${hist}</div>
-    </div>`;
-  }).join('');
-}
+  const wrap=document.getElementById('of-dashboard-wrap');
+  if(!wrap) return;
 
-// ── PAGOS ──────────────────────────────────────────────────
+  const materias=ofMateriasActivas();
+  // Get all encounters
+  const allEncs=[];
+  Object.keys(ofEncuentros).forEach(function(k){
+    (ofEncuentros[k]||[]).forEach(function(e){ allEncs.push(e); });
+  });
+
+  if(!ofAlumnos.length){
+    wrap.innerHTML='<div style="text-align:center;padding:2rem;color:#9CA3AF">No hay alumnos inscriptos</div>';
+    return;
+  }
+
+  var html='';
+
+  // ── KPIs ──
+  var totalAlumnos=ofAlumnos.length;
+  var totalEncs=allEncs.length;
+  var materiasActivas=materias.length;
+  // Overall attendance %
+  var totalP=0, totalReg=0;
+  ofAlumnos.forEach(function(a){
+    allEncs.forEach(function(e){
+      var v=ofAsistencia[a.id+'_'+e.id]||'';
+      if(v) totalReg++;
+      if(v==='P') totalP++;
+    });
+  });
+  var pctGeneral=totalReg>0?Math.round(totalP/totalReg*100):0;
+
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:1.25rem">';
+  html+='<div class="stat"><span class="stat-val">'+totalAlumnos+'</span><span class="stat-lbl">Alumnos</span></div>';
+  html+='<div class="stat"><span class="stat-val">'+materiasActivas+'</span><span class="stat-lbl">Materias activas</span></div>';
+  html+='<div class="stat"><span class="stat-val">'+totalEncs+'</span><span class="stat-lbl">Encuentros</span></div>';
+  html+='<div class="stat"><span class="stat-val" style="color:'+(pctGeneral>=75?'#16A34A':pctGeneral>=50?'#1F4E79':'#DC2626')+'">'+pctGeneral+'%</span><span class="stat-lbl">% Asistencia</span></div>';
+  html+='</div>';
+
+  // ── Por Materia ──
+  if(materias.length){
+    materias.forEach(function(mat){
+      var matEncs=allEncs.filter(function(e){return String(e.materia)===String(mat.id);});
+      if(!matEncs.length) return;
+
+      html+='<div class="card" style="margin-bottom:1rem;border-left:4px solid #7C3AED">';
+      html+='<div style="font-size:14px;font-weight:700;color:#1F4E79;margin-bottom:.75rem">📚 '+mat.nombre+' <span style="font-size:11px;font-weight:400;color:#6B7280">('+matEncs.length+' encuentros)</span></div>';
+
+      // Per-alumno stats for this materia
+      var alumStats=ofAlumnos.map(function(a){
+        var pres=matEncs.filter(function(e){return ofAsistencia[a.id+'_'+e.id]==='P';}).length;
+        var ause=matEncs.filter(function(e){return ofAsistencia[a.id+'_'+e.id]==='A';}).length;
+        var tard=matEncs.filter(function(e){return ofAsistencia[a.id+'_'+e.id]==='T';}).length;
+        var pct=matEncs.length>0?Math.round(pres/matEncs.length*100):0;
+        return {a:a,pres:pres,ause:ause,tard:tard,pct:pct};
+      }).sort(function(x,y){return y.pct-x.pct;});
+
+      alumStats.forEach(function(s){
+        var barColor=s.pct>=75?'#16A34A':s.pct>=50?'#1F4E79':s.pct>=25?'#D97706':'#DC2626';
+        html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap">';
+        html+='<span style="font-size:13px;font-weight:600;flex:1;min-width:120px">'+s.a.nombre+' '+s.a.apellido+'</span>';
+        html+='<div style="flex:2;min-width:100px">';
+        html+='<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">';
+        html+='<span style="color:#6B7280">P:'+s.pres+' A:'+s.ause+' T:'+s.tard+'</span>';
+        html+='<strong style="color:'+barColor+'">'+s.pct+'%</strong></div>';
+        html+='<div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+barColor+';width:'+s.pct+'%"></div></div>';
+        html+='</div></div>';
+      });
+      html+='</div>';
+    });
+  } else {
+    html+='<div style="text-align:center;padding:2rem;color:#9CA3AF">No hay materias activas. Agregá materias desde la tab Materias.</div>';
+  }
+
+  wrap.innerHTML=html;
+}
 function ofAbrirModalObsPago(aid,mes){
   ofObsPagoAid=aid;ofObsPagoMes=mes;
   const a=ofAlumnos.find(x=>x.id===aid);
@@ -3117,7 +3818,6 @@ function ofAbrirModalEnc(){
   const el=document.getElementById('of-me-fecha');
   if(el) el.value=ofDateInput();
   ofUpdateFechaDisplay();
-  // Populate materias activas
   const selMat=document.getElementById('of-me-materia');
   if(selMat){
     selMat.innerHTML='<option value="">— Elegir materia activa —</option>'+
@@ -3125,6 +3825,9 @@ function ofAbrirModalEnc(){
   }
   const selCap=document.getElementById('of-me-capitulo');
   if(selCap) selCap.innerHTML='<option value="">— Elegir capítulo (opcional) —</option>';
+  const exChk=document.getElementById('of-me-esexamen');
+  if(exChk) exChk.checked=false;
+  ofEditEncId=null;
   document.getElementById('of-modalEnc').style.display='flex';
 }
 
@@ -3160,10 +3863,24 @@ function ofGuardarEnc(){
   const matId=parseInt(document.getElementById('of-me-materia')?.value)||null;
   if(!matId){alert('Elegí una materia');return;}
   const capitulo=document.getElementById('of-me-capitulo')?.value||'';
+  const esExamen=document.getElementById('of-me-esexamen')?.checked||false;
   const mat=ofMaterias.find(x=>x.id===matId);
   const k=ofEncKey();
   if(!ofEncuentros[k]) ofEncuentros[k]=[];
-  ofEncuentros[k].push({id:Date.now(),fecha,materiaId:matId,materiaNombre:mat?.nombre||'',capitulo});
+  const enc={id:Date.now(),fecha,
+    materia:matId, materiaId:matId, materiaNombre:mat?.nombre||'',
+    capitulo, esExamen};
+  if(ofEditEncId){
+    const allK=Object.keys(ofEncuentros);
+    allK.forEach(key=>{
+      const idx=ofEncuentros[key].findIndex(e=>e.id===ofEditEncId);
+      if(idx>=0) ofEncuentros[key][idx]={...ofEncuentros[key][idx],...enc,id:ofEditEncId};
+    });
+    ofEditEncId=null;
+  } else {
+    if(!ofEncuentros[k]) ofEncuentros[k]=[];
+    ofEncuentros[k].push(enc);
+  }
   ofCerrarModal();ofSave();ofRenderAsistencia();ofRenderStats();
 }
 
@@ -3214,51 +3931,188 @@ function ofToggleAsist(aid,eid){
 }
 
 function ofRenderAsistencia(){
-  const encs=ofGetEncs(ofMesAsist);
-  const tit=document.getElementById('of-asist-title');
-  if(tit) tit.textContent=`Asistencia — ${MESES[ofMesAsist]} ${ANO}`;
-  const encLista=document.getElementById('of-enc-lista-mes');
-  if(encLista){
-    if(!encs.length){
-      encLista.innerHTML='<div style="font-size:13px;color:#666;padding:4px 0 8px">No hay encuentros este mes.</div>';
-    } else {
-      encLista.innerHTML=encs.map(e=>{
-        const capTag=e.capitulo?`<span class="tema-tag">${e.capitulo}</span>`:'';
-        const matTag=e.materiaNombre?`<span class="tema-tag" style="background:#EEEDFE;color:#3C3489">${e.materiaNombre}</span>`:'';
-        return `<div class="enc-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-            <span style="font-size:13px;font-weight:600">📅 ${ofFmtDate(e.fecha)}</span>
-            <div style="display:flex;gap:4px;flex-wrap:wrap">${matTag}${capTag}</div>
-            <button class="btn-of btn-of-sm" onclick="ofAbrirModalEdit(${e.id})">✏ Editar</button>
-          </div>
-        </div>`;
-      }).join('');
-    }
+  const matFil=document.getElementById('of-asist-materia-fil');
+  // Populate materia filter dynamically
+  if(matFil&&matFil.options.length<=1){
+    ofMateriasActivas().forEach(m=>{
+      const opt=document.createElement('option');
+      opt.value=m.id; opt.textContent=m.nombre;
+      matFil.appendChild(opt);
+    });
   }
-  const wl=document.getElementById('of-weekLabels');
-  if(wl) wl.innerHTML=encs.map(e=>`<div class="wlabel" title="${ofFmtDate(e.fecha)}">${ofFmtDate(e.fecha).slice(0,5)}</div>`).join('');
-  const list=document.getElementById('of-asist-list');if(!list)return;
-  if(!ofAlumnos.length){list.innerHTML='<div style="text-align:center;padding:1rem;color:#666">No hay alumnos inscriptos</div>';return;}
-  if(!encs.length){list.innerHTML='<div style="padding:1rem 0;font-size:13px;color:#666">Agregá encuentros para registrar asistencia</div>';return;}
-  list.innerHTML=ofAlumnos.map(a=>{
-    const act=ofIsActivo(a.id,ofMesAsist);
-    let pCount=0;
-    const btns=encs.map(e=>{
-      if(!act)return `<button class="enc-btn disabled">—</button>`;
-      const st=ofAsistencia[`${a.id}_${e.id}`]||'';
-      if(st==='P')pCount++;
-      return `<button class="enc-btn ${st}" onclick="ofToggleAsist(${a.id},${e.id})" title="${ofFmtDate(e.fecha)}">${st||'·'}</button>`;
-    }).join('');
-    const pct=act&&encs.length>0?Math.round(pCount/encs.length*100)+'%':'—';
-    return `<div class="enc-row">
-      <div class="of-avatar${act?'':' inact'}">${ofIni(a.nombre,a.apellido)}</div>
-      <div class="enc-name">${a.nombre} ${a.apellido}${!act?'<span style="font-size:10px;color:#666;margin-left:4px">(inactivo)</span>':''}</div>
-      <div class="enc-weeks">${btns}</div>
-      <div class="asist-pct">${pct}</div>
+  const filterMat=matFil?.value||'';
+  const filterFecha=document.getElementById('of-asist-fecha-fil')?.value||'';
+
+  // Get all encounters
+  let allEncs=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]);
+  if(filterMat) allEncs=allEncs.filter(e=>String(e.materia||e.materiaId)===String(filterMat));
+  if(filterFecha) allEncs=allEncs.filter(e=>e.fecha===filterFecha);
+  allEncs.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
+  const lista=document.getElementById('of-enc-lista-mes');
+  if(!lista) return;
+
+  if(!allEncs.length){
+    lista.innerHTML='<div style="text-align:center;padding:2rem;color:#9CA3AF;font-size:13px">No hay encuentros con estos filtros</div>';
+    ofRenderAsistenciaTable(null,null);return;
+  }
+
+  lista.innerHTML=allEncs.map(e=>{
+    const mat=ofMaterias.find(m=>String(m.id)===String(e.materia||e.materiaId))||{nombre:'Sin materia',alumnos:[]};
+    const alums=mat.alumnos||[];
+    const presentes=alums.filter(aid=>ofAsistencia[`${aid}_${e.id}`]==='P').length;
+    const semana=getISOWeek(e.fecha);
+    const isExamen=e.esExamen||false;
+    return `<div class="card" style="margin-bottom:.5rem;padding:10px 14px;cursor:pointer;border-left:4px solid ${isExamen?'#DC2626':'#7C3AED'}"
+        onclick="ofSelectEnc('${e.id}','${mat.id}')">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:#1F4E79">
+            ${isExamen?'📝 EXAMEN — ':''}${mat.nombre}
+          </div>
+          <div style="font-size:12px;color:#6B7280;margin-top:2px">
+            ${fmt(e.fecha)} · Semana ${semana}${e.capitulo?' · '+e.capitulo:''}
+          </div>
+        </div>
+        <span class="badge b-ok">${presentes}/${alums.length} presentes</span>
+      </div>
     </div>`;
   }).join('');
+
+  if(allEncs.length){
+    const e=allEncs[0];
+    const mat=ofMaterias.find(m=>String(m.id)===String(e.materia||e.materiaId));
+    ofSelectEnc(e.id, mat?.id);
+  }
 }
 
+function ofClearAsistFil(){
+  const mf=document.getElementById('of-asist-materia-fil');
+  const ff=document.getElementById('of-asist-fecha-fil');
+  if(mf){mf.innerHTML='<option value="">Todas las materias</option>';mf.value='';}
+  if(ff) ff.value='';
+  ofRenderAsistencia();
+}
+
+function ofSelectEnc(encId, matId){
+  ofRenderAsistenciaTable(encId, matId);
+}
+
+function ofRenderAsistenciaTable(encId, matId){
+  const wrap=document.getElementById('of-asist-tabla');
+  if(!wrap) return;
+  if(!encId){wrap.innerHTML='';return;}
+
+  const mat=matId?ofMaterias.find(m=>String(m.id)===String(matId)):null;
+  const alums=mat?(mat.alumnos||[]).map(id=>ofAlumnos.find(a=>a.id===id)).filter(Boolean):ofAlumnos;
+  const allEncs=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]);
+  const enc=allEncs.find(e=>String(e.id)===String(encId));
+  if(!enc){wrap.innerHTML='';return;}
+
+  const isExamen=enc.esExamen||false;
+
+  let html=`<div class="card" style="margin-top:.75rem;border-left:4px solid ${isExamen?'#DC2626':'#7C3AED'}">
+    <div style="font-size:13px;font-weight:700;color:#1F4E79;margin-bottom:1rem">
+      ${isExamen?'📝 Examen — marcar Completado/Incompleto':'✅ Asistencia del encuentro'}
+    </div>`;
+
+  if(!alums.length){
+    html+='<div style="color:#9CA3AF;font-size:13px">No hay alumnos asignados a esta materia. Editá la materia para asignarlos.</div>';
+  } else {
+    alums.forEach(a=>{
+      if(isExamen){
+        // For exam: show Completado / Incompleto toggle
+        const comp=(mat?.completados||{})[a.id]||false;
+        html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6">
+          <span style="font-size:13px;font-weight:500">${a.nombre} ${a.apellido}</span>
+          <button onclick="ofToggleCompletado('${matId}','${a.id}')"
+            style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;
+            background:${comp?'#D1FAE5':'#F3F4F6'};color:${comp?'#065F46':'#6B7280'}">
+            ${comp?'✅ Completado':'⬜ Incompleto'}
+          </button>
+        </div>`;
+      } else {
+        const v=ofAsistencia[`${a.id}_${enc.id}`]||'';
+        const colors={P:'#D1FAE5',A:'#FEE2E2',T:'#FEF3C7','':'#F3F4F6'};
+        const tColors={P:'#065F46',A:'#991B1B',T:'#92400E','':'#6B7280'};
+        const labels={P:'Presente',A:'Ausente',T:'Tardanza','':'Sin marcar'};
+        html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6">
+          <span style="font-size:13px;font-weight:500">${a.nombre} ${a.apellido}</span>
+          <button onclick="ofToggleAsist('${a.id}','${enc.id}')"
+            style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;
+            background:${colors[v]};color:${tColors[v]}">
+            ${labels[v]}
+          </button>
+        </div>`;
+      }
+    });
+  }
+  html+='</div>';
+  wrap.innerHTML=html;
+}
+
+function ofToggleCompletado(matId, alumId){
+  const mat=ofMaterias.find(m=>String(m.id)===String(matId));
+  if(!mat) return;
+  if(!mat.completados) mat.completados={};
+  mat.completados[alumId]=!mat.completados[alumId];
+  ofSave();
+  // Re-render table
+  const allEncs=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]);
+  const examEnc=allEncs.find(e=>e.esExamen&&String(e.materia||e.materiaId)===String(matId));
+  if(examEnc) ofRenderAsistenciaTable(examEnc.id, matId);
+  showToast(mat.completados[alumId]?'✅ Completado':'⬜ Incompleto', mat.completados[alumId]?'#16A34A':'#6B7280');
+}
+function ofClearAsistFil(){
+  var mf=document.getElementById('of-asist-materia-fil');
+  var ff=document.getElementById('of-asist-fecha-fil');
+  if(mf) mf.value='';
+  if(ff) ff.value='';
+  ofRenderAsistencia();
+}
+
+function ofSelectEnc(encId){
+  // Highlight selected encounter
+  document.querySelectorAll('#of-enc-lista-mes .card').forEach(function(c){
+    c.style.background=c.onclick&&c.onclick.toString().includes(encId)?'#EFF6FF':'';
+  });
+  ofRenderAsistenciaTable(encId);
+}
+
+function ofRenderAsistenciaTable(encId){
+  const asistWrap=document.getElementById('of-asist-tabla');
+  if(!asistWrap) return;
+  if(!encId){asistWrap.innerHTML='';return;}
+
+  var allEncs=[];
+  Object.keys(ofEncuentros).forEach(function(k){
+    (ofEncuentros[k]||[]).forEach(function(e){ allEncs.push(e); });
+  });
+  var enc=allEncs.find(function(e){return String(e.id)===String(encId);});
+  if(!enc){asistWrap.innerHTML='';return;}
+
+  var html='<div class="card" style="margin-top:.75rem">'
+    +'<div style="font-size:13px;font-weight:600;color:#1F4E79;margin-bottom:1rem">✅ Asistencia del encuentro</div>';
+
+  if(!ofAlumnos.length){
+    html+='<div style="color:#9CA3AF;font-size:13px">No hay alumnos inscriptos</div>';
+  } else {
+    ofAlumnos.forEach(function(a){
+      var v=ofAsistencia[a.id+'_'+enc.id]||'';
+      var colors={P:'#D1FAE5',A:'#FEE2E2',T:'#FEF3C7','':'#F3F4F6'};
+      var textColors={P:'#065F46',A:'#991B1B',T:'#92400E','':'#6B7280'};
+      var labels={P:'Presente',A:'Ausente',T:'Tardanza','':'Sin marcar'};
+      html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6">'
+        +'<span style="font-size:13px;font-weight:500">'+a.nombre+' '+a.apellido+'</span>'
+        +'<button onclick="ofToggleAsist(\"'+a.id+'\",\"'+enc.id+'\")" '
+        +'style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:'+colors[v]+';color:'+textColors[v]+'">'
+        +labels[v]+'</button>'
+        +'</div>';
+    });
+  }
+  html+='</div>';
+  asistWrap.innerHTML=html;
+}
 function ofExportar(){
   alert(`Datos actuales:\n• Alumnos: ${ofAlumnos.length}\n• Materias: ${ofMaterias.length}\n\nUsá el botón 💾 Exportar del inicio para guardar todos los datos.`);
 }
@@ -3433,7 +4287,13 @@ function renderNuevos(){
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
   if(fGen)   members=members.filter(m=>m.genero===fGen);
 
-  // Show "Sin grupo" label in list
+  // Sort: unassigned seguimiento first, then by registration date
+  members.sort(function(a,b){
+    var aHas=a.seguimientoId?1:0;
+    var bHas=b.seguimientoId?1:0;
+    return aHas-bHas; // 0 (sin asignar) primero
+  });
+
   const countEl=document.getElementById('nv-count');
   if(countEl) countEl.textContent=S.members.filter(m=>m.condicion==='Nuevo'&&m.estado!=='Baja').length;
 
@@ -3554,13 +4414,19 @@ async function nvDarDeBaja(){
   if(!nvSelectedId) return;
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
-  if(!confirm(`¿Dar de baja a ${fullName(m)}? Quedará registrado con fecha de baja.`)) return;
+  var motivo=prompt('Motivo de baja para '+fullName(m)+' (mínimo 10 caracteres):','');
+  if(motivo===null) return;
+  if(!motivo||motivo.trim().length<10){
+    alert('El motivo de baja es obligatorio y debe tener al menos 10 caracteres.');
+    return;
+  }
   m.estado='Baja';
   m.fechaBaja=new Date().toISOString().split('T')[0];
+  m.motivoBaja=motivo.trim();
   await saveK(SK.members,S.members);
   nvClosePromote();
   renderNuevos();
-  showToast(`${fullName(m)} dado/a de baja`, '#DC2626');
+  showToast(fullName(m)+' dado/a de baja','#DC2626');
 }
 
 function nvAgregarNuevo(){
@@ -3656,6 +4522,196 @@ async function nvSaveInlineForm(){
 }
 
 // ════════════════════════════════════════════════════════════
+// PERMISOS (Configuración)
+// ════════════════════════════════════════════════════════════
+var cfgPermRolSeleccionado=null;
+
+function cfgRenderPermisosTabla(){
+  var wrap=document.getElementById('cfg-permisos-wrap');
+  if(!wrap) return;
+  var rolesToShow=S.roles.filter(function(r){return r.id!=='super_admin';});
+
+  // Step 1: Role selector chips
+  var html='<div style="margin-bottom:1.25rem">';
+  html+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">1. Seleccioná un rol para configurar sus permisos:</div>';
+  html+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+  rolesToShow.forEach(function(r){
+    var isSelected=cfgPermRolSeleccionado===r.id;
+    html+='<button onclick="cfgSelectPermRol(\'' + r.id + '\')" '
+      +'style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;border:2px solid '+(isSelected?r.color:'#E5E7EB')+';background:'+(isSelected?r.color+'18':'#fff')+';cursor:pointer;font-size:13px;font-weight:'+(isSelected?'700':'400')+';color:'+(isSelected?r.color:'#374151')+'">'
+      +'<span style="width:10px;height:10px;border-radius:50%;background:'+r.color+';display:inline-block"></span>'
+      +r.name+'</button>';
+  });
+  html+='</div></div>';
+
+  // Step 2+3+4: Show modules and screens for selected role
+  if(cfgPermRolSeleccionado){
+    var role=S.roles.find(function(r){return r.id===cfgPermRolSeleccionado;});
+    html+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">'
+      +'2. Configurá los permisos para <span style="color:'+role.color+'">'+role.name+'</span>:</div>';
+
+    MODULES_PERM.forEach(function(mod){
+      html+='<div style="border:1px solid #E5E7EB;border-radius:12px;margin-bottom:10px;overflow:hidden">';
+      // Module header
+      html+='<div style="background:#F9FAFB;padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #E5E7EB">';
+      html+='<span style="font-size:1.2rem">'+mod.icon+'</span>';
+      html+='<span style="font-size:14px;font-weight:600;color:#1F2937">'+mod.label+'</span>';
+      html+='</div>';
+      // Screens
+      mod.screens.forEach(function(screen,si){
+        var cur=(PERMISOS[cfgPermRolSeleccionado]||{})[screen.key]||'ninguno';
+        var isLast=si===mod.screens.length-1;
+        html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;'+(isLast?'':'border-bottom:1px solid #F3F4F6')+';flex-wrap:wrap;gap:8px">';
+        html+='<span style="font-size:13px;color:#374151">'+screen.label+'</span>';
+        html+='<div style="display:flex;gap:6px">';
+        [{val:'ninguno',label:'— Sin acceso',bg:'#F3F4F6',active:'#6B7280'},
+         {val:'consulta',label:'👁 Ver',bg:'#EFF6FF',active:'#1E40AF'},
+         {val:'ejecuta', label:'✅ Ejecuta',bg:'#F0FDF4',active:'#166534'}
+        ].forEach(function(opt){
+          var isActive=cur===opt.val;
+          html+='<button onclick="cfgSetPermAndRefresh(\'' + cfgPermRolSeleccionado + '\',\'' + screen.key + '\',\'' + opt.val + '\')" '
+            +'style="padding:5px 12px;border-radius:6px;border:1.5px solid '+(isActive?opt.active:'#E5E7EB')+';background:'+(isActive?opt.bg:'#fff')+';color:'+(isActive?opt.active:'#9CA3AF')+';font-size:12px;font-weight:'+(isActive?'700':'400')+';cursor:pointer;white-space:nowrap">'
+            +opt.label+'</button>';
+        });
+        html+='</div></div>';
+      });
+      html+='</div>';
+    });
+
+    html+='<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">';
+    html+='<button class="btn" onclick="cfgResetPermisosRol()">↺ Resetear este rol</button>';
+    html+='<button class="btn btn-primary" onclick="cfgSavePermisos()">💾 Guardar permisos</button>';
+    html+='</div>';
+  } else {
+    html+='<div style="text-align:center;padding:2rem;color:#9CA3AF;font-size:13px">← Seleccioná un rol arriba para configurar sus permisos</div>';
+  }
+
+  wrap.innerHTML=html;
+}
+
+function cfgSelectPermRol(roleId){
+  cfgPermRolSeleccionado=roleId;
+  cfgRenderPermisosTabla();
+}
+
+function cfgSetPermAndRefresh(roleId,screen,value){
+  cfgSetPerm(roleId,screen,value);
+  cfgRenderPermisosTabla();
+}
+
+function cfgCerrarConfirmReset(){
+  var d=document.getElementById('cfg-reset-confirm');
+  if(d) d.remove();
+}
+
+function cfgResetPermisosRol(){
+  if(!cfgPermRolSeleccionado) return;
+  var existing=document.getElementById('cfg-reset-confirm');
+  if(existing) existing.remove();
+
+  var confirmDiv=document.createElement('div');
+  confirmDiv.id='cfg-reset-confirm';
+  confirmDiv.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem';
+  confirmDiv.innerHTML=
+    '<div style="background:#fff;border-radius:14px;padding:2rem;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.2);text-align:center">'
+    +'<div style="font-size:2rem;margin-bottom:1rem">↺</div>'
+    +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:.75rem">Resetear permisos</div>'
+    +'<div style="font-size:14px;color:#6B7280;line-height:1.7;margin-bottom:1.5rem">'
+    +'Al resetear se está volviendo la configuración a los <strong>permisos originales</strong> de este rol. '
+    +'Los cambios realizados se perderán.'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;justify-content:center">'
+    +'<button onclick="cfgCerrarConfirmReset()" '
+    +'style="padding:10px 28px;border-radius:8px;border:1.5px solid #E5E7EB;background:#fff;font-size:14px;cursor:pointer;font-weight:600;color:#374151">Cancelar</button>'
+    +'<button onclick="cfgConfirmarReset()" '
+    +'style="padding:10px 28px;border-radius:8px;border:none;background:#1F4E79;color:#fff;font-size:14px;cursor:pointer;font-weight:600">Confirmar</button>'
+    +'</div></div>';
+  document.body.appendChild(confirmDiv);
+}
+
+function cfgConfirmarReset(){
+  if(!cfgPermRolSeleccionado) return;
+  cfgCerrarConfirmReset();
+  PERMISOS[cfgPermRolSeleccionado]=JSON.parse(JSON.stringify(DEFAULT_PERMISOS[cfgPermRolSeleccionado]||{}));
+  savePermisos();
+  cfgRenderPermisosTabla();
+  showToast('↺ Permisos restaurados a los valores originales','#1F4E79');
+}
+
+function cfgRenderPermisos(){
+  const c=document.getElementById('cfg-content');
+  if(!c) return;
+
+  // Roles to show (exclude super_admin — always full access)
+  const rolesToShow=S.roles.filter(function(r){ return r.id!=='super_admin'; });
+  const PERM_OPTS=[
+    {val:'ninguno', label:'—',      style:'background:#F3F4F6;color:#9CA3AF'},
+    {val:'consulta',label:'👁 Ver',  style:'background:#EFF6FF;color:#1E40AF'},
+    {val:'ejecuta', label:'✅ Ejecuta',style:'background:#F0FDF4;color:#166534'},
+  ];
+
+  var html='<div style="overflow-x:auto">';
+  html+='<div style="font-size:13px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#FEF9C3;border-radius:8px">';
+  html+='⚡ <strong>Super Admin</strong> siempre tiene acceso total a todo — no se puede modificar.';
+  html+='</div>';
+
+  html+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html+='<thead><tr>';
+  html+='<th style="text-align:left;padding:10px 8px;background:#1F4E79;color:#fff;border-radius:8px 0 0 0;white-space:nowrap;min-width:130px">Rol</th>';
+  SCREENS.forEach(function(s){
+    html+='<th style="text-align:center;padding:8px 4px;background:#1F4E79;color:#fff;white-space:nowrap;font-size:11px">'+s.label+'</th>';
+  });
+  html+='</tr></thead><tbody>';
+
+  rolesToShow.forEach(function(role,ri){
+    var bg=ri%2===0?'#fff':'#F9FAFB';
+    html+='<tr style="background:'+bg+'">';
+    html+='<td style="padding:8px;font-weight:600;border-bottom:1px solid #F3F4F6;white-space:nowrap">';
+    html+='<span style="width:10px;height:10px;border-radius:50%;background:'+role.color+';display:inline-block;margin-right:6px"></span>';
+    html+=role.name+'</td>';
+
+    SCREENS.forEach(function(screen){
+      var cur=(PERMISOS[role.id]||{})[screen.key]||'ninguno';
+      html+='<td style="text-align:center;padding:6px 4px;border-bottom:1px solid #F3F4F6">';
+      html+='<select onchange="cfgSetPerm(\"'+role.id+'\",\"'+screen.key+'\",this.value)" ';
+      html+='style="border:1px solid #E5E7EB;border-radius:6px;padding:3px 4px;font-size:11px;cursor:pointer;width:90px">';
+      PERM_OPTS.forEach(function(opt){
+        html+='<option value="'+opt.val+'"'+(cur===opt.val?' selected':'')+' style="'+opt.style+'">'+opt.label+'</option>';
+      });
+      html+='</select></td>';
+    });
+    html+='</tr>';
+  });
+
+  html+='</tbody></table>';
+  html+='<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem">';
+  html+='<button class="btn" onclick="cfgResetPermisos()">↺ Restaurar valores por defecto</button>';
+  html+='<button class="btn btn-primary" onclick="cfgSavePermisos()">💾 Guardar permisos</button>';
+  html+='</div>';
+  html+='</div>';
+
+  c.innerHTML=html;
+}
+
+function cfgSetPerm(roleId, screen, value){
+  if(!PERMISOS[roleId]) PERMISOS[roleId]={};
+  PERMISOS[roleId][screen]=value;
+}
+
+function cfgSavePermisos(){
+  savePermisos();
+  showToast('✅ Permisos guardados correctamente','#16A34A');
+}
+
+function cfgResetPermisos(){
+  if(!confirm('¿Restaurar los permisos a los valores por defecto?')) return;
+  PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
+  savePermisos();
+  cfgRenderPermisos();
+  showToast('↺ Permisos restaurados','#1F4E79');
+}
+
+// ════════════════════════════════════════════════════════════
 // GLOBAL ROLE MODAL
 // ════════════════════════════════════════════════════════════
 let roleModalEditingId=null;
@@ -3733,6 +4789,90 @@ async function deleteRoleGlobal(id, callback){
   await saveK(SK.roles,S.roles);
   await saveK(SK.members,S.members);
   if(callback) callback();
+}
+
+// ════════════════════════════════════════════════════════════
+// PRÓXIMOS CUMPLEAÑOS
+// ════════════════════════════════════════════════════════════
+function renderHomeCumples(){
+  var wrap=document.getElementById('home-cumple-wrap');
+  if(!wrap) return;
+
+  var hoy=new Date();
+  var hoyMes=hoy.getMonth()+1;
+  var hoyDia=hoy.getDate();
+
+  // Get members with birthdate, calculate days until next birthday
+  var conCumple=S.members.filter(function(m){
+    return m.estado!=='Baja' && m.fnac && m.fnac.length>=7;
+  }).map(function(m){
+    var parts=m.fnac.split('-');
+    var mes=parseInt(parts[1]);
+    var dia=parseInt(parts[2]);
+    var anio=parseInt(parts[0]);
+    // Calculate age this year
+    var edadEsteAnio=hoy.getFullYear()-anio;
+
+    // Days until birthday this year
+    var cumpleEsteAnio=new Date(hoy.getFullYear(), mes-1, dia);
+    if(cumpleEsteAnio<hoy){
+      // Already passed this year, calculate for next year
+      cumpleEsteAnio=new Date(hoy.getFullYear()+1, mes-1, dia);
+      edadEsteAnio++;
+    }
+    var diff=Math.round((cumpleEsteAnio-hoy)/(1000*60*60*24));
+    var g=S.groups.find(function(x){return x.id===m.grupoId;});
+    return {
+      nombre:m.nombre+' '+m.apellido,
+      grupo:g?g.name:'',
+      mes:mes, dia:dia,
+      edad:edadEsteAnio,
+      diff:diff,
+      genero:m.genero
+    };
+  }).filter(function(m){ return m.diff<=30; })
+    .sort(function(a,b){ return a.diff-b.diff; });
+
+  if(!conCumple.length){
+    wrap.innerHTML='';
+    return;
+  }
+
+  var html='<div class="card" style="border-left:4px solid #F59E0B">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">';
+  html+='<div class="card-title" style="margin:0">🎂 Próximos cumpleaños <span style="font-size:12px;color:#6B7280;font-weight:400">(próximos 30 días)</span></div>';
+  html+='<span style="font-size:12px;color:#F59E0B;font-weight:600">'+conCumple.length+' cumpleaños</span>';
+  html+='</div>';
+
+  conCumple.forEach(function(m){
+    var badge='';
+    var bgColor='#FFFBEB';
+    if(m.diff===0){
+      badge='<span style="background:#FEF3C7;color:#92400E;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600">🎉 ¡HOY!</span>';
+      bgColor='#FEF9C3';
+    } else if(m.diff===1){
+      badge='<span style="background:#FEE2E2;color:#991B1B;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600">🔔 Mañana</span>';
+    } else if(m.diff<=7){
+      badge='<span style="background:#FEF3C7;color:#92400E;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600">En '+m.diff+' días</span>';
+    } else {
+      badge='<span style="background:#F3F4F6;color:#6B7280;font-size:11px;padding:2px 8px;border-radius:99px">En '+m.diff+' días</span>';
+    }
+    var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+    var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #FEF3C7;background:'+bgColor+';margin:0 -4px;padding:8px 4px">';
+    html+='<div style="font-size:20px">🎂</div>';
+    html+='<div style="flex:1">';
+    html+='<div style="font-size:13px;font-weight:600;color:#1F2937">'+m.nombre;
+    html+=' <span style="background:'+genBg+';color:'+genColor+';font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600">'+m.genero+'</span>';
+    html+='</div>';
+    html+='<div style="font-size:11px;color:#6B7280">'+m.grupo+(m.grupo?' · ':'')+m.dia+'/'+m.mes+' — cumple '+m.edad+' años</div>';
+    html+='</div>';
+    html+=badge;
+    html+='</div>';
+  });
+
+  html+='</div>';
+  wrap.innerHTML=html;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -3867,11 +5007,9 @@ function enviarForm(){
 }
 
 function gdvShowQRModal(){
-  var formHtml=buildFormularioPublicoHTML();
-  var blob=new Blob([formHtml],{type:'text/html'});
-  var url=URL.createObjectURL(blob);
-
-  // Generate QR using a free API
+  // Use permanent URL with query parameter
+  var baseUrl=window.location.origin+window.location.pathname;
+  var url=baseUrl+'?form=nuevo';
   var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent(url);
 
   var overlay=document.getElementById('gdv-qr-overlay');
@@ -3924,6 +5062,637 @@ function gdvDescargarFormulario(url){
   a.click();
 }
 
+
+// ════════════════════════════════════════════════════════════
+// DISCIPULADO MODULE
+// ════════════════════════════════════════════════════════════
+
+function canAccessDisc(){
+  return hasRole('super_admin','admin_disc','disc_n1','disc_n2','disc_n3','pastor');
+}
+function canAdminDisc(){
+  return hasRole('super_admin','admin_disc');
+}
+
+function openDiscipulado(){
+  document.getElementById('screen-home').classList.add('hidden');
+  document.getElementById('screen-app').classList.add('show');
+  document.getElementById('app-topbar-title').textContent='📖 Discipulado';
+  document.getElementById('app-topbar-user').textContent=currentUser.name;
+  document.getElementById('app-content').innerHTML=buildDiscipuladoHTML();
+  discTab('dashboard', document.getElementById('disc-tab-dashboard'));
+}
+
+function buildDiscipuladoHTML(){
+  return `<div class="gdv-app">
+    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+      <button id="disc-tab-dashboard" class="btn btn-primary btn-sm" onclick="discTab('dashboard',this)">📊 Dashboard</button>
+      ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-pasos" class="btn btn-sm" onclick="discTab('pasos',this)">📋 Pasos</button>`:''}
+      <button id="disc-tab-cargar" class="btn btn-sm" onclick="discTab('cargar',this)">✏️ Cargar</button>
+      <button id="disc-tab-registros" class="btn btn-sm" onclick="discTab('registros',this)">📄 Registros</button>
+    </div>
+    <div id="disc-content"></div>
+
+    <!-- MODAL: Editar Paso -->
+    <div id="disc-paso-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:15px;font-weight:700;color:#1F4E79" id="disc-modal-title">Editar Paso</div>
+          <button class="btn btn-sm" onclick="discCloseModal()">✕</button>
+        </div>
+        <div id="disc-modal-body"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
+          <button class="btn" onclick="discCloseModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="discSavePaso()">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+let discEditingPasoId=null;
+
+function discTab(tab, btn){
+  document.querySelectorAll('[id^="disc-tab-"]').forEach(function(b){b.className='btn btn-sm';});
+  if(btn) btn.className='btn btn-primary btn-sm';
+  var c=document.getElementById('disc-content');
+  if(!c) return;
+  if(tab==='dashboard') discRenderDashboard(c);
+  else if(tab==='pasos') discRenderPasos(c);
+  else if(tab==='cargar') discRenderCargar(c);
+  else if(tab==='registros') discRenderRegistros(c);
+}
+
+function discRenderDashboard(c){
+  // Determine which pasos to show
+  var pasosToShow;
+  if(canAdminDisc()||hasRole('pastor','super_admin')){
+    // Ver todos
+    pasosToShow=S.discPasos;
+  } else {
+    // Discipulador solo ve su paso
+    pasosToShow=S.discPasos.filter(function(p){
+      return p.discipuladorId&&S.members.find(function(m){
+        return m.id===p.discipuladorId&&fullName(m).toLowerCase()===currentUser.name.toLowerCase();
+      });
+    });
+  }
+
+  if(!pasosToShow.length){
+    c.innerHTML='<div class="empty">No tenés ningún paso asignado como discipulador</div>';
+    return;
+  }
+
+  var html='';
+  pasosToShow.forEach(function(paso){
+    var disc=paso.discipuladorId?S.members.find(function(m){return m.id===paso.discipuladorId;}):null;
+    var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+    var recs=S.discRecords.filter(function(r){return r.pasoId===paso.id;});
+
+    // Stats
+    var totalEnc=recs.length;
+    var capsUsadas=[...new Set(recs.map(function(r){return r.capitulo;}))];
+
+    // Per member stats
+    var memberStats=mems.map(function(m){
+      var presencias=recs.filter(function(r){return r.asistencia[m.id]&&r.asistencia[m.id].state==='presente';}).length;
+      var pct=totalEnc>0?Math.round(presencias/totalEnc*100):0;
+      var completado=(paso.completados||{})[m.id]||false;
+      return {m:m,presencias:presencias,pct:pct,completado:completado};
+    });
+
+    var completados=memberStats.filter(function(x){return x.completado;}).length;
+    var isActivo=paso.estado==='Activo';
+
+    html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid '+(isActivo?'#7C3AED':'#9CA3AF')+'">';
+    // Header
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem">';
+    html+='<div>';
+    var nivelColors={'Inicial':'#3B82F6','Intermedio':'#8B5CF6','Avanzado':'#EC4899'};
+    var nc=nivelColors[paso.nivel]||'#6B7280';
+    html+='<div style="display:flex;align-items:center;gap:8px">';
+    html+='<div style="font-size:16px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>';
+    html+='<span style="background:'+nc+'22;color:'+nc+';font-size:11px;padding:2px 10px;border-radius:99px;font-weight:600">'+(paso.nivel||'')+'</span>';
+    html+='</div>';
+    html+='<div style="font-size:12px;color:#6B7280;margin-top:3px">';
+    html+='Discipulador: <strong>'+(disc?fullName(disc):'Sin asignar')+'</strong>';
+    html+='</div></div>';
+    html+='<span class="badge '+(isActivo?'b-ok':'b-muted')+'">'+(isActivo?'Activo':'Inactivo')+'</span>';
+    html+='</div>';
+
+    // KPIs
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:1rem">';
+    html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem">'+mems.length+'</span><span class="stat-lbl">Alumnos</span></div>';
+    html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem">'+totalEnc+'</span><span class="stat-lbl">Encuentros</span></div>';
+    html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem;color:#7C3AED">'+capsUsadas.length+'/'+paso.capitulos.length+'</span><span class="stat-lbl">Caps. dados</span></div>';
+    html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem;color:#16A34A">'+completados+'/'+mems.length+'</span><span class="stat-lbl">Completados</span></div>';
+    html+='</div>';
+
+    // Member progress table
+    if(mems.length){
+      html+='<div style="font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Progreso individual</div>';
+      memberStats.forEach(function(ms){
+        var barColor=ms.pct>=75?'#16A34A':ms.pct>=50?'#1F4E79':ms.pct>=25?'#D97706':'#DC2626';
+        var genBg=ms.m.genero==='H'?'#DBEAFE':'#FCE7F3';
+        var genColor=ms.m.genero==='H'?'#1E40AF':'#9D174D';
+        html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap">';
+        html+='<span style="background:'+genBg+';color:'+genColor+';font-size:11px;padding:1px 7px;border-radius:4px;font-weight:600;flex-shrink:0">'+ms.m.genero+'</span>';
+        html+='<span style="font-size:13px;font-weight:600;flex:1;min-width:120px">'+fullName(ms.m)+'</span>';
+        html+='<div style="flex:2;min-width:100px">';
+        html+='<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">';
+        html+='<span style="color:#6B7280">'+ms.presencias+'/'+totalEnc+' enc.</span>';
+        html+='<strong style="color:'+barColor+'">'+ms.pct+'%</strong></div>';
+        html+='<div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+barColor+';width:'+ms.pct+'%"></div></div>';
+        html+='</div>';
+        // Completado toggle
+        if(canAdminDisc()){
+          html+='<button onclick="discToggleCompletado('+paso.id+','+ms.m.id+')" '
+            +'style="padding:4px 12px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600;flex-shrink:0;'
+            +(ms.completado?'background:#D1FAE5;color:#065F46':'background:#F3F4F6;color:#6B7280')+'">'
+            +(ms.completado?'✅ Completado':'⬜ Incompleto')+'</button>';
+        } else {
+          html+='<span style="font-size:11px;padding:4px 10px;border-radius:6px;'+(ms.completado?'background:#D1FAE5;color:#065F46':'background:#F3F4F6;color:#6B7280')+'">'+(ms.completado?'✅ Completado':'Incompleto')+'</span>';
+        }
+        html+='</div>';
+      });
+    }
+    html+='</div>';
+  });
+  c.innerHTML=html;
+}
+
+async function discToggleCompletado(pasoId, memberId){
+  var paso=S.discPasos.find(function(p){return p.id===pasoId;});
+  if(!paso) return;
+  if(!paso.completados) paso.completados={};
+  paso.completados[memberId]=!paso.completados[memberId];
+  await saveK(SK.discPasos,S.discPasos);
+  // Re-render dashboard
+  var c=document.getElementById('disc-content');
+  if(c) discRenderDashboard(c);
+  showToast(paso.completados[memberId]?'✅ Marcado como Completado':'⬜ Marcado como Incompleto',
+    paso.completados[memberId]?'#16A34A':'#6B7280');
+}
+
+function discRenderPasos(c){
+  var html='';
+  S.discPasos.forEach(function(paso){
+    var disc=paso.discipuladorId?S.members.find(function(m){return m.id===paso.discipuladorId;}):null;
+    var isActivo=paso.estado==='Activo';
+    html+='<div class="card" style="margin-bottom:1rem;border-left:4px solid '+(isActivo?'#16A34A':'#9CA3AF')+'">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+    html+='<div>';
+    html+='<div style="font-size:15px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>';
+    html+='<div style="font-size:12px;color:#6B7280;margin-top:4px">';
+    html+='Discipulador: <strong>'+(disc?fullName(disc):'Sin asignar')+'</strong>';
+    html+=' · '+paso.miembros.length+' miembro'+(paso.miembros.length!==1?'s':'');
+    html+=' · '+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'');
+    html+='</div></div>';
+    html+='<div style="display:flex;gap:8px;align-items:center">';
+    html+='<span class="badge '+(isActivo?'b-ok':'b-muted')+'">'+(isActivo?'Activo':'Inactivo')+'</span>';
+    if(canAdminDisc()){
+      html+='<button class="btn btn-sm btn-primary" onclick="discOpenModal('+paso.id+')">✏️ Editar</button>';
+      html+='<button class="btn btn-sm" onclick="discToggleEstado('+paso.id+')" style="'+(isActivo?'color:#DC2626':'color:#16A34A')+'">'+(isActivo?'Desactivar':'Activar')+'</button>';
+    }
+    html+='</div></div>';
+    // Members list
+    if(paso.miembros.length){
+      var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+      html+='<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px">';
+      mems.forEach(function(m){
+        var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+        var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+        html+='<span style="background:'+genBg+';color:'+genColor+';font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600">'+fullName(m)+'</span>';
+      });
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  c.innerHTML=html;
+}
+
+function discOpenModal(pasoId){
+  discEditingPasoId=pasoId;
+  var paso=S.discPasos.find(function(p){return p.id===pasoId;});
+  if(!paso) return;
+  document.getElementById('disc-modal-title').textContent='Editar — '+paso.nombre;
+
+  // Discipulador selector
+  var discOptions=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
+    return '<option value="'+m.id+'"'+(paso.discipuladorId===m.id?' selected':'')+'>'+fullName(m)+'</option>';
+  }).join('');
+
+  // Members checkboxes
+  var memberChecks=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
+    var checked=paso.miembros.includes(m.id);
+    var g=S.groups.find(function(x){return x.id===m.grupoId;});
+    var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+    var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB;min-width:0">'
+      +'<input type="checkbox" class="disc-mem-cb" value="'+m.id+'"'+(checked?' checked':'')+' style="width:16px;height:16px;flex-shrink:0;cursor:pointer">'
+      +'<span style="background:'+genBg+';color:'+genColor+';font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;flex-shrink:0">'+m.genero+'</span>'
+      +'<span style="font-size:13px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fullName(m)+'</span>'
+      +'<span style="font-size:11px;color:#9CA3AF;flex-shrink:0;white-space:nowrap">'+(g?g.name:'Sin grupo')+'</span>'
+      +'</label>';
+  }).join('');
+
+  // Chapters
+  var chapHtml=paso.capitulos.map(function(cap,i){
+    return '<div style="display:flex;gap:6px;margin-bottom:6px">'
+      +'<input type="text" value="'+cap.replace(/"/g,'&quot;')+'" class="disc-cap-inp" style="flex:1;font-size:13px">'
+      +'<button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>'
+      +'</div>';
+  }).join('');
+
+  // Super Admin can edit name, nivel and chapters
+  // Admin Disc can only edit discipulador and members
+  var superFields='';
+  if(hasRole('super_admin')){
+    superFields=
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem">'
+      +'<div><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Nombre del Paso</label>'
+      +'<input type="text" id="disc-modal-nombre" value="'+paso.nombre+'" style="width:100%"></div>'
+      +'<div><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Nivel</label>'
+      +'<select id="disc-modal-nivel" style="width:100%">'
+      +'<option value="Inicial"'+(paso.nivel==='Inicial'?' selected':'')+'>🔵 Inicial</option>'
+      +'<option value="Intermedio"'+(paso.nivel==='Intermedio'?' selected':'')+'>🟣 Intermedio</option>'
+      +'<option value="Avanzado"'+(paso.nivel==='Avanzado'?' selected':'')+'>🩷 Avanzado</option>'
+      +'</select></div></div>'
+      +'<div style="margin-top:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+      +'<label style="font-size:13px;font-weight:600;color:#374151">Capítulos</label>'
+      +'<button class="btn btn-sm" onclick="discAddCap()">+ Agregar</button></div>'
+      +'<div id="disc-caps-list">'+chapHtml+'</div></div>';
+  }
+
+  document.getElementById('disc-modal-body').innerHTML=
+    superFields
+    +'<div style="margin-top:'+(superFields?'1rem':'0')+'"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Discipulador</label>'
+    +'<select id="disc-modal-disc" style="width:100%"><option value="">Sin asignar</option>'+discOptions+'</select></div>'
+    +'<div style="margin-top:1rem"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Miembros asignados</label>'
+    +'<input type="text" placeholder="Buscar..." oninput="discFilterMembers(this.value)" style="width:100%;margin-bottom:8px">'
+    +'<div id="disc-mem-list" style="max-height:180px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+memberChecks+'</div></div>';
+
+  document.getElementById('disc-paso-modal').style.display='flex';
+}
+
+function discFilterMembers(query){
+  var q=query.toLowerCase();
+  document.querySelectorAll('#disc-mem-list label').forEach(function(lbl){
+    lbl.style.display=lbl.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
+
+function discAddCap(){
+  var list=document.getElementById('disc-caps-list');
+  var div=document.createElement('div');
+  div.style.cssText='display:flex;gap:6px;margin-bottom:6px';
+  div.innerHTML='<input type="text" placeholder="Nombre del capítulo..." class="disc-cap-inp" style="flex:1;font-size:13px">'
+    +'<button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>';
+  list.appendChild(div);
+}
+
+function discCloseModal(){
+  document.getElementById('disc-paso-modal').style.display='none';
+  discEditingPasoId=null;
+}
+
+async function discSavePaso(){
+  var paso=S.discPasos.find(function(p){return p.id===discEditingPasoId;});
+  if(!paso) return;
+  // Super Admin can rename and change nivel/chapters
+  if(hasRole('super_admin')){
+    var nombre=document.getElementById('disc-modal-nombre')?.value.trim();
+    if(nombre) paso.nombre=nombre;
+    var nivel=document.getElementById('disc-modal-nivel')?.value;
+    if(nivel) paso.nivel=nivel;
+    paso.capitulos=[...document.querySelectorAll('.disc-cap-inp')].map(function(inp){return inp.value.trim();}).filter(Boolean);
+  }
+  // Admin Disc and Super Admin can assign discipulador and members
+  paso.discipuladorId=parseInt(document.getElementById('disc-modal-disc').value)||null;
+  paso.miembros=[...document.querySelectorAll('.disc-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  if(!paso.completados) paso.completados={};
+  await saveK(SK.discPasos,S.discPasos);
+  discCloseModal();
+  discTab('pasos', document.getElementById('disc-tab-pasos'));
+  showToast('✅ Paso guardado correctamente','#16A34A');
+}
+
+async function discToggleEstado(pasoId){
+  var paso=S.discPasos.find(function(p){return p.id===pasoId;});
+  if(!paso) return;
+  paso.estado=paso.estado==='Activo'?'Inactivo':'Activo';
+  await saveK(SK.discPasos,S.discPasos);
+  discTab('pasos', document.getElementById('disc-tab-pasos'));
+}
+
+// ── Cargar asistencia ──
+var discFacAtt={};
+var discSelectedPasoId=null;
+
+function discRenderCargar(c){
+  var pasosActivos=S.discPasos.filter(function(p){return p.estado==='Activo';});
+  var pasoOpts=pasosActivos.map(function(p){
+    return '<option value="'+p.id+'">'+p.nombre+'</option>';
+  }).join('');
+
+  var hoy=today();
+  c.innerHTML=
+    '<div class="card"><div class="card-title">✏️ Cargar asistencia</div>'
+    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Paso</label>'
+    +'<select id="disc-sel-paso" onchange="discLoadPasoForm()" style="margin-bottom:12px"><option value="">— Seleccioná un paso —</option>'+pasoOpts+'</select>'
+    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha</label>'
+    +'<input type="date" id="disc-fecha" value="'+hoy+'" max="'+hoy+'" style="margin-bottom:12px">'
+    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Capítulo</label>'
+    +'<select id="disc-sel-cap" style="margin-bottom:12px"><option value="">— Primero seleccioná un paso —</option></select>'
+    +'<div id="disc-asistencia-wrap"></div>'
+    +'<button class="btn btn-primary" onclick="discGuardarAsistencia()" style="width:100%;margin-top:1rem">💾 Guardar asistencia</button>'
+    +'<div id="disc-alert" class="hidden" style="margin-top:8px;padding:10px;border-radius:8px;background:#D1FAE5;color:#065F46;font-size:13px"></div>'
+    +'</div>';
+}
+
+function discLoadPasoForm(){
+  var pasoId=parseInt(document.getElementById('disc-sel-paso').value)||null;
+  discSelectedPasoId=pasoId;
+  var paso=pasoId?S.discPasos.find(function(p){return p.id===pasoId;}):null;
+
+  // Load chapters
+  var capSel=document.getElementById('disc-sel-cap');
+  if(paso&&paso.capitulos.length){
+    capSel.innerHTML=paso.capitulos.map(function(c){
+      return '<option value="'+c.replace(/"/g,'&quot;')+'">'+c+'</option>';
+    }).join('');
+  } else {
+    capSel.innerHTML='<option value="">Sin capítulos definidos</option>';
+  }
+
+  // Load members
+  var wrap=document.getElementById('disc-asistencia-wrap');
+  if(!paso||!paso.miembros.length){
+    wrap.innerHTML='<div class="empty">Seleccioná un paso con miembros asignados</div>';
+    discFacAtt={};
+    return;
+  }
+
+  discFacAtt={};
+  var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+  mems.forEach(function(m){discFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'presente'};});
+
+  wrap.innerHTML='<div class="card-title">👥 Asistencia</div>'
+    +mems.map(function(m){
+      var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+      var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6">'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<span style="background:'+genBg+';color:'+genColor+';font-size:11px;padding:2px 7px;border-radius:4px;font-weight:600">'+m.genero+'</span>'
+        +'<span style="font-size:13px;font-weight:500">'+fullName(m)+'</span>'
+        +'</div>'
+        +'<button id="disc-att-'+m.id+'" onclick="discToggleAtt('+m.id+')" '
+        +'style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:#D1FAE5;color:#065F46">Presente</button>'
+        +'</div>';
+    }).join('');
+}
+
+function discToggleAtt(memberId){
+  if(!discFacAtt[memberId]) return;
+  discFacAtt[memberId].state=discFacAtt[memberId].state==='presente'?'ausente':'presente';
+  var btn=document.getElementById('disc-att-'+memberId);
+  if(btn){
+    var isP=discFacAtt[memberId].state==='presente';
+    btn.style.background=isP?'#D1FAE5':'#FEE2E2';
+    btn.style.color=isP?'#065F46':'#991B1B';
+    btn.textContent=isP?'Presente':'Ausente';
+  }
+}
+
+async function discGuardarAsistencia(){
+  var pasoId=discSelectedPasoId;
+  var fecha=document.getElementById('disc-fecha').value;
+  var capitulo=document.getElementById('disc-sel-cap').value;
+  if(!pasoId||!fecha||!capitulo){
+    alert('Completá Paso, Fecha y Capítulo');return;
+  }
+  if(!Object.keys(discFacAtt).length){alert('No hay miembros en este paso');return;}
+  var paso=S.discPasos.find(function(p){return p.id===pasoId;});
+  S.discRecords.push({
+    id:Date.now(),pasoId,pasoNombre:paso?paso.nombre:'',
+    fecha,capitulo,asistencia:{...discFacAtt},ts:new Date().toISOString()
+  });
+  await saveK(SK.discRecords,S.discRecords);
+  var al=document.getElementById('disc-alert');
+  al.textContent='✅ Asistencia guardada correctamente.';
+  al.classList.remove('hidden');
+  setTimeout(function(){al.classList.add('hidden');},3000);
+}
+
+// ── Registros ──
+function discRenderRegistros(c){
+  var recs=[...S.discRecords].sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
+  if(!recs.length){
+    c.innerHTML='<div class="empty">Sin registros de asistencia cargados aún</div>';
+    return;
+  }
+  var html='<div style="font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:1rem">'+recs.length+' registros</div>';
+  recs.forEach(function(r){
+    var att=Object.values(r.asistencia||{});
+    var presentes=att.filter(function(v){return v.state==='presente';}).length;
+    html+='<div class="card" style="margin-bottom:.75rem;padding:12px">';
+    html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+    html+='<span style="font-weight:600">'+(r.fecha?fmt(r.fecha):'—')+'</span>';
+    html+='<span class="badge b-muted">'+r.pasoNombre+'</span>';
+    html+='<span style="flex:1;font-size:13px;color:#6B7280">'+r.capitulo+'</span>';
+    html+='<span class="badge b-ok">'+presentes+'/'+att.length+' presentes</span>';
+    html+='</div>';
+    html+='<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">';
+    att.forEach(function(v){
+      html+='<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:'+(v.state==='presente'?'#D1FAE5':'#FEE2E2')+';color:'+(v.state==='presente'?'#065F46':'#991B1B')+'">'+v.name+'</span>';
+    });
+    html+='</div></div>';
+  });
+  c.innerHTML=html;
+}
+
+
+
+// ════════════════════════════════════════════════════════════
+// FORMULARIOS PÚBLICOS (sin login, acceso por QR)
+// ════════════════════════════════════════════════════════════
+function showPublicForm(tipo){
+  // Hide login screen, show public form
+  document.getElementById('screen-login').classList.add('hidden');
+  document.body.style.background='#F5F7FA';
+
+  var wrap=document.createElement('div');
+  wrap.style.cssText='min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem;font-family:Arial,sans-serif';
+  document.body.appendChild(wrap);
+
+  if(tipo==='nuevo'){
+    wrap.innerHTML=buildPublicNuevoForm();
+  } else if(tipo==='actualizar'){
+    wrap.innerHTML=buildPublicActualizarForm();
+  }
+}
+
+function buildPublicNuevoForm(){
+  return `<div style="background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:440px;box-shadow:0 4px 24px rgba(0,0,0,.1)">
+    <div style="text-align:center;margin-bottom:1.5rem">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">⛪</div>
+      <div style="font-size:20px;font-weight:700;color:#1F4E79">Iglesia Vida Nueva</div>
+      <div style="font-size:13px;color:#6B7280;margin-top:4px">Un lugar para crecer en familia · Gerli</div>
+    </div>
+    <div style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:.25rem">¡Nos alegra que estés acá!</div>
+    <div style="font-size:13px;color:#6B7280;margin-bottom:1.25rem">Completá tus datos y nos ponemos en contacto. Rápido y sin compromisos.</div>
+    <div id="pnv-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Nombre *</label>
+        <input type="text" id="pnv-nombre" placeholder="Tu nombre" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Apellido *</label>
+        <input type="text" id="pnv-apellido" placeholder="Tu apellido" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
+        <input type="tel" id="pnv-cel" placeholder="11 1234-5678" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Edad *</label>
+        <input type="number" id="pnv-edad" placeholder="Edad" min="1" max="120" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+    </div>
+    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad *</label>
+      <input type="text" id="pnv-barrio" placeholder="Desde donde nos escribís..." style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conociste? *</label>
+      <select id="pnv-como" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px">
+        <option value="">— Seleccioná —</option>
+        <option>Por un amigo o familiar</option>
+        <option>Instagram (@iglesiavng)</option>
+        <option>YouTube</option>
+        <option>Pasé por la iglesia</option>
+        <option>Google / Internet</option>
+        <option>Volante o folleto</option>
+        <option>Otro</option>
+      </select>
+    </div>
+    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Algún motivo especial? <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+      <textarea id="pnv-motivo" placeholder="Podés contarnos lo que quieras..." style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;min-height:70px;resize:vertical"></textarea>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:2px">Esta información es confidencial y solo la verá el equipo pastoral.</div>
+    </div>
+    <button onclick="pnvEnviar()" style="width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-top:1.25rem">
+      Enviar — ¡Te esperamos! 🙌
+    </button>
+    <div id="pnv-success" style="display:none;text-align:center;padding:1.5rem 0">
+      <div style="font-size:3.5rem;margin-bottom:1rem">🎉</div>
+      <div style="font-size:20px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">¡Gracias por escribirnos!</div>
+      <div style="font-size:14px;color:#6B7280;line-height:1.7">Recibimos tus datos y pronto nos ponemos en contacto.</div>
+      <div style="background:#EFF6FF;border-radius:10px;padding:12px;margin-top:1rem;font-size:13px;color:#1F4E79;font-weight:600">
+        📍 Lacarra 1965, Gerli · Domingos 10:00 y 11:30 hs
+      </div>
+    </div>
+  </div>`;
+}
+
+async function pnvEnviar(){
+  var n=document.getElementById('pnv-nombre').value.trim();
+  var a=document.getElementById('pnv-apellido').value.trim();
+  var cel=document.getElementById('pnv-cel').value.trim();
+  var edad=document.getElementById('pnv-edad').value.trim();
+  var barrio=document.getElementById('pnv-barrio').value.trim();
+  var como=document.getElementById('pnv-como').value;
+  var motivo=document.getElementById('pnv-motivo')?.value.trim()||'';
+  var err=document.getElementById('pnv-error');
+  if(!n||!a||!cel||!edad||!barrio||!como){
+    err.textContent='Por favor completá todos los campos obligatorios (*)';
+    err.style.display='block';return;
+  }
+  err.style.display='none';
+  try{
+    var members=JSON.parse(localStorage.getItem('gdv_m5')||'[]');
+    members.push({id:Date.now(),nombre:n,apellido:a,tel:cel,genero:'',grupoId:null,
+      condicion:'Nuevo',estado:'Activo',dir:barrio,fnac:'',roles:[],
+      edadDeclarada:edad,comoNosConocio:como,motivoContacto:motivo,
+      fechaRegistro:new Date().toLocaleDateString('es-AR'),origen:'QR / Formulario web'});
+    localStorage.setItem('gdv_m5',JSON.stringify(members));
+  }catch(e){}
+  document.getElementById('pnv-nombre').closest('div').parentElement.style.display='none';
+  document.getElementById('pnv-success').style.display='block';
+}
+
+function buildPublicActualizarForm(){
+  var membersJson=localStorage.getItem('gdv_m5')||'[]';
+  var members=[];
+  try{members=JSON.parse(membersJson);}catch(e){}
+  var activos=members.filter(function(m){return m.estado!=='Baja';});
+
+  var memberOptions=activos.map(function(m){
+    return '<option value="'+m.id+'">'+m.nombre+' '+m.apellido+'</option>';
+  }).join('');
+
+  return `<div style="background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:440px;box-shadow:0 4px 24px rgba(0,0,0,.1)">
+    <div style="text-align:center;margin-bottom:1.5rem">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">✏️</div>
+      <div style="font-size:20px;font-weight:700;color:#1F4E79">Actualizá tus datos</div>
+      <div style="font-size:13px;color:#6B7280;margin-top:4px">Iglesia Vida Nueva · Gerli</div>
+    </div>
+    <div id="pau-step1">
+      <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">¿Cuál es tu nombre?</label>
+      <select id="pau-member-sel" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;margin-bottom:1rem">
+        <option value="">— Buscá tu nombre —</option>
+        ${memberOptions}
+      </select>
+      <button onclick="pauCargarDatos()" style="width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">
+        Continuar →
+      </button>
+    </div>
+    <div id="pau-step2" style="display:none">
+      <div id="pau-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular</label>
+          <input type="tel" id="pau-cel" placeholder="11 1234-5678" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+        <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha de nacimiento</label>
+          <input type="date" id="pau-fnac" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+      </div>
+      <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Dirección</label>
+        <input type="text" id="pau-dir" placeholder="Calle y número" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+      <button onclick="pauGuardar()" style="width:100%;background:#16A34A;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-top:1.25rem">
+        💾 Guardar mis datos
+      </button>
+    </div>
+    <div id="pau-success" style="display:none;text-align:center;padding:1.5rem 0">
+      <div style="font-size:3.5rem;margin-bottom:1rem">✅</div>
+      <div style="font-size:20px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">¡Datos actualizados!</div>
+      <div style="font-size:14px;color:#6B7280">Gracias por completar tu información.</div>
+    </div>
+  </div>`;
+}
+
+var pauSelectedId=null;
+function pauCargarDatos(){
+  var sel=document.getElementById('pau-member-sel');
+  pauSelectedId=parseInt(sel.value)||null;
+  if(!pauSelectedId){alert('Seleccioná tu nombre primero');return;}
+  try{
+    var members=JSON.parse(localStorage.getItem('gdv_m5')||'[]');
+    var m=members.find(function(x){return x.id===pauSelectedId;});
+    if(m){
+      document.getElementById('pau-cel').value=m.tel||'';
+      document.getElementById('pau-fnac').value=m.fnac||'';
+      document.getElementById('pau-dir').value=m.dir||'';
+    }
+  }catch(e){}
+  document.getElementById('pau-step1').style.display='none';
+  document.getElementById('pau-step2').style.display='block';
+}
+
+function pauGuardar(){
+  if(!pauSelectedId) return;
+  try{
+    var members=JSON.parse(localStorage.getItem('gdv_m5')||'[]');
+    var m=members.find(function(x){return x.id===pauSelectedId;});
+    if(m){
+      m.tel=document.getElementById('pau-cel').value.trim();
+      m.fnac=document.getElementById('pau-fnac').value;
+      m.dir=document.getElementById('pau-dir').value.trim();
+      localStorage.setItem('gdv_m5',JSON.stringify(members));
+    }
+  }catch(e){}
+  document.getElementById('pau-step2').style.display='none';
+  document.getElementById('pau-success').style.display='block';
+}
 
 // ════════════════════════════════════════════════════════════
 // EXCEL EXPORT
@@ -4180,35 +5949,19 @@ async function importarTodo(event){
 // ════════════════════════════════════════════════════════════
 async function boot(){
   await initStorage();
+  // Check for public form URL parameter
+  const params=new URLSearchParams(window.location.search);
+  const form=params.get('form');
+  if(form==='nuevo'){
+    showPublicForm('nuevo');
+    return;
+  }
+  if(form==='actualizar'){
+    showPublicForm('actualizar');
+    return;
+  }
 }
 boot();
-</script>
-  <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyCuyEMfRh_It13tBv71itzXW_OT1kliGMY",
-    authDomain: "vng-plataforma.firebaseapp.com",
-    projectId: "vng-plataforma",
-    storageBucket: "vng-plataforma.firebasestorage.app",
-    messagingSenderId: "146170505190",
-    appId: "1:146170505190:web:0e3f37573da35cab7ad827"
-  };
-
-  // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  window.db = db;
-  window._doc = doc;
-  window._setDoc = setDoc;
-  window._getDoc = getDoc;
-  window._collection = collection;
-  window._getDocs = getDocs;
 </script>
 </body>
 </html>

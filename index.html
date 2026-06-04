@@ -319,8 +319,8 @@ function recordInWeek(fechaStr, offsetWeeks=0){
 const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles:'gdv_roles5'};
 
 function load(key,def){return def;}
-async function saveK(key,val){try{const ref=doc(db,key.split('_')[0],key);await setDoc(ref,{data:val});}catch(e){console.error('saveK',e);}}
-async function loadFS(key,def){try{const ref=doc(db,key.split('_')[0],key);const snap=await getDoc(ref);return snap.exists()?snap.data().data:def;}catch(e){return def;}}
+async function saveK(key,val){try{const ref=window._doc(window.db,key.split('_')[0],key);await window._setDoc(ref,{data:val});}catch(e){console.error('saveK',e);}}
+async function loadFS(key,def){try{const ref=window._doc(window.db,key.split('_')[0],key);const snap=await window._getDoc(ref);return snap.exists()?snap.data().data:def;}catch(e){return def;}}
 // ════════════════════════════════════════════════════════════
 // DEFAULT DATA — GdV
 // ════════════════════════════════════════════════════════════
@@ -4200,8 +4200,14 @@ boot();
   };
 
   // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  window.db = db;
+  window._doc = doc;
+  window._setDoc = setDoc;
+  window._getDoc = getDoc;
+  window._collection = collection;
+  window._getDocs = getDocs;
 </script>
 </body>
 </html>

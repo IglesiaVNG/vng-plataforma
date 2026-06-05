@@ -433,13 +433,8 @@ window.fbDownload().then(function(hasData) {
     // Reload S from localStorage (now updated from Firebase)
     if(typeof initStorage === 'function') {
       initStorage().then(function() {
-        // If user is logged in, refresh the home view
-        if(window.currentUser) {
-          if(typeof showHome === 'function') showHome();
-        }
-        if(typeof showToast === 'function') {
-          showToast('☁️ Datos actualizados desde la nube', '#1F4E79');
-        }
+            // Data updated in localStorage - session restore handles the UI
+        console.log('Firebase: data ready in localStorage');
       });
     }
   }
@@ -846,7 +841,7 @@ function doLogin(){
 
 function doLogout(){
   currentUser=null;
-  sessionStorage.removeItem('vng_session');
+  localStorage.removeItem('vng_session');
   document.getElementById('screen-login').classList.remove('hidden');
   document.getElementById('screen-home').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('show');
@@ -6109,22 +6104,6 @@ async function importarTodo(event){
 // ════════════════════════════════════════════════════════════
 async function boot(){
   await initStorage();
-  // Restore session if user was already logged in
-  const savedSession = sessionStorage.getItem('vng_session');
-  if(savedSession){
-    try{
-      currentUser = JSON.parse(savedSession);
-      // Verify user still exists
-      const u = S.users.find(x=>x.id===currentUser.id);
-      if(u){
-        document.getElementById('screen-login').classList.add('hidden');
-        showHome();
-      } else {
-        sessionStorage.removeItem('vng_session');
-        currentUser = null;
-      }
-    }catch(e){ sessionStorage.removeItem('vng_session'); }
-  }
   // Check for public form URL parameter
   const params=new URLSearchParams(window.location.search);
   const form=params.get('form');
@@ -6138,7 +6117,27 @@ async function boot(){
   }
   // Firebase auto-downloads when its module loads (see Firebase script)
   // No need to call fbDownload here
+  
+  // Restore session LAST (after all checks)
+  tryRestoreSession();
 }
+
+function tryRestoreSession(){
+  const saved = localStorage.getItem('vng_session');
+  if(!saved) return;
+  try{
+    const u2 = JSON.parse(saved);
+    const found = S.users.find(function(x){ return x.id===u2.id; });
+    if(found){
+      currentUser = u2;
+      document.getElementById('screen-login').classList.add('hidden');
+      showHome();
+    } else {
+      localStorage.removeItem('vng_session');
+    }
+  }catch(e){ localStorage.removeItem('vng_session'); }
+}
+
 boot();
 </script>
 </body>

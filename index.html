@@ -841,7 +841,7 @@ function doLogin(){
 
 function doLogout(){
   currentUser=null;
-  localStorage.removeItem('vng_session');
+  localStorage.removeItem('vng_cu');
   document.getElementById('screen-login').classList.remove('hidden');
   document.getElementById('screen-home').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('show');
@@ -6123,19 +6123,15 @@ async function boot(){
 }
 
 function tryRestoreSession(){
-  const saved = localStorage.getItem('vng_session');
-  if(!saved) return;
   try{
-    const u2 = JSON.parse(saved);
-    const found = S.users.find(function(x){ return x.id===u2.id; });
-    if(found){
-      currentUser = u2;
+    const saved = localStorage.getItem('vng_cu');
+    if(!saved) return;
+    currentUser = JSON.parse(saved);
+    if(currentUser && currentUser.id){
       document.getElementById('screen-login').classList.add('hidden');
       showHome();
-    } else {
-      localStorage.removeItem('vng_session');
     }
-  }catch(e){ localStorage.removeItem('vng_session'); }
+  }catch(e){ localStorage.removeItem('vng_cu'); }
 }
 
 boot();

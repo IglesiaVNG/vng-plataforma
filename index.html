@@ -363,7 +363,21 @@ const KEY_GROUPS = {
 };
 
 // ── Upload: one Firestore doc per group ──
-window.fbUpload = async function() {
+// Safety check: only upload if we have real member data (not empty/default)
+function fbHasRealData() {
+  const members = localStorage.getItem('gdv_m5');
+  if(!members) return false;
+  try {
+    const arr = JSON.parse(members);
+    return Array.isArray(arr) && arr.length > 5; // more than 5 members = real data
+  } catch(e) { return false; }
+}
+
+window.fbUpload = async function(force) {
+  if(!force && !fbHasRealData()) {
+    console.log('Firebase: upload skipped — no real data in localStorage');
+    return;
+  }
   try {
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
       const data = { _ts: Date.now() };
@@ -375,7 +389,7 @@ window.fbUpload = async function() {
     });
     await Promise.all(promises);
     window.showToast && window.showToast('☁️ Datos guardados en la nube', '#16A34A');
-    console.log('Firebase: upload OK - ' + Object.keys(KEY_GROUPS).length + ' docs');
+    console.log('Firebase: upload OK');
   } catch(e) {
     console.error('Firebase upload error:', e);
     window.showToast && window.showToast('⚠️ Error Firebase: ' + e.message, '#DC2626');
@@ -567,11 +581,11 @@ const DEFAULT_DISC_PASOS=[
 function load(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch(e){return def;}}
 async function saveK(key,val){
   try{localStorage.setItem(key,JSON.stringify(val));}catch(e){}
-  // Auto-sync to Firebase after every save (debounced 2s)
+  // Auto-sync to Firebase after every save (debounced 2s, only if real data)
   if(window.fbReady){
     clearTimeout(window._fbSyncTimer);
     window._fbSyncTimer=setTimeout(function(){
-      window.fbUpload&&window.fbUpload();
+      window.fbUpload&&window.fbUpload(false); // false = respect safety check
     },2000);
   }
 }
@@ -5635,8 +5649,12 @@ async function fbSyncManual(){
     showToast('⚠️ Firebase no disponible aún', '#DC2626');
     return;
   }
+  if(typeof fbHasRealData==='function'&&!fbHasRealData()){
+    showToast('⚠️ No hay datos para sincronizar desde este dispositivo', '#D97706');
+    return;
+  }
   showToast('☁️ Sincronizando...', '#1F4E79');
-  await window.fbUpload();
+  await window.fbUpload(true); // force = true
 }
 
 async function fbSyncDown(){

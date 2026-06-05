@@ -6014,7 +6014,9 @@ async function exportarTodo(){
 }
 
 async function importarTodo(event){
-  const file = event.target.files[0];
+  // Accept both input element directly or change event
+  const input = event.target || event;
+  const file = input.files[0];
   if(!file) return;
   const reader = new FileReader();
   reader.onload = async (e) => {
@@ -6024,8 +6026,8 @@ async function importarTodo(event){
         showToast('❌ Archivo inválido — no es un respaldo de VNG', '#DC2626');
         return;
       }
-      if(!confirm(`¿Importar respaldo del ${new Date(backup.fecha).toLocaleString('es-AR')}?\n\nEsto reemplazará todos los datos actuales.`)){
-        event.target.value='';
+      if(!confirm('¿Importar respaldo del '+new Date(backup.fecha).toLocaleString('es-AR')+'? Esto reemplazará todos los datos actuales.')){
+        input.value='';
         return;
       }
       // Restore GdV
@@ -6049,9 +6051,11 @@ async function importarTodo(event){
       ofObsPago       = backup.of.obsPago       || {};
       ofMaterias      = backup.of.materias      || [];
       ofSave();
-      event.target.value='';
-      showToast('✅ Datos importados correctamente — recargando...', '#16A34A');
-      setTimeout(()=>location.reload(), 1500);
+      input.value='';
+      // Sync to Firebase after import
+      if(window.fbReady && window.fbUpload) await window.fbUpload();
+      showToast('✅ Datos importados y sincronizados con la nube', '#16A34A');
+      setTimeout(()=>location.reload(), 2000);
     } catch(err){
       showToast('❌ Error al leer el archivo: ' + err.message, '#DC2626');
     }

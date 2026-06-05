@@ -338,7 +338,7 @@ tr:hover td{background:#F9FAFB}
 <script type="module">
 // ── FIREBASE INTEGRATION ──────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCuyEMfRh_It13tBv71itzXW_OT1kliGMY",
@@ -352,48 +352,55 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
-// ── Storage keys to sync ──
-const SYNC_KEYS = [
-  'gdv_u5','gdv_g5','gdv_r5','gdv_m5','gdv_roles5',
-  'gdv_disc_pasos','gdv_disc_records',
-  'of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
-  'of5_part','of5_obspart','of5_obspago','of5_materias',
-  'gdv_permisos'
-];
+// ── Keys grouped by document (max ~900KB each) ──
+const KEY_GROUPS = {
+  'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_permisos'],
+  'members': ['gdv_m5'],
+  'records': ['gdv_r5'],
+  'disc':    ['gdv_disc_pasos','gdv_disc_records'],
+  'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
+               'of5_part','of5_obspart','of5_obspago','of5_materias'],
+};
 
-const DOC_REF = 'vng/datos';
-
-// ── Upload all localStorage to Firestore ──
+// ── Upload: one Firestore doc per group ──
 window.fbUpload = async function() {
   try {
-    const data = {};
-    SYNC_KEYS.forEach(k => {
-      const v = localStorage.getItem(k);
-      if(v) data[k] = v;
+    const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
+      const data = { _ts: Date.now() };
+      keys.forEach(k => {
+        const v = localStorage.getItem(k);
+        if(v) data[k] = v;
+      });
+      await setDoc(doc(db, 'vng', docName), data);
     });
-    await setDoc(doc(db, 'vng', 'datos'), data);
+    await Promise.all(promises);
     window.showToast && window.showToast('☁️ Datos guardados en la nube', '#16A34A');
-    console.log('Firebase: upload OK');
+    console.log('Firebase: upload OK - ' + Object.keys(KEY_GROUPS).length + ' docs');
   } catch(e) {
     console.error('Firebase upload error:', e);
-    window.showToast && window.showToast('⚠️ Error al guardar en la nube: ' + e.message, '#DC2626');
+    window.showToast && window.showToast('⚠️ Error Firebase: ' + e.message, '#DC2626');
   }
 };
 
-// ── Download from Firestore to localStorage ──
+// ── Download: read all docs and merge to localStorage ──
 window.fbDownload = async function() {
   try {
-    const snap = await getDoc(doc(db, 'vng', 'datos'));
-    if(snap.exists()) {
-      const data = snap.data();
-      SYNC_KEYS.forEach(k => {
-        if(data[k]) localStorage.setItem(k, data[k]);
-      });
-      window.showToast && window.showToast('☁️ Datos descargados de la nube', '#1F4E79');
+    const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
+      const snap = await getDoc(doc(db, 'vng', docName));
+      if(snap.exists()) {
+        const data = snap.data();
+        keys.forEach(k => { if(data[k]) localStorage.setItem(k, data[k]); });
+        return true;
+      }
+      return false;
+    });
+    const results = await Promise.all(promises);
+    const hasData = results.some(Boolean);
+    if(hasData){
       console.log('Firebase: download OK');
       return true;
     } else {
-      console.log('Firebase: no data yet');
+      console.log('Firebase: no cloud data yet');
       return false;
     }
   } catch(e) {
@@ -402,8 +409,6 @@ window.fbDownload = async function() {
   }
 };
 
-// ── Auto-sync: intercept saveK to also push to Firebase ──
-// We patch saveK after the main script loads
 window.fbReady = true;
 console.log('Firebase: initialized OK');
 </script>

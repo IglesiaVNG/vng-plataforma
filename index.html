@@ -411,6 +411,25 @@ window.fbDownload = async function() {
 
 window.fbReady = true;
 console.log('Firebase: initialized OK');
+
+// Auto-download when Firebase is ready (fixes mobile timing issue)
+window.fbDownload().then(function(hasData) {
+  if(hasData) {
+    console.log('Firebase: auto-download complete, reloading data...');
+    // Reload S from localStorage (now updated from Firebase)
+    if(typeof initStorage === 'function') {
+      initStorage().then(function() {
+        // If user is logged in, refresh the home view
+        if(window.currentUser) {
+          if(typeof showHome === 'function') showHome();
+        }
+        if(typeof showToast === 'function') {
+          showToast('☁️ Datos actualizados desde la nube', '#1F4E79');
+        }
+      });
+    }
+  }
+}).catch(function(e){ console.error('Firebase auto-download error:', e); });
 </script>
 
 <script>
@@ -813,6 +832,7 @@ function doLogin(){
 
 function doLogout(){
   currentUser=null;
+  sessionStorage.removeItem('vng_session');
   document.getElementById('screen-login').classList.remove('hidden');
   document.getElementById('screen-home').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('show');
@@ -6071,6 +6091,22 @@ async function importarTodo(event){
 // ════════════════════════════════════════════════════════════
 async function boot(){
   await initStorage();
+  // Restore session if user was already logged in
+  const savedSession = sessionStorage.getItem('vng_session');
+  if(savedSession){
+    try{
+      currentUser = JSON.parse(savedSession);
+      // Verify user still exists
+      const u = S.users.find(x=>x.id===currentUser.id);
+      if(u){
+        document.getElementById('screen-login').classList.add('hidden');
+        showHome();
+      } else {
+        sessionStorage.removeItem('vng_session');
+        currentUser = null;
+      }
+    }catch(e){ sessionStorage.removeItem('vng_session'); }
+  }
   // Check for public form URL parameter
   const params=new URLSearchParams(window.location.search);
   const form=params.get('form');
@@ -6082,14 +6118,8 @@ async function boot(){
     showPublicForm('actualizar');
     return;
   }
-  // Try to sync from Firebase on startup
-  if(window.fbReady){
-    const synced = await window.fbDownload();
-    if(synced){
-      // Reload data from localStorage after Firebase sync
-      await initStorage();
-    }
-  }
+  // Firebase auto-downloads when its module loads (see Firebase script)
+  // No need to call fbDownload here
 }
 boot();
 </script>

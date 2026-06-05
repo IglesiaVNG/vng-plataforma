@@ -178,6 +178,21 @@ tr:hover td{background:#F9FAFB}
 .of-legend span{display:flex;align-items:center;gap:4px}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 </style>
+<script>
+// ── Instant session restore (runs before any other script) ──
+(function(){
+  try{
+    var cu=localStorage.getItem('vng_cu');
+    if(cu){
+      var u=JSON.parse(cu);
+      if(u&&u.id){
+        // Mark session as valid — boot() will use this
+        window._savedSession=u;
+      }
+    }
+  }catch(e){}
+})();
+</script>
 </head>
 <body>
 
@@ -835,14 +850,14 @@ function doLogin(){
   if(!found){al.textContent='Usuario o contraseña incorrectos';return;}
   al.textContent='';
   currentUser=found;
-  document.getElementById('screen-login').classList.add('hidden');
+  document.getElementById('screen-login').style.display='none';
   showHome();
 }
 
 function doLogout(){
   currentUser=null;
   localStorage.removeItem('vng_cu');
-  document.getElementById('screen-login').classList.remove('hidden');
+  document.getElementById('screen-login').style.display='';
   document.getElementById('screen-home').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('show');
   document.getElementById('inp-user').value='';
@@ -5035,6 +5050,7 @@ textarea{min-height:80px;resize:vertical}
 .success-msg{font-size:14px;color:#6B7280;line-height:1.7}
 .success-horarios{background:#EFF6FF;border-radius:10px;padding:12px;margin-top:1rem;font-size:13px;color:#1F4E79;font-weight:600}
 </style>
+
 </head>
 <body>
 <div class="card">
@@ -5669,7 +5685,7 @@ async function fbSyncDown(){
 // ════════════════════════════════════════════════════════════
 function showPublicForm(tipo){
   // Hide login screen, show public form
-  document.getElementById('screen-login').classList.add('hidden');
+  document.getElementById('screen-login').style.display='none';
   document.body.style.background='#F5F7FA';
 
   var wrap=document.createElement('div');
@@ -6103,6 +6119,12 @@ async function importarTodo(event){
 // INIT
 // ════════════════════════════════════════════════════════════
 async function boot(){
+  // Restore session from pre-loaded value (set in <head>)
+  if(window._savedSession){
+    currentUser = window._savedSession;
+    document.getElementById('screen-login').style.display='none';
+  }
+
   await initStorage();
   // Check for public form URL parameter
   const params=new URLSearchParams(window.location.search);
@@ -6118,8 +6140,10 @@ async function boot(){
   // Firebase auto-downloads when its module loads (see Firebase script)
   // No need to call fbDownload here
   
-  // Restore session LAST (after all checks)
-  tryRestoreSession();
+  // If session was restored before initStorage, show home now
+  if(currentUser && currentUser.id){
+    showHome();
+  }
 }
 
 function tryRestoreSession(){
@@ -6128,7 +6152,7 @@ function tryRestoreSession(){
     if(!saved) return;
     currentUser = JSON.parse(saved);
     if(currentUser && currentUser.id){
-      document.getElementById('screen-login').classList.add('hidden');
+      document.getElementById('screen-login').style.display='none';
       showHome();
     }
   }catch(e){ localStorage.removeItem('vng_cu'); }

@@ -6090,6 +6090,7 @@ function buildPublicNuevoForm(){
       <div style="font-size:20px;font-weight:700;color:#1F4E79">Iglesia Vida Nueva</div>
       <div style="font-size:13px;color:#6B7280;margin-top:4px">Un lugar para crecer en familia · Gerli</div>
     </div>
+    <div id="pnv-form-wrap">
     <div style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:.25rem">¡Nos alegra que estés acá!</div>
     <div style="font-size:13px;color:#6B7280;margin-bottom:1.25rem">Completá tus datos y nos ponemos en contacto. Rápido y sin compromisos.</div>
     <div id="pnv-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px"></div>
@@ -6115,8 +6116,7 @@ function buildPublicNuevoForm(){
         <input type="text" id="pnv-barrio2" placeholder="Tu barrio o ciudad" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px">
       </div>
     </div>
-    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad *</label>
-      <input type="text" id="pnv-barrio" placeholder="Desde donde nos escribís..." style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+
     <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conociste? *</label>
       <select id="pnv-como" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px">
         <option value="">— Seleccioná —</option>
@@ -6136,6 +6136,7 @@ function buildPublicNuevoForm(){
     <button onclick="pnvEnviar()" style="width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-top:1.25rem">
       Enviar — ¡Te esperamos! 🙌
     </button>
+    </div><!-- end pnv-form-wrap -->
     <div id="pnv-success" style="display:none;text-align:center;padding:1.5rem 0">
       <div style="font-size:3.5rem;margin-bottom:1rem">🎉</div>
       <div style="font-size:20px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">¡Gracias por escribirnos!</div>
@@ -6154,30 +6155,37 @@ async function pnvFmtFnac(el){
   el.value=v;
 }
 function pnvEnviar(){
-  var n=document.getElementById('pnv-nombre').value.trim();
-  var a=document.getElementById('pnv-apellido').value.trim();
-  var cel=document.getElementById('pnv-cel').value.trim();
-  var fnac=document.getElementById('pnv-fnac').value.trim();
-  var genero=document.getElementById('pnv-genero').value;
-  var barrio=(document.getElementById('pnv-barrio2')||document.getElementById('pnv-barrio')||{value:''}).value.trim();
-  var como=document.getElementById('pnv-como').value;
-  var motivo=document.getElementById('pnv-motivo')?.value.trim()||'';
+  var n=(document.getElementById('pnv-nombre')||{value:''}).value.trim();
+  var a=(document.getElementById('pnv-apellido')||{value:''}).value.trim();
+  var cel=(document.getElementById('pnv-cel')||{value:''}).value.trim();
+  var fnac=(document.getElementById('pnv-fnac')||{value:''}).value.trim();
+  var genero=(document.getElementById('pnv-genero')||{value:''}).value;
+  var barrio=(document.getElementById('pnv-barrio2')||{value:''}).value.trim();
+  var como=(document.getElementById('pnv-como')||{value:''}).value;
+  var motivo=(document.getElementById('pnv-motivo')||{value:''}).value.trim();
   var err=document.getElementById('pnv-error');
   if(!n||!a||!cel||!fnac||!genero||!barrio||!como){
-    err.textContent='Por favor completá todos los campos obligatorios (*)';
-    err.style.display='block';return;
+    if(err){err.textContent='Por favor completá todos los campos obligatorios (*)';err.style.display='block';}
+    return;
   }
-  err.style.display='none';
+  if(err) err.style.display='none';
   try{
     var members=JSON.parse(localStorage.getItem('gdv_m5')||'[]');
-    members.push({id:Date.now(),nombre:n,apellido:a,tel:cel,genero:'',grupoId:null,
-      condicion:'Nuevo',estado:'Activo',dir:barrio,fnac:'',roles:[],
-      edadDeclarada:edad,comoNosConocio:como,motivoContacto:motivo,
-      fechaRegistro:new Date().toLocaleDateString('es-AR'),origen:'QR / Formulario web'});
+    members.push({
+      id:Date.now(),nombre:n,apellido:a,tel:cel,genero:genero,
+      grupoId:null,condicion:'Nuevo',estado:'Activo',
+      dir:barrio,fnac:fnac,roles:[],
+      comoNosConocio:como,motivoContacto:motivo,
+      fechaRegistro:new Date().toLocaleDateString('es-AR'),
+      origen:'QR / Formulario web'
+    });
     localStorage.setItem('gdv_m5',JSON.stringify(members));
   }catch(e){}
-  document.getElementById('pnv-nombre').closest('div').parentElement.style.display='none';
-  document.getElementById('pnv-success').style.display='block';
+  // Hide form, show success
+  var formWrap=document.getElementById('pnv-form-wrap');
+  var success=document.getElementById('pnv-success');
+  if(formWrap) formWrap.style.display='none';
+  if(success) success.style.display='block';
 }
 
 function buildPublicActualizarForm(){

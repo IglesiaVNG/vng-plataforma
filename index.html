@@ -416,13 +416,31 @@ window.fbUpload = async function(force) {
 };
 
 // ── Download: read all docs and merge to localStorage ──
+function mergeMembers(localStr, cloudStr){
+  try{
+    const local=JSON.parse(localStr||'[]');
+    const cloud=JSON.parse(cloudStr||'[]');
+    const cloudIds=new Set(cloud.map(m=>m.id));
+    const localOnly=local.filter(m=>!cloudIds.has(m.id));
+    return JSON.stringify([...cloud,...localOnly]);
+  }catch(e){ return cloudStr; }
+}
 window.fbDownload = async function() {
   try {
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
       const snap = await getDoc(doc(db, 'vng', docName));
       if(snap.exists()) {
         const data = snap.data();
-        keys.forEach(k => { if(data[k]) localStorage.setItem(k, data[k]); });
+        keys.forEach(k => {
+          if(data[k]){
+            if(k==='gdv_m5'){
+              // Merge: keep local contacts (e.g. from QR) not in Firebase
+              localStorage.setItem(k, mergeMembers(localStorage.getItem(k), data[k]));
+            } else {
+              localStorage.setItem(k, data[k]);
+            }
+          }
+        });
         return true;
       }
       return false;
@@ -5515,6 +5533,8 @@ function enviarForm(){
       origen:'QR / Formulario web'
     });
     localStorage.setItem('gdv_m5',JSON.stringify(members));
+    // Upload to Firebase immediately so the contact isn't lost on next app load
+    if(window.fbUpload) window.fbUpload(true);
   }catch(e){}
   document.getElementById('form-wrap').style.display='none';
   document.getElementById('form-success').style.display='block';
@@ -6180,6 +6200,8 @@ function pnvEnviar(){
       origen:'QR / Formulario web'
     });
     localStorage.setItem('gdv_m5',JSON.stringify(members));
+    // Upload to Firebase immediately so the contact isn't lost on next app load
+    if(window.fbUpload) window.fbUpload(true);
   }catch(e){}
   // Hide form, show success
   var formWrap=document.getElementById('pnv-form-wrap');

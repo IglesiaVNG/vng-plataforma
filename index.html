@@ -470,7 +470,8 @@ window.fbDownload().then(function(hasData) {
     // Reload S from localStorage (now updated from Firebase)
     if(typeof initStorage === 'function') {
       initStorage().then(function() {
-            // Data updated in localStorage - session restore handles the UI
+            // Data updated in localStorage - reload permisos in memory
+        if(typeof loadPermisos === 'function') loadPermisos();
         console.log('Firebase: data ready in localStorage');
       });
     }
@@ -537,8 +538,8 @@ function loadPermisos(){
   }
 }
 
-function savePermisos(){
-  localStorage.setItem('gdv_permisos',JSON.stringify(PERMISOS));
+async function savePermisos(){
+  await saveK('gdv_permisos',PERMISOS);
 }
 
 function getPerm(roleId, screen){
@@ -1207,7 +1208,8 @@ function renderMiembrosStandalone(){
   const rsel=document.getElementById('sa-mfil-rol');
   if(rsel&&rsel.options.length<=1) S.roles.forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.name;rsel.appendChild(o);});
 
-  let members=[...S.members];
+  // Only show Asistente and Miembro - Nuevos have their own module
+  let members=S.members.filter(m=>m.condicion!=='Nuevo');
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo==='nogroup') members=members.filter(m=>!m.grupoId);
   else if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
@@ -1258,9 +1260,10 @@ function renderMiembrosStandalone(){
 function saShowDetail(id,event){
   if(saDetailMemberId===id){saCloseDetail();return;}
   saDetailMemberId=id;
-  const m=S.members.find(x=>x.id===id);
+  const mid=Number(id);
+  const m=S.members.find(x=>Number(x.id)===mid);
   if(!m) return;
-  const g=S.groups.find(x=>x.id===m.grupoId);
+  const g=S.groups.find(x=>Number(x.id)===Number(m.grupoId));
   document.getElementById('sa-detail-name').textContent=fullName(m);
   document.getElementById('sa-detail-body').innerHTML=`
     <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Género</div><div style="font-size:13px;font-weight:500">${m.genero==='H'?'Hombre':'Mujer'}</div></div>
@@ -1276,24 +1279,15 @@ function saShowDetail(id,event){
   `;
   const panel=document.getElementById('sa-detail-panel');
   const backdrop=document.getElementById('sa-backdrop');
+  // Show centered fixed overlay
+  panel.style.position='fixed';
+  panel.style.top='50%';
+  panel.style.left='50%';
+  panel.style.transform='translate(-50%,-50%)';
+  panel.style.maxHeight='90vh';
+  panel.style.overflowY='auto';
   panel.style.display='block';
   backdrop.style.display='block';
-  if(event){
-    const rect=event.target.getBoundingClientRect();
-    const scrollY=window.scrollY||0;
-    const scrollX=window.scrollX||0;
-    let top=rect.bottom+scrollY+6;
-    let left=rect.left+scrollX;
-    // Keep within viewport horizontally
-    if(left+390>window.innerWidth) left=Math.max(8,window.innerWidth-395);
-    // Keep within viewport vertically - if too low, show above the click
-    const panelH=380;
-    if(rect.bottom+panelH>window.innerHeight){
-      top=Math.max(scrollY+8, rect.top+scrollY-panelH-6);
-    }
-    panel.style.top=top+'px';
-    panel.style.left=left+'px';
-  }
 }
 
 function saCloseDetail(){
@@ -1338,8 +1332,8 @@ function saOpenNewMember(){
 }
 
 function saEditMember(id){
-  const m=S.members.find(x=>x.id===id);
-  if(!m){alert('Miembro no encontrado');return;}
+  const m=S.members.find(x=>Number(x.id)===Number(id));
+  if(!m){alert('Miembro no encontrado (id='+id+')');return;}
   saEditingMemberId=id;
   document.getElementById('sa-mf-title').textContent='Editar — '+fullName(m);
   document.getElementById('sa-mf-nombre').value=m.nombre;
@@ -1440,6 +1434,7 @@ function buildConfigHTML(){
       <button class="btn btn-sm" id="cfg-tab-roles" onclick="configTab('roles',this)">🎭 Roles</button>
       <button class="btn btn-sm" id="cfg-tab-permisos" onclick="configTab('permisos',this)">🔐 Permisos</button>
       <button class="btn btn-sm" id="cfg-tab-exportar" onclick="configTab('exportar',this)">💾 Datos</button>
+      <button class="btn btn-sm" id="cfg-tab-restaurar" onclick="configTab('restaurar',this)" style="color:#DC2626;border-color:#FECACA">🔄 Restaurar permisos</button>
     </div>
     <div id="cfg-content">
       <div id="cfg-placeholder" style="text-align:center;padding:2rem;color:#9CA3AF;font-size:14px">
@@ -1540,11 +1535,19 @@ function configTab(sub, btn){
         ⚡ <strong>Super Admin</strong> siempre tiene acceso total — no se puede modificar desde acá.
       </div>
       <div id="cfg-permisos-wrap" style="overflow-x:auto"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
-        <button class="btn" onclick="cfgResetPermisos()">↺ Restaurar valores por defecto</button>
-        <button class="btn btn-primary" onclick="cfgSavePermisos()">💾 Guardar permisos</button>
-      </div>`;
+      <div id="cfg-permisos-footer"></div>`;
     cfgRenderPermisosTabla();
+  } else if(sub==='restaurar'){
+    wrap.innerHTML=
+      '<div style="max-width:420px;margin:1rem auto">' +
+      '<div class="card" style="text-align:center;padding:2rem;border-left:4px solid #DC2626">' +
+      '<div style="font-size:2.5rem;margin-bottom:.75rem">⚠️</div>' +
+      '<div style="font-size:15px;font-weight:700;color:#991B1B;margin-bottom:.75rem">Restaurar permisos al estado original</div>' +
+      '<div style="font-size:13px;color:#6B7280;margin-bottom:1.5rem">Esto borrará TODOS los cambios de permisos de TODOS los roles y los volverá a los valores con los que viene la app.</div>' +
+      '<div style="display:flex;gap:10px;justify-content:center">' +
+      '<button class="btn" onclick="cfgIrAPermisos()">✕ Cancelar</button>' +
+      '<button class="btn" style="background:#DC2626;color:#fff;border-color:#DC2626;font-weight:700" onclick="cfgConfirmarRestaurar()">✅ Confirmar restauración</button>' +
+      '</div></div></div>';
   } else if(sub==='exportar'){
     wrap.innerHTML=
       '<div style="display:flex;flex-direction:column;gap:1rem;max-width:400px;margin:1rem auto">'+
@@ -5131,7 +5134,7 @@ function cfgRenderPermisosTabla(){
     });
 
     html+='<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">';
-    html+='<button class="btn" onclick="cfgResetPermisosRol()">↺ Resetear este rol</button>';
+    html+='<button class="btn" onclick="cfgResetPermisosRol()">✕ Cancelar cambios</button>';
     html+='<button class="btn btn-primary" onclick="cfgSavePermisos()">💾 Guardar permisos</button>';
     html+='</div>';
   } else {
@@ -5237,9 +5240,6 @@ function cfgRenderPermisos(){
 
   html+='</tbody></table>';
   html+='<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem">';
-  html+='<button class="btn" onclick="cfgResetPermisos()">↺ Restaurar valores por defecto</button>';
-  html+='<button class="btn btn-primary" onclick="cfgSavePermisos()">💾 Guardar permisos</button>';
-  html+='</div>';
   html+='</div>';
 
   c.innerHTML=html;
@@ -5250,17 +5250,30 @@ function cfgSetPerm(roleId, screen, value){
   PERMISOS[roleId][screen]=value;
 }
 
-function cfgSavePermisos(){
-  savePermisos();
-  showToast('✅ Permisos guardados correctamente','#16A34A');
+async function cfgSavePermisos(){
+  await savePermisos();
+  loadPermisos(); // Reload in memory immediately
+  showToast('✅ Permisos guardados y sincronizados','#16A34A');
 }
 
-function cfgResetPermisos(){
-  if(!confirm('¿Restaurar los permisos a los valores por defecto?')) return;
+async function cfgResetPermisos(){
   PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
-  savePermisos();
-  cfgRenderPermisos();
+  await savePermisos();
+  loadPermisos();
+  cfgRenderPermisosTabla();
   showToast('↺ Permisos restaurados','#1F4E79');
+}
+
+function cfgIrAPermisos(){
+  var btn=document.getElementById('cfg-tab-permisos');
+  configTab('permisos', btn);
+  if(btn) btn.className='btn btn-primary btn-sm';
+}
+
+async function cfgConfirmarRestaurar(){
+  await cfgResetPermisos();
+  configTab('permisos', document.getElementById('cfg-tab-permisos'));
+  showToast('✅ Permisos restaurados al estado original','#1F4E79');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -6442,7 +6455,8 @@ function exportMiembrosExcel(){
   const fCond=document.getElementById('sa-mfil-condicion')?.value||'';
   const fEstado=document.getElementById('sa-mfil-estado')?.value;
 
-  let members=[...S.members];
+  // Only show Asistente and Miembro - Nuevos have their own module
+  let members=S.members.filter(m=>m.condicion!=='Nuevo');
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
   if(fGen)   members=members.filter(m=>m.genero===fGen);

@@ -6101,9 +6101,19 @@ function buildPublicNuevoForm(){
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
       <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
-        <input type="tel" id="pnv-cel" placeholder="11 1234-5678" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
-      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Edad *</label>
-        <input type="number" id="pnv-edad" placeholder="Edad" min="1" max="120" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+        <input type="tel" id="pnv-cel" placeholder="11 1234-5678" inputmode="numeric" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha de nacimiento *</label>
+        <input type="text" id="pnv-fnac" placeholder="DD/MM/AA" maxlength="8" inputmode="numeric" oninput="pnvFmtFnac(this)" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px">
+      <div style="flex:1"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Género *</label>
+        <select id="pnv-genero" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px">
+          <option value="">— Seleccioná —</option><option value="H">Hombre</option><option value="M">Mujer</option>
+        </select>
+      </div>
+      <div style="flex:1"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad *</label>
+        <input type="text" id="pnv-barrio2" placeholder="Tu barrio o ciudad" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px">
+      </div>
     </div>
     <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad *</label>
       <input type="text" id="pnv-barrio" placeholder="Desde donde nos escribís..." style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
@@ -6137,16 +6147,23 @@ function buildPublicNuevoForm(){
   </div>`;
 }
 
-async function pnvEnviar(){
+async function pnvFmtFnac(el){
+  var v=el.value.replace(/[^0-9]/g,'');
+  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
+  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
+  el.value=v;
+}
+function pnvEnviar(){
   var n=document.getElementById('pnv-nombre').value.trim();
   var a=document.getElementById('pnv-apellido').value.trim();
   var cel=document.getElementById('pnv-cel').value.trim();
-  var edad=document.getElementById('pnv-edad').value.trim();
-  var barrio=document.getElementById('pnv-barrio').value.trim();
+  var fnac=document.getElementById('pnv-fnac').value.trim();
+  var genero=document.getElementById('pnv-genero').value;
+  var barrio=(document.getElementById('pnv-barrio2')||document.getElementById('pnv-barrio')||{value:''}).value.trim();
   var como=document.getElementById('pnv-como').value;
   var motivo=document.getElementById('pnv-motivo')?.value.trim()||'';
   var err=document.getElementById('pnv-error');
-  if(!n||!a||!cel||!edad||!barrio||!como){
+  if(!n||!a||!cel||!fnac||!genero||!barrio||!como){
     err.textContent='Por favor completá todos los campos obligatorios (*)';
     err.style.display='block';return;
   }

@@ -520,13 +520,13 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor:     {gdv_dashboard:'consulta',gdv_cargar:'ninguno',gdv_registros:'consulta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno'},
-  lider:      {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno'},
-  facilitador:{gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno'},
-  admin_gdv:  {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno'},
-  admin_of:   {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno'},
-  disc_n1:    {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno'},
-  contactar:  {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno'},
+  pastor:     {gdv_dashboard:'consulta',gdv_cargar:'ninguno',gdv_registros:'consulta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno','disc_dashboard':'consulta','disc_cargar':'ejecuta','disc_registros':'consulta','disc_pasos':'ninguno'},
+  lider:      {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno','disc_dashboard':'consulta','disc_cargar':'ejecuta','disc_registros':'consulta','disc_pasos':'ninguno'},
+  facilitador:{gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno','disc_dashboard':'consulta','disc_cargar':'ejecuta','disc_registros':'consulta','disc_pasos':'ninguno'},
+  admin_gdv:  {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno','disc_dashboard':'ninguno','disc_cargar':'ninguno','disc_registros':'ninguno','disc_pasos':'ninguno'},
+  admin_of:   {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno','disc_dashboard':'ninguno','disc_cargar':'ninguno','disc_registros':'ninguno','disc_pasos':'ninguno'},
+  disc_n1:    {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',config:'ninguno'},
+  contactar:  {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',config:'ninguno'},
 };
 
 let PERMISOS={};
@@ -804,10 +804,24 @@ async function initStorage(){
     {id:'contactar',name:'Contactar',color:'#D97706',desc:'Agrega nuevos contactos y se autoasigna seguimiento'}
   ];
   // Also ensure contactar permissions are initialized if missing
-  if(!PERMISOS['contactar']){
-    PERMISOS['contactar']=JSON.parse(JSON.stringify(DEFAULT_PERMISOS.contactar));
-    await savePermisos();
-  }
+  // Ensure all roles have disc and other new permission keys
+  var allRoles=Object.keys(DEFAULT_PERMISOS);
+  var needsSave=false;
+  allRoles.forEach(function(role){
+    if(!PERMISOS[role]){
+      PERMISOS[role]=JSON.parse(JSON.stringify(DEFAULT_PERMISOS[role]));
+      needsSave=true;
+    } else {
+      var defKeys=Object.keys(DEFAULT_PERMISOS[role]);
+      defKeys.forEach(function(k){
+        if(PERMISOS[role][k]===undefined){
+          PERMISOS[role][k]=DEFAULT_PERMISOS[role][k];
+          needsSave=true;
+        }
+      });
+    }
+  });
+  if(needsSave) await savePermisos();
   var migrated=false;
   missingRoles.forEach(function(nr){
     if(!S.roles.find(function(r){return r.id===nr.id;})){
@@ -835,21 +849,21 @@ function roleChips(roles){
 // ROLE PERMISSIONS
 // ════════════════════════════════════════════════════════════
 function canAccessMiembros(){
-  return hasRole('super_admin') || canScreen('miembros_ver') || canScreen('miembros_editar');
+  return isSuperAdmin() || canScreen('miembros_ver') || canScreen('miembros_editar');
 }
 function canEditMiembros(){
-  return hasRole('super_admin') || canEjecutar('miembros_editar');
+  return isSuperAdmin() || canEjecutar('miembros_editar');
 }
 
 function canAccessNuevos(){
-  return hasRole('super_admin') || canScreen('nuevos');
+  return isSuperAdmin() || canScreen('nuevos');
 }
 
 function canAccessConfig(){
-  return hasRole('super_admin');
+  return isSuperAdmin() || canScreen('config');
 }
 function canCargarAsistencia(){
-  return hasRole('super_admin') || canEjecutar('gdv_cargar');
+  return isSuperAdmin() || canEjecutar('gdv_cargar');
 }
 
 // ── Role helper ────────────────────────────────────────────
@@ -867,26 +881,27 @@ function hasRole(...rols){ const r=userRoles(); return rols.some(x=>r.includes(x
 // LIDER: GdV (ver todos), Nuevos — nada más
 
 function canAccessGdV(){
-  // At least one GdV screen must be accessible
-  return hasRole('super_admin') || 
+  return isSuperAdmin() ||
     canScreen('gdv_dashboard') || canScreen('gdv_cargar') || canScreen('gdv_registros');
 }
 function isSuperAdmin(){
   return currentUser && currentUser.role==='super_admin';
 }
 function canGestionarNuevos(){
-  return currentUser && (currentUser.role==='super_admin' || hasRole('pastor'));
+  // Configurable: ejecuta on nuevos means full management
+  return isSuperAdmin() || canEjecutar('nuevos');
 }
 function isContactar(){
   return currentUser && currentUser.role==='contactar';
 }
 
 function canAccessOF(){
-  return hasRole('super_admin') || canScreen('of');
+  return isSuperAdmin() || canScreen('of');
 }
 
 function isGdVAdmin(){
-  return hasRole('super_admin','admin_gdv');
+  return isSuperAdmin() ||
+    canEjecutar('gdv_dashboard') || canEjecutar('gdv_cargar') || canEjecutar('gdv_registros');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1866,8 +1881,22 @@ let gdvEditingGroupId=null,gdvEditingUserId=null,gdvEditingMemberId=null,gdvEdit
 
 function buildGdVHTML(){
   const isAdmin=isGdVAdmin();
+  // Build tabs based on individual permissions
+  var tabList='';
+  var firstActive=false;
+  if(isSuperAdmin()||canScreen('gdv_dashboard')){
+    tabList+='<button class="nav-btn'+(firstActive?'':' active')+'" onclick="gdvTab(\'dashboard\',this)">📊 Dashboard</button>';
+    firstActive=true;
+  }
+  if(isSuperAdmin()||canEjecutar('gdv_cargar')){
+    tabList+='<button class="nav-btn'+(firstActive&&tabList.includes('active')?'':' active')+'" onclick="gdvTab(\'cargar\',this)">✏️ Cargar</button>';
+    firstActive=true;
+  }
+  if(isSuperAdmin()||canScreen('gdv_registros')){
+    tabList+='<button class="nav-btn" onclick="gdvTab(\'registros\',this)">📋 Registros</button>';
+  }
   const tabs=isAdmin
-    ?'<button class="nav-btn active" onclick="gdvTab(\'dashboard\',this)">📊 Dashboard</button><button class="nav-btn" onclick="gdvTab(\'cargar\',this)">✏️ Cargar</button><button class="nav-btn" onclick="gdvTab(\'registros\',this)">📋 Registros</button>'
+    ?tabList
     :'<button class="nav-btn active" onclick="gdvTab(\'cargar\',this)">✏️ Cargar asistencia</button><button class="nav-btn" onclick="gdvTab(\'mihistorial\',this)">📋 Mi historial</button>';
   return `<div class="gdv-app">
     <div class="nav" id="gdv-nav">${tabs}</div>
@@ -4841,10 +4870,10 @@ function nvSelectSeguimiento(id, nombre, grupo){
 }
 
 async function nvCanComentario(m){
-  // Can comment: super admin, pastores, or the assigned person
+  // Can comment: if can gestionar nuevos (ejecuta), or the assigned person
   if(!currentUser) return false;
   if(isSuperAdmin()) return true;
-  if(hasRole('pastor')) return true;
+  if(canEjecutar('nuevos')) return true;
   if(m && m.seguimientoId && currentUser.id===m.seguimientoId) return true;
   return false;
 }
@@ -5724,7 +5753,7 @@ function discTab(tab, btn){
 function discRenderDashboard(c){
   // Determine which pasos to show
   var pasosToShow;
-  if(canAdminDisc()||hasRole('pastor','super_admin')){
+  if(isSuperAdmin()||canEjecutar('disc_pasos')||canEjecutar('disc_registros')){
     // Ver todos
     pasosToShow=S.discPasos;
   } else {

@@ -797,6 +797,17 @@ async function initStorage(){
   S.discPasos  =load(SK.discPasos,  DEFAULT_DISC_PASOS);
   S.discRecords=load(SK.discRecords,[]);
   loadPermisos();
+  // ── Migrar roles nuevos si no existen ──
+  var missingRoles=[
+    {id:'contactar',name:'Contactar',color:'#D97706',desc:'Agrega nuevos contactos y se autoasigna seguimiento'}
+  ];
+  var migrated=false;
+  missingRoles.forEach(function(nr){
+    if(!S.roles.find(function(r){return r.id===nr.id;})){
+      S.roles.push(nr); migrated=true;
+    }
+  });
+  if(migrated) await saveK(SK.roles,S.roles);
 }
 
 function today(){return new Date().toISOString().split('T')[0];}
@@ -4589,6 +4600,10 @@ function buildNuevosHTML(){
         <div style="margin-top:8px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Comentario / Motivo</label>
           <textarea id="nv-edit-motivo" style="width:100%;min-height:60px;resize:vertical;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px"></textarea>
         </div>
+        <div id="nv-edit-fecha-wrap" style="margin-top:8px;display:none">
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">📅 Fecha de ingreso <span style="color:#D97706;font-size:11px">(Solo Super Admin)</span></label>
+          <input type="text" id="nv-edit-fecha" placeholder="DD/MM/AA" maxlength="8" inputmode="numeric" oninput="fmtFnacM(this)" style="width:100%;padding:8px;border:1.5px solid #FCD34D;border-radius:8px;font-size:13px;background:#FFFBEB">
+        </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
           <button class="btn" onclick="nvCerrarEditar()">Cancelar</button>
           <button class="btn btn-primary" onclick="nvGuardarEditar()">💾 Guardar cambios</button>
@@ -4733,7 +4748,7 @@ function renderNuevos(){
             ${m.comoNosConocio?`<span style="color:#6B7280">🔗 ${m.comoNosConocio}</span>`:''}
             <span>👤 Seguimiento: ${segLabel}</span>
           </div>
-          ${m.fechaRegistro?`<div style="font-size:11px;color:#9CA3AF;margin-top:3px">Registrado: ${m.fechaRegistro}</div>`:''}
+          <div style="font-size:11px;color:#9CA3AF;margin-top:3px">📅 Ingreso: ${m.fechaRegistro||'Sin fecha'}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
           <span style="background:#FEF3C7;color:#92400E;font-size:11px;padding:3px 10px;border-radius:99px;font-weight:600">🌱 Nuevo</span>
@@ -4897,6 +4912,13 @@ function nvAbrirEditar(id){
   document.getElementById('nv-edit-barrio').value=m.dir||'';
   document.getElementById('nv-edit-como').value=m.comoNosConocio||'';
   document.getElementById('nv-edit-motivo').value=m.motivoContacto||'';
+  // Fecha ingreso - only editable by Super Admin
+  const fechaWrap=document.getElementById('nv-edit-fecha-wrap');
+  const fechaInput=document.getElementById('nv-edit-fecha');
+  if(fechaWrap){
+    fechaWrap.style.display=isSuperAdmin()?'block':'none';
+    if(fechaInput) fechaInput.value=m.fechaRegistro||'';
+  }
   document.getElementById('nv-edit-overlay').style.display='flex';
 }
 function nvCerrarEditar(){
@@ -4913,6 +4935,10 @@ async function nvGuardarEditar(){
   m.dir=document.getElementById('nv-edit-barrio').value.trim();
   m.comoNosConocio=document.getElementById('nv-edit-como').value;
   m.motivoContacto=document.getElementById('nv-edit-motivo').value.trim();
+  if(isSuperAdmin()){
+    const fechaVal=document.getElementById('nv-edit-fecha')?.value.trim();
+    if(fechaVal) m.fechaRegistro=fechaVal;
+  }
   await saveK(SK.members,S.members);
   nvCerrarEditar();
   renderNuevos();

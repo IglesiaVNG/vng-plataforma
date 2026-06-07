@@ -4488,9 +4488,14 @@ function buildNuevosHTML(){
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
           <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
-            <input type="tel" id="nv-mf-cel" placeholder="11 1234-5678"></div>
-          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Edad *</label>
-            <input type="number" id="nv-mf-edad" placeholder="Edad" min="1" max="120"></div>
+            <input type="tel" id="nv-mf-cel" placeholder="11 1234-5678" inputmode="numeric"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha nacimiento</label>
+            <input type="text" id="nv-mf-fnac" placeholder="DD/MM/AA" maxlength="8" inputmode="numeric" oninput="fmtFnacM(this)"></div>
+        </div>
+        <div class="form-row" style="margin-top:8px">
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Género *</label>
+            <select id="nv-mf-genero" style="width:100%"><option value="">—</option><option value="H">Hombre</option><option value="M">Mujer</option></select>
+          </div>
         </div>
         <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad *</label>
           <input type="text" id="nv-mf-barrio" placeholder="Desde donde nos escribe..."></div>
@@ -4910,6 +4915,12 @@ async function nvReactivar(){
   showToast('♻️ '+fullName(m)+' re-activado como Nuevo','#16A34A');
 }
 
+function fmtFnacM(el){
+  var v=el.value.replace(/[^0-9]/g,'');
+  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
+  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
+  el.value=v;
+}
 function nvSetFiltro(filtro, btn){
   nvFiltro=filtro;
   document.querySelectorAll('.nav-btn[id^="nv-btn-"]').forEach(b=>b.classList.remove('active'));
@@ -4929,7 +4940,8 @@ function nvOpenInlineForm(prefill){
     ['nv-mf-nombre','nv-mf-apellido','nv-mf-cel','nv-mf-barrio','nv-mf-motivo'].forEach(id=>{
       const el=document.getElementById(id); if(el) el.value='';
     });
-    const edad=document.getElementById('nv-mf-edad'); if(edad) edad.value='';
+    const fnacEl=document.getElementById('nv-mf-fnac'); if(fnacEl) fnacEl.value='';
+    const genEl=document.getElementById('nv-mf-genero'); if(genEl) genEl.value='';
     const como=document.getElementById('nv-mf-como'); if(como) como.value='';
     const seg=document.getElementById('nv-mf-seguimiento-id'); if(seg) seg.value='';
     document.getElementById('nv-mf-seguimiento-label').textContent='Pendiente de asignar';
@@ -4985,7 +4997,8 @@ async function nvSaveInlineForm(){
   const nombre=document.getElementById('nv-mf-nombre').value.trim();
   const apellido=document.getElementById('nv-mf-apellido').value.trim();
   const cel=document.getElementById('nv-mf-cel').value.trim();
-  const edad=document.getElementById('nv-mf-edad').value.trim();
+  const fnac=document.getElementById('nv-mf-fnac')?.value.trim()||'';
+  const genero=document.getElementById('nv-mf-genero')?.value||'';
   const barrio=document.getElementById('nv-mf-barrio').value.trim();
   const como=document.getElementById('nv-mf-como').value;
   const motivo=document.getElementById('nv-mf-motivo').value.trim();
@@ -5429,11 +5442,12 @@ textarea{min-height:80px;resize:vertical}
 
     <div class="row">
       <div><label>Celular *</label><input type="tel" id="f-cel" placeholder="Ej: 11 1234-5678" inputmode="numeric"></div>
-      <div><label>Edad *</label><input type="number" id="f-edad" placeholder="Tu edad" min="1" max="120"></div>
+      <div><label>Fecha de nacimiento *</label><input type="text" id="f-fnac" placeholder="DD/MM/AA" maxlength="8" inputmode="numeric" oninput="fmtFnac(this)"></div>
     </div>
-
-    <label>Barrio / Ciudad *</label>
-    <input type="text" id="f-barrio" placeholder="Desde donde nos escribís...">
+    <div class="row">
+      <div><label>Género *</label><select id="f-genero"><option value="">— Seleccioná —</option><option value="H">Hombre</option><option value="M">Mujer</option></select></div>
+      <div><label>Barrio / Ciudad *</label><input type="text" id="f-barrio" placeholder="Desde donde nos escribís..."></div>
+    </div>
 
     <label>¿Cómo nos conociste? *</label>
     <select id="f-como">

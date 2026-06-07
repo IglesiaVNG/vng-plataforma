@@ -525,6 +525,7 @@ const DEFAULT_PERMISOS={
   admin_gdv:  {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno'},
   admin_of:   {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno'},
   disc_n1:    {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno'},
+  contactar:  {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno'},
 };
 
 let PERMISOS={};
@@ -545,20 +546,31 @@ async function savePermisos(){
 function getPerm(roleId, screen){
   // Super admin always ejecuta everything
   if(hasRole('super_admin')) return 'ejecuta';
-  const roles=userRoles();
-  // Check all roles the user has and return highest permission
-  let best='ninguno';
+  const sr=currentUser.role;
   const order={ninguno:0,consulta:1,ejecuta:2};
+  // If the system role has explicit permissions defined, use ONLY those
+  // (prevents member roles from granting extra access to system-restricted roles)
+  if(PERMISOS[sr]){
+    const p=PERMISOS[sr][screen]||'ninguno';
+    // For roles with explicit perm config, also check member roles but cap at system role level
+    const sysLevel=order[p]||0;
+    const roles=userRoles();
+    let memberBest='ninguno';
+    roles.forEach(function(r){
+      if(r===sr) return; // skip if same as system role (already counted)
+      const rp=PERMISOS[r]?PERMISOS[r][screen]:'ninguno';
+      if((order[rp]||0)>(order[memberBest]||0)) memberBest=rp;
+    });
+    // Return highest between system role and member roles
+    return (order[memberBest]||0)>(sysLevel)?memberBest:p;
+  }
+  // No explicit permissions for system role - use member roles only
+  let best='ninguno';
+  const roles=userRoles();
   roles.forEach(function(r){
     const p=PERMISOS[r]?PERMISOS[r][screen]:'ninguno';
     if((order[p]||0)>(order[best]||0)) best=p;
   });
-  // Also check by system role
-  const sr=currentUser.role;
-  if(PERMISOS[sr]){
-    const p=PERMISOS[sr][screen]||'ninguno';
-    if((order[p]||0)>(order[best]||0)) best=p;
-  }
   return best;
 }
 
@@ -802,6 +814,11 @@ async function initStorage(){
   var missingRoles=[
     {id:'contactar',name:'Contactar',color:'#D97706',desc:'Agrega nuevos contactos y se autoasigna seguimiento'}
   ];
+  // Also ensure contactar permissions are initialized if missing
+  if(!PERMISOS['contactar']){
+    PERMISOS['contactar']=JSON.parse(JSON.stringify(DEFAULT_PERMISOS.contactar));
+    await savePermisos();
+  }
   var migrated=false;
   missingRoles.forEach(function(nr){
     if(!S.roles.find(function(r){return r.id===nr.id;})){
@@ -4617,7 +4634,11 @@ function buildNuevosHTML(){
     <!-- Modal promover condición -->
     <div id="nv-promote-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:1rem">
       <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:420px;box-shadow:0 12px 40px rgba(0,0,0,.2)">
-        <div style="font-size:15px;font-weight:600;color:#1F4E79;margin-bottom:4px" id="nv-promote-name">—</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:15px;font-weight:600;color:#1F4E79" id="nv-promote-name">—</div>
+          <button onclick="nvClosePromote()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1" title="Cerrar">✕</button>
+        </div>
+        <div style="display:none" id="nv-promote-name-old">—</div>
         <div style="font-size:13px;color:#6B7280;margin-bottom:.75rem">Cambiar condición o asignar seguimiento</div>
         <div id="nv-promote-seg-wrap" style="margin-bottom:1rem;padding:10px 12px;background:#F9FAFB;border-radius:8px;font-size:13px">
           👤 Seguimiento: <span id="nv-promote-seg" style="color:#1F4E79;font-weight:600">—</span>
@@ -4630,7 +4651,7 @@ function buildNuevosHTML(){
           <div id="nv-comentarios-lista" style="max-height:160px;overflow-y:auto;margin-bottom:8px;font-size:12px"></div>
           <div id="nv-comentario-input-wrap">
             <textarea id="nv-comentario-txt" placeholder="Agregar comentario..." style="width:100%;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;min-height:60px;resize:vertical"></textarea>
-            <button onclick="nvGuardarComentario()" class="btn btn-primary btn-sm" style="margin-top:6px;width:100%">💾 Guardar comentario</button>
+            <button onclick="nvGuardarComentario()" class="btn btn-sm" style="margin-top:6px">💾 Guardar comentario</button>
           </div>
         </div>
         <div id="nv-promote-acciones" style="flex-direction:column;gap:0;display:flex">

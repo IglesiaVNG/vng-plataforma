@@ -470,8 +470,9 @@ window.fbDownload().then(function(hasData) {
     // Reload S from localStorage (now updated from Firebase)
     if(typeof initStorage === 'function') {
       initStorage().then(function() {
-            // Data updated in localStorage - reload permisos in memory
+            // Data updated in localStorage - reload permisos and refresh home modules
         if(typeof loadPermisos === 'function') loadPermisos();
+        if(typeof renderModulesGrid === 'function') renderModulesGrid();
         console.log('Firebase: data ready in localStorage');
       });
     }
@@ -548,26 +549,14 @@ function getPerm(roleId, screen){
   if(hasRole('super_admin')) return 'ejecuta';
   const sr=currentUser.role;
   const order={ninguno:0,consulta:1,ejecuta:2};
-  // If the system role has explicit permissions defined, use ONLY those
-  // (prevents member roles from granting extra access to system-restricted roles)
+  // If the system role has explicit permissions → use ONLY those, ignore member roles
+  // This ensures 'contactar' or any restricted role can't bypass limits via member roles
   if(PERMISOS[sr]){
-    const p=PERMISOS[sr][screen]||'ninguno';
-    // For roles with explicit perm config, also check member roles but cap at system role level
-    const sysLevel=order[p]||0;
-    const roles=userRoles();
-    let memberBest='ninguno';
-    roles.forEach(function(r){
-      if(r===sr) return; // skip if same as system role (already counted)
-      const rp=PERMISOS[r]?PERMISOS[r][screen]:'ninguno';
-      if((order[rp]||0)>(order[memberBest]||0)) memberBest=rp;
-    });
-    // Return highest between system role and member roles
-    return (order[memberBest]||0)>(sysLevel)?memberBest:p;
+    return PERMISOS[sr][screen]||'ninguno';
   }
-  // No explicit permissions for system role - use member roles only
+  // No explicit system role permissions → use member roles
   let best='ninguno';
-  const roles=userRoles();
-  roles.forEach(function(r){
+  userRoles().forEach(function(r){
     const p=PERMISOS[r]?PERMISOS[r][screen]:'ninguno';
     if((order[p]||0)>(order[best]||0)) best=p;
   });
@@ -942,6 +931,12 @@ function showHome(){
     ?roleChips(linked.roles)
     :`<span style="font-size:12px;color:#6B7280">${currentUser.role}</span>`;
 
+  renderModulesGrid();
+}
+
+function renderModulesGrid(){
+  const mgEl=document.getElementById('modules-grid');
+  if(!mgEl) return;
   const modules=[];
   if(canAccessGdV()) modules.push({
     icon:'🏘',name:'Grupos de Vida',

@@ -5676,11 +5676,11 @@ function renderHomeCumples(){
       diff:diff,
       genero:m.genero
     };
-  }).filter(function(m){ return m.diff<=30; })
+  }).filter(function(m){ return m.diff<=15; })
     .sort(function(a,b){ return a.diff-b.diff; });
 
   if(!conCumple.length){
-    wrap.innerHTML='';
+    wrap.innerHTML='<div class="card" style="border-left:4px solid #F59E0B;padding:10px 14px;font-size:13px;color:#92400E">🎂 Sin cumpleaños en los próximos 15 días</div>';
     return;
   }
 

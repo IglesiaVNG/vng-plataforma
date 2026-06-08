@@ -4684,10 +4684,12 @@ function openNuevos(){
   document.getElementById('app-topbar-user').textContent=currentUser.name;
   document.getElementById('app-content').innerHTML=buildNuevosHTML();
   renderNuevos();
+  setTimeout(nvCumplesBanner, 100);
 }
 
 function buildNuevosHTML(){
   return `<div class="gdv-app">
+    <div id="nv-cumples-wrap" style="display:none;background:#FFF7ED;border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:1rem"></div>
     <div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:12px 16px;margin-bottom:1.25rem;font-size:13px;color:#166534">
       🌱 <strong>Nuevos Contactos</strong> — Personas en su primer mes de asistencia. 
       Una vez integradas, cambiá su Condición a <strong>Asistente</strong> o <strong>Miembro</strong> desde acá o desde la Base de Miembros.
@@ -4975,6 +4977,7 @@ function renderNuevos(){
           <div style="font-size:12px;color:#6B7280;margin-top:3px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
             ${g?`<span style="color:#374151">${g.name}</span>`:'<span style="color:#F59E0B">Sin grupo</span>'}
             ${m.tel?`<span>· 📱 ${m.tel}</span>`:''}
+            ${nvCalcEdad(m.fnac)!==null?`<span>· ${nvCalcEdad(m.fnac)} años</span>`:''}
             <span style="margin-left:auto;color:#9CA3AF;font-size:11px">📅 ${m.fechaRegistro||'Sin fecha'}</span>
           </div>
           <div style="font-size:12px;margin-top:5px;display:flex;flex-wrap:wrap;gap:10px">
@@ -5198,6 +5201,54 @@ function fmtFnacM(el){
   if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
   el.value=v;
 }
+function nvCalcEdad(fnac){
+  if(!fnac) return null;
+  // fnac format: DD/MM/AA or DD/MM/AAAA
+  const parts=fnac.split('/');
+  if(parts.length<3) return null;
+  const dd=parseInt(parts[0]),mm=parseInt(parts[1]);
+  let yy=parseInt(parts[2]);
+  if(yy<100) yy+=2000;
+  const hoy=new Date();
+  let edad=hoy.getFullYear()-yy;
+  const mDiff=hoy.getMonth()+1-mm;
+  if(mDiff<0||(mDiff===0&&hoy.getDate()<dd)) edad--;
+  return edad>=0&&edad<120?edad:null;
+}
+
+function nvCumplesBanner(){
+  const hoy=new Date();
+  const dd=hoy.getDate(), mm=hoy.getMonth()+1;
+  const proximos=[];
+  S.members.filter(Boolean).filter(m=>m.condicion==='Nuevo'&&m.estado!=='Baja'&&m.fnac).forEach(m=>{
+    const parts=m.fnac.split('/');
+    if(parts.length<3) return;
+    const dNac=parseInt(parts[0]),mNac=parseInt(parts[1]);
+    // Days until birthday this year
+    const cumpleEsteAnio=new Date(hoy.getFullYear(),mNac-1,dNac);
+    if(cumpleEsteAnio<hoy) cumpleEsteAnio.setFullYear(hoy.getFullYear()+1);
+    const dias=Math.round((cumpleEsteAnio-hoy)/(1000*60*60*24));
+    if(dias<=15) proximos.push({nombre:m.nombre+' '+m.apellido,dias,dNac,mNac});
+  });
+  const wrap=document.getElementById('nv-cumples-wrap');
+  if(!wrap) return;
+  if(!proximos.length){wrap.style.display='none';return;}
+  proximos.sort((a,b)=>a.dias-b.dias);
+  wrap.style.display='block';
+  wrap.innerHTML='<div style="font-size:13px;color:#92400E;font-weight:600;margin-bottom:6px">🎂 Próximos cumpleaños en Nuevos</div>'+
+    proximos.map(p=>{
+      const cumpleDate=new Date(new Date().getFullYear()+(p.dias>0&&new Date().getMonth()+1>p.mNac?1:0),p.mNac-1,p.dNac);
+      const diasSemana=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][cumpleDate.getDay()];
+      const fechaStr=diasSemana+' '+String(p.dNac).padStart(2,'0')+'/'+String(p.mNac).padStart(2,'0');
+      const diasLabel=p.dias===0?'HOY':p.dias===1?'Mañana':'en '+p.dias+' días';
+      return `<div style="display:flex;align-items:center;gap:12px;padding:5px 0;border-bottom:1px solid #FDE68A">
+        <span style="font-size:13px;font-weight:600;color:#78350F;flex:1">🎂 ${p.nombre}</span>
+        <span style="font-size:13px;font-weight:700;color:#B45309;min-width:80px">${diasLabel}</span>
+        <span style="font-size:12px;color:#92400E">${fechaStr}</span>
+      </div>`;
+    }).join('');
+}
+
 function nvSetFiltro(filtro, btn){
   nvFiltro=filtro;
   document.querySelectorAll('.nav-btn[id^="nv-btn-"]').forEach(b=>b.classList.remove('active'));

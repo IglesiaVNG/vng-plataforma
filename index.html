@@ -4974,14 +4974,14 @@ function renderNuevos(){
           <div style="font-weight:700;font-size:14px;color:#1F2937">${fullName(m)} ${origenBadge}</div>
           <div style="font-size:12px;color:#6B7280;margin-top:3px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
             ${g?`<span style="color:#374151">${g.name}</span>`:'<span style="color:#F59E0B">Sin grupo</span>'}
-            ${m.edadDeclarada?`<span>· ${m.edadDeclarada} años</span>`:''}
             ${m.tel?`<span>· 📱 ${m.tel}</span>`:''}
+            <span style="margin-left:auto;color:#9CA3AF;font-size:11px">📅 ${m.fechaRegistro||'Sin fecha'}</span>
           </div>
           <div style="font-size:12px;margin-top:5px;display:flex;flex-wrap:wrap;gap:10px">
             ${m.comoNosConocio?`<span style="color:#6B7280">🔗 ${m.comoNosConocio}</span>`:''}
             <span>👤 Seguimiento: ${segLabel}</span>
           </div>
-          <div style="font-size:11px;color:#9CA3AF;margin-top:3px">📅 Ingreso: ${m.fechaRegistro||'Sin fecha'}</div>
+          ${m.motivoContacto?`<div style="font-size:12px;color:#374151;margin-top:4px;font-style:italic">💬 ${m.motivoContacto}</div>`:''}
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
           <span style="background:#FEF3C7;color:#92400E;font-size:11px;padding:3px 10px;border-radius:99px;font-weight:600">🌱 Nuevo</span>

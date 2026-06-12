@@ -1893,7 +1893,7 @@ async function cfgSaveUser(){
     // Keep existing memberId when editing (member is read-only)
     Object.assign(existing,{name,user,pass,role,groupId,memberId:existing.memberId||memberIdVal});
   } else {
-    S.users.push({id:Date.now(),name,user,pass,role,groupId,memberId});
+    S.users.push({id:Date.now(),name,user,pass,role,groupId,memberId:memberIdVal});
   }
   await saveK(SK.users,S.users);
   cfgCloseUserForm();cfgRenderUsuarios();
@@ -1960,6 +1960,7 @@ function cfgCloseRoleForm(){document.getElementById('cfg-role-form').classList.a
 let gdvFacAtt={},gdvVisitsOther=[],gdvVisitsNew=[],gdvSelectedRoles=[];
 let gdvEditingGroupId=null,gdvEditingUserId=null,gdvEditingMemberId=null,gdvEditingRoleId=null;
 let gdvFilDesde='',gdvFilHasta='',gdvFilGrupos=null,gdvFilSexo='';
+let gdvMrSortAsc=true,gdvMrVisible=20;
 
 function buildGdVHTML(){
   // Build nav tabs based purely on permissions - no hardcoded roles
@@ -2028,6 +2029,7 @@ function buildGdVHTML(){
         <button class="nav-btn" onclick="gdvDashTab('evolucion',this)">📈 Evolución</button>
         <button class="nav-btn" onclick="gdvDashTab('ranking',this)">🏆 Ranking</button>
         <button class="nav-btn" onclick="gdvDashTab('asistencia',this)">👤 % Asistencia</button>
+        <button class="nav-btn" onclick="gdvDashTab('miembros',this)">🙋 Asistencia por Miembros</button>
         <button class="nav-btn" onclick="gdvDashTab('nuevos',this)">🌱 Nuevos</button>
       </div>
 
@@ -2051,9 +2053,13 @@ function buildGdVHTML(){
       <!-- PANEL ASISTENCIA -->
       <div id="gdv-panel-asistencia" class="gdv-dash-panel" style="display:none">
         <div class="card"><div class="card-title">📊 % Asistencia por grupo</div><div id="gdv-bars"></div></div>
+    </div><!-- end panel-asistencia -->
+
+      <!-- PANEL ASISTENCIA POR MIEMBROS -->
+      <div id="gdv-panel-miembros" class="gdv-dash-panel" style="display:none">
         <div class="card" id="gdv-member-ranking-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-          <div class="card-title" style="margin:0">👤 Ranking individual de asistencia</div>
+          <div class="card-title" style="margin:0">🙋 Asistencia por Miembros</div>
           <div style="display:flex;align-items:center;gap:8px">
             <span style="font-size:12px;color:#6B7280" id="gdv-mr-order-label">Mostrando: peor asistencia primero</span>
             <button class="btn btn-sm" onclick="gdvToggleMemberRankingOrder()" id="gdv-mr-order-btn" title="Invertir orden">↑↓</button>
@@ -2065,7 +2071,7 @@ function buildGdVHTML(){
           <span id="gdv-mr-count" style="font-size:12px;color:#6B7280;margin-left:8px"></span>
         </div>
       </div>
-    </div>
+    </div><!-- end panel-miembros -->
     </div><!-- close gdv-tab-dashboard -->
     <div id="gdv-tab-cargar" class="section-tab ${isGdVFacilitador()||(!(isSuperAdmin()||canScreen('gdv_dashboard'))&&canEjecutar('gdv_cargar'))?'on':''}">
       <div id="gdv-fac-alert" class="alert alert-ok hidden"></div>
@@ -3119,7 +3125,7 @@ function gdvDashTab(tab, btn){
   document.querySelectorAll('#gdv-tab-dashboard .nav-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   // Switch panel
-  ['nuevos','semanas','evolucion','ranking','asistencia'].forEach(t=>{
+  ['nuevos','semanas','evolucion','ranking','asistencia','miembros'].forEach(t=>{
     const p=document.getElementById('gdv-panel-'+t);
     if(p) p.style.display=t===tab?'block':'none';
   });
@@ -3127,11 +3133,117 @@ function gdvDashTab(tab, btn){
   if(tab==='evolucion') gdvRenderChart();
   if(tab==='semanas') gdvRenderWeeklyStatus();
   if(tab==='asistencia') gdvRenderAttendance();
+  if(tab==='miembros'){gdvMrVisible=20; gdvRenderMemberRanking(gdvGetFilteredRecords());}
+}
+
+
+function gdvToggleMemberRankingOrder(){
+  gdvMrSortAsc=!gdvMrSortAsc;
+  gdvMrVisible=20;
+  const label=document.getElementById('gdv-mr-order-label');
+  const btn=document.getElementById('gdv-mr-order-btn');
+  if(label) label.textContent=gdvMrSortAsc?'Mostrando: peor asistencia primero':'Mostrando: mejor asistencia primero';
+  if(btn) btn.textContent=gdvMrSortAsc?'↑↓':'↓↑';
+  gdvRenderMemberRanking(gdvGetFilteredRecords());
+}
+
+function gdvShowMoreMembers(){
+  gdvMrVisible+=20;
+  gdvRenderMemberRanking(gdvGetFilteredRecords());
+}
+
+function gdvRenderMemberRanking(recs){
+  const wrap=document.getElementById('gdv-member-ranking');
+  const moreBtn=document.getElementById('gdv-mr-show-more');
+  const countEl=document.getElementById('gdv-mr-count');
+  if(!wrap) return;
+
+  // Build encounter count per group from filtered records
+  var encPerGroup={};
+  recs.forEach(function(r){
+    if(!encPerGroup[r.grupoId]) encPerGroup[r.grupoId]=0;
+    encPerGroup[r.grupoId]++;
+  });
+
+  // For each active member, calculate attendance
+  var memberStats=[];
+  S.members.filter(Boolean).filter(function(m){ return m.estado!=='Baja' && m.grupoId && encPerGroup[m.grupoId]>0; })
+    .forEach(function(m){
+      if(gdvFilSexo && m.genero!==gdvFilSexo) return;
+      if(gdvFilGrupos && !gdvFilGrupos.has(m.grupoId)) return;
+
+      var totalEnc=encPerGroup[m.grupoId]||0;
+      if(!totalEnc) return;
+
+      var presencias=0;
+      recs.filter(function(r){ return r.grupoId===m.grupoId; }).forEach(function(r){
+        var att=r.asistencia||{};
+        if(att[m.id] && att[m.id].state==='presente') presencias++;
+      });
+
+      var pctVal=totalEnc>0?Math.round(presencias/totalEnc*100):0;
+      var g=S.groups.find(function(x){ return x.id===m.grupoId; });
+      memberStats.push({
+        nombre:m.nombre,
+        apellido:m.apellido,
+        grupo:g?g.name:'Sin grupo',
+        presencias:presencias,
+        totalEnc:totalEnc,
+        pct:pctVal
+      });
+    });
+
+  if(!memberStats.length){
+    wrap.innerHTML='<div class="empty">Sin datos de asistencia individual para el período seleccionado</div>';
+    if(moreBtn) moreBtn.style.display='none';
+    if(countEl) countEl.textContent='';
+    return;
+  }
+
+  // Sort: worst first (asc pct) by default when gdvMrSortAsc=true
+  memberStats.sort(function(a,b){
+    return gdvMrSortAsc ? a.pct-b.pct : b.pct-a.pct;
+  });
+
+  var toShow=memberStats.slice(0,gdvMrVisible);
+  var remaining=memberStats.length-gdvMrVisible;
+
+  wrap.innerHTML=toShow.map(function(m,i){
+    var barColor = m.pct>=75 ? '#16A34A' : m.pct>=50 ? '#1F4E79' : m.pct>=25 ? '#D97706' : '#DC2626';
+    return '<div style="margin-bottom:10px;padding:8px 0;border-bottom:1px solid #F3F4F6">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;flex-wrap:wrap;gap:4px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-size:11px;color:#9CA3AF;min-width:22px;text-align:right">#'+(i+1)+'</span>' +
+          '<div>' +
+            '<div style="font-size:13px;font-weight:600;color:#1F2937">'+m.nombre+' '+m.apellido+'</div>' +
+            '<div style="font-size:11px;color:#6B7280">'+m.grupo+'</div>' +
+          '</div>' +
+        '</div>' +
+        '<span style="font-size:13px;color:#6B7280;white-space:nowrap">' +
+          '<strong style="color:'+barColor+'">'+m.pct+'%</strong>' +
+          ' &nbsp; '+m.presencias+'/'+m.totalEnc+' enc.' +
+        '</span>' +
+      '</div>' +
+      '<div class="pbar-bg">' +
+        '<div style="height:6px;border-radius:999px;background:'+barColor+';width:'+m.pct+'%;transition:width .3s"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  if(moreBtn){
+    if(remaining>0){
+      moreBtn.style.display='block';
+      if(countEl) countEl.textContent='Mostrando '+toShow.length+' de '+memberStats.length+' miembros';
+    } else {
+      moreBtn.style.display='none';
+      if(countEl) countEl.textContent='Total: '+memberStats.length+' miembros';
+    }
+  }
 }
 
 function gdvRenderAttendance(){
-  try{ gdvRenderBars(); }catch(e){}
-  try{ gdvRenderMemberRanking(); }catch(e){}
+  const recs=gdvGetFilteredRecords();
+  try{ gdvRenderBarsFiltered(recs); }catch(e){console.error('Bars error:',e);}
 }
 
 function gdvToggleNuevos(id){
@@ -5676,11 +5788,11 @@ function renderHomeCumples(){
       diff:diff,
       genero:m.genero
     };
-  }).filter(function(m){ return m.diff<=15; })
+  }).filter(function(m){ return m.diff<=30; })
     .sort(function(a,b){ return a.diff-b.diff; });
 
   if(!conCumple.length){
-    wrap.innerHTML='<div class="card" style="border-left:4px solid #F59E0B;padding:10px 14px;font-size:13px;color:#92400E">🎂 Sin cumpleaños en los próximos 15 días</div>';
+    wrap.innerHTML='';
     return;
   }
 

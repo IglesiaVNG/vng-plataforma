@@ -296,12 +296,12 @@ tr:hover td{background:#F9FAFB}
 <div id="role-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;padding:1rem">
   <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 12px 40px rgba(0,0,0,.2)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-      <div style="font-size:15px;font-weight:600;color:#1F4E79" id="role-modal-title">Nuevo rol</div>
+      <div style="font-size:15px;font-weight:600;color:#1F4E79" id="role-modal-title">Nueva función</div>
       <button class="btn btn-sm" onclick="closeRoleModal()">✕</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div>
-        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre del rol *</label>
+        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre de la función *</label>
         <input type="text" id="rm-nombre" placeholder="Ej: Ujier">
       </div>
       <div>
@@ -323,7 +323,7 @@ tr:hover td{background:#F9FAFB}
     <input type="text" id="rm-desc" placeholder="Breve descripción del rol">
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
       <button class="btn" onclick="closeRoleModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveRoleModal()">Guardar rol</button>
+      <button class="btn btn-primary" onclick="saveRoleModal()">Guardar función</button>
     </div>
   </div>
 </div>
@@ -332,7 +332,7 @@ tr:hover td{background:#F9FAFB}
 <div id="role-members-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;padding:1rem">
   <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:80vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-      <div style="font-size:15px;font-weight:600;color:#1F4E79" id="role-members-title">Miembros con este rol</div>
+      <div style="font-size:15px;font-weight:600;color:#1F4E79" id="role-members-title">Miembros con esta función</div>
       <button class="btn btn-sm" onclick="document.getElementById('role-members-overlay').style.display='none'">✕</button>
     </div>
     <div id="role-members-list"></div>
@@ -574,17 +574,18 @@ async function savePermisos(){
 function getPerm(roleId, screen){
   // Super admin always ejecuta everything
   if(hasRole('super_admin')) return 'ejecuta';
-  const sr=currentUser.role;
   const order={ninguno:0,consulta:1,ejecuta:2};
-  // If the system role has explicit permissions → use ONLY those, ignore member roles
-  // This ensures 'contactar' or any restricted role can't bypass limits via member roles
-  if(PERMISOS[sr]){
-    return PERMISOS[sr][screen]||'ninguno';
-  }
-  // No explicit system role permissions → use member roles
   let best='ninguno';
+  const sr=currentUser.role;
+  // System role (login access role)
+  if(PERMISOS[sr]){
+    const p=PERMISOS[sr][screen]||'ninguno';
+    if((order[p]||0)>(order[best]||0)) best=p;
+  }
+  // Member's assigned Funciones (can have several): the highest wins,
+  // and any screen missing from one function is filled by another.
   userRoles().forEach(function(r){
-    const p=PERMISOS[r]?PERMISOS[r][screen]:'ninguno';
+    const p=PERMISOS[r]?(PERMISOS[r][screen]||'ninguno'):'ninguno';
     if((order[p]||0)>(order[best]||0)) best=p;
   });
   return best;
@@ -847,7 +848,9 @@ function fmt(d){if(!d)return'';const p=String(d).split('-');return p.length===3?
 function initials(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();}
 function pct(a,b){return b?Math.round(a/b*100):0;}
 function fullName(m){return `${m.nombre} ${m.apellido}`.trim();}
-function groupMembers(gid){return S.members.filter(m=>m.grupoId===gid&&m.estado==='Activo');}
+function groupMembers(gid){
+  return S.members.filter(m=>m.estado==='Activo' && (Number(m.grupoId)===Number(gid) || (m.grupoIds||[]).map(Number).includes(Number(gid))));
+}
 function roleChips(roles){
   if(!roles||!roles.length) return '';
   return roles.map(rid=>{
@@ -911,19 +914,29 @@ function canAccessOF(){
 }
 
 function normName(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
-function getFacilitadorGroupId(){
-  // 1. Direct groupId on user record
-  if(currentUser.groupId) return Number(currentUser.groupId);
-  // 2. memberId stored on user → find their group as facId
-  if(currentUser.memberId){
-    const g=S.groups.find(g=>Number(g.facId)===Number(currentUser.memberId));
-    if(g) return Number(g.id);
+function getFacilitadorGroupIds(){
+  // Returns ALL group ids this user is responsible for (can be more than one)
+  const ids=new Set();
+  if(currentUser.groupId) ids.add(Number(currentUser.groupId));
+
+  // Find linked member: by memberId, or by accent-normalized name
+  let linked=null;
+  if(currentUser.memberId) linked=S.members.filter(Boolean).find(m=>Number(m.id)===Number(currentUser.memberId));
+  if(!linked) linked=S.members.filter(Boolean).find(m=>normName(fullName(m))===normName(currentUser.name));
+
+  if(linked){
+    // Member's primary + extra groups
+    if(linked.grupoId) ids.add(Number(linked.grupoId));
+    (linked.grupoIds||[]).forEach(g=>ids.add(Number(g)));
+    // Any group where this member is the assigned Facilitador
+    S.groups.forEach(g=>{ if(Number(g.facId)===Number(linked.id)) ids.add(Number(g.id)); });
   }
-  // 3. Name match (accent-normalized) → find member → find group
-  const linked=S.members.filter(Boolean).find(m=>normName(fullName(m))===normName(currentUser.name));
-  if(!linked) return null;
-  const grupo=S.groups.find(g=>Number(g.facId)===Number(linked.id));
-  return grupo?Number(grupo.id):null;
+  return [...ids];
+}
+function getFacilitadorGroupId(){
+  // Backward-compat: returns the first/primary group id, or null
+  const ids=getFacilitadorGroupIds();
+  return ids.length?ids[0]:null;
 }
 function isGdVScoped(){
   if(isSuperAdmin()) return false;
@@ -1109,7 +1122,7 @@ function buildMiembrosHTML(){
     </div>
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
       <select id="sa-mfil-gen" onchange="renderMiembrosStandalone()" style="flex:0 0 auto"><option value="">H y M</option><option value="H">Hombres</option><option value="M">Mujeres</option></select>
-      <select id="sa-mfil-rol" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px"><option value="">Todos los roles</option></select>
+      <select id="sa-mfil-rol" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px"><option value="">Todas las funciones</option></select>
       <select id="sa-mfil-condicion" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px">
         <option value="">Todas las condiciones</option>
         <option value="Miembro">Miembro</option>
@@ -1128,7 +1141,7 @@ function buildMiembrosHTML(){
           <th style="width:28%">Nombre</th>
           <th style="width:6%">Gén.</th>
           <th style="width:20%">Grupo</th>
-          <th style="width:22%">Roles</th>
+          <th style="width:22%">Función</th>
           <th style="width:12%">Condición</th>
           <th style="width:10%">Estado</th>
         </tr></thead>
@@ -1165,12 +1178,15 @@ function buildMiembrosHTML(){
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Género</label>
           <select id="sa-mf-genero"><option value="H">Hombre</option><option value="M">Mujer</option></select></div>
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label>
-          <select id="sa-mf-grupo"></select></div>
+          <select id="sa-mf-grupo" onchange="saBuildGruposExtra(saSelectedGruposExtra)"></select>
+          <div style="font-size:12px;color:#4B5563;display:block;margin:8px 0 4px">Grupos adicionales (a cargo de más de un Grupo de Vida)</div>
+          <div id="sa-mf-grupos-extra" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
       </div>
       <div class="form-row" style="margin-top:10px">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Condición</label>
           <select id="sa-mf-condicion">
-            <option value="Miembro">Miembro (bautizado)</option>
+            <option value="Miembro">Miembro</option>
             <option value="Asistente">Asistente (activo, no bautizado)</option>
             <option value="Nuevo">Nuevo (primer mes)</option>
           </select></div>
@@ -1186,7 +1202,7 @@ function buildMiembrosHTML(){
       </div>
       <div style="margin-top:10px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Dirección</label>
         <input type="text" id="sa-mf-dir" placeholder="Calle y número"></div>
-      <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Roles asignados</label>
+      <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Funciones asignadas</label>
       <div class="role-selector" id="sa-mf-roles"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
         <button class="btn" onclick="saCloseMemberForm()">Cancelar</button>
@@ -1345,7 +1361,7 @@ function saShowDetail(id,event){
     <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Edad</div><div style="font-size:13px;font-weight:500">${saCalcEdad(m.fnac)}</div></div>
     <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Teléfono</div><div style="font-size:13px;font-weight:500">${m.tel||'—'}</div></div>
     <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Dirección</div><div style="font-size:13px;font-weight:500">${m.dir||'—'}</div></div>
-    ${(m.roles||[]).length?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Roles</div>${roleChips(m.roles)}</div>`:''}
+    ${(m.roles||[]).length?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Función</div>${roleChips(m.roles)}</div>`:''}
     ${m.estado==='Baja'?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#DC2626;margin-bottom:4px">Fecha de baja</div><div style="font-size:13px;font-weight:500;color:#DC2626">${saFmtDate(m.fechaBaja||'')}</div></div>`:''}
   `;
   const panel=document.getElementById('sa-detail-panel');
@@ -1398,6 +1414,7 @@ function saOpenNewMember(){
   const grpSel=document.getElementById('sa-mf-grupo');
   if(grpSel) grpSel.value='';
   saBuildRoleSelector([]);
+  saBuildGruposExtra([]);
   const overlay=document.getElementById('sa-member-modal-overlay');
   overlay.style.display='flex';
 }
@@ -1555,9 +1572,9 @@ function configTab(sub, btn){
         <div id="cfg-uf-info" style="display:none;background:#EFF6FF;border-radius:8px;padding:8px 12px;font-size:13px;color:#1E40AF;margin-top:8px"></div>
         <div class="form-row" style="margin-top:10px">
           <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Contraseña</label><input type="password" id="cfg-uf-pass"></div>
-          <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Rol de acceso</label>
+          <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Función de acceso</label>
             <select id="cfg-uf-role">
-              <option value="">— Seleccioná un rol —</option>
+              <option value="">— Seleccioná una función —</option>
             </select>
           </div>
         </div>
@@ -1572,14 +1589,14 @@ function configTab(sub, btn){
   } else if(sub==='roles'){
     wrap.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <span style="font-size:14px;font-weight:600;color:#1F4E79">Roles del sistema</span>
-        <button class="btn btn-primary btn-sm" onclick="cfgOpenNewRole()">+ Nuevo rol</button>
+        <span style="font-size:14px;font-weight:600;color:#1F4E79">Funciones del sistema</span>
+        <button class="btn btn-primary btn-sm" onclick="cfgOpenNewRole()">+ Nueva función</button>
       </div>
       <div id="cfg-roles-list"></div>
       <div id="cfg-role-form" class="card hidden">
-        <div class="card-title" id="cfg-rf-title">Nuevo rol</div>
+        <div class="card-title" id="cfg-rf-title">Nueva función</div>
         <div class="form-row">
-          <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre del rol</label><input type="text" id="cfg-rf-name" placeholder="Ej: Ujier"></div>
+          <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre de la función</label><input type="text" id="cfg-rf-name" placeholder="Ej: Ujier"></div>
           <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Color</label>
             <select id="cfg-rf-color">
               <option value="#1F4E79">Azul oscuro</option>
@@ -1931,7 +1948,7 @@ function cfgOpenNewRole(){openRoleModal(null,cfgRenderRoles);}
 function cfgEditRole(id){
   const r=S.roles.find(x=>x.id===id);
   cfgEditingRoleId=id;
-  document.getElementById('cfg-rf-title').textContent='Editar rol';
+  document.getElementById('cfg-rf-title').textContent='Editar función';
   document.getElementById('cfg-rf-name').value=r.name;
   document.getElementById('cfg-rf-desc').value=r.desc||'';
   document.getElementById('cfg-rf-color').value=r.color;
@@ -2145,7 +2162,7 @@ function buildGdVHTML(){
         <button class="btn btn-primary btn-sm" onclick="gdvConfigTab('miembros',this)" id="cfg-btn-miembros">👥 Miembros</button>
         <button class="btn btn-sm" onclick="gdvConfigTab('grupos',this)" id="cfg-btn-grupos">🏘 Grupos</button>
         <button class="btn btn-sm" onclick="gdvConfigTab('usuarios',this)" id="cfg-btn-usuarios">👤 Usuarios</button>
-        <button class="btn btn-sm" onclick="gdvConfigTab('roles',this)" id="cfg-btn-roles">🎭 Roles</button>
+        <button class="btn btn-sm" onclick="gdvConfigTab('roles',this)" id="cfg-btn-roles">🎭 Funciones</button>
       </div>
       <div id="gdv-config-content"></div>
     </div>
@@ -2159,13 +2176,13 @@ function buildGdVHTML(){
         <select id="gdv-mfil-grupo" onchange="gdvRenderMiembros()" style="flex:1;min-width:100px"><option value="">Todos los grupos</option></select>
         <select id="gdv-mfil-gen" onchange="gdvRenderMiembros()" style="flex:0 0 auto"><option value="">H y M</option><option value="H">H</option><option value="M">M</option></select>
       </div>
-      <div class="card" style="padding:0;overflow:hidden"><table><thead><tr><th>Nombre</th><th>G</th><th>Grupo</th><th>Roles</th><th>Estado</th><th></th></tr></thead><tbody id="gdv-member-tbody"></tbody></table></div>
+      <div class="card" style="padding:0;overflow:hidden"><table><thead><tr><th>Nombre</th><th>G</th><th>Grupo</th><th>Función</th><th>Estado</th><th></th></tr></thead><tbody id="gdv-member-tbody"></tbody></table></div>
       <div id="gdv-member-form" class="card hidden" style="margin-top:1rem">
         <div class="card-title" id="gdv-mf-title">Nuevo miembro</div>
         <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-mf-nombre"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Apellido</label><input type="text" id="gdv-mf-apellido"></div></div>
         <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Género</label><select id="gdv-mf-genero"><option value="H">Hombre</option><option value="M">Mujer</option></select></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label><select id="gdv-mf-grupo"></select></div></div>
         <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label><input type="tel" id="gdv-mf-tel"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Estado</label><select id="gdv-mf-estado"><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option></select></div></div>
-        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Roles</label><div class="role-selector" id="gdv-mf-roles"></div>
+        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función</label><div class="role-selector" id="gdv-mf-roles"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" onclick="gdvCloseMemberForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveMember()">Guardar</button></div>
       </div>
     </div>
@@ -2185,16 +2202,16 @@ function buildGdVHTML(){
       <div id="gdv-user-form" class="card hidden">
         <div class="card-title" id="gdv-uf-title">Nuevo usuario</div>
         <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-uf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Usuario</label><input type="text" id="gdv-uf-user"></div></div>
-        <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Contraseña</label><input type="password" id="gdv-uf-pass"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Rol acceso</label><select id="gdv-uf-role" onchange="gdvToggleGroupSel()"><option value="facilitador">Facilitador</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option><option value="admin_of">Admin OF</option></select></div></div>
+        <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Contraseña</label><input type="password" id="gdv-uf-pass"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Función</label><select id="gdv-uf-role" onchange="gdvToggleGroupSel()"><option value="facilitador">Facilitador</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option><option value="admin_of">Admin OF</option></select></div></div>
         <div id="gdv-uf-group-row" style="margin-top:10px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo asignado</label><select id="gdv-uf-group"></select></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseUserForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveUser()">Guardar</button></div>
       </div>
     </div>
     <div id="gdv-tab-roles" class="section-tab">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><span style="font-size:14px;font-weight:600;color:#1F4E79">Roles</span><button class="btn btn-primary btn-sm" onclick="gdvOpenNewRole()">+ Nuevo</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><span style="font-size:14px;font-weight:600;color:#1F4E79">Funciones</span><button class="btn btn-primary btn-sm" onclick="gdvOpenNewRole()">+ Nuevo</button></div>
       <div id="gdv-roles-list"></div>
       <div id="gdv-role-form" class="card hidden">
-        <div class="card-title" id="gdv-rf-title">Nuevo rol</div>
+        <div class="card-title" id="gdv-rf-title">Nueva función</div>
         <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-rf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Color</label><select id="gdv-rf-color"><option value="#1F4E79">Azul oscuro</option><option value="#7C3AED">Violeta</option><option value="#059669">Verde</option><option value="#D97706">Naranja</option><option value="#DC2626">Rojo</option><option value="#BE185D">Rosa</option></select></div></div>
         <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Descripción</label><input type="text" id="gdv-rf-desc">
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseRoleForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveRole()">Guardar</button></div>
@@ -2252,13 +2269,13 @@ function gdvMiembrosHTML(){return `
     <select id="gdv-mfil-grupo" onchange="gdvRenderMiembros()" style="flex:1;min-width:100px"><option value="">Todos los grupos</option></select>
     <select id="gdv-mfil-gen" onchange="gdvRenderMiembros()" style="flex:0 0 auto"><option value="">H y M</option><option value="H">H</option><option value="M">M</option></select>
   </div>
-  <div class="card" style="padding:0;overflow:hidden"><table><thead><tr><th>Nombre</th><th>G</th><th>Grupo</th><th>Roles</th><th>Estado</th><th></th></tr></thead><tbody id="gdv-member-tbody"></tbody></table></div>
+  <div class="card" style="padding:0;overflow:hidden"><table><thead><tr><th>Nombre</th><th>G</th><th>Grupo</th><th>Función</th><th>Estado</th><th></th></tr></thead><tbody id="gdv-member-tbody"></tbody></table></div>
   <div id="gdv-member-form" class="card hidden" style="margin-top:1rem">
     <div class="card-title" id="gdv-mf-title">Nuevo miembro</div>
     <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-mf-nombre"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Apellido</label><input type="text" id="gdv-mf-apellido"></div></div>
     <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Género</label><select id="gdv-mf-genero"><option value="H">Hombre</option><option value="M">Mujer</option></select></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label><select id="gdv-mf-grupo"></select></div></div>
     <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label><input type="tel" id="gdv-mf-tel"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Estado</label><select id="gdv-mf-estado"><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option></select></div></div>
-    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Roles</label><div class="role-selector" id="gdv-mf-roles"></div>
+    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función</label><div class="role-selector" id="gdv-mf-roles"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" onclick="gdvCloseMemberForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveMember()">Guardar</button></div>
   </div>`;}
 
@@ -2279,16 +2296,16 @@ function gdvUsuariosHTML(){return `
   <div id="gdv-user-form" class="card hidden">
     <div class="card-title" id="gdv-uf-title">Nuevo usuario</div>
     <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre completo</label><input type="text" id="gdv-uf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Usuario (login)</label><input type="text" id="gdv-uf-user"></div></div>
-    <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Contraseña</label><input type="password" id="gdv-uf-pass"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Rol de acceso</label><select id="gdv-uf-role" onchange="gdvToggleGroupSel()"><option value="facilitador">Facilitador</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option><option value="admin_of">Admin OF</option></select></div></div>
+    <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Contraseña</label><input type="password" id="gdv-uf-pass"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Función de acceso</label><select id="gdv-uf-role" onchange="gdvToggleGroupSel()"><option value="facilitador">Facilitador</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option><option value="admin_of">Admin OF</option></select></div></div>
     <div id="gdv-uf-group-row" style="margin-top:10px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo asignado</label><select id="gdv-uf-group"></select></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseUserForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveUser()">Guardar</button></div>
   </div>`;}
 
 function gdvRolesHTML(){return `
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><span style="font-size:14px;font-weight:600;color:#1F4E79">Roles del sistema</span><button class="btn btn-primary btn-sm" onclick="gdvOpenNewRole()">+ Nuevo</button></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><span style="font-size:14px;font-weight:600;color:#1F4E79">Funciones del sistema</span><button class="btn btn-primary btn-sm" onclick="gdvOpenNewRole()">+ Nuevo</button></div>
   <div id="gdv-roles-list"></div>
   <div id="gdv-role-form" class="card hidden">
-    <div class="card-title" id="gdv-rf-title">Nuevo rol</div>
+    <div class="card-title" id="gdv-rf-title">Nueva función</div>
     <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-rf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Color</label><select id="gdv-rf-color"><option value="#1F4E79">Azul oscuro</option><option value="#7C3AED">Violeta</option><option value="#059669">Verde</option><option value="#D97706">Naranja</option><option value="#DC2626">Rojo</option><option value="#BE185D">Rosa</option></select></div></div>
     <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Descripción</label><input type="text" id="gdv-rf-desc">
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseRoleForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveRole()">Guardar</button></div>
@@ -2443,13 +2460,26 @@ function gdvInitFacForm(){
     document.getElementById('gdv-group-info').textContent='Seleccioná un grupo para cargar su asistencia.';
     document.getElementById('gdv-members').innerHTML='';
   } else {
-    if(document.getElementById('gdv-admin-sel')) document.getElementById('gdv-admin-sel').classList.add('hidden');
-    const facGid=getFacilitadorGroupId();
-    const g=S.groups.find(x=>Number(x.id)===facGid);
-    const members=g?groupMembers(g.id):[];
-    document.getElementById('gdv-group-info').textContent=g?`${g.name} — ${members.length} miembros activos`:'Sin grupo asignado. Verificá la configuración.';
-    members.forEach(m=>{gdvFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
-    gdvRenderFacMembers(members);
+    const facGids=getFacilitadorGroupIds();
+    const adminSel=document.getElementById('gdv-admin-sel');
+    if(facGids.length>1){
+      // Multiple groups assigned: show a small selector limited to those groups
+      const sel=document.getElementById('gdv-grupo-sel');
+      if(sel){
+        sel.innerHTML='<option value="">— Elegí tu grupo —</option>'+S.groups.filter(g=>facGids.includes(Number(g.id))).map(g=>`<option value="${g.id}">${g.name} (${g.type})</option>`).join('');
+        if(adminSel) adminSel.classList.remove('hidden');
+      }
+      document.getElementById('gdv-group-info').textContent='Tenés varios grupos asignados — elegí cuál cargar.';
+      document.getElementById('gdv-members').innerHTML='';
+    } else {
+      if(adminSel) adminSel.classList.add('hidden');
+      const facGid=facGids[0]||null;
+      const g=S.groups.find(x=>Number(x.id)===facGid);
+      const members=g?groupMembers(g.id):[];
+      document.getElementById('gdv-group-info').textContent=g?`${g.name} — ${members.length} miembros activos`:'Sin grupo asignado. Verificá la configuración.';
+      members.forEach(m=>{gdvFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
+      gdvRenderFacMembers(members);
+    }
   }
   }catch(err){
     var tab=document.getElementById('gdv-tab-cargar');
@@ -2621,8 +2651,9 @@ function gdvRenderVisitTags(){
 }
 
 async function gdvSaveRecord(){
-  let gid=isGdVFacilitador()?getFacilitadorGroupId():currentUser.groupId;
-  if(isGdVAdmin()){const sel=document.getElementById('gdv-grupo-sel');if(sel)gid=parseInt(sel.value)||null;}
+  const facGids=isGdVFacilitador()?getFacilitadorGroupIds():[];
+  let gid=facGids.length===1?facGids[0]:currentUser.groupId;
+  if(isGdVAdmin()||facGids.length>1){const sel=document.getElementById('gdv-grupo-sel');if(sel)gid=parseInt(sel.value)||null;}
   const g=S.groups.find(x=>x.id===gid);
   const fecha=document.getElementById('gdv-fecha').value;
   if(!g||!fecha){alert('Seleccioná grupo y fecha');return;}
@@ -2695,7 +2726,7 @@ async function gdvSaveRecord(){
 }
 
 function gdvRenderMyHistory(){
-  const myGid=getFacilitadorGroupId()||currentUser.groupId;
+  const myGids=getFacilitadorGroupIds();
   // Date filter - default last 30 days
   const hastaEl=document.getElementById('gdv-hist-hasta');
   const desdeEl=document.getElementById('gdv-hist-desde');
@@ -2706,7 +2737,7 @@ function gdvRenderMyHistory(){
   }
   const fd=desdeEl?.value||'';
   const fh=hastaEl?.value||'';
-  let recs=S.records.filter(r=>Number(r.grupoId)===Number(myGid));
+  let recs=S.records.filter(r=>myGids.includes(Number(r.grupoId)));
   if(fd) recs=recs.filter(r=>r.fecha>=fd);
   if(fh) recs=recs.filter(r=>r.fecha<=fh);
   recs=recs.sort((a,b)=>b.fecha.localeCompare(a.fecha));
@@ -3472,15 +3503,15 @@ function gdvRenderRegistros(){
   const sel=document.getElementById('gdv-reg-grupo');
   const fg=sel?.value||'';
   if(sel.options.length<=1){
-    const ownGid=isGdVFacilitador()?getFacilitadorGroupId():null;
-    const groupsToShow=(isGdVFacilitador()&&ownGid)
-      ? S.groups.filter(g=>Number(g.id)===ownGid)
+    const ownGids=isGdVFacilitador()?getFacilitadorGroupIds():[];
+    const groupsToShow=(isGdVFacilitador()&&ownGids.length)
+      ? S.groups.filter(g=>ownGids.includes(Number(g.id)))
       : S.groups;
     groupsToShow.forEach(g=>{const o=document.createElement('option');o.value=g.id;o.textContent=g.name;sel.appendChild(o);});
   }
   let recs=[...S.records];
   // Facilitador: only see their own group's records
-  if(isGdVFacilitador()){const fgid=getFacilitadorGroupId();if(fgid) recs=recs.filter(r=>Number(r.grupoId)===fgid);}
+  if(isGdVFacilitador()){const fgids=getFacilitadorGroupIds();if(fgids.length) recs=recs.filter(r=>fgids.includes(Number(r.grupoId)));}
   if(fg)recs=recs.filter(r=>r.grupoId==fg);
   if(fd)recs=recs.filter(r=>r.fecha>=fd);
   if(fh)recs=recs.filter(r=>r.fecha<=fh);
@@ -3725,14 +3756,14 @@ function gdvRenderRoles(){
     </div>`).join('');
 }
 function gdvOpenNewRole(){
-  gdvEditingRoleId=null;document.getElementById('gdv-rf-title').textContent='Nuevo rol';
+  gdvEditingRoleId=null;document.getElementById('gdv-rf-title').textContent='Nueva función';
   document.getElementById('gdv-rf-name').value='';document.getElementById('gdv-rf-desc').value='';
   document.getElementById('gdv-rf-color').value='#1F4E79';
   document.getElementById('gdv-role-form').classList.remove('hidden');
 }
 function gdvEditRole(id){
   const r=S.roles.find(x=>x.id===id);gdvEditingRoleId=id;
-  document.getElementById('gdv-rf-title').textContent='Editar rol';
+  document.getElementById('gdv-rf-title').textContent='Editar función';
   document.getElementById('gdv-rf-name').value=r.name;
   document.getElementById('gdv-rf-desc').value=r.desc||'';
   document.getElementById('gdv-rf-color').value=r.color;
@@ -5344,7 +5375,11 @@ function nvCumplesBanner(){
   });
   const wrap=document.getElementById('nv-cumples-wrap');
   if(!wrap) return;
-  if(!proximos.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  if(!proximos.length){
+    wrap.innerHTML='<div style="font-size:13px;color:#92400E;font-weight:600">🎂 Sin cumpleaños en los próximos 15 días</div>';
+    return;
+  }
   proximos.sort((a,b)=>a.dias-b.dias);
   wrap.style.display='block';
   wrap.innerHTML='<div style="font-size:13px;color:#92400E;font-weight:600;margin-bottom:6px">🎂 Próximos cumpleaños en Nuevos</div>'+
@@ -5481,7 +5516,7 @@ function cfgRenderPermisosTabla(){
 
   // Step 1: Role selector chips
   var html='<div style="margin-bottom:1.25rem">';
-  html+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">1. Seleccioná un rol para configurar sus permisos:</div>';
+  html+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">1. Seleccioná una función para configurar sus permisos:</div>';
   html+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
   rolesToShow.forEach(function(r){
     var isSelected=cfgPermRolSeleccionado===r.id;
@@ -5531,7 +5566,7 @@ function cfgRenderPermisosTabla(){
     html+='<button class="btn btn-primary" onclick="cfgSavePermisos()">💾 Guardar permisos</button>';
     html+='</div>';
   } else {
-    html+='<div style="text-align:center;padding:2rem;color:#9CA3AF;font-size:13px">← Seleccioná un rol arriba para configurar sus permisos</div>';
+    html+='<div style="text-align:center;padding:2rem;color:#9CA3AF;font-size:13px">← Seleccioná una función arriba para configurar sus permisos</div>';
   }
 
   wrap.innerHTML=html;
@@ -5565,7 +5600,7 @@ function cfgResetPermisosRol(){
     +'<div style="font-size:2rem;margin-bottom:1rem">↺</div>'
     +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:.75rem">Resetear permisos</div>'
     +'<div style="font-size:14px;color:#6B7280;line-height:1.7;margin-bottom:1.5rem">'
-    +'Al resetear se está volviendo la configuración a los <strong>permisos originales</strong> de este rol. '
+    +'Al resetear se está volviendo la configuración a los <strong>permisos originales</strong> de esta función. '
     +'Los cambios realizados se perderán.'
     +'</div>'
     +'<div style="display:flex;gap:10px;justify-content:center">'
@@ -5605,7 +5640,7 @@ function cfgRenderPermisos(){
 
   html+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
   html+='<thead><tr>';
-  html+='<th style="text-align:left;padding:10px 8px;background:#1F4E79;color:#fff;border-radius:8px 0 0 0;white-space:nowrap;min-width:130px">Rol</th>';
+  html+='<th style="text-align:left;padding:10px 8px;background:#1F4E79;color:#fff;border-radius:8px 0 0 0;white-space:nowrap;min-width:130px">Función</th>';
   SCREENS.forEach(function(s){
     html+='<th style="text-align:center;padding:8px 4px;background:#1F4E79;color:#fff;white-space:nowrap;font-size:11px">'+s.label+'</th>';
   });
@@ -5678,7 +5713,7 @@ let roleModalCallback=null; // function to call after save to re-render
 function openRoleModal(id, onSave){
   roleModalEditingId=id||null;
   roleModalCallback=onSave||null;
-  document.getElementById('role-modal-title').textContent=id?'Editar rol':'Nuevo rol';
+  document.getElementById('role-modal-title').textContent=id?'Editar función':'Nueva función';
   if(id){
     const r=S.roles.find(x=>x.id===id);
     if(!r) return;
@@ -5720,7 +5755,7 @@ function showRoleMembers(roleId, roleName){
   document.getElementById('role-members-title').textContent=`${roleName} — ${members.length} miembro${members.length!==1?'s':''}`;
   const list=document.getElementById('role-members-list');
   if(!members.length){
-    list.innerHTML='<div style="text-align:center;padding:1.5rem;color:#9CA3AF;font-size:13px">Ningún miembro tiene este rol asignado.</div>';
+    list.innerHTML='<div style="text-align:center;padding:1.5rem;color:#9CA3AF;font-size:13px">Ninguna persona tiene esta función asignada.</div>';
   } else {
     list.innerHTML=members.map(m=>{
       const g=S.groups.find(x=>x.id===m.grupoId);
@@ -5788,17 +5823,17 @@ function renderHomeCumples(){
       diff:diff,
       genero:m.genero
     };
-  }).filter(function(m){ return m.diff<=30; })
+  }).filter(function(m){ return m.diff<=15; })
     .sort(function(a,b){ return a.diff-b.diff; });
 
   if(!conCumple.length){
-    wrap.innerHTML='';
+    wrap.innerHTML='<div class="card" style="border-left:4px solid #F59E0B;padding:10px 14px;font-size:13px;color:#92400E">🎂 Sin cumpleaños en los próximos 15 días</div>';
     return;
   }
 
   var html='<div class="card" style="border-left:4px solid #F59E0B">';
   html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">';
-  html+='<div class="card-title" style="margin:0">🎂 Próximos cumpleaños <span style="font-size:12px;color:#6B7280;font-weight:400">(próximos 30 días)</span></div>';
+  html+='<div class="card-title" style="margin:0">🎂 Próximos cumpleaños <span style="font-size:12px;color:#6B7280;font-weight:400">(próximos 15 días)</span></div>';
   html+='<span style="font-size:12px;color:#F59E0B;font-weight:600">'+conCumple.length+' cumpleaños</span>';
   html+='</div>';
 

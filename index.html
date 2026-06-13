@@ -1262,10 +1262,23 @@ function saShowActualizarQR(){
 function saCalcEdad(fnac){
   if(!fnac) return '—';
   const hoy=new Date();
-  const nac=new Date(fnac);
+  let nac;
+  if(fnac.indexOf('/')>=0){
+    // DD/MM/AA or DD/MM/AAAA
+    const p=fnac.split('/');
+    if(p.length<3) return '—';
+    let yy=parseInt(p[2]);
+    if(yy<100) yy+=2000;
+    nac=new Date(yy,parseInt(p[1])-1,parseInt(p[0]));
+  } else {
+    // ISO format YYYY-MM-DD
+    nac=new Date(fnac);
+  }
+  if(isNaN(nac.getTime())) return '—';
   let edad=hoy.getFullYear()-nac.getFullYear();
   const m=hoy.getMonth()-nac.getMonth();
   if(m<0||(m===0&&hoy.getDate()<nac.getDate())) edad--;
+  if(edad<0||edad>120) return '—';
   return edad+' años';
 }
 
@@ -2217,7 +2230,7 @@ function buildGdVHTML(){
       <div id="gdv-grupos-list"></div>
       <div id="gdv-group-form" class="card hidden">
         <div class="card-title" id="gdv-gf-title">Nuevo grupo</div>
-        <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-gf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label><select id="gdv-gf-gender"><option>Mujeres</option><option>Hombres</option><option>Mixto</option></select></div></div>
+        <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-gf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label><select id="gdv-gf-gender"><option>Mujeres</option><option>Hombres</option><option>Mixto</option><option>Nuevas Generaciones</option></select></div></div>
         <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Facilitador</label><select id="gdv-gf-fac"></select>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseGroupForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveGroup()">Guardar</button></div>
       </div>
@@ -2310,7 +2323,7 @@ function gdvGruposHTML(){return `
   <div id="gdv-grupos-list"></div>
   <div id="gdv-group-form" class="card hidden">
     <div class="card-title" id="gdv-gf-title">Nuevo grupo</div>
-    <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-gf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label><select id="gdv-gf-gender"><option>Mujeres</option><option>Hombres</option><option>Mixto</option></select></div></div>
+    <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-gf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label><select id="gdv-gf-gender"><option>Mujeres</option><option>Hombres</option><option>Mixto</option><option>Nuevas Generaciones</option></select></div></div>
     <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Facilitador</label><select id="gdv-gf-fac"></select>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseGroupForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveGroup()">Guardar</button></div>
   </div>`;}
@@ -7153,7 +7166,7 @@ boot();
     <div class="card-title" id="cfg-gf-title">Nuevo grupo</div>
     <div class="form-row">
       <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="cfg-gf-name" style="width:100%"></div>
-      <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label><select id="cfg-gf-gender" style="width:100%"><option>Mujeres</option><option>Hombres</option><option>Mixto</option></select></div>
+      <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label><select id="cfg-gf-gender" style="width:100%"><option>Mujeres</option><option>Hombres</option><option>Mixto</option><option>Nuevas Generaciones</option></select></div>
     </div>
     <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Facilitador asignado</label>
     <select id="cfg-gf-fac" style="width:100%"></select>

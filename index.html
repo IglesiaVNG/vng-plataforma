@@ -1268,7 +1268,10 @@ function saCalcEdad(fnac){
     const p=fnac.split('/');
     if(p.length<3) return '—';
     let yy=parseInt(p[2]);
-    if(yy<100) yy+=2000;
+    if(yy<100){
+      const curYY=hoy.getFullYear()%100;
+      yy += (yy>curYY) ? 1900 : 2000;
+    }
     nac=new Date(yy,parseInt(p[1])-1,parseInt(p[0]));
   } else {
     // ISO format YYYY-MM-DD
@@ -5390,8 +5393,11 @@ function nvCalcEdad(fnac){
   if(parts.length<3) return null;
   const dd=parseInt(parts[0]),mm=parseInt(parts[1]);
   let yy=parseInt(parts[2]);
-  if(yy<100) yy+=2000;
   const hoy=new Date();
+  if(yy<100){
+    const curYY=hoy.getFullYear()%100;
+    yy += (yy>curYY) ? 1900 : 2000;
+  }
   let edad=hoy.getFullYear()-yy;
   const mDiff=hoy.getMonth()+1-mm;
   if(mDiff<0||(mDiff===0&&hoy.getDate()<dd)) edad--;

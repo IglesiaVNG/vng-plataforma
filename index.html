@@ -1269,20 +1269,44 @@ function saShowActualizarQR(){
     overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
     document.body.appendChild(overlay);
   }
+  var waUrl='https://wa.me/?text='+encodeURIComponent('Hola! Te pido un minuto para actualizar tus datos en la iglesia: '+url);
   overlay.innerHTML=`<div style="background:#fff;border-radius:16px;padding:2rem;max-width:420px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.2)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-      <div style="font-size:15px;font-weight:700;color:#1F4E79">📱 QR — Actualizar datos</div>
+      <div style="font-size:15px;font-weight:700;color:#1F4E79">📱 Actualizar datos</div>
       <button onclick="document.getElementById('sa-qr-overlay').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer">✕</button>
     </div>
     <div style="background:#F9FAFB;border-radius:12px;padding:1.5rem;margin-bottom:1rem">
       <img src="${qrUrl}" alt="QR" style="width:200px;height:200px;display:block;margin:0 auto 1rem">
-      <div style="font-size:13px;color:#6B7280">Cada miembro escanea este QR, busca su nombre y completa: Celular, Fecha de nacimiento y Barrio / Ciudad</div>
+      <div style="font-size:13px;color:#6B7280">Escaneá el QR, o compartí el link por WhatsApp. La persona busca su nombre y completa: Celular, Fecha de nacimiento y Barrio / Ciudad</div>
     </div>
-    <div style="font-size:12px;color:#6B7280;background:#FEF9C3;border-radius:8px;padding:8px">
-      💡 Los datos se guardan en el mismo navegador. Recomendamos que lo hagan desde la misma computadora donde está la app.
+    <div style="display:flex;gap:6px;margin-bottom:.75rem">
+      <input id="sa-actualizar-link" type="text" readonly value="${url}" style="flex:1;padding:9px 10px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:12px;color:#374151;background:#F9FAFB" onclick="this.select()">
+      <button onclick="saCopyActualizarLink()" id="sa-copy-link-btn" class="btn btn-sm" style="white-space:nowrap">📋 Copiar</button>
+    </div>
+    <a href="${waUrl}" target="_blank" rel="noopener" class="btn btn-sm" style="display:block;background:#16A34A;color:#fff;border:none;text-decoration:none;padding:10px;border-radius:8px;font-weight:600;margin-bottom:.75rem">
+      💬 Compartir por WhatsApp
+    </a>
+    <div style="font-size:12px;color:#6B7280;background:#EFF6FF;border-radius:8px;padding:8px">
+      💡 Los datos se sincronizan automáticamente a la nube — funciona desde cualquier celular o computadora.
     </div>
   </div>`;
   overlay.style.display='flex';
+}
+
+function saCopyActualizarLink(){
+  var input=document.getElementById('sa-actualizar-link');
+  var btn=document.getElementById('sa-copy-link-btn');
+  if(!input) return;
+  var done=function(){
+    if(btn){var t=btn.textContent;btn.textContent='✅ Copiado';setTimeout(function(){btn.textContent=t;},1500);}
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(input.value).then(done).catch(function(){
+      input.select();document.execCommand('copy');done();
+    });
+  } else {
+    input.select();document.execCommand('copy');done();
+  }
 }
 
 function saCalcEdad(fnac){
@@ -6796,8 +6820,8 @@ function buildPublicActualizarForm(){
   if(!qrEnabled){
     return `<div style="background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:440px;box-shadow:0 4px 24px rgba(0,0,0,.1);text-align:center">
       <div style="font-size:2.5rem;margin-bottom:.5rem">🔒</div>
-      <div style="font-size:18px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">Actualización de datos no disponible</div>
-      <div style="font-size:13px;color:#6B7280">Por el momento esta opción está deshabilitada. Si necesitás actualizar tus datos, contactá a un líder de tu Grupo de Vida.</div>
+      <div style="font-size:18px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">Acceso no disponible en este momento</div>
+      <div style="font-size:13px;color:#6B7280">Esta opción está temporalmente deshabilitada. Si necesitás actualizar tus datos, contactá a un líder de tu Grupo de Vida.</div>
     </div>`;
   }
 

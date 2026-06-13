@@ -1177,7 +1177,18 @@ function buildMiembrosHTML(){
           <button class="btn btn-sm" onclick="saCloseDetail()">✕</button>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px" id="sa-detail-body"></div>
+      <div class="nav" style="margin-bottom:.75rem;flex-wrap:wrap">
+        <button class="nav-btn active" onclick="saDetailTab('generales',this)" style="font-size:12px;padding:6px 10px">📋 Generales</button>
+        <button class="nav-btn" onclick="saDetailTab('personales',this)" style="font-size:12px;padding:6px 10px">👤 Personales</button>
+        <button class="nav-btn" onclick="saDetailTab('formacion',this)" style="font-size:12px;padding:6px 10px">🎓 Formación</button>
+        <button class="nav-btn" onclick="saDetailTab('servicio',this)" style="font-size:12px;padding:6px 10px">🤝 Servicio</button>
+        <button class="nav-btn" onclick="saDetailTab('historial',this)" style="font-size:12px;padding:6px 10px">📜 Historial</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px" id="sa-detail-generales"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;display:none" id="sa-detail-personales"></div>
+      <div style="display:none" id="sa-detail-formacion"></div>
+      <div style="display:none" id="sa-detail-servicio"></div>
+      <div style="display:none" id="sa-detail-historial"></div>
     </div>
 
     <!-- MODAL nuevo/editar miembro -->
@@ -1216,6 +1227,10 @@ function buildMiembrosHTML(){
           <input type="date" id="sa-mf-fnac"></div>
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label>
           <input type="tel" id="sa-mf-tel" placeholder="+54 ..."></div>
+      </div>
+      <div class="form-row" id="sa-mf-fechaingreso-row" style="display:none">
+        <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de ingreso <span style="color:#9CA3AF;font-weight:400">(solo Super Admin)</span></label>
+          <input type="date" id="sa-mf-fechaingreso"></div>
       </div>
       <div style="margin-top:10px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Barrio / Ciudad</label>
         <input type="text" id="sa-mf-dir" placeholder="Barrio y número"></div>
@@ -1382,6 +1397,21 @@ function renderMiembrosStandalone(){
   }).join('');
 }
 
+function saDetailLabel(text,html,fullWidth){
+  return `<div${fullWidth?' style="grid-column:1/-1"':''}><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${text}</div><div style="font-size:13px;font-weight:500">${html}</div></div>`;
+}
+
+function saDetailTab(tab,btn){
+  document.querySelectorAll('#sa-detail-panel .nav-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  ['generales','personales','formacion','servicio','historial'].forEach(t=>{
+    const el=document.getElementById('sa-detail-'+t);
+    if(!el) return;
+    if(t===tab) el.style.display=(t==='generales'||t==='personales')?'grid':'block';
+    else el.style.display='none';
+  });
+}
+
 function saShowDetail(id,event){
   if(saDetailMemberId===id){saCloseDetail();return;}
   saDetailMemberId=id;
@@ -1390,18 +1420,33 @@ function saShowDetail(id,event){
   if(!m) return;
   const g=S.groups.find(x=>Number(x.id)===Number(m.grupoId));
   document.getElementById('sa-detail-name').textContent=fullName(m);
-  document.getElementById('sa-detail-body').innerHTML=`
-    <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Género</div><div style="font-size:13px;font-weight:500">${m.genero==='H'?'Hombre':'Mujer'}</div></div>
-    <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Grupo</div><div style="font-size:13px;font-weight:500">${g?g.name:'<span style="color:#F59E0B">Sin grupo asignado</span>'}</div></div>
-    <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Condición</div>${saCondicionBadge(m.condicion)}</div>
-    <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Estado</div><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></div>
-    <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Fecha nacimiento</div><div style="font-size:13px;font-weight:500">${saFmtDate(m.fnac)||'—'}</div></div>
-    <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Edad</div><div style="font-size:13px;font-weight:500">${saCalcEdad(m.fnac)}</div></div>
-    <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Teléfono</div><div style="font-size:13px;font-weight:500">${m.tel||'—'}</div></div>
-    <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Barrio / Ciudad</div><div style="font-size:13px;font-weight:500">${m.dir||'—'}</div></div>
-    ${(m.roles||[]).length?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Función</div>${roleChips(m.roles)}</div>`:''}
-    ${m.estado==='Baja'?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#DC2626;margin-bottom:4px">Fecha de baja</div><div style="font-size:13px;font-weight:500;color:#DC2626">${saFmtDate(m.fechaBaja||'')}</div></div>`:''}
-  `;
+
+  // ── Tab 1: Datos Generales (institucional) ──
+  document.getElementById('sa-detail-generales').innerHTML=
+    saDetailLabel('Grupo', g?g.name:'<span style="color:#F59E0B">Sin grupo asignado</span>')
+    + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Condición</div>${saCondicionBadge(m.condicion)}</div>`
+    + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Estado</div><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></div>`
+    + saDetailLabel('Fecha de ingreso', saFmtDate(m.fechaIngreso)||'—')
+    + ((m.roles||[]).length?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Función</div>${roleChips(m.roles)}</div>`:'')
+    + (m.estado==='Baja'?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#DC2626;margin-bottom:4px">Fecha de baja</div><div style="font-size:13px;font-weight:500;color:#DC2626">${saFmtDate(m.fechaBaja||'')}</div></div>`:'');
+
+  // ── Tab 2: Datos Personales (contacto/demográfico) ──
+  document.getElementById('sa-detail-personales').innerHTML=
+    saDetailLabel('Género', m.genero==='H'?'Hombre':'Mujer')
+    + saDetailLabel('Teléfono', m.tel||'—')
+    + saDetailLabel('Fecha nacimiento', saFmtDate(m.fnac)||'—')
+    + saDetailLabel('Edad', saCalcEdad(m.fnac))
+    + saDetailLabel('Barrio / Ciudad', m.dir||'—', true);
+
+  // ── Tabs 3-5: en construcción ──
+  const proximamente='<div class="empty" style="padding:1.5rem 0">🚧 Próximamente</div>';
+  document.getElementById('sa-detail-formacion').innerHTML=proximamente;
+  document.getElementById('sa-detail-servicio').innerHTML=proximamente;
+  document.getElementById('sa-detail-historial').innerHTML=proximamente;
+
+  // Reset to first tab
+  saDetailTab('generales', document.querySelector('#sa-detail-panel .nav-btn'));
+
   const panel=document.getElementById('sa-detail-panel');
   const backdrop=document.getElementById('sa-backdrop');
   // Show centered fixed overlay
@@ -1453,6 +1498,12 @@ function saOpenNewMember(){
   if(grpSel) grpSel.value='';
   saBuildRoleSelector([]);
   saBuildGruposExtra([]);
+  const fiRow=document.getElementById('sa-mf-fechaingreso-row');
+  const fiInput=document.getElementById('sa-mf-fechaingreso');
+  if(fiRow&&fiInput){
+    if(isSuperAdmin()){ fiRow.style.display='block'; fiInput.value=''; }
+    else fiRow.style.display='none';
+  }
   const overlay=document.getElementById('sa-member-modal-overlay');
   overlay.style.display='flex';
 }
@@ -6753,7 +6804,17 @@ function buildPublicActualizarForm(){
   var membersJson=localStorage.getItem('gdv_m5')||'[]';
   var members=[];
   try{members=JSON.parse(membersJson);}catch(e){}
-  var activos=members.filter(function(m){return m.estado!=='Baja';});
+
+  // Only show members with missing data (same criteria as the pink highlight
+  // in Miembros): no apellido (or only "(...)"), no celular, or no fecha de nacimiento.
+  // As people update their data, they disappear from this list.
+  var activos=members.filter(function(m){
+    if(m.estado==='Baja') return false;
+    if(m.condicion==='Nuevo'||m.condicion==='Historico') return false;
+    var apellidoLimpio=(m.apellido||'').replace(/\([^)]*\)/g,'').trim();
+    var telLimpio=(m.tel||'').replace(/[^0-9]/g,'');
+    return !apellidoLimpio || !telLimpio || !m.fnac;
+  });
 
   // Sort alphabetically by full name
   activos=activos.slice().sort(function(a,b){
@@ -6771,6 +6832,13 @@ function buildPublicActualizarForm(){
       <div style="font-size:13px;color:#6B7280;margin-top:4px">Iglesia Vida Nueva · Gerli</div>
     </div>
     <div id="pau-step1">
+      ${activos.length===0?`
+      <div style="text-align:center;padding:1.5rem 0">
+        <div style="font-size:2.5rem;margin-bottom:.5rem">✅</div>
+        <div style="font-size:15px;font-weight:700;color:#16A34A;margin-bottom:.5rem">¡Todo al día!</div>
+        <div style="font-size:13px;color:#6B7280">Por ahora no hay datos pendientes de actualizar. ¡Gracias!</div>
+      </div>
+      `:`
       <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">¿Cuál es tu nombre?</label>
       <select id="pau-member-sel" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;margin-bottom:1rem">
         <option value="">— Buscá tu nombre —</option>
@@ -6779,6 +6847,7 @@ function buildPublicActualizarForm(){
       <button onclick="pauCargarDatos()" style="width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">
         Continuar →
       </button>
+      `}
     </div>
     <div id="pau-step2" style="display:none">
       <div id="pau-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px"></div>

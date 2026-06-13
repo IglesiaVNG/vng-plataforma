@@ -1380,6 +1380,9 @@ function renderMiembrosStandalone(){
   else if(fEstado==='Baja') members=members.filter(m=>m.estado==='Baja');
   // '' = todos
 
+  // Orden alfabético por Nombre
+  members=members.slice().sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'','es',{sensitivity:'base'}));
+
   const activos=S.members.filter(m=>m.estado!=='Baja').length;
   const countEl=document.getElementById('sa-member-count');
   if(countEl) countEl.textContent=activos;

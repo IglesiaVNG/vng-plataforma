@@ -1174,6 +1174,7 @@ function buildMiembrosHTML(){
         <div style="font-size:14px;font-weight:600;color:#1F4E79" id="sa-detail-name">—</div>
         <div style="display:flex;gap:6px">
           ${canEditMiembros()?`<button class="btn btn-primary btn-sm" onclick="saEditFromDetail()">✏️ Editar</button>`:''}
+          ${isSuperAdmin()?`<button class="btn btn-sm btn-danger" onclick="saDeleteMember(saDetailMemberId)">🗑 Eliminar</button>`:''}
           <button class="btn btn-sm" onclick="saCloseDetail()">✕</button>
         </div>
       </div>
@@ -1207,7 +1208,7 @@ function buildMiembrosHTML(){
           <select id="sa-mf-genero"><option value="H">Hombre</option><option value="M">Mujer</option></select></div>
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label>
           <select id="sa-mf-grupo" onchange="saBuildGruposExtra(saSelectedGruposExtra)"></select>
-          <div style="font-size:12px;color:#4B5563;display:block;margin:8px 0 4px">Grupos adicionales (a cargo de más de un Grupo de Vida)</div>
+          <div style="font-size:12px;color:#4B5563;display:block;margin:8px 0 4px">Grupos Adicionales Relacionados</div>
           <div id="sa-mf-grupos-extra" style="display:flex;flex-wrap:wrap;gap:6px"></div>
         </div>
       </div>
@@ -1219,7 +1220,7 @@ function buildMiembrosHTML(){
             <option value="Nuevo">Nuevo (primer mes)</option>
           </select></div>
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Estado</label>
-          <select id="sa-mf-estado"><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option></select></div>
+          <select id="sa-mf-estado" onchange="saCheckEstadoChange()"><option value="Activo">Activo</option><option value="Baja">Baja</option></select></div>
       </div>
       <div style="border-top:1px solid #E5E7EB;margin:14px 0 10px;padding-top:10px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">Datos personales (opcionales)</div>
       <div class="form-row">
@@ -1231,6 +1232,10 @@ function buildMiembrosHTML(){
       <div class="form-row" id="sa-mf-fechaingreso-row" style="display:none">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de ingreso <span style="color:#9CA3AF;font-weight:400">(solo Super Admin)</span></label>
           <input type="date" id="sa-mf-fechaingreso"></div>
+      </div>
+      <div id="sa-mf-motivo-row" style="display:none;margin-top:10px">
+        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Motivo del cambio de estado <span style="color:#9CA3AF;font-weight:400">(mín. 10 caracteres)</span></label>
+        <textarea id="sa-mf-motivo" rows="2" placeholder="Ej: se mudó de barrio, deja de asistir, etc." style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit"></textarea>
       </div>
       <div style="margin-top:10px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Barrio / Ciudad</label>
         <input type="text" id="sa-mf-dir" placeholder="Barrio y número"></div>
@@ -1371,7 +1376,7 @@ function renderMiembrosStandalone(){
   let members=S.members.filter(m=>m.condicion!=='Nuevo');
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo==='nogroup') members=members.filter(m=>!m.grupoId);
-  else if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
+  else if(fGrupo) members=members.filter(m=>Number(m.grupoId)===Number(fGrupo) || (m.grupoIds||[]).map(Number).includes(Number(fGrupo)));
   if(fGen)   members=members.filter(m=>m.genero===fGen);
   if(fRol)   members=members.filter(m=>(m.roles||[]).includes(fRol));
   if(fCond)  members=members.filter(m=>m.condicion===fCond);
@@ -1399,7 +1404,8 @@ function renderMiembrosStandalone(){
   }
 
   tbody.innerHTML=members.map(m=>{
-    const g=S.groups.find(x=>x.id===m.grupoId);
+    const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
+    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
     const genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
     const genColor=m.genero==='H'?'#1E40AF':'#9D174D';
     const isBaja=m.estado==='Baja';
@@ -1415,7 +1421,7 @@ function renderMiembrosStandalone(){
         ${isBaja?`<div style="font-size:11px;color:#DC2626;margin-top:2px">Baja: ${saFmtDate(m.fechaBaja||'')}</div>`:''}
       </td>
       <td><span style="background:${genBg};color:${genColor};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${m.genero}</span></td>
-      <td style="color:#6B7280;font-size:12px">${g?g.name:'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
+      <td style="color:#6B7280;font-size:12px">${memberGroups.length?memberGroups.map(gr=>`<div>${gr.name}</div>`).join(''):'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
       <td style="max-width:180px"><div style="display:flex;flex-wrap:wrap;gap:3px;max-height:52px;overflow:hidden">${roleChips(m.roles||[])}</div></td>
       <td>${saCondicionBadge(m.condicion)}</td>
       <td><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></td>
@@ -1428,6 +1434,10 @@ function saDetailLabel(text,html,fullWidth){
   return `<div${fullWidth?' style="grid-column:1/-1"':''}><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${text}</div><div style="font-size:13px;font-weight:500">${html}</div></div>`;
 }
 
+function saToggleEstadoHistorial(){
+  const el=document.getElementById('sa-estado-historial');
+  if(el) el.style.display=(el.style.display==='none')?'block':'none';
+}
 function saDetailTab(tab,btn){
   document.querySelectorAll('#sa-detail-panel .nav-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
@@ -1455,7 +1465,15 @@ function saShowDetail(id,event){
     + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Estado</div><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></div>`
     + saDetailLabel('Fecha de ingreso', saFmtDate(m.fechaIngreso)||'—')
     + ((m.roles||[]).length?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Función</div>${roleChips(m.roles)}</div>`:'')
-    + (m.estado==='Baja'?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#DC2626;margin-bottom:4px">Fecha de baja</div><div style="font-size:13px;font-weight:500;color:#DC2626">${saFmtDate(m.fechaBaja||'')}</div></div>`:'');
+    + (m.estado==='Baja'?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#DC2626;margin-bottom:4px">Fecha de baja</div><div style="font-size:13px;font-weight:500;color:#DC2626">${saFmtDate(m.fechaBaja||'')}</div></div>`:'')
+    + (m.estadoMotivo?`<div style="grid-column:1/-1">
+        <div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Motivo (último cambio de estado — ${saFmtDate(m.estadoMotivoFecha||'')})</div>
+        <div style="font-size:13px;font-weight:500">${m.estadoMotivo}</div>
+        ${(m.estadoHistorial&&m.estadoHistorial.length>1)?`<span style="font-size:12px;color:#1F4E79;cursor:pointer;text-decoration:underline" onclick="saToggleEstadoHistorial()">Ver historial completo (${m.estadoHistorial.length})</span>
+        <div id="sa-estado-historial" style="display:none;margin-top:6px;border-top:1px solid #F3F4F6;padding-top:6px">
+          ${m.estadoHistorial.slice().reverse().map(h=>`<div style="font-size:12px;color:#4B5563;margin-bottom:4px"><strong>${saFmtDate(h.fecha)}</strong> — ${h.de} → ${h.a}: ${h.motivo}</div>`).join('')}
+        </div>`:''}
+      </div>`:'');
 
   // ── Tab 2: Datos Personales (contacto/demográfico) ──
   document.getElementById('sa-detail-personales').innerHTML=
@@ -1513,6 +1531,24 @@ function saToggleRole(rid,el){
   else{saSelectedRoles.push(rid);el.classList.add('selected');}
 }
 
+let saSelectedGruposExtra=[];
+function saBuildGruposExtra(selected){
+  saSelectedGruposExtra=(selected||[]).map(Number);
+  const wrap=document.getElementById('sa-mf-grupos-extra');
+  if(!wrap) return;
+  const primaryGid=parseInt(document.getElementById('sa-mf-grupo')?.value)||null;
+  wrap.innerHTML=S.groups.filter(g=>Number(g.id)!==Number(primaryGid)).map(g=>`
+    <div class="role-option ${saSelectedGruposExtra.includes(Number(g.id))?'selected':''}" onclick="saToggleGrupoExtra(${g.id},this)" style="font-size:12px">
+      ${g.name}
+    </div>`).join('');
+}
+function saToggleGrupoExtra(gid,el){
+  gid=Number(gid);
+  const idx=saSelectedGruposExtra.indexOf(gid);
+  if(idx>=0){saSelectedGruposExtra.splice(idx,1);el.classList.remove('selected');}
+  else{saSelectedGruposExtra.push(gid);el.classList.add('selected');}
+}
+
 function saOpenNewMember(){
   saEditingMemberId=null;
   document.getElementById('sa-mf-title').textContent='Nuevo miembro';
@@ -1535,6 +1571,15 @@ function saOpenNewMember(){
   overlay.style.display='flex';
 }
 
+let saOriginalEstado='Activo';
+function saCheckEstadoChange(){
+  const sel=document.getElementById('sa-mf-estado');
+  const row=document.getElementById('sa-mf-motivo-row');
+  if(!sel||!row) return;
+  if(sel.value!==saOriginalEstado) row.style.display='block';
+  else row.style.display='none';
+}
+
 function saEditMember(id){
   const m=S.members.find(x=>Number(x.id)===Number(id));
   if(!m){alert('Miembro no encontrado (id='+id+')');return;}
@@ -1552,11 +1597,29 @@ function saEditMember(id){
   }
   if(mgsel) mgsel.value=m.grupoId||'';
   document.getElementById('sa-mf-condicion').value=m.condicion||'Asistente';
-  document.getElementById('sa-mf-estado').value=m.estado==='Baja'?'Inactivo':m.estado||'Activo';
+  saOriginalEstado=m.estado==='Baja'?'Baja':'Activo';
+  document.getElementById('sa-mf-estado').value=saOriginalEstado;
   document.getElementById('sa-mf-tel').value=m.tel||'';
   document.getElementById('sa-mf-dir').value=m.dir||'';
   const fnac=document.getElementById('sa-mf-fnac');if(fnac)fnac.value=m.fnac||'';
   saBuildRoleSelector(m.roles||[]);
+  saBuildGruposExtra(m.grupoIds||[]);
+  // Motivo: oculto hasta que cambien el Estado
+  const motivoRow=document.getElementById('sa-mf-motivo-row');
+  const motivoInput=document.getElementById('sa-mf-motivo');
+  if(motivoRow) motivoRow.style.display='none';
+  if(motivoInput) motivoInput.value='';
+  // Fecha de ingreso: solo visible/editable para Super Admin
+  const fiRow=document.getElementById('sa-mf-fechaingreso-row');
+  const fiInput=document.getElementById('sa-mf-fechaingreso');
+  if(fiRow&&fiInput){
+    if(isSuperAdmin()){
+      fiRow.style.display='block';
+      fiInput.value=m.fechaIngreso||'';
+    } else {
+      fiRow.style.display='none';
+    }
+  }
   saCloseDetail();
   const overlay=document.getElementById('sa-member-modal-overlay');
   overlay.style.display='flex';
@@ -1566,21 +1629,72 @@ async function saSaveMember(){
   const nombre=document.getElementById('sa-mf-nombre').value.trim();
   const apellido=document.getElementById('sa-mf-apellido').value.trim();
   if(!nombre){alert('Ingresá el nombre');return;}
+
+  const nuevoEstado=document.getElementById('sa-mf-estado').value;
+  const estadoCambio=nuevoEstado!==saOriginalEstado;
+  let motivo='';
+  if(estadoCambio){
+    motivo=(document.getElementById('sa-mf-motivo')?.value||'').trim();
+    if(motivo.length<10){
+      alert('Para cambiar el Estado, indicá un Motivo de al menos 10 caracteres.');
+      return;
+    }
+  }
+
+  const primaryGid=document.getElementById('sa-mf-grupo').value?parseInt(document.getElementById('sa-mf-grupo').value):null;
   const data={
     nombre,apellido,
     genero:document.getElementById('sa-mf-genero').value,
-    grupoId:document.getElementById('sa-mf-grupo').value?parseInt(document.getElementById('sa-mf-grupo').value):null,
+    grupoId:primaryGid,
+    grupoIds:saSelectedGruposExtra.filter(gid=>gid!==primaryGid),
     condicion:document.getElementById('sa-mf-condicion').value,
-    estado:document.getElementById('sa-mf-estado').value,
+    estado:nuevoEstado,
     tel:document.getElementById('sa-mf-tel').value.trim(),
     dir:document.getElementById('sa-mf-dir').value.trim(),
     fnac:document.getElementById('sa-mf-fnac')?.value||'',
     roles:[...saSelectedRoles]
   };
-  if(saEditingMemberId) Object.assign(S.members.find(x=>x.id===saEditingMemberId),data);
-  else S.members.push({id:Date.now(),...data});
+  // Fecha de ingreso: solo Super Admin puede modificarla
+  if(isSuperAdmin()){
+    const fiInput=document.getElementById('sa-mf-fechaingreso');
+    if(fiInput) data.fechaIngreso=fiInput.value||'';
+  }
+
+  let target;
+  if(saEditingMemberId){
+    target=S.members.find(x=>Number(x.id)===Number(saEditingMemberId));
+    if(target) Object.assign(target,data);
+  } else {
+    target={id:Date.now(),...data};
+    S.members.push(target);
+  }
+
+  // Registrar el cambio de estado en el historial
+  if(estadoCambio&&target){
+    target.estadoHistorial=target.estadoHistorial||[];
+    target.estadoHistorial.push({
+      fecha:new Date().toISOString().slice(0,10),
+      de:saOriginalEstado,
+      a:nuevoEstado,
+      motivo
+    });
+    target.estadoMotivo=motivo;
+    target.estadoMotivoFecha=new Date().toISOString().slice(0,10);
+    if(nuevoEstado==='Baja') target.fechaBaja=new Date().toISOString().slice(0,10);
+  }
+
   await saveK(SK.members,S.members);
   saCloseMemberForm();
+  renderMiembrosStandalone();
+}
+
+async function saDeleteMember(id){
+  const m=S.members.find(x=>Number(x.id)===Number(id));
+  if(!m) return;
+  if(!confirm('¿Eliminar definitivamente a '+fullName(m)+'? Esta acción no se puede deshacer.')) return;
+  S.members=S.members.filter(x=>Number(x.id)!==Number(id));
+  await saveK(SK.members,S.members);
+  saCloseDetail();
   renderMiembrosStandalone();
 }
 
@@ -1928,7 +2042,8 @@ function cfgRenderUsuarios(){
       .filter(m=>m.estado!=='Baja'&&!existingNames.includes(fullName(m).toLowerCase()))
       .sort((a,b)=>fullName(a).localeCompare(fullName(b)))
       .forEach(m=>{
-        const g=S.groups.find(x=>x.id===m.grupoId);
+        const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
+    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
         const opt=document.createElement('option');
         opt.value=m.id;
         opt.textContent=fullName(m)+(g?' — '+g.name:'');
@@ -3707,11 +3822,12 @@ function gdvRenderMiembros(){
   if(fGen)members=members.filter(m=>m.genero===fGen);
   document.getElementById('gdv-member-count').textContent=S.members.filter(m=>m.estado==='Activo').length;
   document.getElementById('gdv-member-tbody').innerHTML=members.map(m=>{
-    const g=S.groups.find(x=>x.id===m.grupoId);
+    const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
+    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
     return `<tr>
       <td><strong>${fullName(m)}</strong></td>
       <td><span style="background:${m.genero==='H'?'#DBEAFE':'#FCE7F3'};color:${m.genero==='H'?'#1E40AF':'#9D174D'};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${m.genero}</span></td>
-      <td style="color:#6B7280;font-size:12px">${g?g.name:'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
+      <td style="color:#6B7280;font-size:12px">${memberGroups.length?memberGroups.map(gr=>`<div>${gr.name}</div>`).join(''):'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
       <td>${roleChips(m.roles||[])}</td>
       <td><span class="badge ${m.estado==='Activo'?'b-ok':'b-muted'}">${m.estado}</span></td>
       <td style="white-space:nowrap"><button class="btn btn-sm" onclick="gdvEditMember(${m.id})" style="margin-right:4px">✏️</button><button class="btn btn-sm btn-danger" onclick="gdvDeleteMember(${m.id})">🗑</button></td>
@@ -5231,7 +5347,8 @@ function renderNuevos(){
   }
 
   wrap.innerHTML=members.map(m=>{
-    const g=S.groups.find(x=>x.id===m.grupoId);
+    const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
+    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
     const genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
     const genColor=m.genero==='H'?'#1E40AF':'#9D174D';
     const edad=saCalcEdad(m.fnac);
@@ -5588,7 +5705,8 @@ function nvOpenSeguimientoSelector(){
   }
   const filtered=search?activos.filter(m=>fullName(m).toLowerCase().includes(search)):activos;
   wrap.innerHTML=filtered.slice(0,30).map(m=>{
-    const g=S.groups.find(x=>x.id===m.grupoId);
+    const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
+    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
     return `<div onclick="nvSelectSeguimiento(${m.id},'${fullName(m).replace(/'/g,"\'")}','${g?g.name:''}')"
       style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px;display:flex;align-items:center;gap:8px"
       onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background=''">
@@ -5897,7 +6015,8 @@ function showRoleMembers(roleId, roleName){
     list.innerHTML='<div style="text-align:center;padding:1.5rem;color:#9CA3AF;font-size:13px">Ninguna persona tiene esta función asignada.</div>';
   } else {
     list.innerHTML=members.map(m=>{
-      const g=S.groups.find(x=>x.id===m.grupoId);
+      const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
+    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
       const genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
       const genColor=m.genero==='H'?'#1E40AF':'#9D174D';
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F3F4F6">
@@ -7015,7 +7134,8 @@ function exportNuevosExcel(){
   if(fGen)   members=members.filter(m=>m.genero===fGen);
 
   const rows=members.map(m=>{
-    const g=S.groups.find(x=>x.id===m.grupoId);
+    const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
+    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
     return {
       nombre:m.nombre,
       apellido:m.apellido,
@@ -7069,7 +7189,8 @@ function exportMiembrosExcel(){
   else if(fEstado==='Baja') members=members.filter(m=>m.estado==='Baja');
 
   const rows=members.map(m=>{
-    const g=S.groups.find(x=>x.id===m.grupoId);
+    const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
+    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
     const roles=(m.roles||[]).map(rid=>{
       const r=S.roles.find(x=>x.id===rid);
       return r?r.name:'';

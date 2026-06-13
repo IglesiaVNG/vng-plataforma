@@ -373,7 +373,7 @@ const db = getFirestore(fbApp);
 
 // ── Keys grouped by document (max ~900KB each) ──
 const KEY_GROUPS = {
-  'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_permisos'],
+  'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_permisos','gdv_qr_actualizar'],
   'members': ['gdv_m5'],
   'records': ['gdv_r5'],
   'disc':    ['gdv_disc_pasos','gdv_disc_records'],
@@ -536,7 +536,13 @@ let PERMISOS={};
 
 function cleanMembers(){
   // Remove any null/undefined entries from S.members
-  if(S.members) S.members=S.members.filter(m=>m&&m.id);
+  if(!S.members) return;
+  S.members=S.members.filter(m=>m&&m.id);
+  // Merge legacy m.barrio (from QR update form) into m.dir (Barrio/Ciudad field)
+  S.members.forEach(m=>{
+    if(m.barrio && !m.dir){ m.dir=m.barrio; }
+    if(m.barrio) delete m.barrio;
+  });
 }
 
 function loadPermisos(){
@@ -1200,8 +1206,8 @@ function buildMiembrosHTML(){
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label>
           <input type="tel" id="sa-mf-tel" placeholder="+54 ..."></div>
       </div>
-      <div style="margin-top:10px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Dirección</label>
-        <input type="text" id="sa-mf-dir" placeholder="Calle y número"></div>
+      <div style="margin-top:10px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Barrio / Ciudad</label>
+        <input type="text" id="sa-mf-dir" placeholder="Barrio y número"></div>
       <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Funciones asignadas</label>
       <div class="role-selector" id="sa-mf-roles"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
@@ -1653,8 +1659,28 @@ function configTab(sub, btn){
       '📂 Importar datos'+
       '<input type="file" accept=".json" style="display:none" onchange="importarTodo(this)">'+
       '</label>'+
-      '</div></div>';
+      '</div>'+
+      (isSuperAdmin()?(
+      '<div class="card" style="text-align:center;padding:1.5rem">'+
+      '<div style="font-size:2.5rem;margin-bottom:.75rem">🔐</div>'+
+      '<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">QR — Actualizar datos (Miembros)</div>'+
+      '<div style="font-size:13px;color:#6B7280;margin-bottom:1rem">Controlá si las personas pueden actualizar sus propios datos desde el QR público. Solo Super Admin puede cambiar esto.</div>'+
+      '<label style="display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;color:#374151">'+
+      '<input type="checkbox" id="cfg-qr-actualizar-toggle" '+(localStorage.getItem('gdv_qr_actualizar')!=='false'?'checked':'')+' onchange="cfgToggleQrActualizar(this.checked)" style="width:20px;height:20px">'+
+      '<span id="cfg-qr-actualizar-label">'+(localStorage.getItem('gdv_qr_actualizar')!=='false'?'Habilitado':'Inhabilitado')+'</span>'+
+      '</label>'+
+      '</div>'
+      ):'')+
+      '</div>';
   }
+}
+
+async function cfgToggleQrActualizar(enabled){
+  // JSON.stringify(true)/(false) produce 'true'/'false' (no quotes), matching the
+  // plain string check used in buildPublicActualizarForm.
+  await saveK('gdv_qr_actualizar', !!enabled);
+  const label=document.getElementById('cfg-qr-actualizar-label');
+  if(label) label.textContent=enabled?'Habilitado':'Inhabilitado';
 }
 
 // Config: Grupos
@@ -6679,10 +6705,25 @@ function pnvEnviar(){
 }
 
 function buildPublicActualizarForm(){
+  // Super Admin can disable this form for everyone
+  var qrEnabled=localStorage.getItem('gdv_qr_actualizar')!=='false';
+  if(!qrEnabled){
+    return `<div style="background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:440px;box-shadow:0 4px 24px rgba(0,0,0,.1);text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">🔒</div>
+      <div style="font-size:18px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">Actualización de datos no disponible</div>
+      <div style="font-size:13px;color:#6B7280">Por el momento esta opción está deshabilitada. Si necesitás actualizar tus datos, contactá a un líder de tu Grupo de Vida.</div>
+    </div>`;
+  }
+
   var membersJson=localStorage.getItem('gdv_m5')||'[]';
   var members=[];
   try{members=JSON.parse(membersJson);}catch(e){}
   var activos=members.filter(function(m){return m.estado!=='Baja';});
+
+  // Sort alphabetically by full name
+  activos=activos.slice().sort(function(a,b){
+    return (a.nombre+' '+a.apellido).localeCompare(b.nombre+' '+b.apellido,'es',{sensitivity:'base'});
+  });
 
   var memberOptions=activos.map(function(m){
     return '<option value="'+m.id+'">'+m.nombre+' '+m.apellido+'</option>';
@@ -6737,7 +6778,7 @@ function pauCargarDatos(){
     if(m){
       document.getElementById('pau-cel').value=m.tel||'';
       document.getElementById('pau-fnac').value=m.fnac||'';
-      document.getElementById('pau-barrio').value=m.barrio||m.dir||'';
+      document.getElementById('pau-barrio').value=m.dir||m.barrio||'';
     }
   }catch(e){}
   document.getElementById('pau-step1').style.display='none';
@@ -6752,7 +6793,7 @@ function pauGuardar(){
     if(m){
       m.tel=document.getElementById('pau-cel').value.trim();
       m.fnac=document.getElementById('pau-fnac').value.trim();
-      m.barrio=document.getElementById('pau-barrio').value.trim();
+      m.dir=document.getElementById('pau-barrio').value.trim();
       localStorage.setItem('gdv_m5',JSON.stringify(members));
       // Upload to Firebase immediately so the update isn't lost
       if(window.fbUpload) window.fbUpload(true);

@@ -534,15 +534,25 @@ const DEFAULT_PERMISOS={
 
 let PERMISOS={};
 
-function cleanMembers(){
+async function cleanMembers(){
   // Remove any null/undefined entries from S.members
   if(!S.members) return;
   S.members=S.members.filter(m=>m&&m.id);
   // Merge legacy m.barrio (from QR update form) into m.dir (Barrio/Ciudad field)
+  let changed=false;
   S.members.forEach(m=>{
-    if(m.barrio && !m.dir){ m.dir=m.barrio; }
-    if(m.barrio) delete m.barrio;
+    if(m.barrio && !m.dir){ m.dir=m.barrio; changed=true; }
+    if(m.barrio){ delete m.barrio; changed=true; }
   });
+  // One-time migration: anyone not 'Nuevo'/'Historico'/'Miembro' (i.e. 'Asistente' or
+  // undefined/blank) becomes 'Miembro'. Idempotent - safe to run on every load.
+  S.members.forEach(m=>{
+    if(m.condicion!=='Nuevo' && m.condicion!=='Historico' && m.condicion!=='Miembro'){
+      m.condicion='Miembro';
+      changed=true;
+    }
+  });
+  if(changed) await saveK(SK.members, S.members);
 }
 
 function loadPermisos(){
@@ -832,6 +842,7 @@ async function initStorage(){
   S.roles      =load(SK.roles,      DEFAULT_ROLES);
   S.discPasos  =load(SK.discPasos,  DEFAULT_DISC_PASOS);
   S.discRecords=load(SK.discRecords,[]);
+  await cleanMembers();
   loadPermisos();
   // ── Migrar roles nuevos si no existen ──
   var missingRoles=[
@@ -1250,7 +1261,7 @@ function saShowActualizarQR(){
     </div>
     <div style="background:#F9FAFB;border-radius:12px;padding:1.5rem;margin-bottom:1rem">
       <img src="${qrUrl}" alt="QR" style="width:200px;height:200px;display:block;margin:0 auto 1rem">
-      <div style="font-size:13px;color:#6B7280">Cada miembro escanea este QR, busca su nombre y completa: Celular, Fecha de nacimiento y Dirección</div>
+      <div style="font-size:13px;color:#6B7280">Cada miembro escanea este QR, busca su nombre y completa: Celular, Fecha de nacimiento y Barrio / Ciudad</div>
     </div>
     <div style="font-size:12px;color:#6B7280;background:#FEF9C3;border-radius:8px;padding:8px">
       💡 Los datos se guardan en el mismo navegador. Recomendamos que lo hagan desde la misma computadora donde está la app.
@@ -1350,7 +1361,12 @@ function renderMiembrosStandalone(){
     const genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
     const genColor=m.genero==='H'?'#1E40AF':'#9D174D';
     const isBaja=m.estado==='Baja';
-    const rowStyle=isBaja?'opacity:0.55;background:#FEF2F2':'';
+    // Check for missing critical data: Apellido (or "(Nuevo)"-style placeholder), Celular, Fecha Nacimiento
+    const apellidoLimpio=(m.apellido||'').replace(/\([^)]*\)/g,'').trim();
+    const telLimpio=(m.tel||'').replace(/[^0-9]/g,'');
+    const faltaDatos=!apellidoLimpio || !telLimpio || !m.fnac;
+    let rowStyle=isBaja?'opacity:0.55;background:#FEF2F2':'';
+    if(!isBaja&&faltaDatos) rowStyle='background:#FFF0F5';
     return `<tr style="${rowStyle}">
       <td style="max-width:160px">
         <span style="cursor:pointer;color:#1F4E79;font-weight:600;text-decoration:underline dotted;word-break:break-word" onclick="saShowDetail(${m.id},event)">${fullName(m)}</span>
@@ -1382,7 +1398,7 @@ function saShowDetail(id,event){
     <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Fecha nacimiento</div><div style="font-size:13px;font-weight:500">${saFmtDate(m.fnac)||'—'}</div></div>
     <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Edad</div><div style="font-size:13px;font-weight:500">${saCalcEdad(m.fnac)}</div></div>
     <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Teléfono</div><div style="font-size:13px;font-weight:500">${m.tel||'—'}</div></div>
-    <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Dirección</div><div style="font-size:13px;font-weight:500">${m.dir||'—'}</div></div>
+    <div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Barrio / Ciudad</div><div style="font-size:13px;font-weight:500">${m.dir||'—'}</div></div>
     ${(m.roles||[]).length?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Función</div>${roleChips(m.roles)}</div>`:''}
     ${m.estado==='Baja'?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#DC2626;margin-bottom:4px">Fecha de baja</div><div style="font-size:13px;font-weight:500;color:#DC2626">${saFmtDate(m.fechaBaja||'')}</div></div>`:''}
   `;
@@ -6986,7 +7002,7 @@ function exportMiembrosExcel(){
     {key:'condicion', label:'Condición',    width:14},
     {key:'estado',    label:'Estado',       width:10},
     {key:'telefono',  label:'Teléfono',     width:16},
-    {key:'direccion', label:'Dirección',    width:24},
+    {key:'direccion', label:'Barrio / Ciudad', width:24},
     {key:'fnac',      label:'Fecha Nac.',   width:14},
     {key:'edad',      label:'Edad',         width:8},
     {key:'roles',     label:'Roles',        width:30},

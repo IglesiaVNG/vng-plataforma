@@ -1118,18 +1118,18 @@ function buildMiembrosHTML(){
     </div>
     <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
       <input type="text" id="sa-member-search" placeholder="Buscar por nombre..." onkeyup="renderMiembrosStandalone()" style="flex:2;min-width:150px">
+      <select id="sa-mfil-gen" onchange="renderMiembrosStandalone()" style="flex:1;min-width:110px"><option value="">Todos</option><option value="H">Hombres</option><option value="M">Mujeres</option></select>
       <select id="sa-mfil-grupo" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px"><option value="">Todos los grupos</option></select>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
-      <select id="sa-mfil-gen" onchange="renderMiembrosStandalone()" style="flex:0 0 auto"><option value="">H y M</option><option value="H">Hombres</option><option value="M">Mujeres</option></select>
-      <select id="sa-mfil-rol" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px"><option value="">Todas las funciones</option></select>
-      <select id="sa-mfil-condicion" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px">
+      <select id="sa-mfil-condicion" onchange="renderMiembrosStandalone()" style="flex:1;min-width:110px">
         <option value="">Todas las condiciones</option>
         <option value="Miembro">Miembro</option>
         <option value="Asistente">Asistente</option>
         <option value="Nuevo">Nuevo</option>
       </select>
-      <select id="sa-mfil-estado" onchange="renderMiembrosStandalone()" style="flex:0 0 auto">
+      <select id="sa-mfil-rol" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px"><option value="">Todas las funciones</option></select>
+      <select id="sa-mfil-estado" onchange="renderMiembrosStandalone()" style="flex:1;min-width:110px">
         <option value="Activo">Activos</option>
         <option value="Baja">Bajas</option>
         <option value="">Todos</option>
@@ -6710,10 +6710,10 @@ function buildPublicActualizarForm(){
         <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular</label>
           <input type="tel" id="pau-cel" placeholder="11 1234-5678" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
         <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha de nacimiento</label>
-          <input type="date" id="pau-fnac" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+          <input type="text" id="pau-fnac" placeholder="DD/MM/AA" maxlength="8" inputmode="numeric" oninput="pnvFmtFnac(this)" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
       </div>
-      <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Dirección</label>
-        <input type="text" id="pau-dir" placeholder="Calle y número" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+      <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad</label>
+        <input type="text" id="pau-barrio" placeholder="Tu barrio o ciudad" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
       <button onclick="pauGuardar()" style="width:100%;background:#16A34A;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-top:1.25rem">
         💾 Guardar mis datos
       </button>
@@ -6737,7 +6737,7 @@ function pauCargarDatos(){
     if(m){
       document.getElementById('pau-cel').value=m.tel||'';
       document.getElementById('pau-fnac').value=m.fnac||'';
-      document.getElementById('pau-dir').value=m.dir||'';
+      document.getElementById('pau-barrio').value=m.barrio||m.dir||'';
     }
   }catch(e){}
   document.getElementById('pau-step1').style.display='none';
@@ -6751,8 +6751,8 @@ function pauGuardar(){
     var m=members.find(function(x){return x.id===pauSelectedId;});
     if(m){
       m.tel=document.getElementById('pau-cel').value.trim();
-      m.fnac=document.getElementById('pau-fnac').value;
-      m.dir=document.getElementById('pau-dir').value.trim();
+      m.fnac=document.getElementById('pau-fnac').value.trim();
+      m.barrio=document.getElementById('pau-barrio').value.trim();
       localStorage.setItem('gdv_m5',JSON.stringify(members));
     }
   }catch(e){}

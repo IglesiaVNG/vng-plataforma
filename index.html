@@ -6754,6 +6754,8 @@ function pauGuardar(){
       m.fnac=document.getElementById('pau-fnac').value.trim();
       m.barrio=document.getElementById('pau-barrio').value.trim();
       localStorage.setItem('gdv_m5',JSON.stringify(members));
+      // Upload to Firebase immediately so the update isn't lost
+      if(window.fbUpload) window.fbUpload(true);
     }
   }catch(e){}
   document.getElementById('pau-step2').style.display='none';

@@ -1152,18 +1152,60 @@ function buildMiembrosHTML(){
         <option value="">Todos</option>
       </select>
     </div>
-    <div class="card" style="padding:0;overflow:hidden">
+    <!-- Sub-tabs estilo GdV Dashboard -->
+    <div class="nav" style="margin-bottom:.75rem;flex-wrap:wrap">
+      <button class="nav-btn active" onclick="saMembrosTab('generales',this)">📋 Datos Generales</button>
+      <button class="nav-btn" onclick="saMembrosTab('personales',this)">👤 Datos Personales</button>
+      <button class="nav-btn" onclick="saMembrosTab('formacion',this)">🎓 Formación</button>
+      <button class="nav-btn" onclick="saMembrosTab('servicio',this)">🤝 Servicio</button>
+      <button class="nav-btn" onclick="saMembrosTab('historial',this)">📜 Historial</button>
+    </div>
+    <div id="sa-panel-generales" class="card" style="padding:0;overflow:hidden">
       <table>
         <thead><tr>
-          <th style="width:28%">Nombre</th>
-          <th style="width:6%">Gén.</th>
-          <th style="width:20%">Grupo</th>
-          <th style="width:22%">Función</th>
+          <th style="width:27%">Nombre</th>
+          <th style="width:22%">Grupos</th>
+          <th style="width:20%">Función</th>
           <th style="width:12%">Condición</th>
-          <th style="width:10%">Estado</th>
+          <th style="width:9%">Estado</th>
+          <th style="width:10%">Ingreso</th>
         </tr></thead>
         <tbody id="sa-member-tbody"></tbody>
       </table>
+    </div>
+    <div id="sa-panel-personales" class="card" style="display:none;padding:0;overflow:hidden">
+      <table>
+        <thead><tr>
+          <th style="width:27%">Nombre</th>
+          <th style="width:6%">Gén.</th>
+          <th style="width:18%">Teléfono</th>
+          <th style="width:11%">Edad</th>
+          <th style="width:22%">Barrio / Ciudad</th>
+          <th style="width:16%">F. Nacimiento</th>
+        </tr></thead>
+        <tbody id="sa-member-tbody-personales"></tbody>
+      </table>
+    </div>
+    <div id="sa-panel-formacion" style="display:none">
+      <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:.75rem;font-size:13px;color:#92400E;text-align:center">🎓 <strong>Formación</strong> — 🚧 Próximamente</div>
+      <div class="card" style="padding:0;overflow:hidden;opacity:.4;pointer-events:none">
+        <table><thead><tr><th>Nombre</th><th>Grupos</th><th>Función</th><th>Condición</th><th>Estado</th></tr></thead>
+        <tbody id="sa-member-tbody-formacion"></tbody></table>
+      </div>
+    </div>
+    <div id="sa-panel-servicio" style="display:none">
+      <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:.75rem;font-size:13px;color:#92400E;text-align:center">🤝 <strong>Servicio</strong> — 🚧 Próximamente</div>
+      <div class="card" style="padding:0;overflow:hidden;opacity:.4;pointer-events:none">
+        <table><thead><tr><th>Nombre</th><th>Grupos</th><th>Función</th><th>Condición</th><th>Estado</th></tr></thead>
+        <tbody id="sa-member-tbody-servicio"></tbody></table>
+      </div>
+    </div>
+    <div id="sa-panel-historial" style="display:none">
+      <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:.75rem;font-size:13px;color:#92400E;text-align:center">📜 <strong>Historial</strong> — 🚧 Próximamente</div>
+      <div class="card" style="padding:0;overflow:hidden;opacity:.4;pointer-events:none">
+        <table><thead><tr><th>Nombre</th><th>Grupos</th><th>Función</th><th>Condición</th><th>Estado</th></tr></thead>
+        <tbody id="sa-member-tbody-historial"></tbody></table>
+      </div>
     </div>
 
     <!-- Backdrop invisible para cerrar el dropdown -->
@@ -1346,6 +1388,40 @@ function saFmtDate(d){
   return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:d;
 }
 
+function saMembrosTab(tab, btn){
+  document.querySelectorAll('.nav-btn[onclick*="saMembrosTab"]').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  ['generales','personales','formacion','servicio','historial'].forEach(t=>{
+    const el=document.getElementById('sa-panel-'+t);
+    if(el) el.style.display=(t===tab)?'':'none';
+  });
+  if(tab==='personales') renderMiembrosPersonales();
+}
+
+function renderMiembrosPersonales(){
+  const tbody=document.getElementById('sa-member-tbody-personales');
+  if(!tbody) return;
+  const members=window._saMembrosFiltered||[];
+  tbody.innerHTML=members.map(m=>{
+    const apellidoLimpio=(m.apellido||'').replace(/\([^)]*\)/g,'').trim();
+    const telLimpio=(m.tel||'').replace(/[^0-9]/g,'');
+    const faltaDatos=!apellidoLimpio||!telLimpio||!m.fnac;
+    const isBaja=m.estado==='Baja';
+    let rowStyle=isBaja?'opacity:0.55;background:#FEF2F2':'';
+    if(!isBaja&&faltaDatos) rowStyle='background:#FFF0F5';
+    const genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+    const genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+    return `<tr style="${rowStyle}" onclick="saShowDetail(${m.id},event)">
+      <td style="max-width:160px"><span style="cursor:pointer;color:#1F4E79;font-weight:600">${fullName(m)}</span></td>
+      <td><span style="background:${genBg};color:${genColor};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${m.genero}</span></td>
+      <td style="font-size:13px">${m.tel||'—'}</td>
+      <td style="font-size:13px">${saCalcEdad(m.fnac)}</td>
+      <td style="font-size:13px;color:#6B7280">${m.dir||'—'}</td>
+      <td style="font-size:12px;color:#6B7280">${saFmtDate(m.fnac)||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
 function renderMiembrosStandalone(){
   // Populate role filter dynamically from S.roles
   const rolFilter=document.getElementById('sa-mfil-rol');
@@ -1391,6 +1467,7 @@ function renderMiembrosStandalone(){
   const activos=S.members.filter(m=>m.estado!=='Baja').length;
   const countEl=document.getElementById('sa-member-count');
   if(countEl) countEl.textContent=activos;
+  window._saMembrosFiltered=members; // share with other tabs
 
   const tbody=document.getElementById('sa-member-tbody');
   if(!tbody) return;
@@ -1425,9 +1502,37 @@ function renderMiembrosStandalone(){
       <td style="max-width:180px"><div style="display:flex;flex-wrap:wrap;gap:3px;max-height:52px;overflow:hidden">${roleChips(m.roles||[])}</div></td>
       <td>${saCondicionBadge(m.condicion)}</td>
       <td><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></td>
-
+      <td style="font-size:12px;color:#6B7280">${saFmtDate(m.fechaIngreso)||'—'}</td>
     </tr>`;
   }).join('');
+
+  // Populate preview tables for Formación / Servicio / Historial (dimmed, read-only)
+  ['formacion','servicio','historial'].forEach(function(tab){
+    const tb=document.getElementById('sa-member-tbody-'+tab);
+    if(!tb) return;
+    tb.innerHTML=members.map(function(m){
+      const isBaja=m.estado==='Baja';
+      const apl=(m.apellido||'').replace(/\([^)]*\)/g,'').trim();
+      const tel=(m.tel||'').replace(/[^0-9]/g,'');
+      const falta=!apl||!tel||!m.fnac;
+      let rs=isBaja?'opacity:0.55;background:#FEF2F2':'';
+      if(!isBaja&&falta) rs='background:#FFF0F5';
+      const mGroups=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number)
+        .map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
+      return '<tr style="'+rs+'">'
+        +'<td style="max-width:160px"><span style="color:#1F4E79;font-weight:600">'+fullName(m)+'</span></td>'
+        +'<td style="font-size:12px;color:#6B7280">'+(mGroups.length?mGroups.map(gr=>'<div>'+gr.name+'</div>').join(''):'—')+'</td>'
+        +'<td>'+roleChips(m.roles||[])+'</td>'
+        +'<td>'+saCondicionBadge(m.condicion)+'</td>'
+        +'<td><span class="badge '+(m.estado==='Activo'?'b-ok':'b-danger')+'">'+m.estado+'</span></td>'
+        +'</tr>';
+    }).join('');
+  });
+
+  // Re-render personales tab if it's active
+  if(document.getElementById('sa-panel-personales')&&document.getElementById('sa-panel-personales').style.display!=='none'){
+    renderMiembrosPersonales();
+  }
 }
 
 function saDetailLabel(text,html,fullWidth){
@@ -2042,11 +2147,10 @@ function cfgRenderUsuarios(){
       .filter(m=>m.estado!=='Baja'&&!existingNames.includes(fullName(m).toLowerCase()))
       .sort((a,b)=>fullName(a).localeCompare(fullName(b)))
       .forEach(m=>{
-        const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
-    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
+        const mGrp=S.groups.find(x=>Number(x.id)===Number(m.grupoId));
         const opt=document.createElement('option');
         opt.value=m.id;
-        opt.textContent=fullName(m)+(g?' — '+g.name:'');
+        opt.textContent=fullName(m)+(mGrp?' — '+mGrp.name:'');
         memSel.appendChild(opt);
       });
   }

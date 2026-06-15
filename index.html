@@ -7085,7 +7085,30 @@ function discEditRecord(id){
     document.body.appendChild(overlay);
   }
   window._discEditId=id;
-  var att=Object.entries(r.asistencia||{});
+  // Merge: attendance record entries + current paso members not yet in the record
+  var paso=S.discPasos.find(function(p){return p.id===r.pasoId;});
+  var mergedAtt=Object.assign({},r.asistencia||{});
+  if(paso){
+    paso.miembros.forEach(function(mid){
+      if(!mergedAtt[mid]){
+        var m=S.members.find(function(x){return x.id===mid;});
+        if(m) mergedAtt[mid]={name:fullName(m),genero:m.genero,state:'ausente'};
+      }
+    });
+  }
+  // Also: for entries with unknown ID, try matching by name to current members
+  Object.keys(mergedAtt).forEach(function(kid){
+    var stillExists=S.members.some(function(m){return String(m.id)===String(kid);});
+    if(!stillExists){
+      var att=mergedAtt[kid];
+      var match=S.members.find(function(m){return normName(fullName(m))===normName(att.name||'');});
+      if(match&&!mergedAtt[match.id]){
+        mergedAtt[match.id]=att;
+        delete mergedAtt[kid];
+      }
+    }
+  });
+  var att=Object.entries(mergedAtt);
   document.getElementById('disc-edit-body').innerHTML=
     '<div style="font-size:13px;color:#6B7280;margin-bottom:.75rem">Fecha: <strong>'+fmt(r.fecha)+'</strong> · '+r.pasoNombre+' · '+r.capitulo+'</div>'
     +'<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:.5rem">Asistencia:</div>'
@@ -7112,10 +7135,20 @@ async function discSaveEdit(){
   var id=window._discEditId;
   var r=S.discRecords.find(function(x){return x.id===id;});
   if(!r) return;
-  Object.keys(r.asistencia).forEach(function(k){
-    var sel=document.getElementById('disc-edit-'+k);
-    if(sel) r.asistencia[k].state=sel.value;
+  // Save ALL selectors visible (merged attendance incl. new members)
+  var newAtt={};
+  document.querySelectorAll('[id^="disc-edit-"]').forEach(function(sel){
+    var kid=sel.id.replace('disc-edit-','');
+    var existing=r.asistencia[kid]||(Object.values(r.asistencia).find(a=>!r.asistencia[kid])||{});
+    // Rebuild entry from current members list
+    var m=S.members.find(function(x){return String(x.id)===String(kid);});
+    newAtt[kid]={
+      name: (r.asistencia[kid]&&r.asistencia[kid].name)||(m?fullName(m):''),
+      genero: (r.asistencia[kid]&&r.asistencia[kid].genero)||(m?m.genero:''),
+      state: sel.value
+    };
   });
+  r.asistencia=newAtt;
   await saveK(SK.discRecords,S.discRecords);
   discCloseEdit();
   var c=document.getElementById('disc-registros-wrap');
@@ -7734,12 +7767,25 @@ async function boot(){
     }
   } catch(e){
     console.error('Boot error:',e);
-    // If anything fails, show the login screen
+    // Try to restore session directly from localStorage before giving up
+    try{
+      var saved=localStorage.getItem('vng_cu')||sessionStorage.getItem('vng_cu');
+      if(saved){
+        var cu=JSON.parse(saved);
+        if(cu&&cu.id&&cu.name){
+          currentUser=cu;
+          await initStorage();
+          showHome();
+          return;
+        }
+      }
+    }catch(e2){}
+    // Only show login if session truly not recoverable
     try{
       currentUser=null;
       document.getElementById('screen-login').style.display='';
       document.getElementById('screen-home').classList.add('hidden');
-    }catch(e2){}
+    }catch(e3){}
   }
 }
 

@@ -552,6 +552,13 @@ async function cleanMembers(){
       changed=true;
     }
   });
+  // Ensure every 'Nuevo' contact has a fechaRegistro (set today if missing)
+  S.members.forEach(m=>{
+    if(m.condicion==='Nuevo' && !m.fechaRegistro){
+      m.fechaRegistro=todayAA();
+      changed=true;
+    }
+  });
   if(changed) await saveK(SK.members, S.members);
 }
 

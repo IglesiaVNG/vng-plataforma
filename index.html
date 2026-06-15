@@ -3880,6 +3880,7 @@ function gdvRenderRegistros(){
           <span style="font-weight:600;min-width:88px">${fmt(r.fecha)}</span>
           <span style="flex:1;font-size:13px">${r.grupoName}</span>
           <span class="badge" style="background:#FEF3C7;color:#92400E">⏸ Sin encuentro</span>
+          <button class="btn btn-sm" onclick="gdvEditRecord(${r.id})">✏️</button>
           <button class="btn btn-sm btn-danger" onclick="gdvDeleteRecord(${r.id})">🗑</button>
         </div>
         ${r.motivo?`<div style="margin-top:6px;font-size:12px;color:#92400E">📝 ${r.motivo}</div>`:''}
@@ -3896,6 +3897,7 @@ function gdvRenderRegistros(){
         <span style="font-weight:600;min-width:88px">${fmt(r.fecha)}</span>
         <span style="flex:1;font-size:13px">${r.grupoName}</span>
         <span class="badge ${p>=70?'b-ok':'b-muted'}">${pre}/${att.length} (${p}%)</span>
+        <button class="btn btn-sm" onclick="gdvEditRecord(${r.id})">✏️</button>
         <button class="btn btn-sm btn-danger" onclick="gdvDeleteRecord(${r.id})">🗑</button>
       </div>
       <div style="margin-top:6px;font-size:12px;color:#6B7280"><span style="color:#1565C0;font-weight:600">H: ${preH}</span> · <span style="color:#C0006A;font-weight:600">M: ${preM}</span> · ${r.facName}</div>
@@ -3906,9 +3908,69 @@ function gdvRenderRegistros(){
   }).join('');
 }
 async function gdvDeleteRecord(id){
-  if(!confirm('¿Eliminar?'))return;
+  if(!confirm('¿Eliminar este registro? El dashboard se actualizará.'))return;
   S.records=S.records.filter(r=>r.id!==id);
   await saveK(SK.records,S.records);gdvRenderRegistros();gdvRenderDashboard();
+}
+
+function gdvEditRecord(id){
+  var r=S.records.find(x=>String(x.id)===String(id));
+  if(!r) return;
+  var overlay=document.getElementById('gdv-edit-rec-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='gdv-edit-rec-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:400;display:flex;align-items:center;justify-content:center;padding:1rem';
+    overlay.innerHTML='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:440px;max-height:90vh;overflow-y:auto">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">✏️ Editar registro</div>'
+      +'<button onclick="gdvCloseEditRec()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>'
+      +'</div>'
+      +'<div id="gdv-edit-rec-body"></div>'
+      +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">'
+      +'<button class="btn" onclick="gdvCloseEditRec()">Cancelar</button>'
+      +'<button class="btn btn-primary" onclick="gdvSaveEditRec()">💾 Guardar cambios</button>'
+      +'</div></div>';
+    document.body.appendChild(overlay);
+  }
+  window._gdvEditRecId=id;
+  if(r.sinEncuentro){
+    document.getElementById('gdv-edit-rec-body').innerHTML=
+      '<div style="color:#92400E;padding:.5rem;background:#FEF3C7;border-radius:8px;margin-bottom:.5rem">⏸ Sin encuentro: '+(r.motivo||'(sin motivo)')+'</div>'
+      +'<div style="font-size:13px;color:#6B7280">'+fmt(r.fecha)+' · '+r.grupoName+'</div>';
+  } else {
+    var att=Object.entries(r.asistencia||{});
+    document.getElementById('gdv-edit-rec-body').innerHTML=
+      '<div style="font-size:13px;color:#6B7280;margin-bottom:.75rem">'+fmt(r.fecha)+' · '+r.grupoName+'</div>'
+      +'<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:.5rem">Asistencia:</div>'
+      +att.map(function(entry){
+        var k=entry[0], v=entry[1];
+        return '<label style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #F3F4F6;cursor:pointer">'
+          +'<input type="checkbox" id="gdv-edit-att-'+k+'" '+(v.state==='presente'?'checked':'')+' style="width:18px;height:18px">'
+          +'<span style="font-size:14px">'+v.name+'</span>'
+          +'</label>';
+      }).join('');
+  }
+  overlay.style.display='flex';
+}
+
+function gdvCloseEditRec(){
+  var o=document.getElementById('gdv-edit-rec-overlay');
+  if(o) o.style.display='none';
+}
+
+async function gdvSaveEditRec(){
+  var id=window._gdvEditRecId;
+  var r=S.records.find(x=>String(x.id)===String(id));
+  if(!r||r.sinEncuentro){gdvCloseEditRec();return;}
+  Object.keys(r.asistencia).forEach(function(k){
+    var cb=document.getElementById('gdv-edit-att-'+k);
+    if(cb) r.asistencia[k].state=cb.checked?'presente':'ausente';
+  });
+  await saveK(SK.records,S.records);
+  gdvCloseEditRec();
+  gdvRenderRegistros();
+  gdvRenderDashboard();
 }
 
 // GdV: Miembros
@@ -4166,6 +4228,11 @@ function ofSave(){
   ss('of5_encuentros',ofEncuentros); ss('of5_asist',ofAsistencia);
   ss('of5_part',ofParticipacion); ss('of5_obspart',ofObsPart);
   ss('of5_obspago',ofObsPago); ss('of5_materias',ofMaterias);
+  // Trigger Firebase sync (same debounce as saveK)
+  if(window.fbReady){
+    clearTimeout(window._fbSyncTimer);
+    window._fbSyncTimer=setTimeout(function(){window.fbUpload&&window.fbUpload(false);},2000);
+  }
 }
 
 function ofIni(n,a){return((n||'')[0]||'').toUpperCase()+((a||'')[0]||'').toUpperCase();}
@@ -6844,6 +6911,23 @@ async function discGuardarAsistencia(){
     alert('Completá Paso, Fecha y Capítulo');return;
   }
   if(!Object.keys(discFacAtt).length){alert('No hay miembros en este paso');return;}
+
+  // Check for duplicate week (same paso + same ISO week)
+  var semana=getISOWeek(fecha);
+  var anio=new Date(fecha).getFullYear();
+  var yaExiste=S.discRecords.find(function(r){
+    if(r.pasoId!==pasoId) return false;
+    return getISOWeek(r.fecha)===semana && new Date(r.fecha).getFullYear()===anio;
+  });
+  if(yaExiste){
+    if(isSuperAdmin()||canEjecutar('disc_pasos')){
+      if(!confirm('Ya existe un registro para la Semana '+semana+' en este Paso. Como Admin podés guardar igual para corregir errores. ¿Continuar?')) return;
+    } else {
+      alert('Ya existe un registro para la Semana '+semana+' en este Paso. Contactá al Admin si hay un error.');
+      return;
+    }
+  }
+
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   S.discRecords.push({
     id:Date.now(),pasoId,pasoNombre:paso?paso.nombre:'',
@@ -6857,6 +6941,68 @@ async function discGuardarAsistencia(){
 }
 
 // ── Registros ──
+async function discDeleteRecord(id){
+  if(!confirm('¿Eliminar este registro? Los dashboards se actualizarán.')) return;
+  S.discRecords=S.discRecords.filter(function(r){return r.id!==id;});
+  await saveK(SK.discRecords,S.discRecords);
+  var c=document.getElementById('disc-registros-wrap');
+  if(c) discRenderRegistros(c);
+  discRenderDashboard(document.getElementById('disc-dashboard-wrap'));
+}
+
+function discEditRecord(id){
+  var r=S.discRecords.find(function(x){return x.id===id;});
+  if(!r) return;
+  // Show edit modal
+  var overlay=document.getElementById('disc-edit-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='disc-edit-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:400;display:flex;align-items:center;justify-content:center;padding:1rem';
+    overlay.innerHTML='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:420px;max-height:90vh;overflow-y:auto">'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:1rem">✏️ Editar registro</div>'
+      +'<div id="disc-edit-body"></div>'
+      +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">'
+      +'<button class="btn" onclick="discCloseEdit()">Cancelar</button>'
+      +'<button class="btn btn-primary" onclick="discSaveEdit()">💾 Guardar cambios</button>'
+      +'</div></div>';
+    document.body.appendChild(overlay);
+  }
+  window._discEditId=id;
+  var att=Object.entries(r.asistencia||{});
+  document.getElementById('disc-edit-body').innerHTML=
+    '<div style="font-size:13px;color:#6B7280;margin-bottom:.75rem">Fecha: <strong>'+fmt(r.fecha)+'</strong> · '+r.pasoNombre+' · '+r.capitulo+'</div>'
+    +'<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:.5rem">Asistencia:</div>'
+    +att.map(function(entry){
+      var k=entry[0], v=entry[1];
+      return '<label style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #F3F4F6;cursor:pointer">'
+        +'<input type="checkbox" id="disc-edit-'+k+'" '+(v.state==='presente'?'checked':'')+' style="width:18px;height:18px">'
+        +'<span style="font-size:14px">'+v.name+'</span>'
+        +'</label>';
+    }).join('');
+  overlay.style.display='flex';
+}
+
+function discCloseEdit(){
+  var o=document.getElementById('disc-edit-overlay');
+  if(o) o.style.display='none';
+}
+
+async function discSaveEdit(){
+  var id=window._discEditId;
+  var r=S.discRecords.find(function(x){return x.id===id;});
+  if(!r) return;
+  Object.keys(r.asistencia).forEach(function(k){
+    var cb=document.getElementById('disc-edit-'+k);
+    if(cb) r.asistencia[k].state=cb.checked?'presente':'ausente';
+  });
+  await saveK(SK.discRecords,S.discRecords);
+  discCloseEdit();
+  var c=document.getElementById('disc-registros-wrap');
+  if(c) discRenderRegistros(c);
+  discRenderDashboard(document.getElementById('disc-dashboard-wrap'));
+}
+
 function discRenderRegistros(c){
   var recs=[...S.discRecords].sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
   if(!recs.length){
@@ -6873,6 +7019,8 @@ function discRenderRegistros(c){
     html+='<span class="badge b-muted">'+r.pasoNombre+'</span>';
     html+='<span style="flex:1;font-size:13px;color:#6B7280">'+r.capitulo+'</span>';
     html+='<span class="badge b-ok">'+presentes+'/'+att.length+' presentes</span>';
+    html+='<button class="btn btn-sm" onclick="discEditRecord('+r.id+')">✏️</button>';
+    html+='<button class="btn btn-sm btn-danger" onclick="discDeleteRecord('+r.id+')">🗑</button>';
     html+='</div>';
     html+='<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">';
     att.forEach(function(v){

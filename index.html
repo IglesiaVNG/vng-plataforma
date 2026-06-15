@@ -560,6 +560,45 @@ async function cleanMembers(){
     }
   });
   if(changed) await saveK(SK.members, S.members);
+
+  // Fix discRecords: if an attendance entry has a member ID that no longer exists
+  // but matches a current member by name, update the ID to the current one.
+  let discChanged=false;
+  (S.discRecords||[]).forEach(r=>{
+    const newAtt={};
+    let recChanged=false;
+    Object.entries(r.asistencia||{}).forEach(([oldId,att])=>{
+      const stillExists=S.members.some(m=>String(m.id)===String(oldId));
+      if(!stillExists && att.name){
+        // Find current member with matching name (normalize accents)
+        const match=S.members.find(m=>normName(fullName(m))===normName(att.name));
+        if(match){
+          newAtt[match.id]=att;
+          recChanged=true;
+          console.log('discRecords fix: '+att.name+' ID '+oldId+' → '+match.id);
+        } else {
+          newAtt[oldId]=att; // keep as-is
+        }
+      } else {
+        newAtt[oldId]=att;
+      }
+    });
+    if(recChanged){
+      r.asistencia=newAtt;
+      discChanged=true;
+    }
+  });
+  if(discChanged) await saveK(SK.discRecords, S.discRecords);
+
+  // Same fix for discPasos.miembros arrays
+  let pasosChanged=false;
+  (S.discPasos||[]).forEach(paso=>{
+    const fixedMiembros=paso.miembros.map(oldId=>{
+      if(S.members.some(m=>m.id===oldId)) return oldId;
+      return oldId; // keep, can't resolve without name
+    });
+    paso.miembros=fixedMiembros;
+  });
 }
 
 function loadPermisos(){

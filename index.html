@@ -861,7 +861,8 @@ async function initStorage(){
 }
 
 function today(){return new Date().toISOString().split('T')[0];}
-function fmt(d){if(!d)return'';const p=String(d).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:d;}
+function fmt(d){return fmtAA(d);}
+function todayAA(){return fmtAA(todayAA());}
 function initials(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();}
 function pct(a,b){return b?Math.round(a/b*100):0;}
 function fullName(m){return `${m.nombre} ${m.apellido}`.trim();}
@@ -1384,8 +1385,25 @@ function saCalcEdad(fnac){
 
 function saFmtDate(d){
   if(!d) return '—';
-  const p=d.split('-');
-  return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:d;
+  return fmtAA(d)||'—';
+}
+
+// Universal date → DD/MM/AA, handles ISO (YYYY-MM-DD), DD/MM/AAAA, DD/MM/AA
+function fmtAA(d){
+  if(!d) return '';
+  d=String(d).trim();
+  // ISO: 2025-06-01
+  if(/^\d{4}-\d{2}-\d{2}/.test(d)){
+    const p=d.split('-');
+    return p[2].slice(0,2)+'/'+p[1]+'/'+p[0].slice(2);
+  }
+  // DD/MM/AAAA or DD/MM/AA
+  const p=d.split('/');
+  if(p.length===3){
+    const yy=p[2].length===4?p[2].slice(2):p[2];
+    return p[0].padStart(2,'0')+'/'+p[1].padStart(2,'0')+'/'+yy;
+  }
+  return d;
 }
 
 function saMembrosTab(tab, btn){
@@ -2980,7 +2998,7 @@ async function gdvGuardarNuevoContacto(){
     dir:barrio, fnac:'', roles:[],
     edadDeclarada:edad, comoNosConocio:como,
     motivoContacto:motivo,
-    fechaRegistro:new Date().toLocaleDateString('es-AR'),
+    fechaRegistro:todayAA(),
     origen:'Carga por Facilitador'
   };
   S.members.push(nuevo);
@@ -4556,7 +4574,7 @@ function ofAgregarDesdeMiembro(){
     nombre:m.nombre, apellido:m.apellido,
     tel:m.tel||'', dni:'',
     tipo:'miembro',
-    desde:new Date().toLocaleDateString('es-AR'),
+    desde:todayAA(),
     mesComienzo:HOY.getMonth()
   });
   ofSave(); ofRender();
@@ -4572,7 +4590,7 @@ function ofAgregarExterno(){
     tel:document.getElementById('of-inp-tel').value.trim(),
     dni:document.getElementById('of-inp-dni').value.trim(),
     tipo:'externo',
-    desde:new Date().toLocaleDateString('es-AR'),
+    desde:todayAA(),
     mesComienzo:HOY.getMonth()
   });
   ['of-inp-nombre','of-inp-apellido','of-inp-tel','of-inp-dni'].forEach(x=>{const el=document.getElementById(x);if(el)el.value='';});
@@ -5487,7 +5505,9 @@ function renderNuevos(){
     members=members.filter(m=>{
       const partes=(m.fechaRegistro||'').split('/');
       if(partes.length<3) return nvFiltro==='mas30'; // sin fecha → más de 30
-      const fReg=new Date(+('20'+partes[2]),+partes[1]-1,+partes[0]);
+      let yy=parseInt(partes[2]);
+      if(yy<100) yy+=2000; // handle 2-digit year
+      const fReg=new Date(yy,+partes[1]-1,+partes[0]);
       return nvFiltro==='ultimos30' ? fReg>=hace30 : fReg<hace30;
     });
   }
@@ -5922,7 +5942,7 @@ async function nvSaveInlineForm(){
     motivoContacto:motivo,
     seguimientoId:segId?parseInt(segId):null,
     seguimientoNombre:segId?segLabel:'',
-    fechaRegistro:new Date().toLocaleDateString('es-AR'),
+    fechaRegistro:todayAA(),
     origen:'Carga manual'
   };
   S.members.push(nuevo);
@@ -6425,7 +6445,7 @@ function enviarForm(){
       grupoId:null,condicion:'Nuevo',estado:'Activo',
       dir:barrio,fnac:fnac,roles:[],
       comoNosConocio:como,motivoContacto:motivo,
-      fechaRegistro:new Date().toLocaleDateString('es-AR'),
+      fechaRegistro:todayAA(),
       origen:'QR / Formulario web'
     });
     localStorage.setItem('gdv_m5',JSON.stringify(members));
@@ -7174,7 +7194,7 @@ function pnvEnviar(){
       grupoId:null,condicion:'Nuevo',estado:'Activo',
       dir:barrio,fnac:fnac,roles:[],
       comoNosConocio:como,motivoContacto:motivo,
-      fechaRegistro:new Date().toLocaleDateString('es-AR'),
+      fechaRegistro:todayAA(),
       origen:'QR / Formulario web'
     });
     localStorage.setItem('gdv_m5',JSON.stringify(members));
@@ -7377,7 +7397,9 @@ function exportNuevosExcel(){
     members=members.filter(m=>{
       const partes=(m.fechaRegistro||'').split('/');
       if(partes.length<3) return nvFiltro==='mas30'; // sin fecha → más de 30
-      const fReg=new Date(+('20'+partes[2]),+partes[1]-1,+partes[0]);
+      let yy=parseInt(partes[2]);
+      if(yy<100) yy+=2000; // handle 2-digit year
+      const fReg=new Date(yy,+partes[1]-1,+partes[0]);
       return nvFiltro==='ultimos30' ? fReg>=hace30 : fReg<hace30;
     });
   }
@@ -7418,7 +7440,7 @@ function exportNuevosExcel(){
     {key:'fechaRegistro',label:'Fecha registro',   width:16},
     {key:'motivo',      label:'Motivo contacto',   width:30},
   ];
-  const fecha=new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
+  const fecha=todayAA().replace(/\//g,'-');
   exportToExcel(rows, cols, 'VNG_NuevosContactos_'+fecha);
 }
 
@@ -7477,7 +7499,7 @@ function exportMiembrosExcel(){
     {key:'roles',     label:'Roles',        width:30},
     {key:'fechaBaja', label:'Fecha Baja',   width:14},
   ];
-  const fecha=new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
+  const fecha=todayAA().replace(/\//g,'-');
   exportToExcel(rows, cols, 'VNG_Miembros_'+fecha);
 }
 
@@ -7519,7 +7541,7 @@ async function exportarTodo(){
   const blob = new Blob([json], {type:'application/json'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  const fecha = new Date().toLocaleDateString('es-AR').replace(/\//g,'-');
+  const fecha = todayAA().replace(/\//g,'-');
   a.href = url;
   a.download = `VNG_Backup_${fecha}.json`;
   a.click();

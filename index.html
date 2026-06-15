@@ -5262,6 +5262,7 @@ function ofExportar(){
 // NUEVOS CONTACTOS MODULE
 // ════════════════════════════════════════════════════════════
 function openNuevos(){
+  nvFiltro='ultimos30'; // reset to default on every open
   document.getElementById('screen-home').classList.add('hidden');
   document.getElementById('screen-app').classList.add('show');
   document.getElementById('app-topbar-title').textContent='🌱 Nuevos Contactos';
@@ -5504,10 +5505,11 @@ function renderNuevos(){
     members=S.members.filter(m=>m.condicion==='Nuevo'&&m.estado!=='Baja');
     members=members.filter(m=>{
       const partes=(m.fechaRegistro||'').split('/');
-      if(partes.length<3) return nvFiltro==='mas30'; // sin fecha → más de 30
+      if(partes.length<3) return true; // sin fecha → mostrar siempre
       let yy=parseInt(partes[2]);
       if(yy<100) yy+=2000; // handle 2-digit year
       const fReg=new Date(yy,+partes[1]-1,+partes[0]);
+      if(isNaN(fReg.getTime())) return true; // fecha inválida → mostrar siempre
       return nvFiltro==='ultimos30' ? fReg>=hace30 : fReg<hace30;
     });
   }
@@ -7396,10 +7398,11 @@ function exportNuevosExcel(){
     members=S.members.filter(m=>m.condicion==='Nuevo'&&m.estado!=='Baja');
     members=members.filter(m=>{
       const partes=(m.fechaRegistro||'').split('/');
-      if(partes.length<3) return nvFiltro==='mas30'; // sin fecha → más de 30
+      if(partes.length<3) return true; // sin fecha → mostrar siempre
       let yy=parseInt(partes[2]);
       if(yy<100) yy+=2000; // handle 2-digit year
       const fReg=new Date(yy,+partes[1]-1,+partes[0]);
+      if(isNaN(fReg.getTime())) return true; // fecha inválida → mostrar siempre
       return nvFiltro==='ultimos30' ? fReg>=hace30 : fReg<hace30;
     });
   }

@@ -1195,10 +1195,8 @@ function buildMiembrosHTML(){
       </table>
     </div>
     <div id="sa-panel-formacion" style="display:none">
-      <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:.75rem;font-size:13px;color:#92400E;text-align:center">🎓 <strong>Formación</strong> — 🚧 Próximamente</div>
-      <div class="card" style="padding:0;overflow:hidden;opacity:.4;pointer-events:none">
-        <table><thead><tr><th>Nombre</th><th>Grupos</th><th>Función</th><th>Condición</th><th>Estado</th></tr></thead>
-        <tbody id="sa-member-tbody-formacion"></tbody></table>
+      <div style="overflow-x:auto" id="sa-formacion-grid-wrap">
+        <div class="empty" style="padding:1rem;color:#9CA3AF">Cargando grilla...</div>
       </div>
     </div>
     <div id="sa-panel-servicio" style="display:none">
@@ -1413,6 +1411,82 @@ function fmtAA(d){
   return d;
 }
 
+function renderFormacionGrid(){
+  const wrap=document.getElementById('sa-formacion-grid-wrap');
+  if(!wrap) return;
+  const pasos=(S.discPasos||[]).filter(p=>p.estado==='Activo').sort((a,b)=>a.id-b.id);
+  const members=(window._saMembrosFiltered||[]).filter(m=>m.condicion!=='Nuevo'&&m.condicion!=='Historico');
+  if(!pasos.length){
+    wrap.innerHTML='<div class="empty" style="padding:2rem">Sin Pasos de Discipulado configurados.</div>';
+    return;
+  }
+  // Separar pasos por nivel para encabezado agrupado
+  const pasosInic=pasos.filter(p=>!/intermedio|avanzado/i.test(p.nombre));
+  const pasosProx=pasos.filter(p=>/intermedio|avanzado/i.test(p.nombre));
+
+  // Fila 1: grupos de nivel
+  const grupoHeader=
+    (pasosInic.length?`<th colspan="${pasosInic.length}" style="text-align:center;padding:6px 4px;background:#DBEAFE;color:#1E40AF;font-size:11px;font-weight:700;border-bottom:2px solid #93C5FD;letter-spacing:.04em">🔵 INICIAL</th>`:'')
+    +(pasosProx.map(p=>{
+        const isAdv=/avanzado/i.test(p.nombre);
+        return `<th style="text-align:center;padding:6px 4px;background:${isAdv?'#FCE7F3':'#EDE9FE'};color:${isAdv?'#9D174D':'#5B21B6'};font-size:11px;font-weight:700;border-bottom:2px solid ${isAdv?'#F9A8D4':'#C4B5FD'};letter-spacing:.04em">${isAdv?'🩷 AVANZADO':'🟣 INTERMEDIO'}</th>`;
+      }).join(''));
+
+  // Fila 2: nombres individuales de cada paso
+  const headerCols=
+    pasosInic.map(p=>`<th style="min-width:90px;text-align:center;font-size:11px;padding:7px 4px;background:#F0F9FF;color:#0369A1;font-weight:600">${p.nombre}</th>`).join('')
+    +pasosProx.map(p=>'/').join(''); // placeholder, se reemplaza abajo por celda vacía en fila 2
+  // (construimos las filas de header separadas)
+  const header2Cols=
+    pasosInic.map(p=>`<th style="min-width:90px;text-align:center;font-size:11px;padding:7px 4px;background:#F0F9FF;color:#0369A1;font-weight:600">${p.nombre}</th>`).join('')
+    +pasosProx.map(p=>{
+        const isAdv=/avanzado/i.test(p.nombre);
+        return `<th style="min-width:100px;text-align:center;font-size:11px;padding:7px 4px;background:${isAdv?'#FDF2F8':'#FAF5FF'};color:${isAdv?'#9D174D':'#5B21B6'};font-weight:600">${p.nombre}</th>`;
+      }).join('');
+  const rows=members.map(m=>{
+    const isBaja=m.estado==='Baja';
+    const rowStyle=isBaja?'opacity:0.55;background:#FEF2F2':'';
+    const cols=pasos.map(p=>{
+      const entry=(m.formacion||[]).find(f=>String(f.pasoId)===String(p.id));
+      if(entry){
+        // Completado ✓
+        const badge=entry.fuente==='auto'
+          ?`<span style="font-size:9px;background:#D1FAE5;color:#065F46;padding:1px 5px;border-radius:99px;display:block;margin-top:2px">Auto</span>`
+          :`<span style="font-size:9px;background:#E0F2FE;color:#0369A1;padding:1px 5px;border-radius:99px;display:block;margin-top:2px">Manual</span>`;
+        return `<td style="text-align:center;font-size:11px;color:#065F46;font-weight:600;padding:6px 4px;background:#F0FDF4">${fmtAA(entry.fechaCompletado)||'✓'}${badge}</td>`;
+      } else {
+        // ¿En Curso? → tiene registros pero no está completado
+        const enCurso=S.discRecords.some(r=>String(r.pasoId)===String(p.id)&&r.asistencia&&r.asistencia[m.id]);
+        if(enCurso){
+          return `<td style="text-align:center;font-size:11px;color:#92400E;font-weight:600;padding:6px 4px;background:#FFFBEB">🟡 En curso</td>`;
+        }
+        // Próximamente solo para pasos cuyo nombre incluye "Intermedio" o "Avanzado"
+        const esProx=/intermedio|avanzado/i.test(p.nombre);
+        if(esProx){
+          return `<td style="text-align:center;font-size:10px;color:#C4B5FD;padding:6px 4px">🚧 Próximamente</td>`;
+        }
+        return `<td style="text-align:center;font-size:11px;color:#D1D5DB;padding:6px 4px">Pendiente</td>`;
+      }
+    }).join('');
+    return `<tr style="${rowStyle}">
+      <td style="min-width:150px;max-width:180px;padding:7px 8px">
+        <span style="cursor:pointer;color:#1F4E79;font-weight:600;font-size:13px" onclick="saShowDetail(${m.id},event)">${fullName(m)}</span>
+      </td>
+      ${cols}
+    </tr>`;
+  }).join('');
+  wrap.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead>
+      <tr>
+        <th rowspan="2" style="min-width:150px;text-align:left;padding:8px;background:#F9FAFB;border-bottom:2px solid #E5E7EB;position:sticky;left:0;z-index:1;vertical-align:middle">Nombre y Apellido</th>
+        ${grupoHeader}
+      </tr>
+      <tr>${header2Cols}</tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
 function saMembrosTab(tab, btn){
   document.querySelectorAll('.nav-btn[onclick*="saMembrosTab"]').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
@@ -1421,6 +1495,7 @@ function saMembrosTab(tab, btn){
     if(el) el.style.display=(t===tab)?'':'none';
   });
   if(tab==='personales') renderMiembrosPersonales();
+  if(tab==='formacion') renderFormacionGrid();
 }
 
 function renderMiembrosPersonales(){
@@ -1564,6 +1639,35 @@ function saDetailLabel(text,html,fullWidth){
   return `<div${fullWidth?' style="grid-column:1/-1"':''}><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${text}</div><div style="font-size:13px;font-weight:500">${html}</div></div>`;
 }
 
+async function saAddFormacion(memberId){
+  var m=S.members.find(x=>Number(x.id)===Number(memberId));
+  if(!m) return;
+  var pasoId=document.getElementById('sa-form-add-paso-'+memberId)?.value;
+  var fecha=document.getElementById('sa-form-add-fecha-'+memberId)?.value;
+  if(!pasoId||!fecha){showToast('Seleccioná el Paso y la Fecha','#D97706');return;}
+  var paso=S.discPasos.find(p=>String(p.id)===String(pasoId));
+  if(!m.formacion) m.formacion=[];
+  var yaExiste=m.formacion.find(f=>String(f.pasoId)===String(pasoId)&&f.fuente==='manual');
+  if(yaExiste){showToast('Ya existe ese Paso en Formación','#D97706');return;}
+  m.formacion.push({pasoId,pasoNombre:paso?paso.nombre:'Paso desconocido',fechaCompletado:fmtAA(fecha),fuente:'manual'});
+  await saveK(SK.members,S.members);
+  // Re-render formacion tab
+  saShowDetail(memberId,null);
+  saDetailTab('formacion',document.querySelectorAll('#sa-detail-panel .nav-btn')[2]);
+  showToast('✅ Formación agregada','#16A34A');
+}
+
+async function saDeleteFormacion(memberId, key){
+  var m=S.members.find(x=>Number(x.id)===Number(memberId));
+  if(!m||!m.formacion) return;
+  if(!confirm('¿Eliminar este paso de Formación?')) return;
+  m.formacion=m.formacion.filter(f=>!(f.fuente==='manual'&&(f.pasoId+'_'+f.fechaCompletado)===key));
+  await saveK(SK.members,S.members);
+  saShowDetail(memberId,null);
+  saDetailTab('formacion',document.querySelectorAll('#sa-detail-panel .nav-btn')[2]);
+  showToast('🗑 Eliminado','#DC2626');
+}
+
 function saToggleEstadoHistorial(){
   const el=document.getElementById('sa-estado-historial');
   if(el) el.style.display=(el.style.display==='none')?'block':'none';
@@ -1614,10 +1718,37 @@ function saShowDetail(id,event){
     + saDetailLabel('Barrio / Ciudad', m.dir||'—', true);
 
   // ── Tabs 3-5: en construcción ──
-  const proximamente='<div class="empty" style="padding:1.5rem 0">🚧 Próximamente</div>';
-  document.getElementById('sa-detail-formacion').innerHTML=proximamente;
-  document.getElementById('sa-detail-servicio').innerHTML=proximamente;
-  document.getElementById('sa-detail-historial').innerHTML=proximamente;
+  // ── Tab 3: Formación ──
+  const formacion=m.formacion||[];
+  const canAddForm=isSuperAdmin()||canEjecutar('disc_pasos');
+  const pasoOpts=S.discPasos.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
+  document.getElementById('sa-detail-formacion').innerHTML=`
+    <div style="padding:.75rem 0">
+      ${formacion.length===0?'<div style="color:#9CA3AF;font-size:13px;padding:4px 0">Sin formación registrada.</div>':''}
+      ${formacion.slice().sort((a,b)=>(b.fechaCompletado||'').localeCompare(a.fechaCompletado||'')).map(f=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #F3F4F6">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#1F4E79">${f.pasoNombre}</div>
+            <div style="font-size:11px;color:#6B7280">${fmtAA(f.fechaCompletado)||'—'}</div>
+          </div>
+          <span style="font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600;background:${f.fuente==='auto'?'#D1FAE5':'#E0F2FE'};color:${f.fuente==='auto'?'#065F46':'#0369A1'}">${f.fuente==='auto'?'Auto':'Manual'}</span>
+          ${canAddForm&&f.fuente==='manual'?`<button onclick="saDeleteFormacion(${m.id},'${f.pasoId}_${f.fechaCompletado}')" style="background:none;border:none;color:#DC2626;cursor:pointer;font-size:14px">🗑</button>`:''}
+        </div>`).join('')}
+      ${canAddForm?`
+      <div style="margin-top:12px;border-top:1px solid #E5E7EB;padding-top:12px">
+        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">+ Agregar Paso completado</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <select id="sa-form-add-paso-${m.id}" style="flex:1;padding:6px;border:1px solid #E5E7EB;border-radius:6px;font-size:12px">
+            <option value="">— Paso —</option>${pasoOpts}
+          </select>
+          <input type="date" id="sa-form-add-fecha-${m.id}" style="flex:1;padding:6px;border:1px solid #E5E7EB;border-radius:6px;font-size:12px">
+          <button onclick="saAddFormacion(${m.id})" class="btn btn-primary btn-sm">Guardar</button>
+        </div>
+      </div>`:''}
+    </div>`;
+
+  document.getElementById('sa-detail-servicio').innerHTML='<div class="empty" style="padding:1.5rem 0">🤝 Servicio — 🚧 Próximamente</div>';
+  document.getElementById('sa-detail-historial').innerHTML='<div class="empty" style="padding:1.5rem 0">📜 Historial — 🚧 Próximamente</div>';
 
   // Reset to first tab
   saDetailTab('generales', document.querySelector('#sa-detail-panel .nav-btn'));
@@ -3472,7 +3603,7 @@ function gdvRenderMemberRanking(recs){
       memberStats.push({
         nombre:m.nombre,
         apellido:m.apellido,
-        grupo:g?g.name:'Sin grupo',
+        grupo:memberGroups.length?memberGroups.map(gr=>gr.name).join(', '):'Sin grupo',
         presencias:presencias,
         totalEnc:totalEnc,
         pct:pctVal
@@ -3547,110 +3678,6 @@ function gdvDashTab(tab, btn){
   if(tab==='miembros'){gdvMrVisible=20; gdvRenderMemberRanking(gdvGetFilteredRecords());}
 }
 
-
-function gdvToggleMemberRankingOrder(){
-  gdvMrSortAsc=!gdvMrSortAsc;
-  gdvMrVisible=20;
-  const label=document.getElementById('gdv-mr-order-label');
-  const btn=document.getElementById('gdv-mr-order-btn');
-  if(label) label.textContent=gdvMrSortAsc?'Mostrando: peor asistencia primero':'Mostrando: mejor asistencia primero';
-  if(btn) btn.textContent=gdvMrSortAsc?'↑↓':'↓↑';
-  gdvRenderMemberRanking(gdvGetFilteredRecords());
-}
-
-function gdvShowMoreMembers(){
-  gdvMrVisible+=20;
-  gdvRenderMemberRanking(gdvGetFilteredRecords());
-}
-
-function gdvRenderMemberRanking(recs){
-  const wrap=document.getElementById('gdv-member-ranking');
-  const moreBtn=document.getElementById('gdv-mr-show-more');
-  const countEl=document.getElementById('gdv-mr-count');
-  if(!wrap) return;
-
-  // Build encounter count per group from filtered records
-  var encPerGroup={};
-  recs.forEach(function(r){
-    if(!encPerGroup[r.grupoId]) encPerGroup[r.grupoId]=0;
-    encPerGroup[r.grupoId]++;
-  });
-
-  // For each active member, calculate attendance
-  var memberStats=[];
-  S.members.filter(Boolean).filter(function(m){ return m.estado!=='Baja' && m.grupoId && encPerGroup[m.grupoId]>0; })
-    .forEach(function(m){
-      if(gdvFilSexo && m.genero!==gdvFilSexo) return;
-      if(gdvFilGrupos && !gdvFilGrupos.has(m.grupoId)) return;
-
-      var totalEnc=encPerGroup[m.grupoId]||0;
-      if(!totalEnc) return;
-
-      var presencias=0;
-      recs.filter(function(r){ return r.grupoId===m.grupoId; }).forEach(function(r){
-        var att=r.asistencia||{};
-        if(att[m.id] && att[m.id].state==='presente') presencias++;
-      });
-
-      var pctVal=totalEnc>0?Math.round(presencias/totalEnc*100):0;
-      var g=S.groups.find(function(x){ return x.id===m.grupoId; });
-      memberStats.push({
-        nombre:m.nombre,
-        apellido:m.apellido,
-        grupo:g?g.name:'Sin grupo',
-        presencias:presencias,
-        totalEnc:totalEnc,
-        pct:pctVal
-      });
-    });
-
-  if(!memberStats.length){
-    wrap.innerHTML='<div class="empty">Sin datos de asistencia individual para el período seleccionado</div>';
-    if(moreBtn) moreBtn.style.display='none';
-    if(countEl) countEl.textContent='';
-    return;
-  }
-
-  // Sort: worst first (asc pct) by default when gdvMrSortAsc=true
-  memberStats.sort(function(a,b){
-    return gdvMrSortAsc ? a.pct-b.pct : b.pct-a.pct;
-  });
-
-  var toShow=memberStats.slice(0,gdvMrVisible);
-  var remaining=memberStats.length-gdvMrVisible;
-
-  wrap.innerHTML=toShow.map(function(m,i){
-    var barColor = m.pct>=75 ? '#16A34A' : m.pct>=50 ? '#1F4E79' : m.pct>=25 ? '#D97706' : '#DC2626';
-    return '<div style="margin-bottom:10px;padding:8px 0;border-bottom:1px solid #F3F4F6">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;flex-wrap:wrap;gap:4px">' +
-        '<div style="display:flex;align-items:center;gap:8px">' +
-          '<span style="font-size:11px;color:#9CA3AF;min-width:22px;text-align:right">#'+(i+1)+'</span>' +
-          '<div>' +
-            '<div style="font-size:13px;font-weight:600;color:#1F2937">'+m.nombre+' '+m.apellido+'</div>' +
-            '<div style="font-size:11px;color:#6B7280">'+m.grupo+'</div>' +
-          '</div>' +
-        '</div>' +
-        '<span style="font-size:13px;color:#6B7280;white-space:nowrap">' +
-          '<strong style="color:'+barColor+'">'+m.pct+'%</strong>' +
-          ' &nbsp; '+m.presencias+'/'+m.totalEnc+' enc.' +
-        '</span>' +
-      '</div>' +
-      '<div class="pbar-bg">' +
-        '<div style="height:6px;border-radius:999px;background:'+barColor+';width:'+m.pct+'%;transition:width .3s"></div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-
-  if(moreBtn){
-    if(remaining>0){
-      moreBtn.style.display='block';
-      if(countEl) countEl.textContent='Mostrando '+toShow.length+' de '+memberStats.length+' miembros';
-    } else {
-      moreBtn.style.display='none';
-      if(countEl) countEl.textContent='Total: '+memberStats.length+' miembros';
-    }
-  }
-}
 
 function gdvRenderAttendance(){
   const recs=gdvGetFilteredRecords();
@@ -5209,56 +5236,6 @@ function ofToggleCompletado(matId, alumId){
   if(examEnc) ofRenderAsistenciaTable(examEnc.id, matId);
   showToast(mat.completados[alumId]?'✅ Completado':'⬜ Incompleto', mat.completados[alumId]?'#16A34A':'#6B7280');
 }
-function ofClearAsistFil(){
-  var mf=document.getElementById('of-asist-materia-fil');
-  var ff=document.getElementById('of-asist-fecha-fil');
-  if(mf) mf.value='';
-  if(ff) ff.value='';
-  ofRenderAsistencia();
-}
-
-function ofSelectEnc(encId){
-  // Highlight selected encounter
-  document.querySelectorAll('#of-enc-lista-mes .card').forEach(function(c){
-    c.style.background=c.onclick&&c.onclick.toString().includes(encId)?'#EFF6FF':'';
-  });
-  ofRenderAsistenciaTable(encId);
-}
-
-function ofRenderAsistenciaTable(encId){
-  const asistWrap=document.getElementById('of-asist-tabla');
-  if(!asistWrap) return;
-  if(!encId){asistWrap.innerHTML='';return;}
-
-  var allEncs=[];
-  Object.keys(ofEncuentros).forEach(function(k){
-    (ofEncuentros[k]||[]).forEach(function(e){ allEncs.push(e); });
-  });
-  var enc=allEncs.find(function(e){return String(e.id)===String(encId);});
-  if(!enc){asistWrap.innerHTML='';return;}
-
-  var html='<div class="card" style="margin-top:.75rem">'
-    +'<div style="font-size:13px;font-weight:600;color:#1F4E79;margin-bottom:1rem">✅ Asistencia del encuentro</div>';
-
-  if(!ofAlumnos.length){
-    html+='<div style="color:#9CA3AF;font-size:13px">No hay alumnos inscriptos</div>';
-  } else {
-    ofAlumnos.forEach(function(a){
-      var v=ofAsistencia[a.id+'_'+enc.id]||'';
-      var colors={P:'#D1FAE5',A:'#FEE2E2',T:'#FEF3C7','':'#F3F4F6'};
-      var textColors={P:'#065F46',A:'#991B1B',T:'#92400E','':'#6B7280'};
-      var labels={P:'Presente',A:'Ausente',T:'Tardanza','':'Sin marcar'};
-      html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6">'
-        +'<span style="font-size:13px;font-weight:500">'+a.nombre+' '+a.apellido+'</span>'
-        +'<button onclick="ofToggleAsist(\"'+a.id+'\",\"'+enc.id+'\")" '
-        +'style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:'+colors[v]+';color:'+textColors[v]+'">'
-        +labels[v]+'</button>'
-        +'</div>';
-    });
-  }
-  html+='</div>';
-  asistWrap.innerHTML=html;
-}
 function ofExportar(){
   alert(`Datos actuales:\n• Alumnos: ${ofAlumnos.length}\n• Materias: ${ofMaterias.length}\n\nUsá el botón 💾 Exportar del inicio para guardar todos los datos.`);
 }
@@ -5632,7 +5609,6 @@ function nvEditSeguimiento(memberId){
 }
 
 // Override nvSelectSeguimiento to also handle editing from list
-const _nvSelectOrig=nvSelectSeguimiento;
 function nvSelectSeguimiento(id, nombre, grupo){
   // Check if called from inline form or from list edit
   const formOverlay=document.getElementById('nv-form-overlay');
@@ -5703,7 +5679,24 @@ async function nvPromover(condicion){
   if(!nvSelectedId) return;
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
+  const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
+  if(!txtComentario||txtComentario.length<10){
+    alert('El comentario es obligatorio (mín. 10 caracteres) para registrar cualquier cambio de condición.');
+    document.getElementById('nv-comentario-txt')?.focus();
+    return;
+  }
+  const condAnterior=m.condicion||'Nuevo';
   m.condicion=condicion;
+  if(!m.comentarios) m.comentarios=[];
+  const textoAccion=condicion==='Nuevo'
+    ?`Mantenido como Nuevo (estaba: ${condAnterior})`
+    :`Promovido/a de "${condAnterior}" a "${condicion}"`;
+  m.comentarios.push({
+    texto:`${textoAccion}. ${txtComentario}`,
+    autor:currentUser?.name||'Sistema',
+    ts:Date.now()
+  });
+  document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
   nvClosePromote();
   renderNuevos();
@@ -5716,19 +5709,29 @@ async function nvDarDeBaja(){
   if(!nvSelectedId) return;
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
-  var motivo=prompt('Motivo de baja para '+fullName(m)+' (mínimo 10 caracteres):','');
-  if(motivo===null) return;
-  if(!motivo||motivo.trim().length<10){
-    alert('El motivo de baja es obligatorio y debe tener al menos 10 caracteres.');
+  // Use the comment textarea as motivo
+  const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
+  if(!txtComentario||txtComentario.length<10){
+    alert('Para pasar a Histórico escribí un comentario de al menos 10 caracteres explicando el motivo.');
+    document.getElementById('nv-comentario-txt')?.focus();
     return;
   }
+  if(!confirm('¿Pasar a Histórico a '+fullName(m)+'?')) return;
+  m.condicion='Historico';
   m.estado='Baja';
-  m.fechaBaja=new Date().toISOString().split('T')[0];
-  m.motivoBaja=motivo.trim();
+  m.fechaBaja=todayAA();
+  m.motivoBaja=txtComentario;
+  if(!m.comentarios) m.comentarios=[];
+  m.comentarios.push({
+    texto:`Pasado a Histórico. ${txtComentario}`,
+    autor:currentUser?.name||'Sistema',
+    ts:Date.now()
+  });
+  document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
   nvClosePromote();
   renderNuevos();
-  showToast(fullName(m)+' dado/a de baja','#DC2626');
+  showToast(fullName(m)+' pasado/a a Histórico','#6B7280');
 }
 
 function nvAbrirEditar(id){
@@ -5785,6 +5788,14 @@ async function nvReactivar(){
   m.fechaHistorico=null;
   m.fechaBaja=null;
   m.motivoBaja=null;
+  if(!m.comentarios) m.comentarios=[];
+  const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
+  m.comentarios.push({
+    texto: txtComentario ? `Re-activado como Nuevo. ${txtComentario}` : 'Re-activado como Nuevo',
+    autor:currentUser?.name||'Sistema',
+    ts:Date.now()
+  });
+  if(document.getElementById('nv-comentario-txt')) document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
   nvClosePromote();
   renderNuevos();
@@ -5917,12 +5928,6 @@ function nvOpenSeguimientoSelector(){
     </div>`;
   }).join('');
   document.getElementById('nv-seg-modal').style.display='flex';
-}
-
-function nvSelectSeguimiento(id, nombre, grupo){
-  document.getElementById('nv-mf-seguimiento-id').value=id;
-  document.getElementById('nv-mf-seguimiento-label').textContent=nombre+(grupo?' — '+grupo:'');
-  document.getElementById('nv-seg-modal').style.display='none';
 }
 
 async function nvSaveInlineForm(){
@@ -6689,13 +6694,54 @@ function discRenderDashboard(c){
   c.innerHTML=html;
 }
 
+async function discCheckAprobacion(pasoId, memberId){
+  // Max 1 ausencia (Justificado = Presente)
+  var records=S.discRecords.filter(function(r){return r.pasoId===pasoId;});
+  var ausencias=records.filter(function(r){
+    var att=r.asistencia&&r.asistencia[memberId];
+    return att&&att.state==='ausente';
+  }).length;
+  return ausencias<=1;
+}
+
 async function discToggleCompletado(pasoId, memberId){
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   if(!paso) return;
   if(!paso.completados) paso.completados={};
-  paso.completados[memberId]=!paso.completados[memberId];
+  var yaCompletado=paso.completados[memberId];
+
+  if(!yaCompletado){
+    // Validar aprobacion: max 1 ausencia
+    var aprueba=await discCheckAprobacion(pasoId,memberId);
+    if(!aprueba){
+      if(isSuperAdmin()||canEjecutar('disc_pasos')){
+        if(!confirm('Este miembro tiene más de 1 ausencia. Como Admin podés aprobar igual. ¿Confirmar Completado?')) return;
+      } else {
+        alert('El miembro tiene más de 1 ausencia. No cumple el requisito de aprobación.');
+        return;
+      }
+    }
+    paso.completados[memberId]=true;
+    // Guardar fecha de completado (último encuentro de este paso)
+    if(!paso.fechasCompletado) paso.fechasCompletado={};
+    var records=S.discRecords.filter(function(r){return r.pasoId===pasoId;});
+    var ultFecha=records.length?records.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0].fecha:todayAA();
+    paso.fechasCompletado[memberId]=ultFecha;
+    // Auto-alimentar Formación del miembro
+    var miembro=S.members.find(function(m){return m.id==memberId;});
+    if(miembro){
+      if(!miembro.formacion) miembro.formacion=[];
+      var yaEnForm=miembro.formacion.find(function(f){return f.pasoId===pasoId&&f.fuente==='auto';});
+      if(!yaEnForm){
+        miembro.formacion.push({pasoId,pasoNombre:paso.nombre,fechaCompletado:ultFecha,fuente:'auto'});
+        await saveK(SK.members,S.members);
+      }
+    }
+  } else {
+    paso.completados[memberId]=false;
+  }
+
   await saveK(SK.discPasos,S.discPasos);
-  // Re-render dashboard
   var c=document.getElementById('disc-content');
   if(c) discRenderDashboard(c);
   showToast(paso.completados[memberId]?'✅ Marcado como Completado':'⬜ Marcado como Incompleto',
@@ -6903,7 +6949,8 @@ function discLoadPasoForm(){
 
   discFacAtt={};
   var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
-  mems.forEach(function(m){discFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'presente'};});
+  // Default: Ausente
+  mems.forEach(function(m){discFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
 
   wrap.innerHTML='<div class="card-title">👥 Asistencia</div>'
     +mems.map(function(m){
@@ -6915,20 +6962,21 @@ function discLoadPasoForm(){
         +'<span style="font-size:13px;font-weight:500">'+fullName(m)+'</span>'
         +'</div>'
         +'<button id="disc-att-'+m.id+'" onclick="discToggleAtt('+m.id+')" '
-        +'style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:#D1FAE5;color:#065F46">Presente</button>'
+        +'style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:#FEE2E2;color:#991B1B">Ausente</button>'
         +'</div>';
     }).join('');
 }
 
 function discToggleAtt(memberId){
   if(!discFacAtt[memberId]) return;
-  discFacAtt[memberId].state=discFacAtt[memberId].state==='presente'?'ausente':'presente';
+  var cur=discFacAtt[memberId].state;
+  var next=cur==='ausente'?'presente':cur==='presente'?'justificado':'ausente';
+  discFacAtt[memberId].state=next;
   var btn=document.getElementById('disc-att-'+memberId);
   if(btn){
-    var isP=discFacAtt[memberId].state==='presente';
-    btn.style.background=isP?'#D1FAE5':'#FEE2E2';
-    btn.style.color=isP?'#065F46':'#991B1B';
-    btn.textContent=isP?'Presente':'Ausente';
+    btn.style.background=next==='presente'?'#D1FAE5':next==='justificado'?'#FEF3C7':'#FEE2E2';
+    btn.style.color=next==='presente'?'#065F46':next==='justificado'?'#92400E':'#991B1B';
+    btn.textContent=next==='presente'?'Presente':next==='justificado'?'Justificado':'Ausente';
   }
 }
 
@@ -7004,10 +7052,14 @@ function discEditRecord(id){
     +'<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:.5rem">Asistencia:</div>'
     +att.map(function(entry){
       var k=entry[0], v=entry[1];
-      return '<label style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #F3F4F6;cursor:pointer">'
-        +'<input type="checkbox" id="disc-edit-'+k+'" '+(v.state==='presente'?'checked':'')+' style="width:18px;height:18px">'
-        +'<span style="font-size:14px">'+v.name+'</span>'
-        +'</label>';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #F3F4F6">'
+        +'<span style="font-size:14px;flex:1">'+v.name+'</span>'
+        +'<select id="disc-edit-'+k+'" style="padding:4px 8px;border-radius:6px;border:1px solid #E5E7EB;font-size:12px">'
+        +'<option value="ausente"'+(v.state==='ausente'?' selected':'')+'>Ausente</option>'
+        +'<option value="presente"'+(v.state==='presente'?' selected':'')+'>Presente</option>'
+        +'<option value="justificado"'+(v.state==='justificado'?' selected':'')+'>Justificado</option>'
+        +'</select>'
+        +'</div>';
     }).join('');
   overlay.style.display='flex';
 }
@@ -7022,8 +7074,8 @@ async function discSaveEdit(){
   var r=S.discRecords.find(function(x){return x.id===id;});
   if(!r) return;
   Object.keys(r.asistencia).forEach(function(k){
-    var cb=document.getElementById('disc-edit-'+k);
-    if(cb) r.asistencia[k].state=cb.checked?'presente':'ausente';
+    var sel=document.getElementById('disc-edit-'+k);
+    if(sel) r.asistencia[k].state=sel.value;
   });
   await saveK(SK.discRecords,S.discRecords);
   discCloseEdit();
@@ -7424,7 +7476,7 @@ function exportNuevosExcel(){
       nombre:m.nombre,
       apellido:m.apellido,
       genero:m.genero==='H'?'Hombre':m.genero==='M'?'Mujer':'-',
-      grupo:g?g.name:'Sin grupo',
+      grupo:memberGroups.length?memberGroups.map(gr=>gr.name).join(', '):'Sin grupo',
       edad:m.edadDeclarada||'',
       celular:m.tel||'',
       barrio:m.dir||'',
@@ -7483,7 +7535,7 @@ function exportMiembrosExcel(){
       nombre:m.nombre,
       apellido:m.apellido,
       genero:m.genero==='H'?'Hombre':m.genero==='M'?'Mujer':'-',
-      grupo:g?g.name:'Sin grupo',
+      grupo:memberGroups.length?memberGroups.map(gr=>gr.name).join(', '):'Sin grupo',
       condicion:m.condicion||'',
       estado:m.estado||'Activo',
       telefono:m.tel||'',
@@ -7613,30 +7665,42 @@ async function importarTodo(event){
 // INIT
 // ════════════════════════════════════════════════════════════
 async function boot(){
-  // Restore session from pre-loaded value (set in <head>)
-  if(window._savedSession){
-    currentUser = window._savedSession;
-    document.getElementById('screen-login').style.display='none';
-  }
+  try{
+    // Restore session from pre-loaded value (set in <head>)
+    if(window._savedSession){
+      currentUser = window._savedSession;
+      document.getElementById('screen-login').style.display='none';
+    }
 
-  await initStorage();
-  // Check for public form URL parameter
-  const params=new URLSearchParams(window.location.search);
-  const form=params.get('form');
-  if(form==='nuevo'){
-    showPublicForm('nuevo');
-    return;
-  }
-  if(form==='actualizar'){
-    showPublicForm('actualizar');
-    return;
-  }
-  // Firebase auto-downloads when its module loads (see Firebase script)
-  // No need to call fbDownload here
-  
-  // If session was restored before initStorage, show home now
-  if(currentUser && currentUser.id){
-    showHome();
+    await initStorage();
+
+    // Check for public form URL parameter
+    const params=new URLSearchParams(window.location.search);
+    const form=params.get('form');
+    if(form==='nuevo'){
+      showPublicForm('nuevo');
+      return;
+    }
+    if(form==='actualizar'){
+      showPublicForm('actualizar');
+      return;
+    }
+
+    // If session was restored, show home
+    if(currentUser && currentUser.id){
+      showHome();
+    } else {
+      // Make sure login is visible
+      document.getElementById('screen-login').style.display='';
+    }
+  } catch(e){
+    console.error('Boot error:',e);
+    // If anything fails, show the login screen
+    try{
+      currentUser=null;
+      document.getElementById('screen-login').style.display='';
+      document.getElementById('screen-home').classList.add('hidden');
+    }catch(e2){}
   }
 }
 

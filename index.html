@@ -470,8 +470,13 @@ window.fbDownload().then(function(hasData) {
     // Reload S from localStorage (now updated from Firebase)
     if(typeof initStorage === 'function') {
       initStorage().then(function() {
-            // Data updated - reload permisos, run migration for new keys, refresh home
+            // Data updated from Firebase — but PERMISOS must be re-applied from memory
+            // to prevent Firebase cloud (which may have stale permisos) from overwriting local config
         if(typeof cleanMembers === 'function') cleanMembers();
+        // Re-apply current in-memory PERMISOS back to localStorage (protect from Firebase overwrite)
+        if(typeof PERMISOS !== 'undefined' && Object.keys(PERMISOS).length) {
+          try { localStorage.setItem('gdv_permisos', JSON.stringify(PERMISOS)); } catch(e) {}
+        }
         if(typeof loadPermisos === 'function') loadPermisos();
         if(typeof migratePermisos === 'function') migratePermisos();
         if(typeof renderModulesGrid === 'function') renderModulesGrid();
@@ -889,7 +894,18 @@ async function initStorage(){
   S.discPasos  =load(SK.discPasos,  DEFAULT_DISC_PASOS);
   S.discRecords=load(SK.discRecords,[]);
   await cleanMembers();
+  // Only reload permisos from storage if not already loaded in memory
+  // (prevents Firebase sync from wiping configured permisos)
+  var prevPermisos=PERMISOS&&Object.keys(PERMISOS).length?JSON.stringify(PERMISOS):null;
   loadPermisos();
+  // If we had permisos in memory and storage returned something different,
+  // keep the memory version (it was the last configured by an admin)
+  if(prevPermisos){
+    var fromStorage=JSON.stringify(PERMISOS);
+    if(fromStorage!==prevPermisos){
+      try{ PERMISOS=JSON.parse(prevPermisos); localStorage.setItem('gdv_permisos',prevPermisos); }catch(e){}
+    }
+  }
   // ── Migrar roles nuevos si no existen ──
   var missingRoles=[
     {id:'contactar',name:'Contactar',color:'#D97706',desc:'Agrega nuevos contactos y se autoasigna seguimiento'}
@@ -6182,7 +6198,9 @@ function cfgSetPerm(roleId, screen, value){
 async function cfgSavePermisos(){
   await savePermisos();
   loadPermisos(); // Reload in memory immediately
-  showToast('✅ Permisos guardados y sincronizados','#16A34A');
+  // Push to Firebase immediately so cloud matches local config
+  try{ if(typeof window.fbUpload==='function') window.fbUpload(true); }catch(e){}
+  showToast('✅ Permisos guardados y sincronizados ☁️','#16A34A');
 }
 
 async function cfgResetPermisos(){
@@ -6968,6 +6986,31 @@ function discLoadPasoForm(){
   discSelectedPasoId=pasoId;
   var paso=pasoId?S.discPasos.find(function(p){return p.id===pasoId;}):null;
 
+  // Update date min/max based on existing records for this paso
+  var fechaInput=document.getElementById('disc-fecha');
+  var hoy=today();
+  if(fechaInput){
+    fechaInput.max=hoy;
+    if(pasoId){
+      var recsDelPaso=S.discRecords.filter(function(r){return r.pasoId===pasoId;});
+      if(recsDelPaso.length){
+        // Min = day after the last registered date
+        var ultFecha=recsDelPaso.map(function(r){return r.fecha;}).sort().pop();
+        // Min must be at least 1 day after last record
+        var ultDate=new Date(ultFecha);
+        ultDate.setDate(ultDate.getDate()+1);
+        var minISO=ultDate.toISOString().split('T')[0];
+        fechaInput.min=minISO;
+        // If current value is before min, reset to min (or today if min>today)
+        if(fechaInput.value<minISO) fechaInput.value=minISO<=hoy?minISO:hoy;
+      } else {
+        fechaInput.min='';
+      }
+    } else {
+      fechaInput.min='';
+    }
+  }
+
   // Load chapters
   var capSel=document.getElementById('disc-sel-cap');
   if(paso&&paso.capitulos.length){
@@ -7028,7 +7071,24 @@ async function discGuardarAsistencia(){
   }
   if(!Object.keys(discFacAtt).length){alert('No hay miembros en este paso');return;}
 
-  // Check for duplicate week (same paso + same ISO week)
+  // Validar: no puede ser fecha futura
+  var hoy=today();
+  if(fecha>hoy){
+    alert('❌ No podés cargar una fecha futura. Máximo: hoy ('+hoy+').');
+    return;
+  }
+
+  // Validar: no puede ser anterior a la última fecha cargada para este paso
+  var recsDelPaso=S.discRecords.filter(function(r){return r.pasoId===pasoId;});
+  if(recsDelPaso.length){
+    var ultFecha=recsDelPaso.map(function(r){return r.fecha;}).sort().pop();
+    if(fecha<=ultFecha){
+      alert('❌ La fecha ingresada ('+fecha+') es anterior o igual a la última cargada ('+ultFecha+'). Debés cargar una fecha posterior.');
+      return;
+    }
+  }
+
+  // Validar: 1 encuentro por N° de semana para este paso
   var semana=getISOWeek(fecha);
   var anio=new Date(fecha).getFullYear();
   var yaExiste=S.discRecords.find(function(r){
@@ -7039,7 +7099,7 @@ async function discGuardarAsistencia(){
     if(isSuperAdmin()||canEjecutar('disc_pasos')){
       if(!confirm('Ya existe un registro para la Semana '+semana+' en este Paso. Como Admin podés guardar igual para corregir errores. ¿Continuar?')) return;
     } else {
-      alert('Ya existe un registro para la Semana '+semana+' en este Paso. Contactá al Admin si hay un error.');
+      alert('❌ Ya existe un registro para la Semana '+semana+' en este Paso. Solo se permite 1 encuentro por semana.');
       return;
     }
   }

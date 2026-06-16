@@ -433,7 +433,9 @@ window.fbDownload = async function() {
         const data = snap.data();
         keys.forEach(k => {
           if(data[k]){
-            if(k==='gdv_m5'){
+            if(k==='gdv_permisos'||k==='gdv_permisos_ts'){
+              // NEVER overwrite permisos via general sync — only cfgSavePermisos writes them
+            } else if(k==='gdv_m5'){
               localStorage.setItem(k, mergeMembers(localStorage.getItem(k), data[k]));
             } else {
               localStorage.setItem(k, data[k]);
@@ -460,28 +462,21 @@ window.fbDownload = async function() {
 };
 
 window.fbReady = true;
-window._fbDb = db; // expose db for direct permisos access
+window._fbDb = db;
 
-// ── Dedicated permisos save/load (bypasses KEY_GROUPS sync) ──
+// Dedicated permisos read/write using vng/config (existing working path)
 window.fbSavePermisos = async function(permisosStr) {
   try {
-    await setDoc(doc(db, 'vng_cfg', 'permisos'), { data: permisosStr, ts: Date.now() });
-    console.log('Firebase: permisos saved OK');
+    await setDoc(doc(db,'vng','config'), {gdv_permisos: permisosStr, gdv_permisos_ts: Date.now()}, {merge:true});
     return true;
-  } catch(e) {
-    console.error('Firebase: permisos save error', e);
-    return false;
-  }
+  } catch(e) { console.error('fbSavePermisos error:', e); return false; }
 };
 window.fbLoadPermisos = async function() {
   try {
-    const snap = await getDoc(doc(db, 'vng_cfg', 'permisos'));
-    if(snap.exists()) return snap.data();
+    const snap = await getDoc(doc(db,'vng','config'));
+    if(snap.exists() && snap.data().gdv_permisos) return snap.data();
     return null;
-  } catch(e) {
-    console.error('Firebase: permisos load error', e);
-    return null;
-  }
+  } catch(e) { return null; }
 };
 console.log('Firebase: initialized OK');
 
@@ -503,14 +498,14 @@ window.fbDownload().then(function(hasData) {
         S.discRecords = _ld('gdv_disc_records',  S.discRecords ||[]);
         if(typeof cleanMembers==='function') cleanMembers();
       }
-      // Only load permisos if this device has none saved locally
+      // Load permisos from Firebase if this device has none configured
       if(!localStorage.getItem('vng_cfg_permisos') && typeof window.fbLoadPermisos==='function'){
         window.fbLoadPermisos().then(function(fbPerm){
-          if(fbPerm&&fbPerm.data){
-            localStorage.setItem('vng_cfg_permisos',fbPerm.data);
+          if(fbPerm && fbPerm.gdv_permisos){
+            localStorage.setItem('vng_cfg_permisos', fbPerm.gdv_permisos);
             if(typeof loadPermisos==='function') loadPermisos();
-            if(typeof renderModulesGrid==='function') renderModulesGrid();
           }
+          if(typeof renderModulesGrid==='function') renderModulesGrid();
         });
       } else {
         if(typeof renderModulesGrid==='function') renderModulesGrid();
@@ -6252,10 +6247,13 @@ async function cfgSavePermisos(){
     console.error('[PERMISOS] Verificación fallida:', verificado);
     return;
   }
-  // No llamar loadPermisos() - PERMISOS ya está correcto en memoria
+  // Push directly to Firebase vng/config (bypasses general sync)
   try{
-    if(typeof window.fbSavePermisos==='function') await window.fbSavePermisos(verificado);
-  }catch(e){}
+    if(typeof window.fbSavePermisos==='function'){
+      const ok = await window.fbSavePermisos(verificado);
+      console.log('Permisos Firebase push:', ok ? 'OK' : 'failed');
+    }
+  }catch(e){ console.error('Permisos Firebase push error:', e); }
   // Show save confirmation with role count
   const roles=Object.keys(PERMISOS);
   const resumen=roles.map(r=>{

@@ -525,7 +525,7 @@ const MODULES_PERM=[
     {key:'gdv_registros',    label:'Ver registros'},
     {key:'gdv_scope_grupo',  label:'🏘 Limitar a su grupo asignado'},
   ]},
-  {key:'miembros', label:'Miembros', icon:'👥', screens:[
+  {key:'miembros', label:'Rebaños', icon:'👥', screens:[
     {key:'miembros_ver',   label:'Ver base de miembros'},
     {key:'miembros_editar',label:'Editar y agregar miembros'},
   ]},
@@ -963,6 +963,7 @@ function todayAA(){return fmtAA(todayAA());}
 function initials(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();}
 function pct(a,b){return b?Math.round(a/b*100):0;}
 function fullName(m){return `${m.nombre} ${m.apellido}`.trim();}
+function listName(m){return [m.apellido,m.nombre].filter(Boolean).join(' ');}
 function groupMembers(gid){
   return S.members.filter(m=>m.estado==='Activo' && (Number(m.grupoId)===Number(gid) || (m.grupoIds||[]).map(Number).includes(Number(gid))));
 }
@@ -1132,7 +1133,7 @@ function renderModulesGrid(){
     action:'openOF'
   });
   if(canAccessMiembros()) modules.push({
-    icon:'👥',name:'Miembros',
+    icon:'🐑',name:'Rebaños',
     desc:'Base centralizada de todos los miembros de la iglesia con sus roles, grupos y datos de contacto.',
     tag:'Módulo activo',tagClass:'tag-blue',
     action:'openMiembros'
@@ -1215,7 +1216,7 @@ function openGdV(){
 function openMiembros(){
   document.getElementById('screen-home').classList.add('hidden');
   document.getElementById('screen-app').classList.add('show');
-  document.getElementById('app-topbar-title').textContent='👥 Miembros';
+  document.getElementById('app-topbar-title').textContent='🐑 Rebaños';
   document.getElementById('app-topbar-user').textContent=currentUser.name;
   document.getElementById('app-content').innerHTML=buildMiembrosHTML();
   renderMiembrosStandalone();
@@ -1560,7 +1561,7 @@ function renderFormacionGrid(){
     }).join('');
     return `<tr style="${rowStyle}">
       <td style="min-width:150px;max-width:180px;padding:7px 8px">
-        <span style="cursor:pointer;color:#1F4E79;font-weight:600;font-size:13px" onclick="saShowDetail(${m.id},event)">${fullName(m)}</span>
+        <span style="cursor:pointer;color:#1F4E79;font-weight:600;font-size:13px" onclick="saShowDetail(${m.id},event)">${listName(m)}</span>
       </td>
       ${cols}
     </tr>`;
@@ -1652,7 +1653,7 @@ function renderMiembrosStandalone(){
   // '' = todos
 
   // Orden alfabético por Nombre
-  members=members.slice().sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'','es',{sensitivity:'base'}));
+  members=members.slice().sort((a,b)=>((a.apellido||'')+(a.nombre||'')).localeCompare((b.apellido||'')+(b.nombre||''),'es',{sensitivity:'base'}));
 
   const activos=S.members.filter(m=>m.estado!=='Baja').length;
   const countEl=document.getElementById('sa-member-count');
@@ -1684,7 +1685,7 @@ function renderMiembrosStandalone(){
     if(!isBaja&&faltaDatos) rowStyle='background:#FFF0F5';
     return `<tr style="${rowStyle}">
       <td style="max-width:160px">
-        <span style="cursor:pointer;color:#1F4E79;font-weight:600;text-decoration:underline dotted;word-break:break-word" onclick="saShowDetail(${m.id},event)">${fullName(m)}</span>
+        <span style="cursor:pointer;color:#1F4E79;font-weight:600;text-decoration:underline dotted;word-break:break-word" onclick="saShowDetail(${m.id},event)">${listName(m)}</span>
         ${isBaja?`<div style="font-size:11px;color:#DC2626;margin-top:2px">Baja: ${saFmtDate(m.fechaBaja||'')}</div>`:''}
       </td>
       <td><span style="background:${genBg};color:${genColor};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${m.genero}</span></td>
@@ -2135,7 +2136,7 @@ function configTab(sub, btn){
         <button class="btn btn-primary btn-sm" onclick="cfgOpenNewUser()">+ Nuevo usuario</button>
       </div>
       <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 14px;font-size:13px;color:#1E40AF;margin-bottom:1rem">
-        ℹ️ <strong>Usuarios</strong> son las cuentas de login (usuario + contraseña + acceso al sistema). Son diferentes a los <strong>Miembros</strong>, que son las personas de la iglesia.
+        ℹ️ <strong>Usuarios</strong> son las cuentas de login (usuario + contraseña + acceso al sistema). Son diferentes a los <strong>Rebaños</strong>, que son las personas de la iglesia.
       </div>
       <div id="cfg-user-form" class="card" style="display:none;margin-bottom:1rem">
         <div class="card-title" id="cfg-uf-title">Nuevo usuario</div>
@@ -2760,7 +2761,7 @@ function buildGdVHTML(){
     </div>
     <div id="gdv-tab-config" class="section-tab">
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.5rem">
-        <button class="btn btn-primary btn-sm" onclick="gdvConfigTab('miembros',this)" id="cfg-btn-miembros">👥 Miembros</button>
+        <button class="btn btn-primary btn-sm" onclick="gdvConfigTab('miembros',this)" id="cfg-btn-miembros">🐑 Rebaños</button>
         <button class="btn btn-sm" onclick="gdvConfigTab('grupos',this)" id="cfg-btn-grupos">🏘 Grupos</button>
         <button class="btn btn-sm" onclick="gdvConfigTab('usuarios',this)" id="cfg-btn-usuarios">👤 Usuarios</button>
         <button class="btn btn-sm" onclick="gdvConfigTab('roles',this)" id="cfg-btn-roles">🎭 Funciones</button>
@@ -2892,7 +2893,7 @@ function gdvGruposHTML(){return `
 
 function gdvUsuariosHTML(){return `
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><span style="font-size:14px;font-weight:600;color:#1F4E79">Usuarios del sistema</span><button class="btn btn-primary btn-sm" onclick="gdvOpenNewUser()">+ Nuevo</button></div>
-  <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400E;margin-bottom:1rem">⚠️ Los <strong>Usuarios</strong> son las cuentas de login (usuario + contraseña). Los <strong>Miembros</strong> son las personas de la iglesia. Son cosas distintas.</div>
+  <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400E;margin-bottom:1rem">⚠️ Los <strong>Usuarios</strong> son las cuentas de login (usuario + contraseña). Los <strong>Rebaños</strong> son las personas de la iglesia. Son cosas distintas.</div>
   <div id="gdv-users-list"></div>
   <div id="gdv-user-form" class="card hidden">
     <div class="card-title" id="gdv-uf-title">Nuevo usuario</div>
@@ -5917,7 +5918,7 @@ function nvCalcEdad(fnac){
 }
 
 function nvCumplesBanner(){
-  const hoy=new Date();
+  const hoy=new Date(); hoy.setHours(0,0,0,0); // compare at midnight
   const dd=hoy.getDate(), mm=hoy.getMonth()+1;
   const proximos=[];
   S.members.filter(Boolean).filter(m=>m.condicion==='Nuevo'&&m.estado!=='Baja'&&m.fnac).forEach(m=>{
@@ -5927,7 +5928,7 @@ function nvCumplesBanner(){
     // Days until birthday this year
     const cumpleEsteAnio=new Date(hoy.getFullYear(),mNac-1,dNac);
     if(cumpleEsteAnio<hoy) cumpleEsteAnio.setFullYear(hoy.getFullYear()+1);
-    const dias=Math.round((cumpleEsteAnio-hoy)/(1000*60*60*24));
+    const dias=Math.floor((cumpleEsteAnio-hoy)/(1000*60*60*24));
     if(dias<=15) proximos.push({nombre:m.nombre+' '+m.apellido,dias,dNac,mNac});
   });
   const wrap=document.getElementById('nv-cumples-wrap');
@@ -6368,7 +6369,7 @@ function renderHomeCumples(){
   var wrap=document.getElementById('home-cumple-wrap');
   if(!wrap) return;
 
-  var hoy=new Date();
+  var hoy=new Date(); hoy.setHours(0,0,0,0);
   var hoyMes=hoy.getMonth()+1;
   var hoyDia=hoy.getDate();
 
@@ -6390,7 +6391,7 @@ function renderHomeCumples(){
       cumpleEsteAnio=new Date(hoy.getFullYear()+1, mes-1, dia);
       edadEsteAnio++;
     }
-    var diff=Math.round((cumpleEsteAnio-hoy)/(1000*60*60*24));
+    var diff=Math.floor((cumpleEsteAnio-hoy)/(1000*60*60*24));
     var g=S.groups.find(function(x){return x.id===m.grupoId;});
     return {
       nombre:m.nombre+' '+m.apellido,

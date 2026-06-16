@@ -373,7 +373,7 @@ const db = getFirestore(fbApp);
 
 // ── Keys grouped by document (max ~900KB each) ──
 const KEY_GROUPS = {
-  'config':  ['gdv_u5','gdv_g5','gdv_qr_actualizar'],
+  'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_permisos','gdv_qr_actualizar'],
   'members': ['gdv_m5'],
   'records': ['gdv_r5'],
   'disc':    ['gdv_disc_pasos','gdv_disc_records'],
@@ -433,8 +433,11 @@ window.fbDownload = async function() {
         const data = snap.data();
         keys.forEach(k => {
           if(data[k]){
-            if(k==='gdv_permisos'||k==='gdv_permisos_ts'){
-              // NEVER overwrite permisos via general sync — only cfgSavePermisos writes them
+            if(k==='gdv_permisos'){
+              // Only write permisos from Firebase if no local config exists yet
+              if(!localStorage.getItem('gdv_permisos')){
+                localStorage.setItem(k, data[k]);
+              }
             } else if(k==='gdv_m5'){
               localStorage.setItem(k, mergeMembers(localStorage.getItem(k), data[k]));
             } else {
@@ -499,17 +502,9 @@ window.fbDownload().then(function(hasData) {
         if(typeof cleanMembers==='function') cleanMembers();
       }
       // Load permisos from Firebase if this device has none configured
-      if(!localStorage.getItem('vng_cfg_permisos') && typeof window.fbLoadPermisos==='function'){
-        window.fbLoadPermisos().then(function(fbPerm){
-          if(fbPerm && fbPerm.gdv_permisos){
-            localStorage.setItem('vng_cfg_permisos', fbPerm.gdv_permisos);
-            if(typeof loadPermisos==='function') loadPermisos();
-          }
-          if(typeof renderModulesGrid==='function') renderModulesGrid();
-        });
-      } else {
-        if(typeof renderModulesGrid==='function') renderModulesGrid();
-      }
+      // Reload permisos from localStorage (now updated from Firebase if it was empty)
+      if(!window._permisosEditing && typeof loadPermisos==='function') loadPermisos();
+      if(typeof renderModulesGrid==='function') renderModulesGrid();
     }catch(e){ console.error('Firebase post-sync error:',e); }
   }
   }).catch(function(e){ console.error('Firebase auto-download error:', e); });
@@ -635,9 +630,9 @@ async function cleanMembers(){
 }
 
 function loadPermisos(){
-  if(PERMISOS && Object.keys(PERMISOS).length > 0) return;
+  if(window._permisosEditing) return;
   try{
-    const saved=localStorage.getItem('vng_cfg_permisos');
+    const saved=localStorage.getItem('gdv_permisos');
     PERMISOS=saved?JSON.parse(saved):JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
   }catch(e){
     PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
@@ -672,11 +667,8 @@ async function migratePermisos(){
 }
 
 async function savePermisos(){
-  try{
-    if(!PERMISOS || !Object.keys(PERMISOS).length) return;
-    const str=JSON.stringify(PERMISOS);
-    localStorage.setItem('vng_cfg_permisos', str);
-  }catch(e){ console.error('savePermisos error:', e); }
+  if(!PERMISOS || !Object.keys(PERMISOS).length) return;
+  await saveK('gdv_permisos', PERMISOS);
 }
 
 function getPerm(roleId, screen){
@@ -6222,6 +6214,7 @@ function cfgRenderPermisos(){
 }
 
 function cfgSetPerm(roleId, screen, value){
+  window._permisosEditing=true; // block loadPermisos while editing
   if(!PERMISOS[roleId]) PERMISOS[roleId]={};
   PERMISOS[roleId][screen]=value;
 }
@@ -6240,29 +6233,13 @@ function cfgOpenSection(sec){
 }
 async function cfgSavePermisos(){
   await savePermisos();
-  // Verify the save actually worked
-  const verificado=localStorage.getItem('vng_cfg_permisos');
+  const verificado=localStorage.getItem('gdv_permisos');
   if(!verificado||verificado==='{}'){
-    alert('❌ Error al guardar permisos. Intentá de nuevo.');
-    console.error('[PERMISOS] Verificación fallida:', verificado);
+    alert('❌ Error al guardar permisos.');
     return;
   }
-  // Push directly to Firebase vng/config (bypasses general sync)
-  try{
-    if(typeof window.fbSavePermisos==='function'){
-      const ok = await window.fbSavePermisos(verificado);
-      console.log('Permisos Firebase push:', ok ? 'OK' : 'failed');
-    }
-  }catch(e){ console.error('Permisos Firebase push error:', e); }
-  // Show save confirmation with role count
-  const roles=Object.keys(PERMISOS);
-  const resumen=roles.map(r=>{
-    const p=PERMISOS[r]||{};
-    const activos=Object.values(p).filter(v=>v!=='ninguno').length;
-    const total=Object.values(p).length;
-    return r+': '+activos+'/'+total;
-  }).join(' | ');
-  showToast('✅ Permisos guardados — '+resumen,'#16A34A',6000);
+  window._permisosEditing=false;
+  showToast('✅ Permisos guardados','#16A34A');
   setTimeout(function(){
     document.querySelectorAll('[id^="cfg-tab-"]').forEach(b=>b.className='btn btn-sm');
     const wrap=document.getElementById('cfg-content');

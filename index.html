@@ -642,18 +642,8 @@ async function cleanMembers(){
 function loadPermisos(){
   if(PERMISOS && Object.keys(PERMISOS).length > 0) return;
   try{
-    // Try new key first, then old key as migration fallback
-    const saved=localStorage.getItem('vng_cfg_permisos')
-               ||localStorage.getItem('gdv_permisos');
-    if(saved){
-      PERMISOS=JSON.parse(saved);
-      // Migrate: write to new key if read from old key
-      if(!localStorage.getItem('vng_cfg_permisos')){
-        localStorage.setItem('vng_cfg_permisos',saved);
-      }
-    } else {
-      PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
-    }
+    const saved=localStorage.getItem('vng_cfg_permisos');
+    PERMISOS=saved?JSON.parse(saved):JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
   }catch(e){
     PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
   }
@@ -675,18 +665,15 @@ async function migratePermisos(){
       });
     }
   });
-  // Also ensure ALL current S.roles have entries in PERMISOS
+  // Also ensure ALL current S.roles have entries in PERMISOS (in-memory only)
   (S.roles||[]).forEach(function(role){
     if(!PERMISOS[role.id]){
-      // Give unmapped roles the 'pastor' default as base (full access)
       PERMISOS[role.id]=JSON.parse(JSON.stringify(
         DEFAULT_PERMISOS[role.id]||DEFAULT_PERMISOS['pastor']||{}
       ));
-      needsSave=true;
     }
   });
-  // Save if any new keys were added
-  if(needsSave) savePermisos();
+  // NOTE: never save here - admin must explicitly save via cfgSavePermisos
 }
 
 async function savePermisos(){
@@ -945,6 +932,7 @@ let gdvCharts={};
 // HELPERS
 // ════════════════════════════════════════════════════════════
 async function initStorage(){
+  try{ localStorage.removeItem('gdv_permisos'); }catch(e){}
   S.users      =load(SK.users,      DEFAULT_USERS);
   S.groups     =load(SK.groups,     DEFAULT_GROUPS);
   S.records    =load(SK.records,    []);

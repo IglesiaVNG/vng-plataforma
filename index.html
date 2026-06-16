@@ -640,12 +640,20 @@ async function cleanMembers(){
 }
 
 function loadPermisos(){
-  // Solo carga si PERMISOS está vacío (inicio de sesión).
-  // Nunca sobreescribe PERMISOS si ya tiene datos cargados en memoria.
   if(PERMISOS && Object.keys(PERMISOS).length > 0) return;
   try{
-    const saved=localStorage.getItem('vng_cfg_permisos');
-    PERMISOS=saved?JSON.parse(saved):JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
+    // Try new key first, then old key as migration fallback
+    const saved=localStorage.getItem('vng_cfg_permisos')
+               ||localStorage.getItem('gdv_permisos');
+    if(saved){
+      PERMISOS=JSON.parse(saved);
+      // Migrate: write to new key if read from old key
+      if(!localStorage.getItem('vng_cfg_permisos')){
+        localStorage.setItem('vng_cfg_permisos',saved);
+      }
+    } else {
+      PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
+    }
   }catch(e){
     PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
   }
@@ -667,8 +675,18 @@ async function migratePermisos(){
       });
     }
   });
-  // Note: do NOT save here - only cfgSavePermisos writes to localStorage
-  // In-memory PERMISOS is updated; next explicit save will persist it
+  // Also ensure ALL current S.roles have entries in PERMISOS
+  (S.roles||[]).forEach(function(role){
+    if(!PERMISOS[role.id]){
+      // Give unmapped roles the 'pastor' default as base (full access)
+      PERMISOS[role.id]=JSON.parse(JSON.stringify(
+        DEFAULT_PERMISOS[role.id]||DEFAULT_PERMISOS['pastor']||{}
+      ));
+      needsSave=true;
+    }
+  });
+  // Save if any new keys were added
+  if(needsSave) savePermisos();
 }
 
 async function savePermisos(){
@@ -6250,7 +6268,15 @@ async function cfgSavePermisos(){
   try{
     if(typeof window.fbSavePermisos==='function') await window.fbSavePermisos(verificado);
   }catch(e){}
-  showToast('✅ Permisos guardados','#16A34A');
+  // Show save confirmation with role count
+  const roles=Object.keys(PERMISOS);
+  const resumen=roles.map(r=>{
+    const p=PERMISOS[r]||{};
+    const activos=Object.values(p).filter(v=>v!=='ninguno').length;
+    const total=Object.values(p).length;
+    return r+': '+activos+'/'+total;
+  }).join(' | ');
+  showToast('✅ Permisos guardados — '+resumen,'#16A34A',6000);
   setTimeout(function(){
     document.querySelectorAll('[id^="cfg-tab-"]').forEach(b=>b.className='btn btn-sm');
     const wrap=document.getElementById('cfg-content');
@@ -7756,13 +7782,13 @@ function exportMiembrosExcel(){
 // ════════════════════════════════════════════════════════════
 // EXPORT / IMPORT
 // ════════════════════════════════════════════════════════════
-function showToast(msg, color='#1F4E79'){
+function showToast(msg, color='#1F4E79', dur=3000){
   const t=document.getElementById('exp-toast');
   if(!t) return;
   t.textContent=msg;
   t.style.background=color;
   t.style.display='block';
-  setTimeout(()=>t.style.display='none', 3500);
+  setTimeout(function(){t.remove();}, dur||3000);
 }
 
 async function exportarTodo(){

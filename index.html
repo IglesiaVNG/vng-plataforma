@@ -404,7 +404,7 @@ window.fbUpload = async function(force) {
         const v = localStorage.getItem(k);
         if(v) data[k] = v;
       });
-      await setDoc(doc(db, 'vng', docName), data);
+      await setDoc(doc(db, 'vng', docName), data, {merge:true});
     });
     await Promise.all(promises);
     window.showToast && window.showToast('☁️ Datos guardados en la nube', '#16A34A');

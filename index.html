@@ -373,7 +373,7 @@ const db = getFirestore(fbApp);
 
 // ── Keys grouped by document (max ~900KB each) ──
 const KEY_GROUPS = {
-  'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_permisos','gdv_qr_actualizar'],
+  'config':  ['gdv_u5','gdv_g5','gdv_qr_actualizar'],
   'members': ['gdv_m5'],
   'records': ['gdv_r5'],
   'disc':    ['gdv_disc_pasos','gdv_disc_records'],
@@ -434,7 +434,6 @@ window.fbDownload = async function() {
         keys.forEach(k => {
           if(data[k]){
             if(k==='gdv_m5'){
-              // Merge: keep local contacts (e.g. from QR) not in Firebase
               localStorage.setItem(k, mergeMembers(localStorage.getItem(k), data[k]));
             } else {
               localStorage.setItem(k, data[k]);
@@ -461,30 +460,64 @@ window.fbDownload = async function() {
 };
 
 window.fbReady = true;
+window._fbDb = db; // expose db for direct permisos access
+
+// ── Dedicated permisos save/load (bypasses KEY_GROUPS sync) ──
+window.fbSavePermisos = async function(permisosStr) {
+  try {
+    await setDoc(doc(db, 'vng_cfg', 'permisos'), { data: permisosStr, ts: Date.now() });
+    console.log('Firebase: permisos saved OK');
+    return true;
+  } catch(e) {
+    console.error('Firebase: permisos save error', e);
+    return false;
+  }
+};
+window.fbLoadPermisos = async function() {
+  try {
+    const snap = await getDoc(doc(db, 'vng_cfg', 'permisos'));
+    if(snap.exists()) return snap.data();
+    return null;
+  } catch(e) {
+    console.error('Firebase: permisos load error', e);
+    return null;
+  }
+};
 console.log('Firebase: initialized OK');
 
 // Auto-download when Firebase is ready (fixes mobile timing issue)
 window.fbDownload().then(function(hasData) {
   if(hasData) {
-    console.log('Firebase: auto-download complete, reloading data...');
-    // Reload S from localStorage (now updated from Firebase)
-    if(typeof initStorage === 'function') {
-      initStorage().then(function() {
-            // Data updated from Firebase — but PERMISOS must be re-applied from memory
-            // to prevent Firebase cloud (which may have stale permisos) from overwriting local config
-        if(typeof cleanMembers === 'function') cleanMembers();
-        // Re-apply current in-memory PERMISOS back to localStorage (protect from Firebase overwrite)
-        if(typeof PERMISOS !== 'undefined' && Object.keys(PERMISOS).length) {
-          try { localStorage.setItem('gdv_permisos', JSON.stringify(PERMISOS)); } catch(e) {}
-        }
-        if(typeof loadPermisos === 'function') loadPermisos();
-        if(typeof migratePermisos === 'function') migratePermisos();
-        if(typeof renderModulesGrid === 'function') renderModulesGrid();
-        console.log('Firebase: data ready in localStorage');
-      });
-    }
+    console.log('Firebase: auto-download complete');
+    // Reload S from localStorage WITHOUT calling initStorage() or loadPermisos()
+    // initStorage() calls loadPermisos() which would reset PERMISOS mid-edit
+    try{
+      if(typeof S !== 'undefined'){
+        var _ld=function(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
+        S.users       = _ld('gdv_u5',            S.users       ||[]);
+        S.groups      = _ld('gdv_g5',            S.groups      ||[]);
+        S.records     = _ld('gdv_r5',            S.records     ||[]);
+        S.members     = _ld('gdv_m5',            S.members     ||[]);
+        S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
+        S.discPasos   = _ld('gdv_disc_pasos',    S.discPasos   ||[]);
+        S.discRecords = _ld('gdv_disc_records',  S.discRecords ||[]);
+        if(typeof cleanMembers==='function') cleanMembers();
+      }
+      // Only load permisos if this device has none saved locally
+      if(!localStorage.getItem('vng_cfg_permisos') && typeof window.fbLoadPermisos==='function'){
+        window.fbLoadPermisos().then(function(fbPerm){
+          if(fbPerm&&fbPerm.data){
+            localStorage.setItem('vng_cfg_permisos',fbPerm.data);
+            if(typeof loadPermisos==='function') loadPermisos();
+            if(typeof renderModulesGrid==='function') renderModulesGrid();
+          }
+        });
+      } else {
+        if(typeof renderModulesGrid==='function') renderModulesGrid();
+      }
+    }catch(e){ console.error('Firebase post-sync error:',e); }
   }
-}).catch(function(e){ console.error('Firebase auto-download error:', e); });
+  }).catch(function(e){ console.error('Firebase auto-download error:', e); });
 </script>
 
 <script>
@@ -528,11 +561,11 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor:     {gdv_dashboard:'consulta',gdv_cargar:'ninguno',gdv_registros:'consulta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno','disc_dashboard':'consulta','disc_cargar':'ejecuta','disc_registros':'consulta','disc_pasos':'ninguno',gdv_scope_grupo:'ninguno'},
-  lider:      {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno','disc_dashboard':'consulta','disc_cargar':'ejecuta','disc_registros':'consulta','disc_pasos':'ninguno',gdv_scope_grupo:'ninguno'},
-  facilitador:{gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno','disc_dashboard':'consulta','disc_cargar':'ejecuta','disc_registros':'consulta','disc_pasos':'ninguno',gdv_scope_grupo:'ejecuta'},
-  admin_gdv:  {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno','disc_dashboard':'ninguno','disc_cargar':'ninguno','disc_registros':'ninguno','disc_pasos':'ninguno',gdv_scope_grupo:'ninguno'},
-  admin_of:   {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno','disc_dashboard':'ninguno','disc_cargar':'ninguno','disc_registros':'ninguno','disc_pasos':'ninguno',gdv_scope_grupo:'ninguno'},
+  pastor:     {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
+  lider:      {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
+  facilitador:{gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ejecuta'},
+  admin_gdv:  {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
+  admin_of:   {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
   disc_n1:    {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',config:'ninguno',gdv_scope_grupo:'ninguno'},
   contactar:  {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',config:'ninguno',gdv_scope_grupo:'ninguno'},
 };
@@ -607,8 +640,11 @@ async function cleanMembers(){
 }
 
 function loadPermisos(){
+  // Solo carga si PERMISOS está vacío (inicio de sesión).
+  // Nunca sobreescribe PERMISOS si ya tiene datos cargados en memoria.
+  if(PERMISOS && Object.keys(PERMISOS).length > 0) return;
   try{
-    const saved=localStorage.getItem('gdv_permisos');
+    const saved=localStorage.getItem('vng_cfg_permisos');
     PERMISOS=saved?JSON.parse(saved):JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
   }catch(e){
     PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
@@ -631,11 +667,16 @@ async function migratePermisos(){
       });
     }
   });
-  if(needsSave) await savePermisos();
+  // Note: do NOT save here - only cfgSavePermisos writes to localStorage
+  // In-memory PERMISOS is updated; next explicit save will persist it
 }
 
 async function savePermisos(){
-  await saveK('gdv_permisos',PERMISOS);
+  try{
+    if(!PERMISOS || !Object.keys(PERMISOS).length) return;
+    const str=JSON.stringify(PERMISOS);
+    localStorage.setItem('vng_cfg_permisos', str);
+  }catch(e){ console.error('savePermisos error:', e); }
 }
 
 function getPerm(roleId, screen){
@@ -894,18 +935,7 @@ async function initStorage(){
   S.discPasos  =load(SK.discPasos,  DEFAULT_DISC_PASOS);
   S.discRecords=load(SK.discRecords,[]);
   await cleanMembers();
-  // Only reload permisos from storage if not already loaded in memory
-  // (prevents Firebase sync from wiping configured permisos)
-  var prevPermisos=PERMISOS&&Object.keys(PERMISOS).length?JSON.stringify(PERMISOS):null;
   loadPermisos();
-  // If we had permisos in memory and storage returned something different,
-  // keep the memory version (it was the last configured by an admin)
-  if(prevPermisos){
-    var fromStorage=JSON.stringify(PERMISOS);
-    if(fromStorage!==prevPermisos){
-      try{ PERMISOS=JSON.parse(prevPermisos); localStorage.setItem('gdv_permisos',prevPermisos); }catch(e){}
-    }
-  }
   // ── Migrar roles nuevos si no existen ──
   var missingRoles=[
     {id:'contactar',name:'Contactar',color:'#D97706',desc:'Agrega nuevos contactos y se autoasigna seguimiento'}
@@ -6195,18 +6225,44 @@ function cfgSetPerm(roleId, screen, value){
   PERMISOS[roleId][screen]=value;
 }
 
+function cfgOpenSection(sec){
+  // null = show main config menu, string = show that section
+  document.querySelectorAll('.cfg-section').forEach(el=>el.style.display='none');
+  const menu=document.getElementById('cfg-main-menu');
+  if(!sec){
+    if(menu) menu.style.display='';
+  } else {
+    if(menu) menu.style.display='none';
+    const el=document.getElementById('cfg-sec-'+sec);
+    if(el) el.style.display='';
+  }
+}
 async function cfgSavePermisos(){
   await savePermisos();
-  loadPermisos(); // Reload in memory immediately
-  // Push to Firebase immediately so cloud matches local config
-  try{ if(typeof window.fbUpload==='function') window.fbUpload(true); }catch(e){}
-  showToast('✅ Permisos guardados y sincronizados ☁️','#16A34A');
+  // Verify the save actually worked
+  const verificado=localStorage.getItem('vng_cfg_permisos');
+  if(!verificado||verificado==='{}'){
+    alert('❌ Error al guardar permisos. Intentá de nuevo.');
+    console.error('[PERMISOS] Verificación fallida:', verificado);
+    return;
+  }
+  // No llamar loadPermisos() - PERMISOS ya está correcto en memoria
+  try{
+    if(typeof window.fbSavePermisos==='function') await window.fbSavePermisos(verificado);
+  }catch(e){}
+  showToast('✅ Permisos guardados','#16A34A');
+  setTimeout(function(){
+    document.querySelectorAll('[id^="cfg-tab-"]').forEach(b=>b.className='btn btn-sm');
+    const wrap=document.getElementById('cfg-content');
+    if(wrap) wrap.innerHTML='<div class="empty" style="padding:2rem;color:#9CA3AF;text-align:center">Seleccioná una sección para configurar.</div>';
+    const ph=document.getElementById('cfg-placeholder');
+    if(ph) ph.style.display='';
+  }, 800);
 }
 
 async function cfgResetPermisos(){
-  PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
+  PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS)); // sets directly, bypasses guard
   await savePermisos();
-  loadPermisos();
   cfgRenderPermisosTabla();
   showToast('↺ Permisos restaurados','#1F4E79');
 }

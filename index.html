@@ -398,8 +398,10 @@ window.fbUpload = async function(force) {
     return;
   }
   try {
+    const uploadTs=Date.now();
+    localStorage.setItem('_vng_last_upload', String(uploadTs));
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
-      const data = { _ts: Date.now() };
+      const data = { _ts: uploadTs };
       keys.forEach(k => {
         const v = localStorage.getItem(k);
         if(v) data[k] = v;
@@ -440,6 +442,11 @@ window.fbDownload = async function() {
               }
             } else if(k==='gdv_m5'){
               localStorage.setItem(k, mergeMembers(localStorage.getItem(k), data[k]));
+            } else if(k==='gdv_g5'||k==='gdv_u5'||k==='gdv_roles5'){
+              // Config data: only overwrite if Firebase is NEWER than last local upload
+              const fbTs=parseInt(data['_ts']||'0');
+              const localTs=parseInt(localStorage.getItem('_vng_last_upload')||'0');
+              if(fbTs>=localTs) localStorage.setItem(k, data[k]);
             } else {
               localStorage.setItem(k, data[k]);
             }
@@ -466,6 +473,12 @@ window.fbDownload = async function() {
 
 window.fbReady = true;
 window._fbDb = db;
+window.syncNow = async function() {
+  try {
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    return true;
+  } catch(e) { console.error('syncNow error:', e); return false; }
+};
 
 // Dedicated permisos read/write using vng/config (existing working path)
 window.fbSavePermisos = async function(permisosStr) {
@@ -753,14 +766,25 @@ const DEFAULT_DISC_PASOS=[
 ];
 
 function load(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch(e){return def;}}
-async function saveK(key,val){
+// Config save: saves + immediate Firebase sync + returns success
+async function saveConfig(key, val, label){
+  try{
+    localStorage.setItem(key, JSON.stringify(val));
+    if(window.fbReady && typeof window.syncNow==='function'){
+      const ok = await window.syncNow();
+      if(ok) return true;
+    }
+    return true; // saved locally at minimum
+  }catch(e){ console.error('saveConfig error:', e); return false; }
+}
+function saveK(key,val){
   try{localStorage.setItem(key,JSON.stringify(val));}catch(e){}
   // Auto-sync to Firebase after every save (debounced 2s, only if real data)
   if(window.fbReady){
     clearTimeout(window._fbSyncTimer);
     window._fbSyncTimer=setTimeout(function(){
-      window.fbUpload&&window.fbUpload(false); // false = respect safety check
-    },2000);
+      window.fbUpload&&window.fbUpload(false);
+    },500); // 500ms debounce for faster sync
   }
 }
 
@@ -955,6 +979,7 @@ async function initStorage(){
     }
   });
   if(migrated) await saveK(SK.roles,S.roles);
+  try{if(typeof window.syncNow==="function")window.syncNow();}catch(_e){}
 }
 
 function today(){return new Date().toISOString().split('T')[0];}
@@ -2433,8 +2458,14 @@ async function cfgSaveGroup(){
 
   await saveK(SK.groups,S.groups);
   await saveK(SK.members,S.members);
+  // Force immediate Firebase upload so data persists across deployments
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    showToast('✅ Grupo guardado y sincronizado ☁️','#16A34A');
+  }catch(e){
+    showToast('✅ Grupo guardado (sin sincronizar)','#F59E0B');
+  }
   cfgCloseGroupForm();cfgRenderGrupos();
-  showToast('✅ Grupo guardado','#16A34A');
 }
 function cfgCloseGroupForm(){
   var m=document.getElementById('cfg-group-modal');
@@ -2578,6 +2609,7 @@ async function cfgSaveUser(){
     S.users.push({id:Date.now(),name,user,pass,role,groupId,memberId:memberIdVal});
   }
   await saveK(SK.users,S.users);
+  try{if(typeof window.syncNow==="function")window.syncNow();}catch(_e){}
   cfgCloseUserForm();cfgRenderUsuarios();
 }
 async function cfgDeleteUser(id){
@@ -7893,6 +7925,7 @@ async function importarTodo(event){
       S.members = backup.gdv.members || [];
       S.roles   = backup.gdv.roles   || [];
       await saveK(SK.users,   S.users);
+  try{if(typeof window.syncNow==="function")window.syncNow();}catch(_e){}
       await saveK(SK.groups,  S.groups);
       await saveK(SK.records, S.records);
       await saveK(SK.members, S.members);

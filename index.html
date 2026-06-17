@@ -1346,9 +1346,19 @@ function buildMiembrosHTML(){
       <div class="form-row" style="margin-top:10px">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Género</label>
           <select id="sa-mf-genero"><option value="H">Hombre</option><option value="M">Mujer</option></select></div>
-        <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label>
-          <select id="sa-mf-grupo" onchange="saBuildGruposExtra(saSelectedGruposExtra)"></select>
-          <div style="font-size:12px;color:#4B5563;display:block;margin:8px 0 4px">Grupos Adicionales Relacionados</div>
+        <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo Principal</label>
+          <div id="sa-grupo-view" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0">
+            <span id="sa-grupo-chip" style="padding:4px 12px;background:#DBEAFE;color:#1E40AF;border-radius:99px;font-size:13px;font-weight:600">Sin grupo</span>
+            <button type="button" onclick="saOpenGrupoSelector()" style="font-size:12px;color:#6B7280;border:1px solid #E5E7EB;border-radius:6px;padding:3px 10px;background:#F9FAFB;cursor:pointer">✏️ Cambiar</button>
+          </div>
+          <div id="sa-grupo-selector" style="display:none;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;max-height:200px;overflow-y:auto">
+            <div style="padding:4px;background:#F9FAFB;border-bottom:1px solid #E5E7EB">
+              <input type="text" placeholder="Buscar..." oninput="saFilterGrupoOpts(this.value)" style="width:100%;padding:4px 8px;border:1px solid #E5E7EB;border-radius:6px;font-size:12px">
+            </div>
+            <div id="sa-grupo-opts"></div>
+          </div>
+          <input type="hidden" id="sa-mf-grupo">
+          <div style="font-size:12px;color:#4B5563;display:block;margin:8px 0 4px">Grupos Adicionales</div>
           <div id="sa-mf-grupos-extra" style="display:flex;flex-wrap:wrap;gap:6px"></div>
         </div>
       </div>
@@ -1665,14 +1675,6 @@ function renderMiembrosStandalone(){
   const tbody=document.getElementById('sa-member-tbody');
   if(!tbody) return;
 
-  const mgsel=document.getElementById('sa-mf-grupo');
-  if(mgsel&&mgsel.options.length===0){
-    const def=document.createElement('option');
-    def.value='';def.textContent='Sin grupo (por asignar)';
-    mgsel.appendChild(def);
-    S.groups.forEach(g=>{const o=document.createElement('option');o.value=g.id;o.textContent=g.name;mgsel.appendChild(o);});
-  }
-
   tbody.innerHTML=members.map(m=>{
     const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
     const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
@@ -1886,15 +1888,73 @@ function saToggleRole(rid,el){
 }
 
 let saSelectedGruposExtra=[];
+function saOpenGrupoSelector(){
+  const sel=document.getElementById('sa-grupo-selector');
+  const view=document.getElementById('sa-grupo-view');
+  if(sel) sel.style.display='';
+  if(view) view.style.display='none';
+  saFilterGrupoOpts('');
+}
+function saSelectGrupo(gid, gname){
+  const inp=document.getElementById('sa-mf-grupo');
+  if(inp) inp.value=gid||'';
+  const chip=document.getElementById('sa-grupo-chip');
+  if(chip){ chip.textContent=gname||'Sin grupo'; chip.style.background=gid?'#DBEAFE':'#F3F4F6'; chip.style.color=gid?'#1E40AF':'#6B7280'; }
+  const sel=document.getElementById('sa-grupo-selector');
+  if(sel) sel.style.display='none';
+  const view=document.getElementById('sa-grupo-view');
+  if(view) view.style.display='flex';
+  saBuildGruposExtra(saSelectedGruposExtra);
+}
+function saFilterGrupoOpts(q){
+  q=(q||'').toLowerCase();
+  const opts=document.getElementById('sa-grupo-opts');
+  if(!opts) return;
+  const current=parseInt(document.getElementById('sa-mf-grupo')?.value)||null;
+  const rows=[{id:'',name:'Sin grupo (por asignar)'},...S.groups].filter(g=>!q||g.name.toLowerCase().includes(q));
+  opts.innerHTML=rows.map(g=>{
+    const active=Number(g.id)===current||(g.id===''&&!current);
+    return `<div onclick="saSelectGrupo('${g.id||''}','${g.name||''}')" style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F9FAFB;background:${active?'#EFF6FF':'#fff'};color:${active?'#1D4ED8':'#374151'};font-weight:${active?'600':'400'}">${g.name}</div>`;
+  }).join('');
+}
 function saBuildGruposExtra(selected){
   saSelectedGruposExtra=(selected||[]).map(Number);
   const wrap=document.getElementById('sa-mf-grupos-extra');
   if(!wrap) return;
+  // Default: show only selected groups as chips + an "Agregar" button
+  saRenderGruposExtraView();
+}
+function saRenderGruposExtraView(){
+  const wrap=document.getElementById('sa-mf-grupos-extra');
+  if(!wrap) return;
   const primaryGid=parseInt(document.getElementById('sa-mf-grupo')?.value)||null;
-  wrap.innerHTML=S.groups.filter(g=>Number(g.id)!==Number(primaryGid)).map(g=>`
-    <div class="role-option ${saSelectedGruposExtra.includes(Number(g.id))?'selected':''}" onclick="saToggleGrupoExtra(${g.id},this)" style="font-size:12px">
-      ${g.name}
-    </div>`).join('');
+  // Chips for selected groups
+  const chips=saSelectedGruposExtra.map(gid=>{
+    const g=S.groups.find(x=>Number(x.id)===gid);
+    return g?`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#DBEAFE;color:#1E40AF;border-radius:99px;font-size:12px;font-weight:600">${g.name}<span onclick="saRemoveGrupoExtra(${g.id})" style="cursor:pointer;font-size:14px;line-height:1;margin-left:2px;color:#93C5FD">×</span></span>`:'';
+  }).join('');
+  // Agregar button
+  const addBtn=`<button type="button" onclick="saOpenGruposExtraSelector()" style="font-size:12px;color:#6B7280;border:1px solid #E5E7EB;border-radius:6px;padding:3px 10px;background:#F9FAFB;cursor:pointer">+ Agregar</button>`;
+  // Selector (hidden by default)
+  const availableGroups=S.groups.filter(g=>Number(g.id)!==primaryGid&&!saSelectedGruposExtra.includes(Number(g.id)));
+  const selectorHtml=`<div id="sa-grupos-extra-sel" style="display:none;margin-top:6px;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;max-height:180px;overflow-y:auto">`
+    +availableGroups.map(g=>`<div onclick="saAddGrupoExtra(${g.id})" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F9FAFB;color:#374151">${g.name}</div>`).join('')
+    +(availableGroups.length===0?'<div style="padding:8px 12px;font-size:12px;color:#9CA3AF">No hay más grupos disponibles</div>':'')
+    +`</div>`;
+  wrap.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">${chips}${addBtn}</div>${selectorHtml}`;
+}
+function saOpenGruposExtraSelector(){
+  const sel=document.getElementById('sa-grupos-extra-sel');
+  if(sel) sel.style.display=sel.style.display==='none'?'':'none';
+}
+function saAddGrupoExtra(id){
+  id=Number(id);
+  if(!saSelectedGruposExtra.includes(id)) saSelectedGruposExtra.push(id);
+  saRenderGruposExtraView();
+}
+function saRemoveGrupoExtra(id){
+  saSelectedGruposExtra=saSelectedGruposExtra.filter(x=>x!==Number(id));
+  saRenderGruposExtraView();
 }
 function saToggleGrupoExtra(gid,el){
   gid=Number(gid);
@@ -1942,14 +2002,9 @@ function saEditMember(id){
   document.getElementById('sa-mf-nombre').value=m.nombre;
   document.getElementById('sa-mf-apellido').value=m.apellido;
   document.getElementById('sa-mf-genero').value=m.genero;
-  const mgsel=document.getElementById('sa-mf-grupo');
-  if(mgsel&&mgsel.options.length===0){
-    const def=document.createElement('option');
-    def.value='';def.textContent='Sin grupo (por asignar)';
-    mgsel.appendChild(def);
-    S.groups.forEach(g=>{const o=document.createElement('option');o.value=g.id;o.textContent=g.name;mgsel.appendChild(o);});
-  }
-  if(mgsel) mgsel.value=m.grupoId||'';
+  // Set grupo chip
+  const _grpObj=S.groups.find(g=>Number(g.id)===Number(m.grupoId));
+  saSelectGrupo(m.grupoId||'', _grpObj?_grpObj.name:'Sin grupo');
   document.getElementById('sa-mf-condicion').value=m.condicion||'Asistente';
   saOriginalEstado=m.estado==='Baja'?'Baja':'Activo';
   document.getElementById('sa-mf-estado').value=saOriginalEstado;
@@ -2263,14 +2318,31 @@ async function cfgToggleQrActualizar(enabled){
 
 // Config: Grupos
 let cfgEditingGroupId=null;
+function cfgPopulateFacSelects(fac1Id, fac2Id){
+  // Show ALL active Miembros (not just those with facilitador role)
+  const opts='<option value="">Sin asignar</option>'
+    +S.members.filter(m=>m.condicion!=='Historico'&&m.estado!=='Baja')
+    .sort((a,b)=>listName(a).localeCompare(listName(b)))
+    .map(m=>`<option value="${m.id}">${listName(m)}</option>`).join('');
+  const fac1=document.getElementById('cfg-gf-fac');
+  const fac2=document.getElementById('cfg-gf-fac2');
+  if(fac1){ fac1.innerHTML=opts; fac1.value=fac1Id||''; }
+  if(fac2){ fac2.innerHTML='<option value="">No aplica</option>'+opts.replace('<option value="">Sin asignar</option>',''); fac2.value=fac2Id||''; }
+  cfgCheckFac2();
+}
+function cfgCheckFac2(){
+  const fac1=document.getElementById('cfg-gf-fac');
+  const row=document.getElementById('cfg-gf-fac2-row');
+  if(row) row.style.display=(fac1&&fac1.value)?'':'none';
+}
 function cfgRenderGrupos(){
-  const facSel=document.getElementById('cfg-gf-fac');
-  if(facSel) facSel.innerHTML='<option value="">Sin asignar</option>'+S.users.filter(u=>u.role==='facilitador').map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
+  // (facSelects populated in cfgOpenNewGroup / cfgEditGroup)
   const wrap=document.getElementById('cfg-grupos-list');
   if(!wrap) return;
   wrap.innerHTML=S.groups.map(g=>{
-    const fac=S.members.find(m=>m.id===g.facId);
-    const facName=fac?fullName(fac):'Sin facilitador';
+    const _fac1=g.facId?S.members.find(m=>m.id===g.facId):null;
+    const _fac2=g.facId2?S.members.find(m=>m.id===g.facId2):null;
+    const facName=_fac1?listName(_fac1)+(_fac2?' · '+listName(_fac2):''):'Sin facilitador';
     const members=groupMembers(g.id);
     const tot=members.length;
     const mH=members.filter(m=>m.genero==='H').length;
@@ -2296,18 +2368,7 @@ function cfgRenderGrupos(){
   }).join('');
 }
 function cfgPopulateGroupModal(){
-  const facSel=document.getElementById('cfg-gf-fac');
-  if(!facSel) return;
-  const miembros=(S.members||[]).filter(function(m){ return m.estado!=='Baja'; });
-  miembros.sort(function(a,b){ return fullName(a).localeCompare(fullName(b)); });
-  var opts='<option value="">Sin asignar</option>';
-  miembros.forEach(function(m){
-    var gNom='';
-    var gm=S.groups.find(function(x){ return x.id===m.grupoId; });
-    if(gm) gNom=' — '+gm.name;
-    opts+='<option value="'+m.id+'">'+fullName(m)+gNom+'</option>';
-  });
-  facSel.innerHTML=opts;
+  cfgPopulateFacSelects();
 }
 
 function cfgOpenNewGroup(){
@@ -2321,6 +2382,7 @@ function cfgOpenNewGroup(){
   if(diaSel) diaSel.value='';
   var horSel=document.getElementById('cfg-gf-horario');
   if(horSel) horSel.value='';
+  cfgPopulateFacSelects(null, null);
   document.getElementById('cfg-group-modal').style.display='flex';
 }
 function cfgEditGroup(id){
@@ -2333,13 +2395,11 @@ function cfgEditGroup(id){
   document.getElementById('cfg-gf-name').value=g.name||'';
   var genSel=document.getElementById('cfg-gf-gender');
   if(genSel) genSel.value=g.type||'Mujeres';
-  var facSel=document.getElementById('cfg-gf-fac');
-  if(facSel) facSel.value=g.facId?String(g.facId):'';
   var diaSel=document.getElementById('cfg-gf-dia');
   if(diaSel) diaSel.value=g.dia||'';
   var horSel=document.getElementById('cfg-gf-horario');
   if(horSel) horSel.value=g.horario||'';
-  // Show modal AFTER values are set
+  cfgPopulateFacSelects(g.facId||null, g.facId2||null);
   document.getElementById('cfg-group-modal').style.display='flex';
 }
 async function cfgSaveGroup(){
@@ -2347,6 +2407,7 @@ async function cfgSaveGroup(){
   if(!name){alert('Ingresá un nombre');return;}
   const type=document.getElementById('cfg-gf-gender').value;
   const facId=parseInt(document.getElementById('cfg-gf-fac')?.value)||null;
+  const facId2=parseInt(document.getElementById('cfg-gf-fac2')?.value)||null;
   const dia=document.getElementById('cfg-gf-dia')?.value||'';
   const horario=document.getElementById('cfg-gf-horario')?.value||'';
 
@@ -2357,9 +2418,9 @@ async function cfgSaveGroup(){
       const oldFac=S.members.find(m=>m.id===g.facId);
       if(oldFac) oldFac.roles=(oldFac.roles||[]).filter(r=>r!=='facilitador');
     }
-    Object.assign(g,{name,type,facId,dia,horario});
+    Object.assign(g,{name,type,facId,facId2,dia,horario});
   } else {
-    S.groups.push({id:Date.now(),name,type,facId,dia,horario});
+    S.groups.push({id:Date.now(),name,type,facId,facId2,dia,horario,miembros:[]});
   }
 
   // Assign 'facilitador' role to selected member
@@ -4205,8 +4266,9 @@ function gdvRenderGrupos(){
   const facSel=document.getElementById('gdv-gf-fac');
   if(facSel)facSel.innerHTML='<option value="">Sin asignar</option>'+S.users.filter(u=>u.role==='facilitador').map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
   document.getElementById('gdv-grupos-list').innerHTML=S.groups.map(g=>{
-    const fac=S.members.find(m=>m.id===g.facId);
-    const facName=fac?fullName(fac):'Sin facilitador';
+    const _fac1=g.facId?S.members.find(m=>m.id===g.facId):null;
+    const _fac2=g.facId2?S.members.find(m=>m.id===g.facId2):null;
+    const facName=_fac1?listName(_fac1)+(_fac2?' · '+listName(_fac2):''):'Sin facilitador';
     const members=groupMembers(g.id);
     const tot=members.length;
     const mH=members.filter(m=>m.genero==='H').length;
@@ -7964,8 +8026,12 @@ boot();
       <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="cfg-gf-name" style="width:100%"></div>
       <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label><select id="cfg-gf-gender" style="width:100%"><option>Mujeres</option><option>Hombres</option><option>Mixto</option><option>Nuevas Generaciones</option></select></div>
     </div>
-    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Facilitador asignado</label>
-    <select id="cfg-gf-fac" style="width:100%"></select>
+    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Facilitador</label>
+    <select id="cfg-gf-fac" style="width:100%" onchange="cfgCheckFac2()"></select>
+    <div id="cfg-gf-fac2-row" style="display:none">
+      <label style="font-size:13px;color:#4B5563;display:block;margin:8px 0 4px">Facilitador 2</label>
+      <select id="cfg-gf-fac2" style="width:100%"></select>
+    </div>
     <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Día de reunión</label>
     <select id="cfg-gf-dia" style="width:100%"><option value="">Sin día fijo</option><option>Lunes</option><option>Martes</option><option>Miércoles</option><option>Jueves</option><option>Viernes</option><option>Sábado</option><option>Domingo</option></select>
     <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Horario</label>

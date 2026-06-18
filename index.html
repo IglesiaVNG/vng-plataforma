@@ -730,7 +730,12 @@ async function saveConfig(key, val, label){
   }catch(e){ console.error('saveConfig error:', e); return false; }
 }
 function saveK(key,val){
-  try{localStorage.setItem(key,JSON.stringify(val));}catch(e){}
+  try{
+    const str=JSON.stringify(val);
+    localStorage.setItem(key,str);
+  }catch(e){
+    console.error('saveK error for key='+key+':', e.message);
+  }
   // Auto-sync to Firebase after every save (debounced 2s, only if real data)
   if(window.fbReady){
     clearTimeout(window._fbSyncTimer);
@@ -2742,7 +2747,10 @@ function buildGdVHTML(){
     <div id="gdv-tab-cargar" class="section-tab ${isGdVFacilitador()||(!(isSuperAdmin()||canScreen('gdv_dashboard'))&&canEjecutar('gdv_cargar'))?'on':''}">
       <div id="gdv-fac-alert" class="alert alert-ok hidden"></div>
       <div class="card">
-        <div class="card-title">📅 Nuevo encuentro</div>
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📅 Nuevo encuentro</span>
+          <button class="btn btn-sm" onclick="nvOpenInlineForm()" style="font-size:12px;background:#EDE9FE;color:#5B21B6;border:none;padding:5px 12px;border-radius:8px">+ Alta Nueva Persona</button>
+        </div>
         <div id="gdv-admin-sel" class="hidden"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Seleccioná el grupo</label><select id="gdv-grupo-sel" onchange="gdvAdminGroupChanged()" style="margin-bottom:12px"></select></div>
         <div id="gdv-group-info" style="font-size:13px;color:#1E40AF;padding:8px;background:#EFF6FF;border-radius:6px;margin-bottom:8px"></div>
         <div id="gdv-pending-alert" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px;color:#92400E"></div>
@@ -5397,7 +5405,7 @@ function buildNuevosHTML(){
         <button class="btn btn-sm" onclick="exportNuevosExcel()" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">
           📥 Exportar Excel
         </button>
-        <button class="btn btn-primary btn-sm" onclick="nvAgregarNuevo()">+ Agregar manualmente</button>
+        <button class="btn btn-primary btn-sm" onclick="nvAgregarNuevo()">+ Alta Nueva Persona</button>
       </div>
     </div>
 
@@ -5405,63 +5413,7 @@ function buildNuevosHTML(){
     <div id="nv-list"></div>
 
     <!-- MODAL: Agregar nuevo contacto manualmente -->
-    <div id="nv-form-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:1rem">
-      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-          <div style="font-size:15px;font-weight:700;color:#1F4E79">+ Nuevo contacto</div>
-          <button class="btn btn-sm" onclick="nvCloseInlineForm()">✕</button>
-        </div>
-        <div class="error" id="nv-form-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Nombre *</label>
-            <input type="text" id="nv-mf-nombre" placeholder="Nombre"></div>
-          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Apellido *</label>
-            <input type="text" id="nv-mf-apellido" placeholder="Apellido"></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
-          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
-            <input type="tel" id="nv-mf-cel" placeholder="11 1234-5678" inputmode="numeric"></div>
-          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha nacimiento</label>
-            <input type="text" id="nv-mf-fnac" placeholder="DD/MM/AA" maxlength="8" inputmode="numeric" oninput="fmtFnacM(this)"></div>
-        </div>
-        <div class="form-row" style="margin-top:8px">
-          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Género *</label>
-            <select id="nv-mf-genero" style="width:100%"><option value="">—</option><option value="H">Hombre</option><option value="M">Mujer</option></select>
-          </div>
-        </div>
-        <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad *</label>
-          <input type="text" id="nv-mf-barrio" placeholder="Desde donde nos escribe..."></div>
-        <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conociste? *</label>
-          <select id="nv-mf-como">
-            <option value="">— Seleccioná —</option>
-            <option>Por un amigo o familiar</option>
-            <option>Instagram (@iglesiavng)</option>
-            <option>YouTube</option>
-            <option>Pasé por la iglesia</option>
-            <option>Google / Internet</option>
-            <option>Volante o folleto</option>
-            <option>Contacto en las calles</option>
-            <option>Otro</option>
-          </select>
-        </div>
-        <div style="margin-top:10px">
-          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Seguimiento asignado</label>
-          <div style="display:flex;gap:8px;align-items:center">
-            <div id="nv-mf-seguimiento-label" style="flex:1;font-size:13px;color:#6B7280;padding:8px 12px;border:1.5px solid #E5E7EB;border-radius:8px;cursor:pointer;background:#F9FAFB"
-              onclick="nvOpenSeguimientoSelector()">Pendiente de asignar</div>
-            <button class="btn btn-sm" onclick="nvOpenSeguimientoSelector()">Asignar →</button>
-          </div>
-          <input type="hidden" id="nv-mf-seguimiento-id">
-        </div>
-        <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Motivo <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
-          <textarea id="nv-mf-motivo" placeholder="Motivo de contacto, situación especial..." style="width:100%;padding:8px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;min-height:70px;resize:vertical"></textarea>
-        </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-          <button class="btn" onclick="nvCloseInlineForm()">Cancelar</button>
-          <button class="btn btn-primary" onclick="nvSaveInlineForm()">Guardar contacto</button>
-        </div>
-      </div>
-    </div>
+<!-- nv-form-overlay moved to static HTML body -->
 
     <!-- MODAL: Selector de miembro para seguimiento -->
     <div id="nv-seg-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:400;align-items:center;justify-content:center;padding:1rem">
@@ -5982,7 +5934,7 @@ function nvAgregarNuevo(){
 }
 
 function nvOpenInlineForm(prefill){
-  // Show the same form as QR but inline in a modal
+  // nv-form-overlay is in static HTML - always available
   const overlay=document.getElementById('nv-form-overlay');
   if(overlay){
     // reset fields
@@ -6038,40 +5990,53 @@ function nvOpenSeguimientoSelector(){
 }
 
 async function nvSaveInlineForm(){
-  const nombre=document.getElementById('nv-mf-nombre').value.trim();
-  const apellido=document.getElementById('nv-mf-apellido').value.trim();
-  const cel=document.getElementById('nv-mf-cel').value.trim();
-  const fnac=document.getElementById('nv-mf-fnac')?.value.trim()||'';
-  const genero=document.getElementById('nv-mf-genero')?.value||'H';
-  const barrio=document.getElementById('nv-mf-barrio')?.value.trim()||'';
-  const como=document.getElementById('nv-mf-como')?.value||'';
-  const motivo=document.getElementById('nv-mf-motivo')?.value.trim()||'';
-  const segId=document.getElementById('nv-mf-seguimiento-id')?.value||'';
-  const segLabel=document.getElementById('nv-mf-seguimiento-label')?.textContent||'';
-  const err=document.getElementById('nv-form-error');
-  if(!nombre||!apellido||!cel||!fnac){
-    if(err){err.textContent='Completá los campos obligatorios: Nombre, Apellido, Celular y Fecha de Nacimiento (*)';err.style.display='block';}
-    return;
+  try{
+    const nombre=(document.getElementById('nv-mf-nombre')?.value||'').trim();
+    const apellido=(document.getElementById('nv-mf-apellido')?.value||'').trim();
+    const cel=(document.getElementById('nv-mf-cel')?.value||'').trim();
+    const fnac=(document.getElementById('nv-mf-fnac')?.value||'').trim();
+    const genero=document.getElementById('nv-mf-genero')?.value||'H';
+    const barrio=(document.getElementById('nv-mf-barrio')?.value||'').trim();
+    const como=document.getElementById('nv-mf-como')?.value||'';
+    const motivo=(document.getElementById('nv-mf-motivo')?.value||'').trim();
+    const segId=document.getElementById('nv-mf-seguimiento-id')?.value||'';
+    const segLabel=document.getElementById('nv-mf-seguimiento-label')?.textContent||'';
+    const err=document.getElementById('nv-form-error');
+    if(!nombre||!apellido||!cel){
+      const msg='Completá los campos obligatorios: Nombre, Apellido y Celular (*)';
+      if(err){err.textContent=msg;err.style.display='block';}
+      else alert(msg);
+      return;
+    }
+    if(err) err.style.display='none';
+    const nuevo={
+      id:Date.now(),nombre,apellido,
+      tel:cel,genero,grupoId:null,
+      condicion:'Nuevo',estado:'Activo',
+      dir:barrio,fnac,roles:[],
+      comoNosConocio:como,
+      motivoContacto:motivo,
+      seguimientoId:segId?parseInt(segId):null,
+      seguimientoNombre:segId?segLabel:'',
+      fechaRegistro:todayAA(),
+      origen:'Carga manual'
+    };
+    S.members.push(nuevo);
+    await saveK(SK.members,S.members);
+    try{if(window.syncNow)window.syncNow();}catch(_e){}
+    nvCloseInlineForm();
+    // Only re-render Nuevos list if that screen is currently active
+  try{
+    const nvContainer=document.getElementById('nv-container');
+    if(nvContainer && nvContainer.offsetParent!==null && typeof renderNuevos==='function'){
+      renderNuevos();
+    }
+  }catch(e){}
+    showToast('✅ '+nombre+' '+apellido+' agregado a Nuevos Contactos','#16A34A');
+  }catch(e){
+    console.error('nvSaveInlineForm error:',e);
+    alert('Error al guardar: '+e.message);
   }
-  if(err) err.style.display='none';
-  const nuevo={
-    id:Date.now(),nombre,apellido,
-    tel:cel,genero,grupoId:null,
-    condicion:'Nuevo',estado:'Activo',
-    dir:barrio,fnac,roles:[],
-    comoNosConocio:como,
-    motivoContacto:motivo,
-    seguimientoId:segId?parseInt(segId):null,
-    seguimientoNombre:segId?segLabel:'',
-    fechaRegistro:todayAA(),
-    origen:'Carga manual'
-  };
-  S.members.push(nuevo);
-  await saveK(SK.members,S.members);
-  try{if(window.syncNow)window.syncNow();}catch(_e){}
-  nvCloseInlineForm();
-  renderNuevos();
-  showToast('✅ Nuevo contacto agregado','#16A34A');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -6610,6 +6575,7 @@ function enviarForm(){
 
 </div>
 </div>
+
 </body>
 </html>`;
 }
@@ -7800,30 +7766,28 @@ async function importarTodo(event){
 // INIT
 // ════════════════════════════════════════════════════════════
 async function boot(){
-  // Restore session from pre-loaded value (set in <head>)
-  if(window._savedSession){
-    currentUser = window._savedSession;
-    document.getElementById('screen-login').style.display='none';
-  }
-
-  await initStorage();
-  // Check for public form URL parameter
-  const params=new URLSearchParams(window.location.search);
-  const form=params.get('form');
-  if(form==='nuevo'){
-    showPublicForm('nuevo');
-    return;
-  }
-  if(form==='actualizar'){
-    showPublicForm('actualizar');
-    return;
-  }
-  // Firebase auto-downloads when its module loads (see Firebase script)
-  // No need to call fbDownload here
-  
-  // If session was restored before initStorage, show home now
-  if(currentUser && currentUser.id){
-    showHome();
+  try{
+    if(window._savedSession){
+      currentUser = window._savedSession;
+      document.getElementById('screen-login').style.display='none';
+    }
+    await initStorage();
+    const params=new URLSearchParams(window.location.search);
+    const form=params.get('form');
+    if(form==='nuevo'){ showPublicForm('nuevo'); return; }
+    if(form==='actualizar'){ showPublicForm('actualizar'); return; }
+    if(currentUser && currentUser.id){
+      showHome();
+    } else {
+      document.getElementById('screen-login').style.display='';
+    }
+  }catch(e){
+    console.error('Boot error:',e);
+    try{
+      currentUser=null;
+      document.getElementById('screen-login').style.display='';
+      document.getElementById('screen-home').classList.add('hidden');
+    }catch(e2){}
   }
 }
 
@@ -7922,5 +7886,62 @@ boot();
     </div>
   </div>
 </div>
+    <div id="nv-form-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:15px;font-weight:700;color:#1F4E79">+ Nuevo contacto</div>
+          <button class="btn btn-sm" onclick="nvCloseInlineForm()">✕</button>
+        </div>
+        <div class="error" id="nv-form-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Nombre *</label>
+            <input type="text" id="nv-mf-nombre" placeholder="Nombre"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Apellido *</label>
+            <input type="text" id="nv-mf-apellido" placeholder="Apellido"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
+            <input type="tel" id="nv-mf-cel" placeholder="11 1234-5678" inputmode="numeric"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha nacimiento <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+            <input type="text" id="nv-mf-fnac" placeholder="DD/MM/AA" maxlength="8" inputmode="numeric" oninput="fmtFnacM(this)"></div>
+        </div>
+        <div class="form-row" style="margin-top:8px">
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Género *</label>
+            <select id="nv-mf-genero" style="width:100%"><option value="">—</option><option value="H">Hombre</option><option value="M">Mujer</option></select>
+          </div>
+        </div>
+        <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad *</label>
+          <input type="text" id="nv-mf-barrio" placeholder="Desde donde nos escribe..."></div>
+        <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conociste? *</label>
+          <select id="nv-mf-como">
+            <option value="">— Seleccioná —</option>
+            <option>Por un amigo o familiar</option>
+            <option>Instagram (@iglesiavng)</option>
+            <option>YouTube</option>
+            <option>Pasé por la iglesia</option>
+            <option>Google / Internet</option>
+            <option>Volante o folleto</option>
+            <option>Contacto en las calles</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div style="margin-top:10px">
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Seguimiento asignado</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div id="nv-mf-seguimiento-label" style="flex:1;font-size:13px;color:#6B7280;padding:8px 12px;border:1.5px solid #E5E7EB;border-radius:8px;cursor:pointer;background:#F9FAFB"
+              onclick="nvOpenSeguimientoSelector()">Pendiente de asignar</div>
+            <button class="btn btn-sm" onclick="nvOpenSeguimientoSelector()">Asignar →</button>
+          </div>
+          <input type="hidden" id="nv-mf-seguimiento-id">
+        </div>
+        <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Motivo <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+          <textarea id="nv-mf-motivo" placeholder="Motivo de contacto, situación especial..." style="width:100%;padding:8px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;min-height:70px;resize:vertical"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+          <button class="btn" onclick="nvCloseInlineForm()">Cancelar</button>
+          <button class="btn btn-primary" onclick="nvSaveInlineForm()">Guardar contacto</button>
+        </div>
+      </div>
+    </div>
 </body>
 </html>

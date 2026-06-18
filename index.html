@@ -244,54 +244,6 @@ tr:hover td{background:#F9FAFB}
 <!-- Export/Import feedback -->
 <div id="exp-toast" style="display:none;position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1F4E79;color:#fff;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:500;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.2)"></div>
 
-<!-- MODAL GLOBAL: Nuevo Contacto desde Facilitador -->
-<div id="gdv-nc-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:400;align-items:center;justify-content:center;padding:1rem">
-  <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-      <div style="font-size:15px;font-weight:700;color:#1F4E79">🌱 Registrar Nuevo Contacto</div>
-      <button class="btn btn-sm" onclick="document.getElementById('gdv-nc-overlay').style.display='none'">✕</button>
-    </div>
-    <div style="background:#F0FDF4;border-radius:8px;padding:8px 12px;font-size:12px;color:#166534;margin-bottom:1rem">
-      Esta persona quedará en <strong>Nuevos Contactos</strong> para que el equipo pastoral haga el seguimiento.
-    </div>
-    <div id="gdv-nc-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Nombre *</label>
-        <input type="text" id="gdv-nc-nombre" placeholder="Nombre"></div>
-      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Apellido *</label>
-        <input type="text" id="gdv-nc-apellido" placeholder="Apellido"></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
-      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
-        <input type="tel" id="gdv-nc-cel" placeholder="11 1234-5678"></div>
-      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Edad</label>
-        <input type="number" id="gdv-nc-edad" placeholder="Edad" min="1" max="120"></div>
-    </div>
-    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad</label>
-      <input type="text" id="gdv-nc-barrio" placeholder="Desde donde nos escribe..."></div>
-    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conociste?</label>
-      <select id="gdv-nc-como">
-        <option value="">— Seleccioná —</option>
-        <option>Por un amigo o familiar</option>
-        <option>Instagram (@iglesiavng)</option>
-        <option>YouTube</option>
-        <option>Pasé por la iglesia</option>
-        <option>Google / Internet</option>
-        <option>Volante o folleto</option>
-        <option>Contacto en las calles</option>
-        <option>Otro</option>
-      </select>
-    </div>
-    <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Motivo <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
-      <textarea id="gdv-nc-motivo" placeholder="Situación especial, motivo de contacto..." style="width:100%;padding:8px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;min-height:60px;resize:vertical"></textarea>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-      <button class="btn" onclick="document.getElementById('gdv-nc-overlay').style.display='none'">Cancelar</button>
-      <button class="btn btn-primary" onclick="gdvGuardarNuevoContacto()">Guardar y agregar</button>
-    </div>
-  </div>
-</div>
-
 <!-- MODAL GLOBAL: Editar/Nuevo Rol -->
 <div id="role-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;padding:1rem">
   <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 12px 40px rgba(0,0,0,.2)">
@@ -3225,11 +3177,21 @@ function gdvAutoComplete(type, query){
   // For 'other': show members from OTHER groups
   let pool=S.members.filter(function(m){ return m.estado!=='Baja'; });
   if(type==='other'){
-    const curGrupo=currentUser.groupId||parseInt(document.getElementById('gdv-grupo-sel')?.value)||null;
-    if(curGrupo) pool=pool.filter(function(m){ return m.grupoId!==curGrupo; });
+    // Visitas de otro grupo: excluir miembros del grupo actual (por grupoId principal O grupoIds adicionales)
+    const curGrupo=parseInt(document.getElementById('gdv-grupo-sel')?.value)||currentUser.groupId||null;
+    if(curGrupo){
+      pool=pool.filter(function(m){
+        const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
+        return !allGids.includes(Number(curGrupo));
+      });
+    }
+    // Super Admin y facilitadores sin grupo propio: mostrar todos
   } else if(type==='new'){
-    // Personas nuevas: misma busqueda que visitas, se diferencia al guardar
-    // (no aplicar filtro extra - mostrar todos los activos)
+    // Personas Nuevas: solo condición Nuevo O sin grupo GdV asignado
+    pool=pool.filter(function(m){
+      const sinGrupo=!m.grupoId&&!(m.grupoIds||[]).length;
+      return m.condicion==='Nuevo'||sinGrupo;
+    });
   }
 
   const q=query.toLowerCase();
@@ -3287,56 +3249,10 @@ function gdvAddVisit(type){
 }
 
 function gdvAbrirFormNuevoContacto(){
-  // Open simplified new contact form (no roles, no seguimiento)
-  const overlay=document.getElementById('gdv-nc-overlay');
-  if(overlay){
-    ['gdv-nc-nombre','gdv-nc-apellido','gdv-nc-cel','gdv-nc-barrio','gdv-nc-motivo'].forEach(function(id){
-      const el=document.getElementById(id); if(el) el.value='';
-    });
-    const edad=document.getElementById('gdv-nc-edad'); if(edad) edad.value='';
-    const como=document.getElementById('gdv-nc-como'); if(como) como.value='';
-    overlay.style.display='flex';
-  }
+  nvOpenInlineForm(); // Usa el mismo formulario que Nuevos Contactos
 }
 
-async function gdvGuardarNuevoContacto(){
-  const nombre=document.getElementById('gdv-nc-nombre').value.trim();
-  const apellido=document.getElementById('gdv-nc-apellido').value.trim();
-  const cel=document.getElementById('gdv-nc-cel').value.trim();
-  const edad=document.getElementById('gdv-nc-edad').value.trim();
-  const barrio=document.getElementById('gdv-nc-barrio').value.trim();
-  const como=document.getElementById('gdv-nc-como').value;
-  const motivo=document.getElementById('gdv-nc-motivo').value.trim();
-  const err=document.getElementById('gdv-nc-error');
 
-  if(!nombre||!apellido||!cel){
-    if(err){err.textContent='Nombre, Apellido y Celular son obligatorios';err.style.display='block';}
-    return;
-  }
-  if(err) err.style.display='none';
-
-  const nuevo={
-    id:Date.now(), nombre, apellido,
-    tel:cel, genero:'', grupoId:null,
-    condicion:'Nuevo', estado:'Activo',
-    dir:barrio, fnac:'', roles:[],
-    edadDeclarada:edad, comoNosConocio:como,
-    motivoContacto:motivo,
-    fechaRegistro:todayAA(),
-    origen:'Carga por Facilitador'
-  };
-  S.members.push(nuevo);
-  await saveK(SK.members, S.members);
-
-  // Add to visitsNew list
-  const nombreCompleto=nombre+' '+apellido;
-  gdvVisitsNew.push(nombreCompleto);
-  gdvRenderVisitTags();
-
-  // Close modal
-  document.getElementById('gdv-nc-overlay').style.display='none';
-  showToast('✅ '+nombreCompleto+' registrado como Nuevo Contacto','#16A34A');
-}
 function gdvRemoveVisit(type,i){if(type==='other')gdvVisitsOther.splice(i,1);else gdvVisitsNew.splice(i,1);gdvRenderVisitTags();}
 function gdvRenderVisitTags(){
   ['other','new'].forEach(type=>{
@@ -6126,23 +6042,23 @@ async function nvSaveInlineForm(){
   const apellido=document.getElementById('nv-mf-apellido').value.trim();
   const cel=document.getElementById('nv-mf-cel').value.trim();
   const fnac=document.getElementById('nv-mf-fnac')?.value.trim()||'';
-  const genero=document.getElementById('nv-mf-genero')?.value||'';
-  const barrio=document.getElementById('nv-mf-barrio').value.trim();
-  const como=document.getElementById('nv-mf-como').value;
-  const motivo=document.getElementById('nv-mf-motivo').value.trim();
-  const segId=document.getElementById('nv-mf-seguimiento-id').value;
-  const segLabel=document.getElementById('nv-mf-seguimiento-label').textContent;
+  const genero=document.getElementById('nv-mf-genero')?.value||'H';
+  const barrio=document.getElementById('nv-mf-barrio')?.value.trim()||'';
+  const como=document.getElementById('nv-mf-como')?.value||'';
+  const motivo=document.getElementById('nv-mf-motivo')?.value.trim()||'';
+  const segId=document.getElementById('nv-mf-seguimiento-id')?.value||'';
+  const segLabel=document.getElementById('nv-mf-seguimiento-label')?.textContent||'';
   const err=document.getElementById('nv-form-error');
-  if(!nombre||!apellido||!cel||!edad||!barrio||!como){
-    err.textContent='Completá todos los campos obligatorios (*)';err.style.display='block';return;
+  if(!nombre||!apellido||!cel||!fnac){
+    if(err){err.textContent='Completá los campos obligatorios: Nombre, Apellido, Celular y Fecha de Nacimiento (*)';err.style.display='block';}
+    return;
   }
-  err.style.display='none';
+  if(err) err.style.display='none';
   const nuevo={
     id:Date.now(),nombre,apellido,
-    tel:cel,genero:'',grupoId:null,
+    tel:cel,genero,grupoId:null,
     condicion:'Nuevo',estado:'Activo',
-    dir:barrio,fnac:'',roles:[],
-    edadDeclarada:edad,
+    dir:barrio,fnac,roles:[],
     comoNosConocio:como,
     motivoContacto:motivo,
     seguimientoId:segId?parseInt(segId):null,
@@ -6152,6 +6068,7 @@ async function nvSaveInlineForm(){
   };
   S.members.push(nuevo);
   await saveK(SK.members,S.members);
+  try{if(window.syncNow)window.syncNow();}catch(_e){}
   nvCloseInlineForm();
   renderNuevos();
   showToast('✅ Nuevo contacto agregado','#16A34A');
@@ -6549,6 +6466,9 @@ function renderHomeCumples(){
 // ════════════════════════════════════════════════════════════
 // QR + FORMULARIO PÚBLICO DE NUEVOS CONTACTOS
 // ════════════════════════════════════════════════════════════
+
+
+
 
 function buildFormularioPublicoHTML(){
   return `<!DOCTYPE html>
@@ -7144,31 +7064,6 @@ function discLoadPasoForm(){
   discSelectedPasoId=pasoId;
   var paso=pasoId?S.discPasos.find(function(p){return p.id===pasoId;}):null;
 
-  // Update date min/max based on existing records for this paso
-  var fechaInput=document.getElementById('disc-fecha');
-  var hoy=today();
-  if(fechaInput){
-    fechaInput.max=hoy;
-    if(pasoId){
-      var recsDelPaso=S.discRecords.filter(function(r){return r.pasoId===pasoId;});
-      if(recsDelPaso.length){
-        // Min = day after the last registered date
-        var ultFecha=recsDelPaso.map(function(r){return r.fecha;}).sort().pop();
-        // Min must be at least 1 day after last record
-        var ultDate=new Date(ultFecha);
-        ultDate.setDate(ultDate.getDate()+1);
-        var minISO=ultDate.toISOString().split('T')[0];
-        fechaInput.min=minISO;
-        // If current value is before min, reset to min (or today if min>today)
-        if(fechaInput.value<minISO) fechaInput.value=minISO<=hoy?minISO:hoy;
-      } else {
-        fechaInput.min='';
-      }
-    } else {
-      fechaInput.min='';
-    }
-  }
-
   // Load chapters
   var capSel=document.getElementById('disc-sel-cap');
   if(paso&&paso.capitulos.length){
@@ -7229,24 +7124,7 @@ async function discGuardarAsistencia(){
   }
   if(!Object.keys(discFacAtt).length){alert('No hay miembros en este paso');return;}
 
-  // Validar: no puede ser fecha futura
-  var hoy=today();
-  if(fecha>hoy){
-    alert('❌ No podés cargar una fecha futura. Máximo: hoy ('+hoy+').');
-    return;
-  }
-
-  // Validar: no puede ser anterior a la última fecha cargada para este paso
-  var recsDelPaso=S.discRecords.filter(function(r){return r.pasoId===pasoId;});
-  if(recsDelPaso.length){
-    var ultFecha=recsDelPaso.map(function(r){return r.fecha;}).sort().pop();
-    if(fecha<=ultFecha){
-      alert('❌ La fecha ingresada ('+fecha+') es anterior o igual a la última cargada ('+ultFecha+'). Debés cargar una fecha posterior.');
-      return;
-    }
-  }
-
-  // Validar: 1 encuentro por N° de semana para este paso
+  // Check for duplicate week (same paso + same ISO week)
   var semana=getISOWeek(fecha);
   var anio=new Date(fecha).getFullYear();
   var yaExiste=S.discRecords.find(function(r){
@@ -7257,7 +7135,7 @@ async function discGuardarAsistencia(){
     if(isSuperAdmin()||canEjecutar('disc_pasos')){
       if(!confirm('Ya existe un registro para la Semana '+semana+' en este Paso. Como Admin podés guardar igual para corregir errores. ¿Continuar?')) return;
     } else {
-      alert('❌ Ya existe un registro para la Semana '+semana+' en este Paso. Solo se permite 1 encuentro por semana.');
+      alert('Ya existe un registro para la Semana '+semana+' en este Paso. Contactá al Admin si hay un error.');
       return;
     }
   }
@@ -7303,30 +7181,7 @@ function discEditRecord(id){
     document.body.appendChild(overlay);
   }
   window._discEditId=id;
-  // Merge: attendance record entries + current paso members not yet in the record
-  var paso=S.discPasos.find(function(p){return p.id===r.pasoId;});
-  var mergedAtt=Object.assign({},r.asistencia||{});
-  if(paso){
-    paso.miembros.forEach(function(mid){
-      if(!mergedAtt[mid]){
-        var m=S.members.find(function(x){return x.id===mid;});
-        if(m) mergedAtt[mid]={name:fullName(m),genero:m.genero,state:'ausente'};
-      }
-    });
-  }
-  // Also: for entries with unknown ID, try matching by name to current members
-  Object.keys(mergedAtt).forEach(function(kid){
-    var stillExists=S.members.some(function(m){return String(m.id)===String(kid);});
-    if(!stillExists){
-      var att=mergedAtt[kid];
-      var match=S.members.find(function(m){return normName(fullName(m))===normName(att.name||'');});
-      if(match&&!mergedAtt[match.id]){
-        mergedAtt[match.id]=att;
-        delete mergedAtt[kid];
-      }
-    }
-  });
-  var att=Object.entries(mergedAtt);
+  var att=Object.entries(r.asistencia||{});
   document.getElementById('disc-edit-body').innerHTML=
     '<div style="font-size:13px;color:#6B7280;margin-bottom:.75rem">Fecha: <strong>'+fmt(r.fecha)+'</strong> · '+r.pasoNombre+' · '+r.capitulo+'</div>'
     +'<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:.5rem">Asistencia:</div>'
@@ -7353,20 +7208,10 @@ async function discSaveEdit(){
   var id=window._discEditId;
   var r=S.discRecords.find(function(x){return x.id===id;});
   if(!r) return;
-  // Save ALL selectors visible (merged attendance incl. new members)
-  var newAtt={};
-  document.querySelectorAll('[id^="disc-edit-"]').forEach(function(sel){
-    var kid=sel.id.replace('disc-edit-','');
-    var existing=r.asistencia[kid]||(Object.values(r.asistencia).find(a=>!r.asistencia[kid])||{});
-    // Rebuild entry from current members list
-    var m=S.members.find(function(x){return String(x.id)===String(kid);});
-    newAtt[kid]={
-      name: (r.asistencia[kid]&&r.asistencia[kid].name)||(m?fullName(m):''),
-      genero: (r.asistencia[kid]&&r.asistencia[kid].genero)||(m?m.genero:''),
-      state: sel.value
-    };
+  Object.keys(r.asistencia).forEach(function(k){
+    var sel=document.getElementById('disc-edit-'+k);
+    if(sel) r.asistencia[k].state=sel.value;
   });
-  r.asistencia=newAtt;
   await saveK(SK.discRecords,S.discRecords);
   discCloseEdit();
   var c=document.getElementById('disc-registros-wrap');
@@ -7858,13 +7703,13 @@ function exportMiembrosExcel(){
 // ════════════════════════════════════════════════════════════
 // EXPORT / IMPORT
 // ════════════════════════════════════════════════════════════
-function showToast(msg, color='#1F4E79', dur=3000){
+function showToast(msg, color='#1F4E79'){
   const t=document.getElementById('exp-toast');
   if(!t) return;
   t.textContent=msg;
   t.style.background=color;
   t.style.display='block';
-  setTimeout(function(){t.remove();}, dur||3000);
+  setTimeout(()=>t.style.display='none', 3500);
 }
 
 async function exportarTodo(){
@@ -7925,7 +7770,6 @@ async function importarTodo(event){
       S.members = backup.gdv.members || [];
       S.roles   = backup.gdv.roles   || [];
       await saveK(SK.users,   S.users);
-  try{if(typeof window.syncNow==="function")window.syncNow();}catch(_e){}
       await saveK(SK.groups,  S.groups);
       await saveK(SK.records, S.records);
       await saveK(SK.members, S.members);
@@ -7956,55 +7800,30 @@ async function importarTodo(event){
 // INIT
 // ════════════════════════════════════════════════════════════
 async function boot(){
-  try{
-    // Restore session from pre-loaded value (set in <head>)
-    if(window._savedSession){
-      currentUser = window._savedSession;
-      document.getElementById('screen-login').style.display='none';
-    }
+  // Restore session from pre-loaded value (set in <head>)
+  if(window._savedSession){
+    currentUser = window._savedSession;
+    document.getElementById('screen-login').style.display='none';
+  }
 
-    await initStorage();
-
-    // Check for public form URL parameter
-    const params=new URLSearchParams(window.location.search);
-    const form=params.get('form');
-    if(form==='nuevo'){
-      showPublicForm('nuevo');
-      return;
-    }
-    if(form==='actualizar'){
-      showPublicForm('actualizar');
-      return;
-    }
-
-    // If session was restored, show home
-    if(currentUser && currentUser.id){
-      showHome();
-    } else {
-      // Make sure login is visible
-      document.getElementById('screen-login').style.display='';
-    }
-  } catch(e){
-    console.error('Boot error:',e);
-    // Try to restore session directly from localStorage before giving up
-    try{
-      var saved=localStorage.getItem('vng_cu')||sessionStorage.getItem('vng_cu');
-      if(saved){
-        var cu=JSON.parse(saved);
-        if(cu&&cu.id&&cu.name){
-          currentUser=cu;
-          await initStorage();
-          showHome();
-          return;
-        }
-      }
-    }catch(e2){}
-    // Only show login if session truly not recoverable
-    try{
-      currentUser=null;
-      document.getElementById('screen-login').style.display='';
-      document.getElementById('screen-home').classList.add('hidden');
-    }catch(e3){}
+  await initStorage();
+  // Check for public form URL parameter
+  const params=new URLSearchParams(window.location.search);
+  const form=params.get('form');
+  if(form==='nuevo'){
+    showPublicForm('nuevo');
+    return;
+  }
+  if(form==='actualizar'){
+    showPublicForm('actualizar');
+    return;
+  }
+  // Firebase auto-downloads when its module loads (see Firebase script)
+  // No need to call fbDownload here
+  
+  // If session was restored before initStorage, show home now
+  if(currentUser && currentUser.id){
+    showHome();
   }
 }
 
@@ -8043,83 +7862,60 @@ function tryRestoreSession(){
 
 boot();
 
-
 </script>
 
 <!-- Global Group Form Modal -->
-
-
-
-</div>
-<!-- Global Group Form Modal -->
-<div id="cfg-group-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem">
-  <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;box-shadow:0 12px 40px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto">
-    <div class="card-title" id="cfg-gf-title">Nuevo grupo</div>
-    <div class="form-row">
-      <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="cfg-gf-name" style="width:100%"></div>
-      <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label><select id="cfg-gf-gender" style="width:100%"><option>Mujeres</option><option>Hombres</option><option>Mixto</option><option>Nuevas Generaciones</option></select></div>
+<div id="cfg-group-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:440px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div id="cfg-gf-title" style="font-size:15px;font-weight:700;color:#1F4E79">Nuevo grupo</div>
+      <button class="btn btn-sm" onclick="cfgCloseGroupForm()">✕</button>
     </div>
+    <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre del grupo *</label>
+    <input type="text" id="cfg-gf-name" style="width:100%;margin-bottom:10px" placeholder="Ej: Grupo 5 Hombres">
+    <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label>
+    <select id="cfg-gf-gender" style="width:100%;margin-bottom:10px">
+      <option value="Hombres">Hombres</option>
+      <option value="Mujeres">Mujeres</option>
+      <option value="Mixto">Mixto</option>
+      <option value="Adolescentes Mixto">Adolescentes Mixto</option>
+      <option value="Jóvenes Mixto">Jóvenes Mixto</option>
+      <option value="Matrimonios">Matrimonios</option>
+      <option value="Nuevas Generaciones">Nuevas Generaciones</option>
+    </select>
+    <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Día de reunión</label>
+    <select id="cfg-gf-dia" style="width:100%;margin-bottom:10px">
+      <option value="">Sin definir</option>
+      <option value="Lunes">Lunes</option>
+      <option value="Martes">Martes</option>
+      <option value="Miércoles">Miércoles</option>
+      <option value="Jueves">Jueves</option>
+      <option value="Viernes">Viernes</option>
+      <option value="Sábado">Sábado</option>
+      <option value="Domingo">Domingo</option>
+    </select>
+    <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Horario</label>
+    <select id="cfg-gf-horario" style="width:100%;margin-bottom:10px">
+      <option value="">Sin definir</option>
+      <option value="08:00 hs">08:00 hs</option><option value="08:30 hs">08:30 hs</option>
+      <option value="09:00 hs">09:00 hs</option><option value="09:30 hs">09:30 hs</option>
+      <option value="10:00 hs">10:00 hs</option><option value="10:30 hs">10:30 hs</option>
+      <option value="11:00 hs">11:00 hs</option><option value="11:30 hs">11:30 hs</option>
+      <option value="12:00 hs">12:00 hs</option><option value="12:30 hs">12:30 hs</option>
+      <option value="13:00 hs">13:00 hs</option><option value="14:00 hs">14:00 hs</option>
+      <option value="15:00 hs">15:00 hs</option><option value="16:00 hs">16:00 hs</option>
+      <option value="17:00 hs">17:00 hs</option><option value="18:00 hs">18:00 hs</option>
+      <option value="18:30 hs">18:30 hs</option><option value="19:00 hs">19:00 hs</option>
+      <option value="19:30 hs">19:30 hs</option><option value="20:00 hs">20:00 hs</option>
+      <option value="20:30 hs">20:30 hs</option><option value="21:00 hs">21:00 hs</option>
+      <option value="21:30 hs">21:30 hs</option><option value="22:00 hs">22:00 hs</option>
+    </select>
     <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Facilitador</label>
     <select id="cfg-gf-fac" style="width:100%" onchange="cfgCheckFac2()"></select>
     <div id="cfg-gf-fac2-row" style="display:none">
       <label style="font-size:13px;color:#4B5563;display:block;margin:8px 0 4px">Facilitador 2</label>
       <select id="cfg-gf-fac2" style="width:100%"></select>
     </div>
-    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Día de reunión</label>
-    <select id="cfg-gf-dia" style="width:100%"><option value="">Sin día fijo</option><option>Lunes</option><option>Martes</option><option>Miércoles</option><option>Jueves</option><option>Viernes</option><option>Sábado</option><option>Domingo</option></select>
-    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Horario</label>
-    <select id="cfg-gf-horario" style="width:100%">
-      <option value="">Sin horario</option>
-<option value="00:00 hs">00:00 hs</option>
-<option value="00:30 hs">00:30 hs</option>
-<option value="01:00 hs">01:00 hs</option>
-<option value="01:30 hs">01:30 hs</option>
-<option value="02:00 hs">02:00 hs</option>
-<option value="02:30 hs">02:30 hs</option>
-<option value="03:00 hs">03:00 hs</option>
-<option value="03:30 hs">03:30 hs</option>
-<option value="04:00 hs">04:00 hs</option>
-<option value="04:30 hs">04:30 hs</option>
-<option value="05:00 hs">05:00 hs</option>
-<option value="05:30 hs">05:30 hs</option>
-<option value="06:00 hs">06:00 hs</option>
-<option value="06:30 hs">06:30 hs</option>
-<option value="07:00 hs">07:00 hs</option>
-<option value="07:30 hs">07:30 hs</option>
-<option value="08:00 hs">08:00 hs</option>
-<option value="08:30 hs">08:30 hs</option>
-<option value="09:00 hs">09:00 hs</option>
-<option value="09:30 hs">09:30 hs</option>
-<option value="10:00 hs">10:00 hs</option>
-<option value="10:30 hs">10:30 hs</option>
-<option value="11:00 hs">11:00 hs</option>
-<option value="11:30 hs">11:30 hs</option>
-<option value="12:00 hs">12:00 hs</option>
-<option value="12:30 hs">12:30 hs</option>
-<option value="13:00 hs">13:00 hs</option>
-<option value="13:30 hs">13:30 hs</option>
-<option value="14:00 hs">14:00 hs</option>
-<option value="14:30 hs">14:30 hs</option>
-<option value="15:00 hs">15:00 hs</option>
-<option value="15:30 hs">15:30 hs</option>
-<option value="16:00 hs">16:00 hs</option>
-<option value="16:30 hs">16:30 hs</option>
-<option value="17:00 hs">17:00 hs</option>
-<option value="17:30 hs">17:30 hs</option>
-<option value="18:00 hs">18:00 hs</option>
-<option value="18:30 hs">18:30 hs</option>
-<option value="19:00 hs">19:00 hs</option>
-<option value="19:30 hs">19:30 hs</option>
-<option value="20:00 hs">20:00 hs</option>
-<option value="20:30 hs">20:30 hs</option>
-<option value="21:00 hs">21:00 hs</option>
-<option value="21:30 hs">21:30 hs</option>
-<option value="22:00 hs">22:00 hs</option>
-<option value="22:30 hs">22:30 hs</option>
-<option value="23:00 hs">23:00 hs</option>
-<option value="23:30 hs">23:30 hs</option>
-
-    </select>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
       <button class="btn" onclick="cfgCloseGroupForm()">Cancelar</button>
       <button class="btn btn-primary" onclick="cfgSaveGroup()">Guardar</button>
@@ -8128,5 +7924,3 @@ boot();
 </div>
 </body>
 </html>
-</div>
-

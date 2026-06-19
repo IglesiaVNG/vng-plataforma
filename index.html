@@ -3526,7 +3526,7 @@ function gdvGetFilteredRecords(){
     if(r.sinEncuentro) return false;
     // Facilitador: only see their own group
     if(isGdVFacilitador()&&ownGroupId&&Number(r.grupoId)!==Number(ownGroupId)) return false;
-    if(gdvFilGrupos&&!gdvFilGrupos.has(r.grupoId)) return false;
+    if(gdvFilGrupos&&!gdvFilGrupos.has(Number(r.grupoId))) return false;
     if(gdvFilDesde&&r.fecha<gdvFilDesde) return false;
     if(gdvFilHasta&&r.fecha>gdvFilHasta) return false;
     return true;
@@ -3598,13 +3598,13 @@ function gdvRenderDashboard(){
 
   const sinEncTot=S.records.filter(r=>r.sinEncuentro&&
     (!gdvFilDesde||r.fecha>=gdvFilDesde)&&(!gdvFilHasta||r.fecha<=gdvFilHasta)&&
-    (!gdvFilGrupos||gdvFilGrupos.has(r.grupoId))).length;
+    (!gdvFilGrupos||gdvFilGrupos.has(Number(r.grupoId)))).length;
 
   // Nuevos por grupo (con sus nombres)
   const nuevosPorGrupo={};
   recs.forEach(r=>{
     if((r.visitsNew||[]).length===0) return;
-    if(gdvFilGrupos&&!gdvFilGrupos.has(r.grupoId)) return;
+    if(gdvFilGrupos&&!gdvFilGrupos.has(Number(r.grupoId))) return;
     if(!nuevosPorGrupo[r.grupoId]) nuevosPorGrupo[r.grupoId]={grupo:r.grupoName,nombres:[]};
     (r.visitsNew||[]).forEach(n=>{
       if(!nuevosPorGrupo[r.grupoId].nombres.includes(n))
@@ -3684,28 +3684,30 @@ function gdvRenderMemberRanking(recs){
   // Build encounter count per group from filtered records
   var encPerGroup={};
   recs.forEach(function(r){
-    if(!encPerGroup[r.grupoId]) encPerGroup[r.grupoId]=0;
-    encPerGroup[r.grupoId]++;
+    var gid=Number(r.grupoId);
+    if(!encPerGroup[gid]) encPerGroup[gid]=0;
+    encPerGroup[gid]++;
   });
 
   // For each active member, calculate attendance
   var memberStats=[];
-  S.members.filter(function(m){ return m.estado!=='Baja' && m.grupoId && encPerGroup[m.grupoId]>0; })
+  S.members.filter(function(m){ return m.estado!=='Baja' && m.grupoId && encPerGroup[Number(m.grupoId)]>0; })
     .forEach(function(m){
       // Skip gender filter
       if(gdvFilSexo && m.genero!==gdvFilSexo) return;
       // Skip group filter
-      if(gdvFilGrupos && !gdvFilGrupos.has(m.grupoId)) return;
+      if(gdvFilGrupos && !gdvFilGrupos.has(Number(m.grupoId))) return;
 
-      var totalEnc=encPerGroup[m.grupoId]||0;
+      var totalEnc=encPerGroup[Number(m.grupoId)]||0;
       if(!totalEnc) return;
 
       // Count presencias in filtered records for this member
       var presencias=0;
-      recs.filter(function(r){ return r.grupoId===m.grupoId; }).forEach(function(r){
+      recs.filter(function(r){ return Number(r.grupoId)===Number(m.grupoId); }).forEach(function(r){
         var att=r.asistencia||{};
-        // asistencia keyed by member id
-        if(att[m.id] && att[m.id].state==='presente') presencias++;
+        // asistencia keyed by member id (try both string and number key)
+        var entry=att[m.id]||att[String(m.id)]||att[Number(m.id)];
+        if(entry && entry.state==='presente') presencias++;
       });
 
       var pctVal=totalEnc>0?Math.round(presencias/totalEnc*100):0;

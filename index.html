@@ -6022,20 +6022,31 @@ async function nvSaveInlineForm(){
       origen:'Carga manual'
     };
     S.members.push(nuevo);
-    await saveK(SK.members,S.members);
-    try{if(window.syncNow)window.syncNow();}catch(_e){}
-    nvCloseInlineForm();
-    // Only re-render Nuevos list if that screen is currently active
-  try{
-    const nvContainer=document.getElementById('nv-container');
-    if(nvContainer && nvContainer.offsetParent!==null && typeof renderNuevos==='function'){
-      renderNuevos();
+    // Save directly to localStorage - avoid full saveK to prevent stack overflow on large datasets
+    try{
+      localStorage.setItem('gdv_m5', JSON.stringify(S.members));
+    }catch(saveErr){
+      // If stringify fails (too large), try saving without formacion arrays
+      const slim=S.members.map(function(m){
+        var c=Object.assign({},m);
+        if(c.formacion&&c.formacion.length>50) c.formacion=c.formacion.slice(-50);
+        return c;
+      });
+      localStorage.setItem('gdv_m5', JSON.stringify(slim));
     }
-  }catch(e){}
+    // Schedule Firebase upload via debounce
+    if(window.fbReady){
+      clearTimeout(window._fbSyncTimer);
+      window._fbSyncTimer=setTimeout(function(){
+        window.fbUpload&&window.fbUpload(false);
+      },500);
+    }
+    nvCloseInlineForm();
     showToast('✅ '+nombre+' '+apellido+' agregado a Nuevos Contactos','#16A34A');
   }catch(e){
     console.error('nvSaveInlineForm error:',e);
-    alert('Error al guardar: '+e.message);
+    const stack=(e.stack||'').split('\n').slice(0,6).join('\n');
+    alert('Error: '+e.message+'\n\nDónde:\n'+stack);
   }
 }
 

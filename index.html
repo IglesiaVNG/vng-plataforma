@@ -3711,11 +3711,11 @@ function gdvRenderMemberRanking(recs){
       });
 
       var pctVal=totalEnc>0?Math.round(presencias/totalEnc*100):0;
-      var g=S.groups.find(function(x){ return x.id===m.grupoId; });
+      var g=S.groups.find(function(x){ return Number(x.id)===Number(m.grupoId); });
       memberStats.push({
         nombre:m.nombre,
         apellido:m.apellido,
-        grupo:memberGroups.length?memberGroups.map(gr=>gr.name).join(', '):'Sin grupo',
+        grupo:g?g.name:'Sin grupo',
         presencias:presencias,
         totalEnc:totalEnc,
         pct:pctVal

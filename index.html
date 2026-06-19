@@ -358,6 +358,8 @@ window.fbUpload = async function(force) {
     localStorage.setItem('_vng_last_upload', String(uploadTs));
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
       const data = { _ts: uploadTs };
+      // Update local timestamps so download won't overwrite what we just uploaded
+      keys.forEach(function(k){ localStorage.setItem('_local_ts_'+k, String(uploadTs)); });
       keys.forEach(k => {
         const v = localStorage.getItem(k);
         if(v) data[k] = v;
@@ -397,12 +399,17 @@ window.fbDownload = async function() {
               if(!localStorage.getItem('gdv_permisos')){
                 localStorage.setItem(k, data[k]);
               }
-            } else if(k==='gdv_m5'){
-              localStorage.setItem(k, mergeMembers(localStorage.getItem(k), data[k]));
-            } else if(k==='gdv_g5'||k==='gdv_u5'||k==='gdv_roles5'){
-              localStorage.setItem(k, data[k]); // Firebase is authoritative
             } else {
-              localStorage.setItem(k, data[k]); // Firebase is authoritative
+              // Only overwrite if Firebase is NEWER than last local explicit save
+              var fbTs=parseInt(data['_ts']||'0');
+              var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
+              if(fbTs>=localTs){
+                if(k==='gdv_m5'){
+                  localStorage.setItem(k, mergeMembers(localStorage.getItem(k), data[k]));
+                } else {
+                  localStorage.setItem(k, data[k]);
+                }
+              }
             }
           }
         });
@@ -758,11 +765,10 @@ function markSynced(){
 }
 
 function saveK(key,val){
-  // ONLY saves to localStorage. Firebase sync is ONLY triggered by explicit user actions.
-  // Auto-upload was removed because it caused old-data devices to overwrite Firebase.
   try{
     const str=JSON.stringify(val);
     localStorage.setItem(key,str);
+    localStorage.setItem('_local_ts_'+key, String(Date.now())); // track local save time
   }catch(e){
     console.error('saveK error for key='+key+':', e.message);
   }

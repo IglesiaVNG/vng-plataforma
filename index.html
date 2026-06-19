@@ -461,20 +461,11 @@ console.log('Firebase: initialized OK');
 window.fbDownload().then(function(hasData) {
   if(hasData) {
     console.log('Firebase: auto-download complete');
-    // Reload S from localStorage WITHOUT calling initStorage() or loadPermisos()
-    // initStorage() calls loadPermisos() which would reset PERMISOS mid-edit
+    // Firebase downloaded new data into localStorage.
+    // We do NOT replace S.* in memory — that would cause race conditions
+    // with any active user edits. S.* stays as-is; next page load will
+    // pick up the updated localStorage via initStorage().
     try{
-      if(typeof S !== 'undefined'){
-        var _ld=function(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
-        S.users       = _ld('gdv_u5',            S.users       ||[]);
-        S.groups      = _ld('gdv_g5',            S.groups      ||[]);
-        S.records     = _ld('gdv_r5',            S.records     ||[]);
-        S.members     = _ld('gdv_m5',            S.members     ||[]);
-        S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
-        S.discPasos   = _ld('gdv_disc_pasos',    S.discPasos   ||[]);
-        S.discRecords = _ld('gdv_disc_records',  S.discRecords ||[]);
-        if(typeof cleanMembers==='function') cleanMembers();
-      }
       // Load permisos from Firebase if this device has none configured
       // Reload permisos from localStorage (now updated from Firebase if it was empty)
       if(!window._permisosEditing && typeof loadPermisos==='function') loadPermisos();

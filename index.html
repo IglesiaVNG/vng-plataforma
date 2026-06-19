@@ -196,6 +196,10 @@ tr:hover td{background:#F9FAFB}
 </script>
 </head>
 <body>
+<div id="sync-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10000;background:#DC2626;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:600">
+  ⚠️ Hay datos sin sincronizar. No cerrés la app.
+  <button onclick="forceSyncNow()" style="margin-left:12px;background:#fff;color:#DC2626;border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-weight:700">☁️ Sincronizar ahora</button>
+</div>
 
 <!-- ═══════════════ LOGIN ═══════════════ -->
 <div id="screen-login">
@@ -362,6 +366,7 @@ window.fbUpload = async function(force) {
     });
     await Promise.all(promises);
     window.showToast && window.showToast('☁️ Datos guardados en la nube', '#16A34A');
+    if(typeof window.markSynced==='function') window.markSynced();
     console.log('Firebase: upload OK');
   } catch(e) {
     console.error('Firebase upload error:', e);
@@ -395,12 +400,9 @@ window.fbDownload = async function() {
             } else if(k==='gdv_m5'){
               localStorage.setItem(k, mergeMembers(localStorage.getItem(k), data[k]));
             } else if(k==='gdv_g5'||k==='gdv_u5'||k==='gdv_roles5'){
-              // Config data: only overwrite if Firebase is NEWER than last local upload
-              const fbTs=parseInt(data['_ts']||'0');
-              const localTs=parseInt(localStorage.getItem('_vng_last_upload')||'0');
-              if(fbTs>=localTs) localStorage.setItem(k, data[k]);
+              localStorage.setItem(k, data[k]); // Firebase is authoritative
             } else {
-              localStorage.setItem(k, data[k]);
+              localStorage.setItem(k, data[k]); // Firebase is authoritative
             }
           }
         });
@@ -718,6 +720,12 @@ const DEFAULT_DISC_PASOS=[
 ];
 
 function load(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch(e){return def;}}
+// Save data and wait for Firebase confirmation. Returns true if cloud confirmed.
+async function saveAndSync(key, val){
+  try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
+  if(typeof window.fbUpload!=='function') return false;
+  try{ await window.fbUpload(true); return true; }catch(e){ return false; }
+}
 // Config save: saves + immediate Firebase sync + returns success
 async function saveConfig(key, val, label){
   try{
@@ -729,19 +737,34 @@ async function saveConfig(key, val, label){
     return true; // saved locally at minimum
   }catch(e){ console.error('saveConfig error:', e); return false; }
 }
+async function forceSyncNow(){
+  const banner=document.getElementById('sync-banner');
+  if(banner) banner.textContent='⏳ Sincronizando...';
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    if(banner){ banner.style.display='none'; }
+    showToast('☁️ Todo sincronizado correctamente','#16A34A');
+  }catch(e){
+    if(banner) banner.textContent='⚠️ Error de red. Verificá tu conexión y reintentá.';
+  }
+}
+function markUnsynced(){
+  const b=document.getElementById('sync-banner');
+  if(b) b.style.display='';
+}
+function markSynced(){
+  const b=document.getElementById('sync-banner');
+  if(b) b.style.display='none';
+}
+
 function saveK(key,val){
+  // ONLY saves to localStorage. Firebase sync is ONLY triggered by explicit user actions.
+  // Auto-upload was removed because it caused old-data devices to overwrite Firebase.
   try{
     const str=JSON.stringify(val);
     localStorage.setItem(key,str);
   }catch(e){
     console.error('saveK error for key='+key+':', e.message);
-  }
-  // Auto-sync to Firebase after every save (debounced 2s, only if real data)
-  if(window.fbReady){
-    clearTimeout(window._fbSyncTimer);
-    window._fbSyncTimer=setTimeout(function(){
-      window.fbUpload&&window.fbUpload(false);
-    },500); // 500ms debounce for faster sync
   }
 }
 
@@ -2415,12 +2438,11 @@ async function cfgSaveGroup(){
 
   await saveK(SK.groups,S.groups);
   await saveK(SK.members,S.members);
-  // Force immediate Firebase upload so data persists across deployments
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-    showToast('✅ Grupo guardado y sincronizado ☁️','#16A34A');
-  }catch(e){
-    showToast('✅ Grupo guardado (sin sincronizar)','#F59E0B');
+  const gCloudOk=await saveAndSync('gdv_g5', S.groups);
+  if(!gCloudOk){
+    showToast('⚠️ Grupo guardado SIN sincronizar — verificá tu conexión y volvé a guardar','#DC2626');
+  } else {
+    showToast('✅ Grupo guardado ☁️','#16A34A');
   }
   cfgCloseGroupForm();cfgRenderGrupos();
 }
@@ -3319,6 +3341,8 @@ async function gdvSaveRecord(){
     ts:new Date().toISOString()};
   S.records.push(rec);
   await saveK(SK.records,S.records);
+  // Upload records to Firebase immediately (prevents old-data overwrite)
+  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){ console.error('Firebase sync error:',e); }
 
   // ── Auto-assign group to "Nuevos" so they appear in next encounter ──
   var membersUpdated=false;
@@ -7125,10 +7149,12 @@ async function discGuardarAsistencia(){
     fecha,capitulo,asistencia:{...discFacAtt},ts:new Date().toISOString()
   });
   await saveK(SK.discRecords,S.discRecords);
+  let dCloudOk=false;
+  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); dCloudOk=true; }catch(e){}
   var al=document.getElementById('disc-alert');
-  al.textContent='✅ Asistencia guardada correctamente.';
+  al.textContent=dCloudOk?'✅ Asistencia guardada ☁️':'⚠️ Guardada sin sincronizar — reintentá';
   al.classList.remove('hidden');
-  setTimeout(function(){al.classList.add('hidden');},3000);
+  setTimeout(function(){al.classList.add('hidden');},4000);
 }
 
 // ── Registros ──

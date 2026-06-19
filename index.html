@@ -941,7 +941,7 @@ async function initStorage(){
 
 function today(){return new Date().toISOString().split('T')[0];}
 function fmt(d){return fmtAA(d);}
-function todayAA(){return fmtAA(todayAA());}
+function todayAA(){var d=new Date();return fmtAA(d.toISOString().slice(0,10));}
 function initials(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();}
 function pct(a,b){return b?Math.round(a/b*100):0;}
 function fullName(m){return `${m.nombre} ${m.apellido}`.trim();}
@@ -2749,7 +2749,7 @@ function buildGdVHTML(){
       <div class="card">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
           <span>📅 Nuevo encuentro</span>
-          <button class="btn btn-sm" onclick="nvOpenInlineForm()" style="font-size:12px;background:#EDE9FE;color:#5B21B6;border:none;padding:5px 12px;border-radius:8px">+ Alta Nueva Persona</button>
+          <button class="btn btn-sm" onclick="nvOpenInlineForm()" style="background:#1D4ED8;color:#fff;font-weight:700;font-size:13px;padding:6px 16px;border:none;border-radius:8px;cursor:pointer">+ Alta Nueva Persona</button>
         </div>
         <div id="gdv-admin-sel" class="hidden"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Seleccioná el grupo</label><select id="gdv-grupo-sel" onchange="gdvAdminGroupChanged()" style="margin-bottom:12px"></select></div>
         <div id="gdv-group-info" style="font-size:13px;color:#1E40AF;padding:8px;background:#EFF6FF;border-radius:6px;margin-bottom:8px"></div>
@@ -5405,7 +5405,7 @@ function buildNuevosHTML(){
         <button class="btn btn-sm" onclick="exportNuevosExcel()" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">
           📥 Exportar Excel
         </button>
-        <button class="btn btn-primary btn-sm" onclick="nvAgregarNuevo()">+ Alta Nueva Persona</button>
+        <button onclick="nvAgregarNuevo()" style="background:#1D4ED8;color:#fff;font-weight:700;font-size:13px;padding:6px 16px;border:none;border-radius:8px;cursor:pointer">+ Alta Nueva Persona</button>
       </div>
     </div>
 

@@ -1570,32 +1570,44 @@ function ngRenderAsistenciaMiembros(recs){
   var leaderEncPerCom={};
   leaderRecs.forEach(function(r){var cid=Number(r.comunidadId);leaderEncPerCom[cid]=(leaderEncPerCom[cid]||0)+1;});
 
+  // Build a map of leader → community for lookup
+  var liderComMap={};
+  (S.ngComunidades||[]).forEach(function(ngx){
+    (ngx.liderIds||[]).concat(ngx.colaboradorIds||[]).forEach(function(id){
+      liderComMap[Number(id)]=Number(ngx.id);
+    });
+  });
   S.members.filter(function(m){
     if(m.estado==='Baja') return false;
     if(ngFilSexo==='lideres') return allLiderIds.has(Number(m.id));
     return m.grupoId&&encPerCom[Number(m.grupoId)]>0&&!allLiderIds.has(Number(m.id));
   }).forEach(function(m){
     if(ngFilSexo&&ngFilSexo!=='lideres'&&m.genero!==ngFilSexo) return;
-    if(ngFilComunidad&&Number(m.grupoId)!==Number(ngFilComunidad)) return;
-    // For leaders: find their community via liderIds/colaboradorIds
-    var myCom=null;
+    // For community filter: leaders use liderComMap, members use grupoId
+    var memberComId=ngFilSexo==='lideres'?(liderComMap[Number(m.id)]||Number(m.grupoId)):Number(m.grupoId);
+    if(ngFilComunidad&&memberComId!==Number(ngFilComunidad)) return;
+    // Find this member's community (for leaders: via liderIds/colaboradorIds; for members: via grupoId)
+    var myCid=Number(m.grupoId);
     if(ngFilSexo==='lideres'){
-      myCom=(S.ngComunidades||[]).find(function(ngx){
+      var myCom2=(S.ngComunidades||[]).find(function(ngx){
         return (ngx.liderIds||[]).map(Number).includes(Number(m.id))||
                (ngx.colaboradorIds||[]).map(Number).includes(Number(m.id));
       });
+      if(myCom2) myCid=Number(myCom2.id);
     }
-    var myCid=myCom?Number(myCom.id):Number(m.grupoId);
-    var totalEnc=ngFilSexo==='lideres'?(leaderEncPerCom[myCid]||0):(encPerCom[myCid]||0);
+    // Count encounters for this community
+    var useRecs2=ngFilSexo==='lideres'?leaderRecs:recs;
+    var comRecs2=useRecs2.filter(function(r){return Number(r.comunidadId)===myCid;});
+    var totalEnc=comRecs2.length;
     if(!totalEnc) return;
-    var useRecs=ngFilSexo==='lideres'?leaderRecs:recs;
-    var presencias=useRecs.filter(function(r){return Number(r.comunidadId)===myCid;}).reduce(function(acc,r){
+    // Count presencias for this member
+    var presencias=comRecs2.reduce(function(acc,r){
       var att=r.asistencia||{};
       var entry=att[m.id]||att[String(m.id)];
       return acc+(entry&&entry.state==='presente'?1:0);
     },0);
-    var ngx=S.ngComunidades.find(function(x){return Number(x.id)===myCid;});
-    memberStats.push({nombre:m.nombre,apellido:m.apellido,comunidad:ngx?ngx.name:'—',presencias,totalEnc,pct:totalEnc?Math.round(presencias/totalEnc*100):0});
+    var ngx2=S.ngComunidades.find(function(x){return Number(x.id)===myCid;});
+    memberStats.push({nombre:m.nombre,apellido:m.apellido,comunidad:ngx2?ngx2.name:'—',presencias,totalEnc,pct:totalEnc?Math.round(presencias/totalEnc*100):0});
   });
   memberStats.sort(function(a,b){return b.pct-a.pct||b.presencias-a.presencias;});
   if(!memberStats.length) return '<div class="card" style="text-align:center;padding:1.5rem;color:#9CA3AF">Sin datos de asistencia para los filtros seleccionados</div>';
@@ -1635,7 +1647,7 @@ function ngRenderCargar(c){
         '<span>📝 Nuevo encuentro</span>'+
         '<button onclick="nvOpenInlineForm()" style="background:#1D4ED8;color:#fff;font-weight:700;font-size:13px;padding:6px 16px;border:none;border-radius:8px;cursor:pointer">+ Alta Nueva Persona</button>'+
       '</div>'+
-      (misComs.length>1?'<div id="ng-admin-sel" style="margin-bottom:12px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Comunidad</label><select id="ng-com-sel" onchange="ngCargarComChanged()" style="margin-bottom:0">'+comOpts+'</select></div>':'<input type="hidden" id="ng-com-sel" value="'+misComs[0].id+'">'+
+      (misComs.length>1?'<div id="ng-admin-sel" style="margin-bottom:12px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Comunidad</label><select id="ng-com-sel" onchange="ngCargarComChanged()" style="margin-bottom:0"><option value="">— Elegir comunidad —</option>'+comOpts+'</select></div>':'<input type="hidden" id="ng-com-sel" value="">'+
         '<div id="ng-com-info" style="font-size:13px;color:#1E40AF;padding:8px;background:#EFF6FF;border-radius:6px;margin-bottom:8px">'+misComs[0].name+' — '+misComs[0].tipo+'</div>')+
       '<div id="ng-pending-alert" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px;font-size:13px;color:#92400E;margin-bottom:12px"></div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
@@ -1674,11 +1686,17 @@ function ngRenderCargar(c){
 
 function ngCargarComChanged(){
   var sel=document.getElementById('ng-com-sel');
-  var cid=sel?parseInt(sel.value):null;
-  if(!cid) return;
+  var cid=sel&&sel.value?parseInt(sel.value):null;
+  var list=document.getElementById('ng-asist-list');
+  var info=document.getElementById('ng-com-info');
+  if(!cid){
+    ngCurrentComunidadId=null;
+    if(list) list.innerHTML='<div style="color:#9CA3AF;font-size:13px;padding:12px">Seleccioná una comunidad para ver los integrantes.</div>';
+    if(info) info.textContent='';
+    return;
+  }
   ngCurrentComunidadId=cid;
   var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(cid);});
-  var info=document.getElementById('ng-com-info');
   if(info&&ng) info.textContent=ng.name+' — Comunidad '+ng.tipo;
   ngCheckExistingRecord();
   ngBuildAsistList(cid);

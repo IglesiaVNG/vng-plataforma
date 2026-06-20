@@ -1426,40 +1426,39 @@ function ngRenderMiembrosPanel(){
   var p=document.getElementById('ng-panel-miembros');
   if(!p) return;
   var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
-  // Same as ngRenderAsistenciaMiembros but with visual bars
   var allLiderIds=new Set();
   (S.ngComunidades||[]).forEach(function(ngx){
     (ngx.liderIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
     (ngx.colaboradorIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
   });
+  // Build member stats DIRECTLY from records (not from grupoId lookup)
+  var memberData={}; // memberId -> {pres, enc, comId}
   var encPerCom={};
-  recs.forEach(function(r){var cid=Number(r.comunidadId);encPerCom[cid]=(encPerCom[cid]||0)+1;});
+  recs.forEach(function(r){
+    var cid=Number(r.comunidadId);
+    encPerCom[cid]=(encPerCom[cid]||0)+1;
+    Object.entries(r.asistencia||{}).forEach(function(e){
+      var mid=Number(e[0]);
+      var a=e[1];
+      if(ngFilSexo==='lideres'&&!allLiderIds.has(mid)) return;
+      if(ngFilSexo!=='lideres'&&ngFilSexo!==''&&allLiderIds.has(mid)) return;
+      if(!memberData[mid]) memberData[mid]={pres:0,enc:0,comId:cid,genero:a.genero||''};
+      memberData[mid].enc++;
+      if(a.state==='presente') memberData[mid].pres++;
+    });
+  });
   var stats=[];
-  // Get all NG community IDs
-  var ngComIds=new Set((S.ngComunidades||[]).map(function(c){return Number(c.id);}));
-  S.members.filter(function(m){
-    if(m.estado==='Baja') return false;
-    // Find the member's NG community (primary or secondary group)
-    var mGids=[Number(m.grupoId)].concat((m.grupoIds||[]).map(Number));
-    var hasNgCom=mGids.some(function(gid){return ngComIds.has(gid)&&encPerCom[gid]>0;});
-    if(!hasNgCom) return false;
-    return ngFilSexo==='lideres'?allLiderIds.has(Number(m.id)):!allLiderIds.has(Number(m.id));
-  }).forEach(function(m){
+  Object.entries(memberData).forEach(function(e){
+    var mid=Number(e[0]);
+    var d=e[1];
+    var m=S.members.find(function(x){return Number(x.id)===mid;});
+    if(!m||m.estado==='Baja') return;
     if(ngFilSexo&&ngFilSexo!=='lideres'&&m.genero!==ngFilSexo) return;
-    // Find the NG community this member belongs to
-    var mGids2=[Number(m.grupoId)].concat((m.grupoIds||[]).map(Number));
-    var mComId=mGids2.find(function(gid){return ngComIds.has(gid)&&encPerCom[gid]>0;})||0;
-    if(ngFilComunidad&&mComId!==Number(ngFilComunidad)) return;
-    var totalEnc=encPerCom[mComId]||0;
-    if(!totalEnc) return;
-    var pres=recs.filter(function(r){return Number(r.comunidadId)===mComId;}).reduce(function(acc,r){
-      var att=r.asistencia||{};
-      var e=att[m.id]||att[String(m.id)];
-      return acc+(e&&e.state==='presente'?1:0);
-    },0);
-    var ngx=S.ngComunidades.find(function(x){return Number(x.id)===mComId;});
-    var pct=totalEnc?Math.round(pres/totalEnc*100):0;
-    stats.push({nombre:listName(m),genero:m.genero,comunidad:ngx?ngx.name:'—',pres,totalEnc,pct});
+    if(ngFilComunidad&&d.comId!==Number(ngFilComunidad)) return;
+    var totalEnc=encPerCom[d.comId]||d.enc;
+    var ngx=S.ngComunidades.find(function(x){return Number(x.id)===d.comId;});
+    var pct=totalEnc?Math.round(d.pres/totalEnc*100):0;
+    stats.push({nombre:listName(m),genero:m.genero||d.genero,comunidad:ngx?ngx.name:'—',pres:d.pres,totalEnc,pct});
   });
   stats.sort(function(a,b){return b.pct-a.pct||b.pres-a.pres;});
   if(!stats.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}

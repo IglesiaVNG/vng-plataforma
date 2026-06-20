@@ -557,16 +557,16 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ejecuta'},
-  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',gdv_scope_grupo:'ninguno'},
-  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
+  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno'},
+  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta'},
+  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta'},
+  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno'},
+  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
+  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
+  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
+  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
+  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
+  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'}
 };
 
 let PERMISOS={};
@@ -1063,14 +1063,14 @@ function buildNGHTML(){
   var isLider=ngIsLiderOColab();
   var showDash=isSuperAdmin()||canScreen('ng_dashboard');
   var showCarg=isSuperAdmin()||canScreen('ng_cargar')||isLider;
-  var showReg =isSuperAdmin()||canScreen('ng_registros');
+  var showReg=isSuperAdmin()||canScreen('ng_registros');
   var defaultTab=showCarg?'cargar':(showDash?'dashboard':'registros');
+  var navBtns='';
+  if(showDash) navBtns+="<button class=\"nav-btn"+(defaultTab==='dashboard'?" active":"")+"\" onclick=\"ngTab('dashboard',this)\">📊 Dashboard</button>";
+  if(showCarg) navBtns+="<button class=\"nav-btn"+(defaultTab==='cargar'?" active":"")+"\" onclick=\"ngTab('cargar',this)\">📝 Cargar Asistencia</button>";
+  if(showReg)  navBtns+="<button class=\"nav-btn"+(defaultTab==='registros'?" active":"")+"\" onclick=\"ngTab('registros',this)\">📋 Registros</button>";
   return '<div class="gdv-app">'+
-    '<div class="nav" style="margin-bottom:1rem">'+
-      (showDash?'<button class="nav-btn '+(defaultTab==='dashboard'?'active':'')+'" onclick="ngTab(\"dashboard\",this)">📊 Dashboard</button>':'')+
-      (showCarg?'<button class="nav-btn '+(defaultTab==='cargar'?'active':'')+'" onclick="ngTab(\"cargar\",this)">📝 Cargar Asistencia</button>':'')+
-      (showReg?'<button class="nav-btn '+(defaultTab==='registros'?'active':'')+'" onclick="ngTab(\"registros\",this)">📋 Registros</button>':'')+
-    '</div>'+
+    '<div class="nav" style="margin-bottom:1rem">'+navBtns+'</div>'+
     '<div id="ng-alert" class="alert alert-ok hidden"></div>'+
     '<div id="ng-tab-content"></div>'+
   '</div>';
@@ -2236,6 +2236,7 @@ function renderMiembrosStandalone(){
   const _fGrupoRaw=document.getElementById('sa-mfil-grupo')?.value||'';
   const fGrupo=_fGrupoRaw==='nogroup'?'nogroup':(parseInt(_fGrupoRaw)||null);
   const fGen=document.getElementById('sa-mfil-gen')?.value||'';
+  const fTipoGrupo=document.getElementById('sa-mfil-tipo-grupo')?.value||'';
   const fRol=document.getElementById('sa-mfil-rol')?.value||'';
   const fCond=document.getElementById('sa-mfil-condicion')?.value||'';
   const fEstado=document.getElementById('sa-mfil-estado')?.value;
@@ -2266,6 +2267,13 @@ function renderMiembrosStandalone(){
   }
   else if(fGrupo) members=members.filter(m=>Number(m.grupoId)===Number(fGrupo) || (m.grupoIds||[]).map(Number).includes(Number(fGrupo)));
   if(fGen)   members=members.filter(m=>m.genero===fGen);
+  if(fTipoGrupo==='gdv'){
+    var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
+    members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});
+  } else if(fTipoGrupo==='ng'){
+    var ngIds=new Set((S.ngComunidades||[]).map(function(ng){return Number(ng.id);}));
+    members=members.filter(function(m){return m.grupoId&&ngIds.has(Number(m.grupoId));});
+  }
   if(fRol)   members=members.filter(m=>(m.roles||[]).includes(fRol));
   if(fCond)  members=members.filter(m=>m.condicion===fCond);
   // Estado filter
@@ -6647,6 +6655,13 @@ function renderNuevos(){
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
   if(fGen)   members=members.filter(m=>m.genero===fGen);
+  if(fTipoGrupo==='gdv'){
+    var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
+    members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});
+  } else if(fTipoGrupo==='ng'){
+    var ngIds=new Set((S.ngComunidades||[]).map(function(ng){return Number(ng.id);}));
+    members=members.filter(function(m){return m.grupoId&&ngIds.has(Number(m.grupoId));});
+  }
 
   // Sort: unassigned seguimiento first, then by registration date
   members.sort(function(a,b){
@@ -8757,6 +8772,13 @@ function exportNuevosExcel(){
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
   if(fGen)   members=members.filter(m=>m.genero===fGen);
+  if(fTipoGrupo==='gdv'){
+    var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
+    members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});
+  } else if(fTipoGrupo==='ng'){
+    var ngIds=new Set((S.ngComunidades||[]).map(function(ng){return Number(ng.id);}));
+    members=members.filter(function(m){return m.grupoId&&ngIds.has(Number(m.grupoId));});
+  }
 
   const rows=members.map(m=>{
     const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
@@ -8801,6 +8823,7 @@ function exportMiembrosExcel(){
   const _fGrupoRaw=document.getElementById('sa-mfil-grupo')?.value||'';
   const fGrupo=_fGrupoRaw==='nogroup'?'nogroup':(parseInt(_fGrupoRaw)||null);
   const fGen=document.getElementById('sa-mfil-gen')?.value||'';
+  const fTipoGrupo=document.getElementById('sa-mfil-tipo-grupo')?.value||'';
   const fRol=document.getElementById('sa-mfil-rol')?.value||'';
   const fCond=document.getElementById('sa-mfil-condicion')?.value||'';
   const fEstado=document.getElementById('sa-mfil-estado')?.value;
@@ -8810,6 +8833,13 @@ function exportMiembrosExcel(){
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
   if(fGen)   members=members.filter(m=>m.genero===fGen);
+  if(fTipoGrupo==='gdv'){
+    var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
+    members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});
+  } else if(fTipoGrupo==='ng'){
+    var ngIds=new Set((S.ngComunidades||[]).map(function(ng){return Number(ng.id);}));
+    members=members.filter(function(m){return m.grupoId&&ngIds.has(Number(m.grupoId));});
+  }
   if(fRol)   members=members.filter(m=>(m.roles||[]).includes(fRol));
   if(fCond)  members=members.filter(m=>m.condicion===fCond);
   if(fEstado==='Activo') members=members.filter(m=>m.estado!=='Baja');

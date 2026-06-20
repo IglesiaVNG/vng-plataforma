@@ -317,6 +317,7 @@ tr:hover td{background:#F9FAFB}
 // ── FIREBASE INTEGRATION ──────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 // Detect environment: PROD only if exact production URL, everything else = DEV
 const _PROD_HOSTS = ['vng-plataforma.vercel.app', 'iglesiavng.vercel.app'];
@@ -334,6 +335,16 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+
+// Autenticación anónima — requerida por reglas de seguridad Firestore
+try {
+  await signInAnonymously(auth);
+  console.log('Firebase: auth anónima OK');
+} catch(authErr) {
+  console.error('Firebase: error auth', authErr);
+  window.showToast && window.showToast('⚠️ Sin conexión Firebase — datos no se sincronizarán', '#DC2626');
+}
 
 // ── Keys grouped by document (max ~900KB each) ──
 const KEY_GROUPS = {

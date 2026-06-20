@@ -318,10 +318,10 @@ tr:hover td{background:#F9FAFB}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-// Auto-detect development environment
-const VNG_COL = (window.location.hostname.includes('dev') ||
-                 window.location.hostname.includes('localhost') ||
-                 window.location.search.includes('dev=1')) ? 'vng_dev' : 'vng';
+// Detect environment: PROD only if exact production URL, everything else = DEV
+const _PROD_HOSTS = ['vng-plataforma.vercel.app', 'iglesiavng.vercel.app'];
+const _isProd = _PROD_HOSTS.includes(window.location.hostname);
+const VNG_COL = _isProd ? 'vng' : 'vng_dev';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCuyEMfRh_It13tBv71itzXW_OT1kliGMY",
@@ -7891,9 +7891,8 @@ async function importarTodo(event){
 async function boot(){
   try{
     // Show DEV badge if in development environment
-    const _isDev = window.location.hostname.includes('dev') || 
-                   window.location.hostname.includes('localhost') ||
-                   window.location.search.includes('dev=1');
+    const _PROD = ['vng-plataforma.vercel.app','iglesiavng.vercel.app'];
+    const _isDev = !_PROD.includes(window.location.hostname);
     if(_isDev){
       const badge=document.getElementById('dev-badge');
       if(badge) badge.style.display='inline';

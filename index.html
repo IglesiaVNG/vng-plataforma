@@ -341,6 +341,7 @@ const KEY_GROUPS = {
   'members': ['gdv_m5'],
   'records': ['gdv_r5'],
   'disc':    ['gdv_disc_pasos','gdv_disc_records'],
+  'ng':      ['gdv_ng5','gdv_ng_records'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
                'of5_part','of5_obspart','of5_obspago','of5_materias'],
 };
@@ -479,8 +480,10 @@ window.fbDownload().then(function(hasData) {
         S.records     = _ld('gdv_r5',            S.records     ||[]);
         S.members     = _ld('gdv_m5',            S.members     ||[]);
         S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
-        S.discPasos   = _ld('gdv_disc_pasos',    S.discPasos   ||[]);
-        S.discRecords = _ld('gdv_disc_records',  S.discRecords ||[]);
+        S.discPasos      = _ld('gdv_disc_pasos',    S.discPasos      ||[]);
+        S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);
+        S.ngComunidades  = _ld('gdv_ng5',           S.ngComunidades  ||[]);
+        S.ngRecords      = _ld('gdv_ng_records',    S.ngRecords      ||[]);
       }
       // Load permisos from Firebase if this device has none configured
       // Reload permisos from localStorage (now updated from Firebase if it was empty)
@@ -505,6 +508,12 @@ const MODULES_PERM=[
     {key:'gdv_cargar',       label:'Cargar asistencia'},
     {key:'gdv_registros',    label:'Ver registros'},
     {key:'gdv_scope_grupo',  label:'🏘 Limitar a su grupo asignado'},
+  ]},
+  {key:'ng', label:'Nuevas Generaciones', icon:'🌱', screens:[
+    {key:'ng_dashboard',   label:'Dashboard y estadísticas'},
+    {key:'ng_cargar',      label:'Cargar asistencia'},
+    {key:'ng_registros',   label:'Ver registros'},
+    {key:'ng_scope_grupo', label:'🌱 Limitar a su comunidad'},
   ]},
   {key:'miembros', label:'Rebaños', icon:'👥', screens:[
     {key:'miembros_ver',   label:'Ver base de miembros'},
@@ -719,7 +728,8 @@ function recordInWeek(fechaStr, offsetWeeks=0){
 // STORAGE
 // ════════════════════════════════════════════════════════════
 const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles:'gdv_roles5',
-  discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records'};
+  discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records',
+  ngComunidades:'gdv_ng5',ngRecords:'gdv_ng_records'};
 
 const DEFAULT_DISC_PASOS=[
   {id:1,nombre:'Discipulado N1',nivel:'Inicial',roleId:'disc_n1',estado:'Activo',discipuladorId:null,miembros:[],completados:{},
@@ -2232,6 +2242,14 @@ function configTab(sub, btn){
       <div id="cfg-grupos-list"></div>
     `;
     cfgRenderGrupos();
+  } else if(sub==='ng'){
+    wrap.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <span style="font-size:14px;font-weight:600;color:#1F4E79">🌱 Nuevas Generaciones</span>
+        <button class="btn btn-primary btn-sm" onclick="ngOpenForm()">+ Comunidad</button>
+      </div>
+      <div id="ng-comunidades-list"></div>`;
+    ngRenderList();
   } else if(sub==='usuarios'){
     wrap.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
@@ -2363,6 +2381,207 @@ async function cfgToggleQrActualizar(enabled){
 }
 
 // Config: Grupos
+
+// ══════════════════════════════════════════════════════════════════
+// NUEVAS GENERACIONES CONFIG
+// ══════════════════════════════════════════════════════════════════
+let ngEditingId = null;
+let ngSelectedLideres = [];
+let ngSelectedColaboradores = [];
+
+const NG_TIPOS = ['Jóvenes','Adolescentes','Niños','Preadolescentes'];
+const NG_DIAS  = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const NG_HORARIOS = ['08:00','09:00','10:00','11:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'];
+
+function ngRenderList(){
+  const c=document.getElementById('ng-comunidades-list');
+  if(!c) return;
+  if(!S.ngComunidades.length){
+    c.innerHTML='<p style="color:#9CA3AF;font-size:13px;text-align:center;padding:24px">Sin comunidades cargadas</p>';
+    return;
+  }
+  c.innerHTML=S.ngComunidades.map(function(ng){
+    const lideres=(ng.liderIds||[]).map(function(id){
+      var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+      return m?fullName(m):'?';
+    }).join(', ')||'—';
+    return `<div class="card" style="margin-bottom:8px;padding:12px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;color:#1F4E79">${ng.name}</div>
+          <div style="font-size:12px;color:#6B7280">${ng.tipo} · ${ng.dia||'—'} ${ng.horario||''} · Líder: ${lideres}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="ngEditComunidad(${ng.id})">✏️</button>
+          <button onclick="ngDeleteComunidad(${ng.id})" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:13px">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function ngOpenForm(id){
+  ngEditingId = id||null;
+  ngSelectedLideres=[];
+  ngSelectedColaboradores=[];
+  const ng = id ? S.ngComunidades.find(function(x){return Number(x.id)===Number(id);}) : null;
+  if(ng){
+    ngSelectedLideres=[...(ng.liderIds||[])];
+    ngSelectedColaboradores=[...(ng.colaboradorIds||[])];
+  }
+  const tipoOpts=NG_TIPOS.map(function(t){return `<option value="${t}"${ng&&ng.tipo===t?' selected':''}>${t}</option>`;}).join('');
+  const diaOpts=NG_DIAS.map(function(d){return `<option value="${d}"${ng&&ng.dia===d?' selected':''}>${d}</option>`;}).join('');
+  const horOpts=NG_HORARIOS.map(function(h){return `<option value="${h}"${ng&&ng.horario===h?' selected':''}>${h}</option>`;}).join('');
+  const membOpts=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
+    return `<option value="${m.id}">${listName(m)}</option>`;
+  }).join('');
+
+  document.getElementById('cfg-ng-overlay').innerHTML=`
+    <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div style="font-size:15px;font-weight:700;color:#1F4E79">${id?'Editar':'Nueva'} Comunidad</div>
+        <button class="btn btn-sm" onclick="ngCloseForm()">✕</button>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input id="ng-f-nombre" type="text" maxlength="50" value="${ng?ng.name:''}" placeholder="Nombre de la comunidad">
+        </div>
+      </div>
+      <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>Tipo *</label>
+          <select id="ng-f-tipo">${tipoOpts}</select>
+        </div>
+        <div class="form-group">
+          <label>Día de reunión</label>
+          <select id="ng-f-dia"><option value="">— Día —</option>${diaOpts}</select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Horario</label>
+          <select id="ng-f-horario"><option value="">— Horario —</option>${horOpts}</select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Líder/es</label>
+        <div id="ng-lideres-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <select id="ng-f-lider" onchange="ngAddLider(this.value);this.value=''">
+          <option value="">+ Agregar Líder</option>${membOpts}
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label>Colaboradores</label>
+        <div id="ng-colab-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <select id="ng-f-colab" onchange="ngAddColab(this.value);this.value=''">
+          <option value="">+ Agregar Colaborador</option>${membOpts}
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn" onclick="ngCloseForm()">Cancelar</button>
+        <button class="btn btn-primary" onclick="ngSaveComunidad()">Confirmar</button>
+      </div>
+    </div>`;
+  document.getElementById('cfg-ng-overlay').style.display='flex';
+  ngRenderLideresChips();
+  ngRenderColabChips();
+}
+
+function ngCloseForm(){
+  document.getElementById('cfg-ng-overlay').style.display='none';
+}
+
+function ngAddLider(id){
+  if(!id) return;
+  id=parseInt(id);
+  if(!ngSelectedLideres.includes(id)) ngSelectedLideres.push(id);
+  ngRenderLideresChips();
+}
+function ngRemoveLider(id){
+  ngSelectedLideres=ngSelectedLideres.filter(function(x){return x!==id;});
+  ngRenderLideresChips();
+}
+function ngRenderLideresChips(){
+  var c=document.getElementById('ng-lideres-chips');
+  if(!c) return;
+  c.innerHTML=ngSelectedLideres.map(function(id){
+    var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+    return m?`<span style="background:#DBEAFE;color:#1E40AF;border-radius:20px;padding:3px 10px;font-size:12px;display:flex;align-items:center;gap:4px">${listName(m)}<button onclick="ngRemoveLider(${id})" style="background:none;border:none;cursor:pointer;color:#1E40AF;font-size:14px;padding:0">×</button></span>`:'';
+  }).join('');
+}
+function ngAddColab(id){
+  if(!id) return;
+  id=parseInt(id);
+  if(!ngSelectedColaboradores.includes(id)) ngSelectedColaboradores.push(id);
+  ngRenderColabChips();
+}
+function ngRemoveColab(id){
+  ngSelectedColaboradores=ngSelectedColaboradores.filter(function(x){return x!==id;});
+  ngRenderColabChips();
+}
+function ngRenderColabChips(){
+  var c=document.getElementById('ng-colab-chips');
+  if(!c) return;
+  c.innerHTML=ngSelectedColaboradores.map(function(id){
+    var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+    return m?`<span style="background:#D1FAE5;color:#065F46;border-radius:20px;padding:3px 10px;font-size:12px;display:flex;align-items:center;gap:4px">${listName(m)}<button onclick="ngRemoveColab(${id})" style="background:none;border:none;cursor:pointer;color:#065F46;font-size:14px;padding:0">×</button></span>`:'';
+  }).join('');
+}
+
+function ngEditComunidad(id){
+  ngOpenForm(id);
+}
+
+async function ngSaveComunidad(){
+  const nombre=(document.getElementById('ng-f-nombre')?.value||'').trim();
+  const tipo=document.getElementById('ng-f-tipo')?.value||'';
+  const dia=document.getElementById('ng-f-dia')?.value||'';
+  const horario=document.getElementById('ng-f-horario')?.value||'';
+  if(!nombre||!tipo){ alert('Completá Nombre y Tipo'); return; }
+  if(ngEditingId){
+    var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(ngEditingId);});
+    if(ng){ Object.assign(ng,{name:nombre,tipo,dia,horario,liderIds:ngSelectedLideres,colaboradorIds:ngSelectedColaboradores}); }
+  } else {
+    S.ngComunidades.push({id:Date.now(),name:nombre,tipo,dia,horario,
+      liderIds:ngSelectedLideres,colaboradorIds:ngSelectedColaboradores,estado:'Activo'});
+  }
+  await saveK(SK.ngComunidades, S.ngComunidades);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    alert('No se pudo guardar en la nube. Verificá tu conexión.');
+    return;
+  }
+  ngCloseForm();
+  ngRenderList();
+  showToast('✅ Comunidad guardada','#16A34A');
+}
+
+async function ngDeleteComunidad(id){
+  var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(id);});
+  if(!ng) return;
+  // Check for members using this community as group
+  var withMembers=S.members.filter(function(m){
+    return Number(m.grupoId)===Number(id)||(m.grupoIds||[]).map(Number).includes(Number(id));
+  });
+  if(withMembers.length>0){
+    alert('La comunidad "'+ng.name+'" tiene '+withMembers.length+' miembro'+(withMembers.length>1?'s':'')+' asignado'+(withMembers.length>1?'s':'')+'. Quitálos antes de eliminarla.');
+    return;
+  }
+  if(!confirm('¿Eliminar la comunidad "'+ng.name+'"? Esta acción no se puede deshacer.')) return;
+  S.ngComunidades=S.ngComunidades.filter(function(x){return Number(x.id)!==Number(id);});
+  try{
+    await saveK(SK.ngComunidades,S.ngComunidades);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    ngRenderList();
+    showToast('✅ Comunidad eliminada','#16A34A');
+  }catch(e){
+    S.ngComunidades.push(ng);
+    alert('No se pudo eliminar. Verificá tu conexión.');
+  }
+}
+
 let cfgEditingGroupId=null;
 
 async function cfgDeleteGroup(id){
@@ -2534,7 +2753,9 @@ function cfgCloseGroupForm(){
 let cfgEditingUserId=null;
 function cfgRenderUsuarios(){
   const ugSel=document.getElementById('cfg-uf-group');
-  if(ugSel) ugSel.innerHTML='<option value="">Sin grupo</option>'+S.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  if(ugSel) ugSel.innerHTML='<option value="">Sin grupo</option>'+
+    [...(S.groups||[]), ...(S.ngComunidades||[]).map(ng=>({id:ng.id,name:'🌱 '+ng.name}))]
+    .map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
 
   // Populate member selector — always fresh
   const memSel=document.getElementById('cfg-uf-member');
@@ -2620,7 +2841,9 @@ function cfgEditUser(id){
   const ugSel=document.getElementById('cfg-uf-group');
   if(ugSel){
     if(ugSel.options.length<=1)
-      ugSel.innerHTML='<option value="">Sin grupo</option>'+S.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+      ugSel.innerHTML='<option value="">Sin grupo</option>'+
+    [...(S.groups||[]), ...(S.ngComunidades||[]).map(ng=>({id:ng.id,name:'🌱 '+ng.name}))]
+    .map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
     if(u.groupId) ugSel.value=u.groupId;
   }
   // Show associated member as read-only when editing
@@ -4382,7 +4605,9 @@ function gdvCloseGroupForm(){document.getElementById('gdv-group-form').classList
 // GdV: Usuarios
 function gdvRenderUsuarios(){
   const ugSel=document.getElementById('gdv-uf-group');
-  if(ugSel)ugSel.innerHTML='<option value="">Sin grupo</option>'+S.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  if(ugSel)ugSel.innerHTML='<option value="">Sin grupo</option>'+
+    [...(S.groups||[]), ...(S.ngComunidades||[]).map(ng=>({id:ng.id,name:'🌱 '+ng.name}))]
+    .map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
   document.getElementById('gdv-users-list').innerHTML=S.users.map(u=>{
     const g=S.groups.find(x=>x.id===u.groupId);
     return `<div class="row" style="cursor:default">
@@ -8073,5 +8298,6 @@ boot();
         </div>
       </div>
     </div>
+<div id="cfg-ng-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem"></div>
 </body>
 </html>

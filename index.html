@@ -196,6 +196,9 @@ tr:hover td{background:#F9FAFB}
 </script>
 </head>
 <body>
+<div id="dev-badge" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10001;background:#F59E0B;color:#fff;text-align:center;padding:6px;font-size:12px;font-weight:700;letter-spacing:1px">
+  🔧 MODO DESARROLLO — los datos NO son los reales
+</div>
 <div id="sync-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10000;background:#DC2626;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:600">
   ⚠️ Hay datos sin sincronizar. No cerrés la app.
   <button onclick="forceSyncNow()" style="margin-left:12px;background:#fff;color:#DC2626;border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-weight:700">☁️ Sincronizar ahora</button>
@@ -315,6 +318,11 @@ tr:hover td{background:#F9FAFB}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
+// Auto-detect development environment
+const VNG_COL = (window.location.hostname.includes('dev') ||
+                 window.location.hostname.includes('localhost') ||
+                 window.location.search.includes('dev=1')) ? 'vng_dev' : 'vng';
+
 const firebaseConfig = {
   apiKey: "AIzaSyCuyEMfRh_It13tBv71itzXW_OT1kliGMY",
   authDomain: "vng-plataforma.firebaseapp.com",
@@ -364,7 +372,7 @@ window.fbUpload = async function(force) {
         const v = localStorage.getItem(k);
         if(v) data[k] = v;
       });
-      await setDoc(doc(db, 'vng', docName), data, {merge:true});
+      await setDoc(doc(db, VNG_COLLECTION, docName), data, {merge:true});
     });
     await Promise.all(promises);
     window.showToast && window.showToast('☁️ Datos guardados en la nube', '#16A34A');
@@ -389,7 +397,7 @@ function mergeMembers(localStr, cloudStr){
 window.fbDownload = async function() {
   try {
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
-      const snap = await getDoc(doc(db, 'vng', docName));
+      const snap = await getDoc(doc(db, VNG_COLLECTION, docName));
       if(snap.exists()) {
         const data = snap.data();
         keys.forEach(k => {
@@ -444,13 +452,13 @@ window.syncNow = async function() {
 // Dedicated permisos read/write using vng/config (existing working path)
 window.fbSavePermisos = async function(permisosStr) {
   try {
-    await setDoc(doc(db,'vng','config'), {gdv_permisos: permisosStr, gdv_permisos_ts: Date.now()}, {merge:true});
+    await setDoc(doc(db,VNG_COL,'config'), {gdv_permisos: permisosStr, gdv_permisos_ts: Date.now()}, {merge:true});
     return true;
   } catch(e) { console.error('fbSavePermisos error:', e); return false; }
 };
 window.fbLoadPermisos = async function() {
   try {
-    const snap = await getDoc(doc(db,'vng','config'));
+    const snap = await getDoc(doc(db,VNG_COL,'config'));
     if(snap.exists() && snap.data().gdv_permisos) return snap.data();
     return null;
   } catch(e) { return null; }
@@ -549,7 +557,7 @@ async function cleanMembers(){
     if(m.barrio){ delete m.barrio; changed=true; }
   });
   // Migration: fix truly blank/undefined condicion (but NEVER change valid conditions)
-  const VALID_CONDICIONES=['Miembro','Asistente Bautizado','Asistente NO Bautizado','Asistente','Nuevo','Historico'];
+  const VALID_CONDICIONES=['Miembro','Asistente Bautizado','Asistente NO Bautizado','Nuevo','Historico'];
   S.members.forEach(m=>{
     if(!m.condicion || !VALID_CONDICIONES.includes(m.condicion)){
       m.condicion='Miembro'; // only fix blank/invalid, never override valid ones
@@ -1267,13 +1275,13 @@ function buildMiembrosHTML(){
         <option value="">Todas las condiciones</option>
         <option value="Miembro">Miembro</option>
         <option value="Asistente Bautizado">Asistente Bautizado</option>
-              <option value="Asistente NO Bautizado">Asistente NO Bautizado</option>
-        <option value="Nuevo">Nuevo</option>
+        <option value="Asistente NO Bautizado">Asistente NO Bautizado</option>
+        <option value="Historico">Histórico</option>
       </select>
       <select id="sa-mfil-rol" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px"><option value="">Todas las funciones</option></select>
       <select id="sa-mfil-estado" onchange="renderMiembrosStandalone()" style="flex:1;min-width:110px">
-        <option value="">Todos</option>
         <option value="Activo">Activos</option>
+        <option value="">Todos</option>
         <option value="Baja">Bajas</option>
         <option value="">Todos</option>
       </select>
@@ -7882,6 +7890,14 @@ async function importarTodo(event){
 // ════════════════════════════════════════════════════════════
 async function boot(){
   try{
+    // Show DEV badge if in development environment
+    const _isDev = window.location.hostname.includes('dev') || 
+                   window.location.hostname.includes('localhost') ||
+                   window.location.search.includes('dev=1');
+    if(_isDev){
+      const badge=document.getElementById('dev-badge');
+      if(badge) badge.style.display='inline';
+    }
     if(window._savedSession){
       currentUser = window._savedSession;
       document.getElementById('screen-login').style.display='none';

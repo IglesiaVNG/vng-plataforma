@@ -1164,12 +1164,14 @@ function ngRenderDashboard(c){
     // Tab buttons
     '<div class="nav" style="margin-bottom:1rem">'+
       "<button class=\"nav-btn active\" onclick=\"ngDashTab('semanas',this)\">📋 Semanas</button>"+
+      "<button class=\"nav-btn\" onclick=\"ngDashTab('evolucion',this)\">📈 Evolución</button>"+
       "<button class=\"nav-btn\" onclick=\"ngDashTab('ranking',this)\">🏆 Ranking</button>"+
       "<button class=\"nav-btn\" onclick=\"ngDashTab('asistencia',this)\">📊 % Asistencia</button>"+
       "<button class=\"nav-btn\" onclick=\"ngDashTab('miembros',this)\">👤 Asistencia Personal</button>"+
       "<button class=\"nav-btn\" onclick=\"ngDashTab('nuevos',this)\">🌱 Nuevos</button>"+
     '</div>'+
     '<div id="ng-panel-semanas"></div>'+
+    '<div id="ng-panel-evolucion" style="display:none"></div>'+
     '<div id="ng-panel-ranking" style="display:none"></div>'+
     '<div id="ng-panel-asistencia" style="display:none"></div>'+
     '<div id="ng-panel-miembros" style="display:none"></div>'+
@@ -1181,11 +1183,12 @@ function ngRenderDashboard(c){
 function ngDashTab(tab,btn){
   document.querySelectorAll('[onclick*="ngDashTab"]').forEach(function(b){b.classList.remove('active');});
   if(btn) btn.classList.add('active');
-  ['semanas','ranking','asistencia','miembros','nuevos'].forEach(function(t){
+  ['semanas','evolucion','ranking','asistencia','miembros','nuevos'].forEach(function(t){
     var p=document.getElementById('ng-panel-'+t);
     if(p) p.style.display=t===tab?'block':'none';
   });
   if(tab==='semanas') ngRenderSemanas();
+  else if(tab==='evolucion') ngRenderEvolucion();
   else if(tab==='ranking') ngRenderRanking();
   else if(tab==='asistencia') ngRenderPctAsist();
   else if(tab==='miembros') ngRenderMiembrosPanel();
@@ -1245,48 +1248,149 @@ function ngRenderSemanas(){
   var p=document.getElementById('ng-panel-semanas');
   if(!p) return;
   var recs=ngGetFilteredRecords().sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
-  if(!recs.length){p.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#9CA3AF">Sin registros</div>';return;}
-  // Group by week
-  var weeks={};
-  recs.forEach(function(r){
-    var wk=getWeekKey(r.fecha);
-    if(!weeks[wk]) weeks[wk]={key:wk,records:[],pres:0,aus:0,enc:0};
-    weeks[wk].records.push(r);
-    if(!r.sinEncuentro){
-      weeks[wk].enc++;
-      Object.values(r.asistencia||{}).forEach(function(a){
-        if(a.esLider||a.esColab) return;
-        if(a.state==='presente') weeks[wk].pres++;
-        else weeks[wk].aus++;
+  var coms=(ngFilComunidad?S.ngComunidades.filter(function(c){return Number(c.id)===Number(ngFilComunidad);}):S.ngComunidades)||[];
+  if(!coms.length||!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  // Get unique weeks
+  var weeks=[];
+  var weekSet={};
+  recs.forEach(function(r){var w=getWeekKey(r.fecha);if(!weekSet[w]){weekSet[w]=true;weeks.push(w);}});
+  weeks.sort(function(a,b){return b.localeCompare(a);});
+  var html='<div class="card"><div class="card-title">📋 Estado por semana</div>';
+  weeks.forEach(function(wk){
+    html+='<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:8px;border-bottom:1px solid #F3F4F6;padding-bottom:4px">Semana del '+wk+'</div>';
+    coms.forEach(function(com){
+      var comRecs=recs.filter(function(r){return Number(r.comunidadId)===Number(com.id)&&getWeekKey(r.fecha)===wk;});
+      if(!comRecs.length){
+        html+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0">'+
+          '<span style="font-size:13px;font-weight:600;flex:1">'+com.name+'</span>'+
+          '<span style="font-size:12px;color:#9CA3AF;background:#F3F4F6;padding:3px 10px;border-radius:6px">Sin registro</span>'+
+        '</div>';
+        return;
+      }
+      comRecs.forEach(function(r){
+        if(r.sinEncuentro){
+          html+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0">'+
+            '<span style="font-size:13px;font-weight:600;flex:1">'+com.name+(r.encuentroNum===2?' (2°)':'')+'</span>'+
+            '<span style="font-size:12px;color:#92400E;background:#FEF3C7;padding:3px 10px;border-radius:6px">Sin encuentro</span>'+
+          '</div>';
+          return;
+        }
+        var att=Object.values(r.asistencia||{});
+        var main=att.filter(function(a){return !a.esLider&&!a.esColab;});
+        var pres=main.filter(function(a){return a.state==='presente';}).length;
+        var tot=main.length;
+        var pct=tot?Math.round(pres/tot*100):0;
+        var col=pct>=75?'#16A34A':pct>=50?'#D97706':'#DC2626';
+        var bg=pct>=75?'#DCFCE7':pct>=50?'#FEF3C7':'#FEE2E2';
+        html+='<div style="padding:6px 0">'+
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">'+
+            '<span style="font-size:13px;font-weight:600;flex:1">'+com.name+(r.encuentroNum===2?' (2°)':'')+'</span>'+
+            '<span style="font-size:12px;font-weight:700;color:'+col+';background:'+bg+';padding:3px 10px;border-radius:6px">'+pres+'/'+tot+' — '+pct+'%</span>'+
+          '</div>'+
+          '<div style="height:6px;background:#F3F4F6;border-radius:4px"><div style="height:6px;background:'+col+';border-radius:4px;width:'+pct+'%"></div></div>'+
+        '</div>';
       });
-    }
+    });
+    html+='</div>';
   });
-  var sorted=Object.values(weeks).sort(function(a,b){return b.key.localeCompare(a.key);});
-  p.innerHTML='<div class="card" style="padding:0;overflow:hidden"><table><thead><tr>'+
-    '<th>Semana</th><th>Encuentros</th><th>Presentes</th><th>Ausentes</th><th>% Asistencia</th>'+
-    '</tr></thead><tbody>'+
-    sorted.map(function(w){
-      var tot=w.pres+w.aus;
-      var pct=tot?Math.round(w.pres/tot*100):0;
-      var color=pct>=75?'#16A34A':pct>=50?'#D97706':'#DC2626';
-      return '<tr>'+
-        '<td style="font-weight:600">'+w.key+'</td>'+
-        '<td style="text-align:center">'+w.enc+'</td>'+
-        '<td style="text-align:center;color:#16A34A">'+w.pres+'</td>'+
-        '<td style="text-align:center;color:#DC2626">'+w.aus+'</td>'+
-        '<td style="text-align:center;font-weight:700;color:'+color+'">'+pct+'%</td>'+
-      '</tr>';
-    }).join('')+
-  '</tbody></table></div>';
+  html+='</div>';
+  p.innerHTML=html;
+}
+
+function ngRenderEvolucion(){
+  var p=document.getElementById('ng-panel-evolucion');
+  if(!p) return;
+  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;}).sort(function(a,b){return a.fecha.localeCompare(b.fecha);});
+  if(!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  // Group by date, count presentes
+  var byDate={};
+  recs.forEach(function(r){
+    if(!byDate[r.fecha]) byDate[r.fecha]={pres:0,aus:0,new:0};
+    Object.values(r.asistencia||{}).forEach(function(a){
+      if(a.esLider||a.esColab) return;
+      if(a.state==='presente') byDate[r.fecha].pres++;
+      else byDate[r.fecha].aus++;
+    });
+    byDate[r.fecha].new+=(r.visitsNew||[]).length;
+  });
+  var dates=Object.keys(byDate).sort();
+  if(!dates.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  var maxPres=Math.max.apply(null,dates.map(function(d){return byDate[d].pres;}));
+  var html='<div class="card"><div class="card-title">📈 Evolución — Presentes por encuentro</div>'+
+    '<div style="overflow-x:auto"><div style="display:flex;align-items:flex-end;gap:6px;min-height:180px;padding:8px 0">';
+  dates.forEach(function(d){
+    var v=byDate[d];
+    var h=maxPres>0?Math.round((v.pres/maxPres)*140):0;
+    var pct=Math.round((v.pres/(v.pres+v.aus||1))*100);
+    var col=pct>=75?'#16A34A':pct>=50?'#1F4E79':'#DC2626';
+    html+='<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:44px">'+
+      '<span style="font-size:11px;font-weight:700;color:'+col+'">'+pct+'%</span>'+
+      '<div style="width:36px;background:'+col+';border-radius:4px 4px 0 0;height:'+h+'px;min-height:4px"></div>'+
+      '<span style="font-size:10px;color:#9CA3AF;writing-mode:vertical-rl;transform:rotate(180deg);max-height:60px">'+d.slice(5)+'</span>'+
+    '</div>';
+  });
+  html+='</div></div>';
+  // Summary table
+  html+='<table style="margin-top:8px"><thead><tr><th>Fecha</th><th>Presentes</th><th>Ausentes</th><th>% Asist.</th><th>Nuevos</th></tr></thead><tbody>';
+  dates.slice().reverse().forEach(function(d){
+    var v=byDate[d];
+    var pct=Math.round((v.pres/(v.pres+v.aus||1))*100);
+    var col=pct>=75?'#16A34A':pct>=50?'#D97706':'#DC2626';
+    html+='<tr><td>'+d+'</td><td style="text-align:center;color:#16A34A">'+v.pres+'</td>'+
+      '<td style="text-align:center;color:#DC2626">'+v.aus+'</td>'+
+      '<td style="text-align:center;font-weight:700;color:'+col+'">'+pct+'%</td>'+
+      '<td style="text-align:center;color:#7C3AED">'+v.new+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  p.innerHTML=html;
 }
 
 function ngRenderRanking(){
   var p=document.getElementById('ng-panel-ranking');
   if(!p) return;
   var coms=S.ngComunidades||[];
-  if(!coms.length){p.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#9CA3AF">Sin comunidades</div>';return;}
   var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
-  var comStats=coms.map(function(com){
+  if(!coms.length||!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  var comData=coms.map(function(com){
+    var comRecs=recs.filter(function(r){return Number(r.comunidadId)===Number(com.id);});
+    var pres=0,tot=0;
+    comRecs.forEach(function(r){
+      Object.values(r.asistencia||{}).forEach(function(a){
+        if(a.esLider||a.esColab) return;
+        tot++;if(a.state==='presente') pres++;
+      });
+    });
+    var pct=tot?Math.round(pres/tot*100):0;
+    var avg=comRecs.length?Math.round(pres/comRecs.length):0;
+    return {name:com.name,tipo:com.tipo,enc:comRecs.length,pres,tot,pct,avg};
+  }).filter(function(c){return c.enc>0;}).sort(function(a,b){return b.pct-a.pct;});
+  var html='<div class="card"><div class="card-title">🏆 Ranking — Promedio de presentes</div>';
+  comData.forEach(function(c,i){
+    var col=c.pct>=75?'#16A34A':c.pct>=50?'#1F4E79':'#DC2626';
+    html+='<div style="margin-bottom:14px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+        '<span style="font-size:13px;font-weight:700;color:#6B7280;min-width:20px">'+(i+1)+'.</span>'+
+        '<span style="font-size:13px;font-weight:600;flex:1">'+c.name+'</span>'+
+        '<span style="font-size:11px;color:#6B7280">'+c.pres+'/'+c.tot+'</span>'+
+        '<strong style="font-size:13px;color:'+col+';min-width:38px;text-align:right">'+c.pct+'%</strong>'+
+      '</div>'+
+      '<div style="height:8px;background:#F3F4F6;border-radius:4px">'+
+        '<div style="height:8px;background:'+col+';border-radius:4px;width:'+c.pct+'%"></div>'+
+      '</div>'+
+      '<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+c.tipo+' · prom. '+c.avg+'/enc · '+c.enc+' encuentro'+(c.enc>1?'s':'')+'</div>'+
+    '</div>';
+  });
+  html+='</div>';
+  p.innerHTML=html;
+}
+
+function ngRenderPctAsist(){
+  var p=document.getElementById('ng-panel-asistencia');
+  if(!p) return;
+  var coms=S.ngComunidades||[];
+  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
+  if(!coms.length||!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  var comData=coms.map(function(com){
     var comRecs=recs.filter(function(r){return Number(r.comunidadId)===Number(com.id);});
     var pres=0,aus=0;
     comRecs.forEach(function(r){
@@ -1296,37 +1400,80 @@ function ngRenderRanking(){
       });
     });
     var tot=pres+aus;
-    return {name:com.name,tipo:com.tipo,enc:comRecs.length,pres,pct:tot?Math.round(pres/tot*100):0};
-  }).sort(function(a,b){return b.pct-a.pct;});
-  p.innerHTML='<div class="card" style="padding:0;overflow:hidden"><table><thead><tr>'+
-    '<th>Comunidad</th><th>Tipo</th><th>Encuentros</th><th>Presentes</th><th>%</th>'+
-    '</tr></thead><tbody>'+
-    comStats.map(function(s,i){
-      var color=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';
-      return '<tr>'+
-        '<td><strong>'+(i+1)+'. '+s.name+'</strong></td>'+
-        '<td style="font-size:12px;color:#6B7280">'+s.tipo+'</td>'+
-        '<td style="text-align:center">'+s.enc+'</td>'+
-        '<td style="text-align:center">'+s.pres+'</td>'+
-        '<td style="text-align:center;font-weight:700;color:'+color+'">'+s.pct+'%</td>'+
-      '</tr>';
-    }).join('')+
-  '</tbody></table></div>';
-}
-
-function ngRenderPctAsist(){
-  var p=document.getElementById('ng-panel-asistencia');
-  if(!p) return;
-  // Reuse member stats table
-  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
-  p.innerHTML=ngRenderAsistenciaMiembros(recs);
+    var pct=tot?Math.round(pres/tot*100):0;
+    return {name:com.name,tipo:com.tipo,pres,aus,tot,pct,enc:comRecs.length};
+  }).filter(function(c){return c.enc>0;}).sort(function(a,b){return b.pct-a.pct;});
+  var html='<div class="card"><div class="card-title">📊 % Asistencia por Comunidad</div>';
+  comData.forEach(function(c){
+    var col=c.pct>=75?'#16A34A':c.pct>=50?'#1F4E79':'#DC2626';
+    html+='<div style="margin-bottom:12px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+        '<span style="font-size:13px;font-weight:600;flex:1">'+c.name+'</span>'+
+        '<span style="color:#6B7280;font-size:12px">'+c.pres+'/'+c.tot+
+          ' · <strong style="color:'+col+'">'+c.pct+'%</strong>'+
+          '<span style="font-size:11px;color:#9CA3AF"> · '+c.enc+' enc.</span>'+
+        '</span>'+
+      '</div>'+
+      '<div class="pbar-bg"><div class="pbar-fill" style="width:'+c.pct+'%;background:'+col+'"></div></div>'+
+    '</div>';
+  });
+  html+='</div>';
+  p.innerHTML=html;
 }
 
 function ngRenderMiembrosPanel(){
   var p=document.getElementById('ng-panel-miembros');
   if(!p) return;
   var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
-  p.innerHTML=ngRenderAsistenciaMiembros(recs);
+  // Same as ngRenderAsistenciaMiembros but with visual bars
+  var allLiderIds=new Set();
+  (S.ngComunidades||[]).forEach(function(ngx){
+    (ngx.liderIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
+    (ngx.colaboradorIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
+  });
+  var encPerCom={};
+  recs.forEach(function(r){var cid=Number(r.comunidadId);encPerCom[cid]=(encPerCom[cid]||0)+1;});
+  var stats=[];
+  S.members.filter(function(m){
+    return m.estado!=='Baja'&&m.grupoId&&encPerCom[Number(m.grupoId)]>0&&
+           (ngFilSexo==='lideres'?allLiderIds.has(Number(m.id)):!allLiderIds.has(Number(m.id)));
+  }).forEach(function(m){
+    if(ngFilSexo&&ngFilSexo!=='lideres'&&m.genero!==ngFilSexo) return;
+    if(ngFilComunidad&&Number(m.grupoId)!==Number(ngFilComunidad)) return;
+    var totalEnc=encPerCom[Number(m.grupoId)]||0;
+    if(!totalEnc) return;
+    var pres=recs.filter(function(r){return Number(r.comunidadId)===Number(m.grupoId);}).reduce(function(acc,r){
+      var att=r.asistencia||{};
+      var e=att[m.id]||att[String(m.id)];
+      return acc+(e&&e.state==='presente'?1:0);
+    },0);
+    var ngx=S.ngComunidades.find(function(x){return Number(x.id)===Number(m.grupoId);});
+    var pct=totalEnc?Math.round(pres/totalEnc*100):0;
+    stats.push({nombre:listName(m),genero:m.genero,comunidad:ngx?ngx.name:'—',pres,totalEnc,pct});
+  });
+  stats.sort(function(a,b){return b.pct-a.pct||b.pres-a.pres;});
+  if(!stats.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  var html='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+    '<div class="card-title" style="margin:0">👤 Asistencia Personal</div>'+
+    '<span style="font-size:12px;color:#6B7280">'+stats.length+' personas</span></div>';
+  stats.forEach(function(s){
+    var col=s.pct>=75?'#16A34A':s.pct>=50?'#1F4E79':'#DC2626';
+    var genBg=s.genero==='H'?'#DBEAFE':'#FCE7F3';
+    var genCol=s.genero==='H'?'#1E40AF':'#9D174D';
+    html+='<div style="margin-bottom:10px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'+
+        '<span style="font-size:10px;background:'+genBg+';color:'+genCol+';padding:1px 5px;border-radius:3px;font-weight:700">'+s.genero+'</span>'+
+        '<span style="font-size:13px;font-weight:600;flex:1">'+s.nombre+'</span>'+
+        '<span style="font-size:11px;color:#6B7280">'+s.pres+'/'+s.totalEnc+'</span>'+
+        '<strong style="font-size:12px;color:'+col+';min-width:35px;text-align:right">'+s.pct+'%</strong>'+
+      '</div>'+
+      '<div style="height:5px;background:#F3F4F6;border-radius:3px">'+
+        '<div style="height:5px;background:'+col+';border-radius:3px;width:'+s.pct+'%"></div>'+
+      '</div>'+
+    '</div>';
+  });
+  html+='</div>';
+  p.innerHTML=html;
 }
 
 function ngRenderNuevosPanel(){
@@ -1335,24 +1482,21 @@ function ngRenderNuevosPanel(){
   var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro&&(r.visitsNew||[]).length>0;})
     .sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
   if(!recs.length){p.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#9CA3AF">Sin personas nuevas en el período</div>';return;}
-  var rows=[];
+  var html='<div class="card"><div class="card-title">🌱 Personas Nuevas</div>';
   recs.forEach(function(r){
     var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(r.comunidadId);});
+    html+='<div style="margin-bottom:12px">'+
+      '<div style="font-size:12px;font-weight:600;color:#6B7280;margin-bottom:4px">'+r.fecha+' · '+(ng?ng.name:'—')+'</div>';
     (r.visitsNew||[]).forEach(function(n){
-      rows.push({fecha:r.fecha,comunidad:ng?ng.name:'—',nombre:n});
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#F0FDF4;border-radius:6px;margin-bottom:3px">'+
+        '<span style="font-size:14px">🌱</span>'+
+        '<span style="font-size:13px;font-weight:600;color:#166534">'+n+'</span>'+
+      '</div>';
     });
+    html+='</div>';
   });
-  p.innerHTML='<div class="card" style="padding:0;overflow:hidden"><table><thead><tr>'+
-    '<th>Fecha</th><th>Comunidad</th><th>Nombre</th>'+
-    '</tr></thead><tbody>'+
-    rows.map(function(r){
-      return '<tr>'+
-        '<td>'+r.fecha+'</td>'+
-        '<td style="font-size:12px;color:#6B7280">'+r.comunidad+'</td>'+
-        '<td style="font-weight:600">'+r.nombre+'</td>'+
-      '</tr>';
-    }).join('')+
-  '</tbody></table></div>';
+  html+='</div>';
+  p.innerHTML=html;
 }
 
 

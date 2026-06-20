@@ -1272,6 +1272,7 @@ function buildMiembrosHTML(){
       </select>
       <select id="sa-mfil-rol" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px"><option value="">Todas las funciones</option></select>
       <select id="sa-mfil-estado" onchange="renderMiembrosStandalone()" style="flex:1;min-width:110px">
+        <option value="">Todos</option>
         <option value="Activo">Activos</option>
         <option value="Baja">Bajas</option>
         <option value="">Todos</option>
@@ -1288,12 +1289,13 @@ function buildMiembrosHTML(){
     <div id="sa-panel-generales" class="card" style="padding:0;overflow:hidden">
       <table>
         <thead><tr>
-          <th style="width:27%">Nombre</th>
-          <th style="width:22%">Grupos</th>
-          <th style="width:20%">Función</th>
-          <th style="width:12%">Condición</th>
+          <th style="width:24%">Nombre</th>
+          <th style="width:5%">Sexo</th>
+          <th style="width:19%">Grupos</th>
+          <th style="width:18%">Función</th>
+          <th style="width:13%">Condición</th>
           <th style="width:9%">Estado</th>
-          <th style="width:10%">Ingreso</th>
+          <th style="width:12%">Ingreso</th>
         </tr></thead>
         <tbody id="sa-member-tbody"></tbody>
       </table>
@@ -1666,7 +1668,7 @@ function renderMiembrosStandalone(){
   const fRol=document.getElementById('sa-mfil-rol')?.value||'';
   const fCond=document.getElementById('sa-mfil-condicion')?.value||'';
   const fEstado=document.getElementById('sa-mfil-estado')?.value;
-  // Default filter: show only Activos (fEstado='Activo')
+  // Estado filter — default shows all
 
   const gsel=document.getElementById('sa-mfil-grupo');
   if(gsel&&gsel.options.length<=1){

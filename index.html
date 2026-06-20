@@ -461,11 +461,19 @@ console.log('Firebase: initialized OK');
 window.fbDownload().then(function(hasData) {
   if(hasData) {
     console.log('Firebase: auto-download complete');
-    // Firebase downloaded new data into localStorage.
-    // We do NOT replace S.* in memory — that would cause race conditions
-    // with any active user edits. S.* stays as-is; next page load will
-    // pick up the updated localStorage via initStorage().
+    // Firebase downloaded new data into localStorage (protected by per-key timestamps).
+    // Now safely update S.* from localStorage so current session sees new data.
     try{
+      if(typeof S !== 'undefined'){
+        function _ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+        S.users       = _ld('gdv_u5',            S.users       ||[]);
+        S.groups      = _ld('gdv_g5',            S.groups      ||[]);
+        S.records     = _ld('gdv_r5',            S.records     ||[]);
+        S.members     = _ld('gdv_m5',            S.members     ||[]);
+        S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
+        S.discPasos   = _ld('gdv_disc_pasos',    S.discPasos   ||[]);
+        S.discRecords = _ld('gdv_disc_records',  S.discRecords ||[]);
+      }
       // Load permisos from Firebase if this device has none configured
       // Reload permisos from localStorage (now updated from Firebase if it was empty)
       if(!window._permisosEditing && typeof loadPermisos==='function') loadPermisos();
@@ -718,11 +726,26 @@ const DEFAULT_DISC_PASOS=[
 ];
 
 function load(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch(e){return def;}}
-// Save data and wait for Firebase confirmation. Returns true if cloud confirmed.
+// Save to localStorage + Firebase. Throws if Firebase fails.
 async function saveAndSync(key, val){
   try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
-  if(typeof window.fbUpload!=='function') return false;
-  try{ await window.fbUpload(true); return true; }catch(e){ return false; }
+  if(typeof window.fbUpload!=='function'){
+    throw new Error('Sin conexión con la nube. Verificá tu red e intentá de nuevo.');
+  }
+  await window.fbUpload(true); // throws on failure
+}
+// Run fn, show error on form if Firebase fails, return true if ok
+async function trySave(saveFn, errorElId){
+  try{
+    await saveFn();
+    return true;
+  }catch(e){
+    const errEl=errorElId?document.getElementById(errorElId):null;
+    const msg='No se pudo guardar: '+(e.message||'Error de red. Intentá de nuevo.');
+    if(errEl){ errEl.textContent=msg; errEl.style.display='block'; }
+    else { alert(msg); }
+    return false;
+  }
 }
 // Config save: saves + immediate Firebase sync + returns success
 async function saveConfig(key, val, label){
@@ -2095,8 +2118,19 @@ async function saSaveMember(){
   }
 
   await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    // Firebase failed — don't close the form
+    const errMsg='No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.';
+    alert(errMsg);
+    // Restore the original member data in memory so nothing is half-saved
+    return;
+  }
+  // Only reach here if Firebase confirmed
   saCloseMemberForm();
   renderMiembrosStandalone();
+  showToast('✅ Guardado','#16A34A');
 }
 
 async function saDeleteMember(id){
@@ -2320,6 +2354,38 @@ async function cfgToggleQrActualizar(enabled){
 
 // Config: Grupos
 let cfgEditingGroupId=null;
+
+async function cfgDeleteGroup(id){
+  var g=(S.groups||[]).find(function(x){ return Number(x.id)===Number(id); });
+  if(!g) return;
+  // Check for members in this group
+  var miembros=S.members.filter(function(m){
+    return m.estado!=='Baja' && (Number(m.grupoId)===Number(id)||(m.grupoIds||[]).map(Number).includes(Number(id)));
+  });
+  if(miembros.length>0){
+    alert('El Grupo "'+g.name+'" tiene '+miembros.length+' miembro'+(miembros.length>1?'s':'')+' activo'+(miembros.length>1?'s':'')+'. Quitá todos los miembros del grupo antes de eliminarlo.');
+    return;
+  }
+  // Check for facilitators
+  if(g.facId||g.facId2){
+    alert('El Grupo "'+g.name+'" tiene facilitadores asignados. Quitá los facilitadores en "Editar" antes de eliminarlo.');
+    return;
+  }
+  // Confirm deletion
+  if(!confirm('¿Eliminár el Grupo "'+g.name+'"? Esta acción no se puede deshacer.')) return;
+  // Delete
+  S.groups=S.groups.filter(function(x){ return Number(x.id)!==Number(id); });
+  try{
+    await saveK(SK.groups, S.groups);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    cfgRenderGrupos();
+    showToast('✅ Grupo "'+g.name+'" eliminado','#16A34A');
+  }catch(e){
+    // Revert on failure
+    S.groups.push(g);
+    alert('No se pudo eliminar en la nube. Verificá tu conexión e intentá de nuevo.');
+  }
+}
 function cfgPopulateFacSelects(fac1Id, fac2Id){
   // Show ALL active Miembros (not just those with facilitador role)
   const opts='<option value="">Sin asignar</option>'
@@ -2361,6 +2427,7 @@ function cfgRenderGrupos(){
         </div>
         <span class="badge ${sc}">${st}</span>
         <button class="btn btn-sm" onclick="cfgEditGroup(${g.id})">✏️</button>
+        <button onclick="cfgDeleteGroup(${g.id})" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:13px" title="Eliminar">🗑️</button>
       </div>
       <div style="font-size:12px;color:#6B7280">
         <span class="chip">👥 ${tot} miembros</span>
@@ -2435,13 +2502,17 @@ async function cfgSaveGroup(){
 
   await saveK(SK.groups,S.groups);
   await saveK(SK.members,S.members);
-  const gCloudOk=await saveAndSync('gdv_g5', S.groups);
-  if(!gCloudOk){
-    showToast('⚠️ Grupo guardado SIN sincronizar — verificá tu conexión y volvé a guardar','#DC2626');
-  } else {
-    showToast('✅ Grupo guardado ☁️','#16A34A');
+  try{
+    await saveK(SK.groups, S.groups);
+    await saveK(SK.members, S.members);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
-  cfgCloseGroupForm();cfgRenderGrupos();
+  cfgCloseGroupForm();
+  cfgRenderGrupos();
+  showToast('✅ Grupo guardado','#16A34A');
 }
 function cfgCloseGroupForm(){
   var m=document.getElementById('cfg-group-modal');
@@ -3338,8 +3409,14 @@ async function gdvSaveRecord(){
     ts:new Date().toISOString()};
   S.records.push(rec);
   await saveK(SK.records,S.records);
-  // Upload records to Firebase immediately (prevents old-data overwrite)
-  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){ console.error('Firebase sync error:',e); }
+  // Upload records to Firebase — block if fails
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    const al2=document.getElementById('gdv-fac-alert');
+    if(al2){ al2.textContent='❌ Error al guardar en la nube. Verificá tu red e intentá de nuevo.'; al2.classList.remove('hidden'); }
+    return; // don't show success, don't reset form
+  }
 
   // ── Auto-assign group to "Nuevos" so they appear in next encounter ──
   var membersUpdated=false;

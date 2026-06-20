@@ -1149,7 +1149,7 @@ function ngRenderDashboard(c){
           '</select></div>'+
         '<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Sexo</label>'+
           '<select id="ng-df-sex" onchange="ngApplyFilters()" style="min-width:100px">'+
-            '<option value="">Todos</option><option value="H">Hombres</option><option value="M">Mujeres</option>'+
+            '<option value="">Todos</option><option value="H">Hombres</option><option value="M">Mujeres</option><option value="lideres">Líderes y Colabs</option>'+
           '</select></div>'+
         '<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde</label>'+
           '<input type="date" id="ng-df-desde" value="'+ngFilDesde+'" onchange="ngApplyFilters()"></div>'+
@@ -1189,6 +1189,7 @@ function ngRenderDashboardStats(){
   var totalAtt=0,totalPres=0,totalNew=0;
   recs.forEach(function(r){
     Object.values(r.asistencia||{}).forEach(function(a){
+      if(a.esLider||a.esColab) return; // exclude leaders from main stats
       totalAtt++;
       if(a.state==='presente') totalPres++;
     });
@@ -1220,10 +1221,18 @@ function ngRenderAsistenciaMiembros(recs){
     var cid=Number(r.comunidadId);
     encPerCom[cid]=(encPerCom[cid]||0)+1;
   });
+  // 'lideres' special filter - show only leaders across all communities
+  var allLiderIds=new Set();
+  (S.ngComunidades||[]).forEach(function(ng){
+    (ng.liderIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
+    (ng.colaboradorIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
+  });
   S.members.filter(function(m){
-    return m.estado!=='Baja'&&m.grupoId&&encPerCom[Number(m.grupoId)]>0;
+    if(m.estado==='Baja') return false;
+    if(ngFilSexo==='lideres') return allLiderIds.has(Number(m.id));
+    return m.grupoId&&encPerCom[Number(m.grupoId)]>0&&!allLiderIds.has(Number(m.id));
   }).forEach(function(m){
-    if(ngFilSexo&&m.genero!==ngFilSexo) return;
+    if(ngFilSexo&&ngFilSexo!=='lideres'&&m.genero!==ngFilSexo) return;
     if(ngFilComunidad&&Number(m.grupoId)!==Number(ngFilComunidad)) return;
     var totalEnc=encPerCom[Number(m.grupoId)]||0;
     if(!totalEnc) return;
@@ -1346,29 +1355,54 @@ function ngCheckExistingRecord(){
 }
 
 function ngBuildAsistList(cid){
+  var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(cid);});
   var members=ngGetMembersOfComunidad(cid).sort(function(a,b){return listName(a).localeCompare(listName(b));});
+  var liderIds=((ng&&ng.liderIds)||[]).map(Number);
+  var colabIds=((ng&&ng.colaboradorIds)||[]).map(Number);
+  var roleIds=new Set([].concat(liderIds,colabIds));
+  var roleMembros=Array.from(roleIds).map(function(id){
+    return S.members.find(function(m){return Number(m.id)===Number(id);});
+  }).filter(function(m){return m&&m.estado!=='Baja';});
+  var mainMembers=members.filter(function(m){return !roleIds.has(Number(m.id));});
   ngFacAtt={};
-  members.forEach(function(m){ngFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'presente'};});
+  mainMembers.forEach(function(m){ngFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente',esLider:false};});
+  roleMembros.forEach(function(m){
+    ngFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente',
+      esLider:liderIds.includes(Number(m.id)),esColab:colabIds.includes(Number(m.id))};
+  });
   var list=document.getElementById('ng-asist-list');
   if(!list) return;
-  if(!members.length){
-    list.innerHTML='<div style="color:#F59E0B;font-size:13px;padding:8px">No hay personas asignadas a esta comunidad.</div>';
-    return;
+  window.ngToggleBtn=function(id,btn){
+    var n=ngFacAtt[id].state==='presente'?'ausente':'presente';
+    ngFacAtt[id].state=n;
+    btn.className='toggle-btn '+n;
+    btn.textContent=n==='presente'?'Presente':'Ausente';
+  };
+  function buildRow(m,rol){
+    var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+    var genCol=m.genero==='H'?'#1E40AF':'#9D174D';
+    var rolBadge=rol?'<span style="font-size:10px;background:#D1FAE5;color:#065F46;padding:1px 6px;border-radius:4px;margin-left:4px">'+rol+'</span>':'';
+    return '<div class="member-row">'+
+      '<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:'+genBg+';color:'+genCol+';font-weight:600;flex-shrink:0">'+m.genero+'</span>'+
+      '<span class="member-name">'+listName(m)+rolBadge+'</span>'+
+      '<button class="toggle-btn ausente" onclick="ngToggleBtn('+m.id+',this)">Ausente</button>'+
+    '</div>';
   }
-  list.innerHTML='<div style="font-size:13px;font-weight:600;color:#4B5563;margin-bottom:8px">Asistencia ('+members.length+' personas)</div>'+
-    members.map(function(m){
-      return '<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F3F4F6;cursor:pointer;font-size:14px">'+
-        '<input type="checkbox" id="ng-att-'+m.id+'" checked onchange="ngToggleAtt('+m.id+',this.checked)" style="width:18px;height:18px">'+
-        '<span>'+listName(m)+'</span>'+
-      '</label>';
+  var html='';
+  if(mainMembers.length){
+    html+='<div style="font-size:12px;font-weight:600;color:#6B7280;margin:8px 0 4px">Integrantes ('+mainMembers.length+')</div>';
+    html+=mainMembers.map(function(m){return buildRow(m,'');}).join('');
+  }
+  if(roleMembros.length){
+    html+='<div style="font-size:12px;font-weight:600;color:#6B7280;margin:12px 0 4px">Líderes y Colaboradores</div>';
+    html+=roleMembros.map(function(m){
+      return buildRow(m,liderIds.includes(Number(m.id))?'Líder':'Colaborador');
     }).join('');
+  }
+  if(!html) html='<div style="color:#F59E0B;font-size:13px;padding:8px">No hay personas asignadas.</div>';
+  list.innerHTML=html;
 }
 
-function ngToggleSinEnc(checked){
-  var formAsist=document.getElementById('ng-form-asist');
-  if(formAsist) formAsist.style.opacity=checked?'0.4':'1';
-  if(formAsist) formAsist.style.pointerEvents=checked?'none':'';
-}
 
 function ngToggleAtt(mid,checked){
   if(ngFacAtt[mid]) ngFacAtt[mid].state=checked?'presente':'ausente';
@@ -1422,11 +1456,8 @@ async function ngSaveRecord(){
   if(existing.length>=1&&!sinEnc){
     if(!confirm('Ya hay un encuentro registrado esta semana. ¿Confirmás agregar el segundo encuentro del '+fecha+'?')) return;
   }
-  // Update asistencia from checkboxes
-  Object.keys(ngFacAtt).forEach(function(k){
-    var cb=document.getElementById('ng-att-'+k);
-    if(cb) ngFacAtt[k].state=cb.checked?'presente':'ausente';
-  });
+  // State already updated via ngToggleBtn - no need to re-read from DOM
+  // Tag each entry with esLider flag for dashboard filtering
   var rec={
     id:Date.now(),
     comunidadId:cid,

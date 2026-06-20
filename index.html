@@ -1126,7 +1126,8 @@ function ngGetFilteredRecords(){
   if(ngFilDesde) recs=recs.filter(function(r){return r.fecha>=ngFilDesde;});
   if(ngFilHasta) recs=recs.filter(function(r){return r.fecha<=ngFilHasta;});
   if(ngFilComunidad) recs=recs.filter(function(r){return Number(r.comunidadId)===Number(ngFilComunidad);});
-  if(ngFilSexo) recs=recs.filter(function(r){
+  // 'lideres' is handled separately in stats — don't filter records by it here
+  if(ngFilSexo&&ngFilSexo!=='lideres') recs=recs.filter(function(r){
     return Object.entries(r.asistencia||{}).some(function(e){
       var m=S.members.find(function(x){return Number(x.id)===Number(e[0]);});
       return m&&m.genero===ngFilSexo&&e[1].state==='presente';

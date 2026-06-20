@@ -385,7 +385,7 @@ window.fbUpload = async function(force) {
         const v = localStorage.getItem(k);
         if(v) data[k] = v;
       });
-      await setDoc(doc(db, VNG_COLLECTION, docName), data, {merge:true});
+      await setDoc(doc(db, VNG_COL, docName), data, {merge:true});
     });
     await Promise.all(promises);
     window.showToast && window.showToast('☁️ Datos guardados en la nube', '#16A34A');
@@ -410,7 +410,7 @@ function mergeMembers(localStr, cloudStr){
 window.fbDownload = async function() {
   try {
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
-      const snap = await getDoc(doc(db, VNG_COLLECTION, docName));
+      const snap = await getDoc(doc(db, VNG_COL, docName));
       if(snap.exists()) {
         const data = snap.data();
         keys.forEach(k => {

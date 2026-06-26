@@ -196,6 +196,9 @@ tr:hover td{background:#F9FAFB}
 </script>
 </head>
 <body>
+<div id="dev-badge" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10001;background:#F59E0B;color:#fff;text-align:center;padding:6px;font-size:12px;font-weight:700;letter-spacing:1px">
+  🔧 MODO DESARROLLO — los datos NO son los reales
+</div>
 <div id="sync-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10000;background:#DC2626;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:600">
   ⚠️ Hay datos sin sincronizar. No cerrés la app.
   <button onclick="forceSyncNow()" style="margin-left:12px;background:#fff;color:#DC2626;border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-weight:700">☁️ Sincronizar ahora</button>
@@ -314,6 +317,12 @@ tr:hover td{background:#F9FAFB}
 // ── FIREBASE INTEGRATION ──────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+// Detect environment: PROD only if exact production URL, everything else = DEV
+const _PROD_HOSTS = ['vng-plataforma.vercel.app', 'iglesiavng.vercel.app'];
+const _isProd = _PROD_HOSTS.includes(window.location.hostname);
+const VNG_COL = _isProd ? 'vng' : 'vng_dev';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCuyEMfRh_It13tBv71itzXW_OT1kliGMY",
@@ -326,6 +335,16 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+
+// Autenticación anónima — requerida por reglas de seguridad Firestore
+try {
+  await signInAnonymously(auth);
+  console.log('Firebase: auth anónima OK');
+} catch(authErr) {
+  console.error('Firebase: error auth', authErr);
+  window.showToast && window.showToast('⚠️ Sin conexión Firebase — datos no se sincronizarán', '#DC2626');
+}
 
 // ── Keys grouped by document (max ~900KB each) ──
 const KEY_GROUPS = {
@@ -333,6 +352,8 @@ const KEY_GROUPS = {
   'members': ['gdv_m5'],
   'records': ['gdv_r5'],
   'disc':    ['gdv_disc_pasos','gdv_disc_records'],
+  'ng':      ['gdv_ng5','gdv_ng_records'],
+  'modules': ['gdv_modules5'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
                'of5_part','of5_obspart','of5_obspago','of5_materias'],
 };
@@ -364,7 +385,7 @@ window.fbUpload = async function(force) {
         const v = localStorage.getItem(k);
         if(v) data[k] = v;
       });
-      await setDoc(doc(db, 'vng', docName), data, {merge:true});
+      await setDoc(doc(db, VNG_COL, docName), data, {merge:true});
     });
     await Promise.all(promises);
     window.showToast && window.showToast('☁️ Datos guardados en la nube', '#16A34A');
@@ -381,15 +402,30 @@ function mergeMembers(localStr, cloudStr){
   try{
     const local=JSON.parse(localStr||'[]');
     const cloud=JSON.parse(cloudStr||'[]');
-    const cloudIds=new Set(cloud.map(m=>m.id));
-    const localOnly=local.filter(m=>!cloudIds.has(m.id));
-    return JSON.stringify([...cloud,...localOnly]);
+    // Index local members by id for quick lookup
+    const localMap={};
+    local.forEach(function(m){ localMap[m.id]=m; });
+    const cloudMap={};
+    cloud.forEach(function(m){ cloudMap[m.id]=m; });
+    const allIds=new Set([...local.map(function(m){return m.id;}), ...cloud.map(function(m){return m.id;})]);
+    const merged=[];
+    allIds.forEach(function(id){
+      const l=localMap[id];
+      const c=cloudMap[id];
+      if(!l){ merged.push(c); return; } // solo en cloud → usar cloud
+      if(!c){ merged.push(l); return; } // solo en local → usar local
+      // Ambos existen → ganar el que tiene _ts más reciente
+      const lTs=parseInt(l._ts||'0');
+      const cTs=parseInt(c._ts||'0');
+      merged.push(lTs>cTs ? l : c);
+    });
+    return JSON.stringify(merged);
   }catch(e){ return cloudStr; }
 }
 window.fbDownload = async function() {
   try {
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
-      const snap = await getDoc(doc(db, 'vng', docName));
+      const snap = await getDoc(doc(db, VNG_COL, docName));
       if(snap.exists()) {
         const data = snap.data();
         keys.forEach(k => {
@@ -444,13 +480,13 @@ window.syncNow = async function() {
 // Dedicated permisos read/write using vng/config (existing working path)
 window.fbSavePermisos = async function(permisosStr) {
   try {
-    await setDoc(doc(db,'vng','config'), {gdv_permisos: permisosStr, gdv_permisos_ts: Date.now()}, {merge:true});
+    await setDoc(doc(db,VNG_COL,'config'), {gdv_permisos: permisosStr, gdv_permisos_ts: Date.now()}, {merge:true});
     return true;
   } catch(e) { console.error('fbSavePermisos error:', e); return false; }
 };
 window.fbLoadPermisos = async function() {
   try {
-    const snap = await getDoc(doc(db,'vng','config'));
+    const snap = await getDoc(doc(db,VNG_COL,'config'));
     if(snap.exists() && snap.data().gdv_permisos) return snap.data();
     return null;
   } catch(e) { return null; }
@@ -471,8 +507,14 @@ window.fbDownload().then(function(hasData) {
         S.records     = _ld('gdv_r5',            S.records     ||[]);
         S.members     = _ld('gdv_m5',            S.members     ||[]);
         S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
-        S.discPasos   = _ld('gdv_disc_pasos',    S.discPasos   ||[]);
-        S.discRecords = _ld('gdv_disc_records',  S.discRecords ||[]);
+        S.discPasos      = _ld('gdv_disc_pasos',    S.discPasos      ||[]);
+        S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);
+  S.ngComunidades  = _ld('gdv_ng5',           S.ngComunidades  ||[]);
+  S.ngRecords      = _ld('gdv_ng_records',    S.ngRecords      ||[]);
+  S.modulesConfig  = _ld('gdv_modules5',      S.modulesConfig  ||[]);
+        S.ngComunidades  = _ld('gdv_ng5',           S.ngComunidades  ||[]);
+        S.ngRecords      = _ld('gdv_ng_records',    S.ngRecords      ||[]);
+        S.modulesConfig  = _ld('gdv_modules5',      S.modulesConfig  ||[]);
       }
       // Load permisos from Firebase if this device has none configured
       // Reload permisos from localStorage (now updated from Firebase if it was empty)
@@ -494,9 +536,15 @@ function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 const MODULES_PERM=[
   {key:'gdv', label:'Grupos de Vida', icon:'🏘️', screens:[
     {key:'gdv_dashboard',    label:'Dashboard y estadísticas'},
-    {key:'gdv_cargar',       label:'Cargar asistencia'},
+    {key:'gdv_cargar',       label:'Cargar Asistencia'},
     {key:'gdv_registros',    label:'Ver registros'},
     {key:'gdv_scope_grupo',  label:'🏘 Limitar a su grupo asignado'},
+  ]},
+  {key:'ng', label:'Nuevas Generaciones', icon:'🌱', screens:[
+    {key:'ng_dashboard',   label:'Dashboard y estadísticas'},
+    {key:'ng_cargar',      label:'Cargar Asistencia'},
+    {key:'ng_registros',   label:'Ver registros'},
+    {key:'ng_scope_grupo', label:'🌱 Limitar a su comunidad'},
   ]},
   {key:'miembros', label:'Rebaños', icon:'👥', screens:[
     {key:'miembros_ver',   label:'Ver base de miembros'},
@@ -510,7 +558,7 @@ const MODULES_PERM=[
   ]},
   {key:'disc', label:'Discipulado', icon:'📖', screens:[
     {key:'disc_dashboard', label:'Dashboard y progreso'},
-    {key:'disc_cargar',    label:'Cargar asistencia'},
+    {key:'disc_cargar',    label:'Cargar Asistencia'},
     {key:'disc_registros', label:'Ver registros'},
     {key:'disc_pasos',     label:'Configurar Pasos (Admin)'},
   ]},
@@ -524,16 +572,16 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ejecuta'},
-  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',gdv_scope_grupo:'ninguno'},
-  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
-  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno'},
+  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno'},
+  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta'},
+  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta'},
+  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno'},
+  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
+  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
+  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
+  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
+  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
+  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'}
 };
 
 let PERMISOS={};
@@ -549,7 +597,7 @@ async function cleanMembers(){
     if(m.barrio){ delete m.barrio; changed=true; }
   });
   // Migration: fix truly blank/undefined condicion (but NEVER change valid conditions)
-  const VALID_CONDICIONES=['Miembro','Asistente Bautizado','Asistente NO Bautizado','Asistente','Nuevo','Historico'];
+  const VALID_CONDICIONES=['Miembro','Asistente Bautizado','Asistente NO Bautizado','Nuevo','Historico'];
   S.members.forEach(m=>{
     if(!m.condicion || !VALID_CONDICIONES.includes(m.condicion)){
       m.condicion='Miembro'; // only fix blank/invalid, never override valid ones
@@ -711,7 +759,9 @@ function recordInWeek(fechaStr, offsetWeeks=0){
 // STORAGE
 // ════════════════════════════════════════════════════════════
 const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles:'gdv_roles5',
-  discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records'};
+  discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records',
+  ngComunidades:'gdv_ng5',ngRecords:'gdv_ng_records',
+  modulesConfig:'gdv_modules5'};
 
 const DEFAULT_DISC_PASOS=[
   {id:1,nombre:'Discipulado N1',nivel:'Inicial',roleId:'disc_n1',estado:'Activo',discipuladorId:null,miembros:[],completados:{},
@@ -944,7 +994,7 @@ const DEFAULT_USERS=[
 // ════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════
-let S={users:[],groups:[],records:[],members:[],roles:[]};
+let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],ngComunidades:[],ngRecords:[],modulesConfig:[]};
 let currentUser=null;
 let gdvCharts={};
 
@@ -1003,6 +1053,952 @@ function roleChips(roles){
 // ════════════════════════════════════════════════════════════
 // ROLE PERMISSIONS
 // ════════════════════════════════════════════════════════════
+function canAccessNG(){
+  return isSuperAdmin()||canScreen('ng_dashboard')||canScreen('ng_cargar')||canScreen('ng_registros');
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// NUEVAS GENERACIONES MODULE
+// ══════════════════════════════════════════════════════════════════
+var ngCurrentComunidadId=null;
+var ngFilDesde=(function(){var d=new Date();d.setDate(d.getDate()-14);return d.toISOString().slice(0,10);})();
+var ngFilHasta='',ngFilComunidad=null,ngFilSexo='';
+
+function openNG(){
+  document.getElementById('screen-home').classList.add('hidden');
+  document.getElementById('screen-app').classList.add('show');
+  document.getElementById('app-topbar-title').textContent='🌿 Nuevas Generaciones';
+  document.getElementById('app-topbar-user').textContent=currentUser.name;
+  document.getElementById('app-content').innerHTML=buildNGHTML();
+  initNG();
+}
+
+function buildNGHTML(){
+  var isLider=ngIsLiderOColab();
+  var showDash=isSuperAdmin()||canScreen('ng_dashboard');
+  var showCarg=isSuperAdmin()||canScreen('ng_cargar')||isLider;
+  var showReg=isSuperAdmin()||canScreen('ng_registros');
+  var defaultTab=showCarg?'cargar':(showDash?'dashboard':'registros');
+  var navBtns='';
+  if(showDash) navBtns+="<button class=\"nav-btn"+(defaultTab==='dashboard'?" active":"")+"\" onclick=\"ngTab('dashboard',this)\">📊 Dashboard</button>";
+  if(showCarg) navBtns+="<button class=\"nav-btn"+(defaultTab==='cargar'?" active":"")+"\" onclick=\"ngTab('cargar',this)\">📝 Cargar Asistencia</button>";
+  if(showReg)  navBtns+="<button class=\"nav-btn"+(defaultTab==='registros'?" active":"")+"\" onclick=\"ngTab('registros',this)\">📋 Registros</button>";
+  return '<div class="gdv-app">'+
+    '<div class="nav" style="margin-bottom:1rem">'+navBtns+'</div>'+
+    '<div id="ng-alert" class="alert alert-ok hidden"></div>'+
+    '<div id="ng-tab-content"></div>'+
+  '</div>';
+}
+
+function initNG(){
+  var defaultTab=ngIsLiderOColab()?'cargar':(isSuperAdmin()||canScreen('ng_dashboard')?'dashboard':'registros');
+  ngTab(defaultTab,null);
+}
+
+function ngTab(tab,btn){
+  document.querySelectorAll('.nav-btn[onclick*="ngTab"]').forEach(function(b){b.classList.remove('active');});
+  if(btn) btn.classList.add('active');
+  else {
+    document.querySelectorAll('.nav-btn[onclick*="ngTab"]').forEach(function(b){
+      if(b.textContent.toLowerCase().includes(tab.slice(0,4))) b.classList.add('active');
+    });
+  }
+  var c=document.getElementById('ng-tab-content');
+  if(!c) return;
+  if(tab==='dashboard') ngRenderDashboard(c);
+  else if(tab==='cargar') ngRenderCargar(c);
+  else if(tab==='registros') ngRenderRegistros(c);
+}
+
+function ngIsLiderOColab(){
+  if(!currentUser) return false;
+  var linked=S.members.find(function(m){return fullName(m).toLowerCase()===currentUser.name.toLowerCase();});
+  if(!linked) return false;
+  return (S.ngComunidades||[]).some(function(ng){
+    return (ng.liderIds||[]).includes(linked.id)||(ng.colaboradorIds||[]).includes(linked.id);
+  });
+}
+
+function ngGetMisComunidades(){
+  if(isSuperAdmin()) return S.ngComunidades||[];
+  var linked=S.members.find(function(m){return fullName(m).toLowerCase()===currentUser.name.toLowerCase();});
+  if(!linked) return [];
+  return (S.ngComunidades||[]).filter(function(ng){
+    return (ng.liderIds||[]).some(function(id){return Number(id)===Number(linked.id);})||
+           (ng.colaboradorIds||[]).some(function(id){return Number(id)===Number(linked.id);});
+  });
+}
+
+function ngGetMembersOfComunidad(cid){
+  return (S.members||[]).filter(function(m){
+    return m.estado!=='Baja'&&(Number(m.grupoId)===Number(cid)||(m.grupoIds||[]).map(Number).includes(Number(cid)));
+  });
+}
+
+function ngGetFilteredRecords(){
+  var recs=S.ngRecords||[];
+  if(ngFilDesde) recs=recs.filter(function(r){return r.fecha>=ngFilDesde;});
+  if(ngFilHasta) recs=recs.filter(function(r){return r.fecha<=ngFilHasta;});
+  if(ngFilComunidad) recs=recs.filter(function(r){return Number(r.comunidadId)===Number(ngFilComunidad);});
+  // 'lideres' is handled separately in stats — don't filter records by it here
+  if(ngFilSexo&&ngFilSexo!=='lideres') recs=recs.filter(function(r){
+    return Object.entries(r.asistencia||{}).some(function(e){
+      var m=S.members.find(function(x){return Number(x.id)===Number(e[0]);});
+      return m&&m.genero===ngFilSexo&&e[1].state==='presente';
+    });
+  });
+  return recs;
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────────────
+function ngRenderDashboard(c){
+  if(!c) c=document.getElementById('ng-tab-content');
+  var coms=S.ngComunidades||[];
+  var comOpts=coms.map(function(ng){return '<option value="'+ng.id+'">'+ng.name+'</option>';}).join('');
+  c.innerHTML=
+    '<div class="card" style="margin-bottom:1rem">'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'+
+        '<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Comunidad</label>'+
+          '<select id="ng-df-com" onchange="ngApplyFilters()" style="min-width:140px">'+
+            '<option value="">Todas</option>'+comOpts+
+          '</select></div>'+
+        '<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Sexo</label>'+
+          '<select id="ng-df-sex" onchange="ngApplyFilters()" style="min-width:110px">'+
+            '<option value="">Todos</option><option value="H">Hombres</option><option value="M">Mujeres</option>'+
+            '<option value="lideres">Líderes y Colabs</option>'+
+          '</select></div>'+
+        '<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde</label>'+
+          '<input type="date" id="ng-df-desde" value="'+ngFilDesde+'" onchange="ngApplyFilters()"></div>'+
+        '<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Hasta</label>'+
+          '<input type="date" id="ng-df-hasta" value="'+(ngFilHasta||'')+'" onchange="ngApplyFilters()"></div>'+
+        '<button class="btn btn-sm" onclick="ngResetFilters()">🔄</button>'+
+      '</div>'+
+    '</div>'+
+    // Stat cards
+    '<div id="ng-stat-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:1rem"></div>'+
+    // Tab buttons
+    '<div class="nav" style="margin-bottom:1rem">'+
+      "<button class=\"nav-btn active\" onclick=\"ngDashTab('semanas',this)\">📋 Semanas</button>"+
+      "<button class=\"nav-btn\" onclick=\"ngDashTab('evolucion',this)\">📈 Evolución</button>"+
+      "<button class=\"nav-btn\" onclick=\"ngDashTab('ranking',this)\">🏆 Ranking</button>"+
+      "<button class=\"nav-btn\" onclick=\"ngDashTab('asistencia',this)\">📊 % Asistencia</button>"+
+      "<button class=\"nav-btn\" onclick=\"ngDashTab('miembros',this)\">👤 Asistencia Personal</button>"+
+      "<button class=\"nav-btn\" onclick=\"ngDashTab('nuevos',this)\">🌱 Nuevos</button>"+
+    '</div>'+
+    '<div id="ng-panel-semanas"></div>'+
+    '<div id="ng-panel-evolucion" style="display:none"></div>'+
+    '<div id="ng-panel-ranking" style="display:none"></div>'+
+    '<div id="ng-panel-asistencia" style="display:none"></div>'+
+    '<div id="ng-panel-miembros" style="display:none"></div>'+
+    '<div id="ng-panel-nuevos" style="display:none"></div>';
+  ngRenderDashStats();
+  ngDashTab('semanas',null);
+}
+
+var ngMrSortAsc=true; // true = peor primero
+function ngToggleMiembrosSort(){
+  ngMrSortAsc=!ngMrSortAsc;
+  var btn=document.getElementById('ng-sort-btn');
+  if(btn) btn.textContent=ngMrSortAsc?'peor↑↓':'mejor↑↓';
+  ngRenderMiembrosPanel();
+}
+function ngDashTab(tab,btn){
+  document.querySelectorAll('[onclick*="ngDashTab"]').forEach(function(b){b.classList.remove('active');});
+  if(btn) btn.classList.add('active');
+  ['semanas','evolucion','ranking','asistencia','miembros','nuevos'].forEach(function(t){
+    var p=document.getElementById('ng-panel-'+t);
+    if(p) p.style.display=t===tab?'block':'none';
+  });
+  if(tab==='semanas') ngRenderSemanas();
+  else if(tab==='evolucion') ngRenderEvolucion();
+  else if(tab==='ranking') ngRenderRanking();
+  else if(tab==='asistencia') ngRenderPctAsist();
+  else if(tab==='miembros') ngRenderMiembrosPanel();
+  else if(tab==='nuevos') ngRenderNuevosPanel();
+}
+
+function ngGetStatData(){
+  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
+  var allLiderIds=new Set();
+  (S.ngComunidades||[]).forEach(function(ngx){
+    (ngx.liderIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
+    (ngx.colaboradorIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
+  });
+  var coms=new Set(recs.map(function(r){return r.comunidadId;}));
+  var varones=0,chicas=0,presTotal=0,varNuevos=0,chkNuevas=0;
+  recs.forEach(function(r){
+    Object.entries(r.asistencia||{}).forEach(function(e){
+      var a=e[1];
+      if(a.esLider||a.esColab) return;
+      if(a.state!=='presente') return;
+      presTotal++;
+      if(a.genero==='H') varones++;
+      else if(a.genero==='M') chicas++;
+    });
+    (r.visitsNew||[]).forEach(function(n){
+      // Simple heuristic: can't determine gender from name easily
+      varNuevos++;  // show total as varones nuevos for now
+    });
+  });
+  var totalPartic=new Set();
+  recs.forEach(function(r){Object.keys(r.asistencia||{}).forEach(function(id){if(!allLiderIds.has(Number(id))) totalPartic.add(id);});});
+  return {comunidades:coms.size,participantes:totalPartic.size,varones,chicas,presTotal,varNuevos,chkNuevas};
+}
+
+function ngRenderDashStats(){
+  var s=ngGetStatData();
+  var el=document.getElementById('ng-stat-cards');
+  if(!el) return;
+  var stats=[
+    {icon:'🌿',label:'Comunidades',val:s.comunidades},
+    {icon:'👥',label:'Participantes',val:s.participantes},
+    {icon:'👦',label:'Varones',val:s.varones},
+    {icon:'👧',label:'Chicas',val:s.chicas},
+    {icon:'✅',label:'Total Presentes',val:s.presTotal},
+    {icon:'🌱',label:'Nuevos',val:s.varNuevos},
+  ];
+  el.innerHTML=stats.map(function(s){
+    return '<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:14px 10px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px">'+
+      '<div style="font-size:1.3rem">'+s.icon+'</div>'+
+      '<div style="font-size:1.6rem;font-weight:700;color:#1F4E79;line-height:1.1">'+s.val+'</div>'+
+      '<div style="font-size:11px;color:#6B7280;font-weight:500">'+s.label+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+function ngRenderSemanas(){
+  var p=document.getElementById('ng-panel-semanas');
+  if(!p) return;
+  var recs=ngGetFilteredRecords().sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
+  var coms=(ngFilComunidad?S.ngComunidades.filter(function(c){return Number(c.id)===Number(ngFilComunidad);}):S.ngComunidades)||[];
+  if(!coms.length||!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  // Get unique weeks
+  var weeks=[];
+  var weekSet={};
+  recs.forEach(function(r){var w=getWeekKey(r.fecha);if(!weekSet[w]){weekSet[w]=true;weeks.push(w);}});
+  weeks.sort(function(a,b){return b.localeCompare(a);});
+  var html='<div class="card"><div class="card-title">📋 Estado por semana</div>';
+  weeks.forEach(function(wk){
+    html+='<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:8px;border-bottom:1px solid #F3F4F6;padding-bottom:4px">Semana del '+wk+'</div>';
+    coms.forEach(function(com){
+      var comRecs=recs.filter(function(r){return Number(r.comunidadId)===Number(com.id)&&getWeekKey(r.fecha)===wk;});
+      if(!comRecs.length){
+        html+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0">'+
+          '<span style="font-size:13px;font-weight:600;flex:1">'+com.name+'</span>'+
+          '<span style="font-size:12px;color:#9CA3AF;background:#F3F4F6;padding:3px 10px;border-radius:6px">Sin registro</span>'+
+        '</div>';
+        return;
+      }
+      comRecs.forEach(function(r){
+        if(r.sinEncuentro){
+          html+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0">'+
+            '<span style="font-size:13px;font-weight:600;flex:1">'+com.name+(r.encuentroNum===2?' (2°)':'')+'</span>'+
+            '<span style="font-size:12px;color:#92400E;background:#FEF3C7;padding:3px 10px;border-radius:6px">Sin encuentro</span>'+
+          '</div>';
+          return;
+        }
+        var att=Object.values(r.asistencia||{});
+        var main=att.filter(function(a){return !a.esLider&&!a.esColab;});
+        var pres=main.filter(function(a){return a.state==='presente';}).length;
+        var tot=main.length;
+        var pct=tot?Math.round(pres/tot*100):0;
+        var col=pct>=75?'#16A34A':pct>=50?'#D97706':'#DC2626';
+        var bg=pct>=75?'#DCFCE7':pct>=50?'#FEF3C7':'#FEE2E2';
+        html+='<div style="padding:6px 0">'+
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">'+
+            '<span style="font-size:13px;font-weight:600;flex:1">'+com.name+(r.encuentroNum===2?' (2°)':'')+'</span>'+
+            '<span style="font-size:12px;font-weight:700;color:'+col+';background:'+bg+';padding:3px 10px;border-radius:6px">'+pres+'/'+tot+' — '+pct+'%</span>'+
+          '</div>'+
+          '<div style="height:6px;background:#F3F4F6;border-radius:4px"><div style="height:6px;background:'+col+';border-radius:4px;width:'+pct+'%"></div></div>'+
+        '</div>';
+      });
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  p.innerHTML=html;
+}
+
+function ngRenderEvolucion(){
+  var p=document.getElementById('ng-panel-evolucion');
+  if(!p) return;
+  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;}).sort(function(a,b){return a.fecha.localeCompare(b.fecha);});
+  if(!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  // Group by date, count presentes
+  var byDate={};
+  recs.forEach(function(r){
+    if(!byDate[r.fecha]) byDate[r.fecha]={pres:0,aus:0,new:0};
+    Object.values(r.asistencia||{}).forEach(function(a){
+      if(a.esLider||a.esColab) return;
+      if(a.state==='presente') byDate[r.fecha].pres++;
+      else byDate[r.fecha].aus++;
+    });
+    byDate[r.fecha].new+=(r.visitsNew||[]).length;
+  });
+  var dates=Object.keys(byDate).sort();
+  if(!dates.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  var maxPres=Math.max.apply(null,dates.map(function(d){return byDate[d].pres;}));
+  var html='<div class="card"><div class="card-title">📈 Evolución — Presentes por encuentro</div>'+
+    '<div style="overflow-x:auto"><div style="display:flex;align-items:flex-end;gap:6px;min-height:180px;padding:8px 0">';
+  dates.forEach(function(d){
+    var v=byDate[d];
+    var h=maxPres>0?Math.round((v.pres/maxPres)*140):0;
+    var pct=Math.round((v.pres/(v.pres+v.aus||1))*100);
+    var col=pct>=75?'#16A34A':pct>=50?'#1F4E79':'#DC2626';
+    html+='<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:44px">'+
+      '<span style="font-size:11px;font-weight:700;color:'+col+'">'+pct+'%</span>'+
+      '<div style="width:36px;background:'+col+';border-radius:4px 4px 0 0;height:'+h+'px;min-height:4px"></div>'+
+      '<span style="font-size:10px;color:#9CA3AF;writing-mode:vertical-rl;transform:rotate(180deg);max-height:60px">'+d.slice(5)+'</span>'+
+    '</div>';
+  });
+  html+='</div></div>';
+  // Summary table
+  html+='<table style="margin-top:8px"><thead><tr><th>Fecha</th><th>Presentes</th><th>Ausentes</th><th>% Asist.</th><th>Nuevos</th></tr></thead><tbody>';
+  dates.slice().reverse().forEach(function(d){
+    var v=byDate[d];
+    var pct=Math.round((v.pres/(v.pres+v.aus||1))*100);
+    var col=pct>=75?'#16A34A':pct>=50?'#D97706':'#DC2626';
+    html+='<tr><td>'+d+'</td><td style="text-align:center;color:#16A34A">'+v.pres+'</td>'+
+      '<td style="text-align:center;color:#DC2626">'+v.aus+'</td>'+
+      '<td style="text-align:center;font-weight:700;color:'+col+'">'+pct+'%</td>'+
+      '<td style="text-align:center;color:#7C3AED">'+v.new+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  p.innerHTML=html;
+}
+
+function ngRenderRanking(){
+  var p=document.getElementById('ng-panel-ranking');
+  if(!p) return;
+  var coms=S.ngComunidades||[];
+  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
+  if(!coms.length||!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  var comData=coms.map(function(com){
+    var comRecs=recs.filter(function(r){return Number(r.comunidadId)===Number(com.id);});
+    var pres=0,tot=0;
+    comRecs.forEach(function(r){
+      Object.values(r.asistencia||{}).forEach(function(a){
+        if(a.esLider||a.esColab) return;
+        tot++;if(a.state==='presente') pres++;
+      });
+    });
+    var pct=tot?Math.round(pres/tot*100):0;
+    var avg=comRecs.length?Math.round(pres/comRecs.length):0;
+    return {name:com.name,tipo:com.tipo,enc:comRecs.length,pres,tot,pct,avg};
+  }).filter(function(c){return c.enc>0;}).sort(function(a,b){return b.pct-a.pct;});
+  var html='<div class="card"><div class="card-title">🏆 Ranking — Promedio de presentes</div>';
+  comData.forEach(function(c,i){
+    var col=c.pct>=75?'#16A34A':c.pct>=50?'#1F4E79':'#DC2626';
+    html+='<div style="margin-bottom:14px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+        '<span style="font-size:13px;font-weight:700;color:#6B7280;min-width:20px">'+(i+1)+'.</span>'+
+        '<span style="font-size:13px;font-weight:600;flex:1">'+c.name+'</span>'+
+        '<span style="font-size:11px;color:#6B7280">'+c.pres+'/'+c.tot+'</span>'+
+        '<strong style="font-size:13px;color:'+col+';min-width:38px;text-align:right">'+c.pct+'%</strong>'+
+      '</div>'+
+      '<div style="height:8px;background:#F3F4F6;border-radius:4px">'+
+        '<div style="height:8px;background:'+col+';border-radius:4px;width:'+c.pct+'%"></div>'+
+      '</div>'+
+      '<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+c.tipo+' · prom. '+c.avg+'/enc · '+c.enc+' encuentro'+(c.enc>1?'s':'')+'</div>'+
+    '</div>';
+  });
+  html+='</div>';
+  p.innerHTML=html;
+}
+
+function ngRenderPctAsist(){
+  var p=document.getElementById('ng-panel-asistencia');
+  if(!p) return;
+  var coms=S.ngComunidades||[];
+  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
+  if(!coms.length||!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  var comData=coms.map(function(com){
+    var comRecs=recs.filter(function(r){return Number(r.comunidadId)===Number(com.id);});
+    var pres=0,aus=0;
+    comRecs.forEach(function(r){
+      Object.values(r.asistencia||{}).forEach(function(a){
+        if(a.esLider||a.esColab) return;
+        if(a.state==='presente') pres++;else aus++;
+      });
+    });
+    var tot=pres+aus;
+    var pct=tot?Math.round(pres/tot*100):0;
+    return {name:com.name,tipo:com.tipo,pres,aus,tot,pct,enc:comRecs.length};
+  }).filter(function(c){return c.enc>0;}).sort(function(a,b){return b.pct-a.pct;});
+  var html='<div class="card"><div class="card-title">📊 % Asistencia por Comunidad</div>';
+  comData.forEach(function(c){
+    var col=c.pct>=75?'#16A34A':c.pct>=50?'#1F4E79':'#DC2626';
+    html+='<div style="margin-bottom:12px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+        '<span style="font-size:13px;font-weight:600;flex:1">'+c.name+'</span>'+
+        '<span style="color:#6B7280;font-size:12px">'+c.pres+'/'+c.tot+
+          ' · <strong style="color:'+col+'">'+c.pct+'%</strong>'+
+          '<span style="font-size:11px;color:#9CA3AF"> · '+c.enc+' enc.</span>'+
+        '</span>'+
+      '</div>'+
+      '<div class="pbar-bg"><div class="pbar-fill" style="width:'+c.pct+'%;background:'+col+'"></div></div>'+
+    '</div>';
+  });
+  html+='</div>';
+  p.innerHTML=html;
+}
+
+function ngRenderMiembrosPanel(){
+  var p=document.getElementById('ng-panel-miembros');
+  if(!p) return;
+  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
+  var allLiderIds=new Set();
+  (S.ngComunidades||[]).forEach(function(ngx){
+    (ngx.liderIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
+    (ngx.colaboradorIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
+  });
+  // Build member stats DIRECTLY from records (not from grupoId lookup)
+  var memberData={}; // memberId -> {pres, enc, comId}
+  var encPerCom={};
+  recs.forEach(function(r){
+    var cid=Number(r.comunidadId);
+    encPerCom[cid]=(encPerCom[cid]||0)+1;
+    Object.entries(r.asistencia||{}).forEach(function(e){
+      var mid=Number(e[0]);
+      var a=e[1];
+      if(ngFilSexo==='lideres'&&!allLiderIds.has(mid)) return;
+      if(ngFilSexo!=='lideres'&&ngFilSexo!==''&&allLiderIds.has(mid)) return;
+      if(!memberData[mid]) memberData[mid]={pres:0,enc:0,comId:cid,genero:a.genero||''};
+      memberData[mid].enc++;
+      if(a.state==='presente') memberData[mid].pres++;
+    });
+  });
+  var stats=[];
+  Object.entries(memberData).forEach(function(e){
+    var mid=Number(e[0]);
+    var d=e[1];
+    var m=S.members.find(function(x){return Number(x.id)===mid;});
+    if(!m||m.estado==='Baja') return;
+    if(ngFilSexo&&ngFilSexo!=='lideres'&&m.genero!==ngFilSexo) return;
+    if(ngFilComunidad&&d.comId!==Number(ngFilComunidad)) return;
+    var totalEnc=encPerCom[d.comId]||d.enc;
+    var ngx=S.ngComunidades.find(function(x){return Number(x.id)===d.comId;});
+    var pct=totalEnc?Math.round(d.pres/totalEnc*100):0;
+    stats.push({nombre:listName(m),genero:m.genero||d.genero,comunidad:ngx?ngx.name:'—',pres:d.pres,totalEnc,pct});
+  });
+  stats.sort(function(a,b){return ngMrSortAsc?(a.pct-b.pct||a.pres-b.pres):(b.pct-a.pct||b.pres-a.pres);});
+  if(!stats.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  var html='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+    '<div class="card-title" style="margin:0">👤 Asistencia Personal</div>'+
+    '<div style="display:flex;align-items:center;gap:8px">'+
+      '<span style="font-size:12px;color:#6B7280">'+stats.length+' personas</span>'+
+      '<button onclick="ngToggleMiembrosSort()" style="background:#F3F4F6;border:none;border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer" id="ng-sort-btn">peor↑↓</button>'+
+    '</div></div>';
+  stats.forEach(function(s){
+    var col=s.pct>=75?'#16A34A':s.pct>=50?'#1F4E79':'#DC2626';
+    var genBg=s.genero==='H'?'#DBEAFE':'#FCE7F3';
+    var genCol=s.genero==='H'?'#1E40AF':'#9D174D';
+    html+='<div style="margin-bottom:10px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'+
+        '<span style="font-size:10px;background:'+genBg+';color:'+genCol+';padding:1px 5px;border-radius:3px;font-weight:700">'+s.genero+'</span>'+
+        '<span style="font-size:13px;font-weight:600;flex:1">'+s.nombre+'</span>'+
+        '<span style="font-size:11px;color:#6B7280">'+s.pres+'/'+s.totalEnc+'</span>'+
+        '<strong style="font-size:12px;color:'+col+';min-width:35px;text-align:right">'+s.pct+'%</strong>'+
+      '</div>'+
+      '<div style="height:5px;background:#F3F4F6;border-radius:3px">'+
+        '<div style="height:5px;background:'+col+';border-radius:3px;width:'+s.pct+'%"></div>'+
+      '</div>'+
+    '</div>';
+  });
+  html+='</div>';
+  p.innerHTML=html;
+}
+
+function ngRenderNuevosPanel(){
+  var p=document.getElementById('ng-panel-nuevos');
+  if(!p) return;
+  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro&&(r.visitsNew||[]).length>0;})
+    .sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
+  if(!recs.length){p.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#9CA3AF">Sin personas nuevas en el período</div>';return;}
+  var html='<div class="card"><div class="card-title">🌱 Personas Nuevas</div>';
+  recs.forEach(function(r){
+    var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(r.comunidadId);});
+    html+='<div style="margin-bottom:12px">'+
+      '<div style="font-size:12px;font-weight:600;color:#6B7280;margin-bottom:4px">'+r.fecha+' · '+(ng?ng.name:'—')+'</div>';
+    (r.visitsNew||[]).forEach(function(n){
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#F0FDF4;border-radius:6px;margin-bottom:3px">'+
+        '<span style="font-size:14px">🌱</span>'+
+        '<span style="font-size:13px;font-weight:600;color:#166534">'+n+'</span>'+
+      '</div>';
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  p.innerHTML=html;
+}
+
+
+function ngApplyFilters(){
+  ngFilDesde=document.getElementById('ng-df-desde')?.value||'';
+  ngFilHasta=document.getElementById('ng-df-hasta')?.value||'';
+  ngFilComunidad=document.getElementById('ng-df-com')?.value?parseInt(document.getElementById('ng-df-com').value):null;
+  ngFilSexo=document.getElementById('ng-df-sex')?.value||'';
+  ngRenderDashboardStats();
+}
+
+function ngResetFilters(){
+  ngFilDesde=(function(){var d=new Date();d.setDate(d.getDate()-14);return d.toISOString().slice(0,10);})();
+  ngFilHasta=''; ngFilComunidad=null; ngFilSexo='';
+  var el;
+  if((el=document.getElementById('ng-df-desde'))) el.value=ngFilDesde;
+  if((el=document.getElementById('ng-df-hasta'))) el.value='';
+  if((el=document.getElementById('ng-df-com'))) el.value='';
+  if((el=document.getElementById('ng-df-sex'))) el.value='';
+  ngRenderDashboardStats();
+}
+
+function ngRenderDashboardStats(){
+  var d=document.getElementById('ng-dash-content');
+  if(!d) return;
+  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
+  var total=recs.length;
+  var totalAtt=0,totalPres=0,totalNew=0;
+  recs.forEach(function(r){
+    Object.values(r.asistencia||{}).forEach(function(a){
+      if(a.esLider||a.esColab) return; // exclude leaders from main stats
+      totalAtt++;
+      if(a.state==='presente') totalPres++;
+    });
+    totalNew+=(r.visitsNew||[]).length;
+  });
+  var pctPres=totalAtt?Math.round(totalPres/totalAtt*100):0;
+  var stats=[
+    {label:'Encuentros',val:total,icon:'📅'},
+    {label:'Promedio asistencia',val:total?Math.round(totalPres/total):0,icon:'👥'},
+    {label:'% Asistencia',val:pctPres+'%',icon:'📊'},
+    {label:'Personas nuevas',val:totalNew,icon:'🌱'},
+  ];
+  d.innerHTML=
+    '<div class="stat-grid" style="margin-bottom:1rem">'+
+      stats.map(function(s){
+        return '<div class="stat-card"><div style="font-size:1.5rem">'+s.icon+'</div>'+
+          '<div style="font-size:1.5rem;font-weight:700;color:#1F4E79">'+s.val+'</div>'+
+          '<div style="font-size:12px;color:#6B7280">'+s.label+'</div></div>';
+      }).join('')+
+    '</div>'+
+    ngRenderAsistenciaMiembros(recs);
+}
+
+function ngRenderAsistenciaMiembros(recs){
+  if(!recs.length) return '<div class="card" style="text-align:center;padding:1.5rem;color:#9CA3AF">Sin registros para el período seleccionado</div>';
+  var memberStats=[];
+  var encPerCom={};
+  recs.forEach(function(r){
+    var cid=Number(r.comunidadId);
+    encPerCom[cid]=(encPerCom[cid]||0)+1;
+  });
+  // Build leader IDs across all NG communities
+  var allLiderIds=new Set();
+  (S.ngComunidades||[]).forEach(function(ngx){
+    (ngx.liderIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
+    (ngx.colaboradorIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
+  });
+  // For leaders filter: look at ALL records' asistencia for leader ids
+  var leaderRecs=ngFilSexo==='lideres'?ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;}):[];
+  var leaderEncPerCom={};
+  leaderRecs.forEach(function(r){var cid=Number(r.comunidadId);leaderEncPerCom[cid]=(leaderEncPerCom[cid]||0)+1;});
+
+  // Build a map of leader → community for lookup
+  var liderComMap={};
+  (S.ngComunidades||[]).forEach(function(ngx){
+    (ngx.liderIds||[]).concat(ngx.colaboradorIds||[]).forEach(function(id){
+      liderComMap[Number(id)]=Number(ngx.id);
+    });
+  });
+  S.members.filter(function(m){
+    if(m.estado==='Baja') return false;
+    if(ngFilSexo==='lideres') return allLiderIds.has(Number(m.id));
+    return m.grupoId&&encPerCom[Number(m.grupoId)]>0&&!allLiderIds.has(Number(m.id));
+  }).forEach(function(m){
+    if(ngFilSexo&&ngFilSexo!=='lideres'&&m.genero!==ngFilSexo) return;
+    // For community filter: leaders use liderComMap, members use grupoId
+    var memberComId=ngFilSexo==='lideres'?(liderComMap[Number(m.id)]||Number(m.grupoId)):Number(m.grupoId);
+    if(ngFilComunidad&&memberComId!==Number(ngFilComunidad)) return;
+    // Find this member's community (for leaders: via liderIds/colaboradorIds; for members: via grupoId)
+    var myCid=Number(m.grupoId);
+    if(ngFilSexo==='lideres'){
+      var myCom2=(S.ngComunidades||[]).find(function(ngx){
+        return (ngx.liderIds||[]).map(Number).includes(Number(m.id))||
+               (ngx.colaboradorIds||[]).map(Number).includes(Number(m.id));
+      });
+      if(myCom2) myCid=Number(myCom2.id);
+    }
+    // Count encounters for this community
+    var useRecs2=ngFilSexo==='lideres'?leaderRecs:recs;
+    var comRecs2=useRecs2.filter(function(r){return Number(r.comunidadId)===myCid;});
+    var totalEnc=comRecs2.length;
+    if(!totalEnc) return;
+    // Count presencias for this member
+    var presencias=comRecs2.reduce(function(acc,r){
+      var att=r.asistencia||{};
+      var entry=att[m.id]||att[String(m.id)];
+      return acc+(entry&&entry.state==='presente'?1:0);
+    },0);
+    var ngx2=S.ngComunidades.find(function(x){return Number(x.id)===myCid;});
+    memberStats.push({nombre:m.nombre,apellido:m.apellido,comunidad:ngx2?ngx2.name:'—',presencias,totalEnc,pct:totalEnc?Math.round(presencias/totalEnc*100):0});
+  });
+  memberStats.sort(function(a,b){return b.pct-a.pct||b.presencias-a.presencias;});
+  if(!memberStats.length) return '<div class="card" style="text-align:center;padding:1.5rem;color:#9CA3AF">Sin datos de asistencia para los filtros seleccionados</div>';
+  return '<div class="card" style="padding:0;overflow:hidden">'+
+    '<table><thead><tr>'+
+      '<th>Nombre</th><th>Comunidad</th><th>Presencias</th><th>Encuentros</th><th>%</th>'+
+    '</tr></thead><tbody>'+
+    memberStats.map(function(s){
+      var color=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';
+      return '<tr>'+
+        '<td style="font-weight:600">'+s.apellido+', '+s.nombre+'</td>'+
+        '<td style="font-size:12px;color:#6B7280">'+s.comunidad+'</td>'+
+        '<td style="text-align:center">'+s.presencias+'</td>'+
+        '<td style="text-align:center">'+s.totalEnc+'</td>'+
+        '<td style="text-align:center;font-weight:700;color:'+color+'">'+s.pct+'%</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table></div>';
+}
+
+// ── CARGAR ASISTENCIA ──────────────────────────────────────────────
+var ngFacAtt={};
+var ngVisitsNew=[];
+
+function ngRenderCargar(c){
+  if(!c) c=document.getElementById('ng-tab-content');
+  var misComs=ngGetMisComunidades();
+  if(!misComs.length){
+    c.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#6B7280">No tenés comunidades asignadas.</div>';
+    return;
+  }
+  var hoy=today();
+  var comOpts=misComs.map(function(ng){return '<option value="'+ng.id+'">'+ng.name+'</option>';}).join('');
+  c.innerHTML=
+    '<div class="card">'+
+      '<div class="card-title" style="display:flex;justify-content:space-between;align-items:center">'+
+        '<span>📝 Nuevo encuentro</span>'+
+        '<button onclick="nvOpenInlineForm()" style="background:#1D4ED8;color:#fff;font-weight:700;font-size:13px;padding:6px 16px;border:none;border-radius:8px;cursor:pointer">+ Alta Nueva Persona</button>'+
+      '</div>'+
+      (misComs.length>1?'<div id="ng-admin-sel" style="margin-bottom:12px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Comunidad</label><select id="ng-com-sel" onchange="ngCargarComChanged()" style="margin-bottom:0"><option value="">— Elegir comunidad —</option>'+comOpts+'</select></div>':'<input type="hidden" id="ng-com-sel" value="">'+
+        '<div id="ng-com-info" style="font-size:13px;color:#1E40AF;padding:8px;background:#EFF6FF;border-radius:6px;margin-bottom:8px">'+misComs[0].name+' — '+misComs[0].tipo+'</div>')+
+      '<div id="ng-pending-alert" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px;font-size:13px;color:#92400E;margin-bottom:12px"></div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
+        '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha del encuentro</label>'+
+          '<input type="date" id="ng-fecha" value="'+hoy+'" max="'+hoy+'" onchange="ngCheckExistingRecord()"></div>'+
+        '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">N° Encuentro</label>'+
+          '<select id="ng-encuentro-num">'+
+            '<option value="1">Primer encuentro de la semana</option>'+
+            '<option value="2">Segundo encuentro de la semana</option>'+
+          '</select></div>'+
+      '</div>'+
+      '<div id="ng-sin-enc-row" style="margin-bottom:12px">'+
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#4B5563">'+
+          '<input type="checkbox" id="ng-sin-enc" onchange="ngToggleSinEnc(this.checked)"> Sin encuentro esta semana'+
+        '</label>'+
+      '</div>'+
+      '<div id="ng-form-asist">'+
+        '<div id="ng-asist-list"></div>'+
+        '<div id="ng-nuevos-section" style="margin-top:12px">'+
+          '<div style="font-size:13px;font-weight:600;color:#4B5563;margin-bottom:6px">Personas Nuevas</div>'+
+          '<div id="ng-nuevos-list"></div>'+
+          '<div style="display:flex;gap:8px;margin-top:6px">'+
+            '<input type="text" id="ng-nuevo-nombre" placeholder="Nombre y Apellido" style="flex:1">'+
+            '<button class="btn btn-sm" onclick="ngAddNuevo()">+ Agregar</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">'+
+        '<button class="btn btn-primary" onclick="ngSaveRecord()">✅ Confirmar asistencia</button>'+
+      '</div>'+
+    '</div>';
+  ngFacAtt={};
+  ngVisitsNew=[];
+  ngCargarComChanged();
+}
+
+function ngCargarComChanged(){
+  var sel=document.getElementById('ng-com-sel');
+  var cid=sel&&sel.value?parseInt(sel.value):null;
+  var list=document.getElementById('ng-asist-list');
+  var info=document.getElementById('ng-com-info');
+  if(!cid){
+    ngCurrentComunidadId=null;
+    if(list) list.innerHTML='<div style="color:#9CA3AF;font-size:13px;padding:12px">Seleccioná una comunidad para ver los integrantes.</div>';
+    if(info) info.textContent='';
+    return;
+  }
+  ngCurrentComunidadId=cid;
+  var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(cid);});
+  if(info&&ng) info.textContent=ng.name+' — Comunidad '+ng.tipo;
+  ngCheckExistingRecord();
+  ngBuildAsistList(cid);
+}
+
+function ngCheckExistingRecord(){
+  var fecha=document.getElementById('ng-fecha')?.value;
+  var cid=ngCurrentComunidadId;
+  if(!fecha||!cid) return;
+  var semana=getWeekKey(fecha);
+  var existing=S.ngRecords.filter(function(r){
+    return Number(r.comunidadId)===Number(cid)&&getWeekKey(r.fecha)===semana&&!r.sinEncuentro;
+  });
+  var alert2=document.getElementById('ng-pending-alert');
+  var numSel=document.getElementById('ng-encuentro-num');
+  if(existing.length>=1){
+    if(alert2){
+      alert2.style.display='block';
+      alert2.textContent='⚠️ Ya hay '+existing.length+' encuentro'+( existing.length>1?'s':'')+' registrado'+( existing.length>1?'s':'')+' esta semana ('+existing.map(function(r){return r.fecha;}).join(', ')+').'+( existing.length<2?' Podés cargar el segundo encuentro.':' Ya se cargaron 2 encuentros esta semana.');
+    }
+    if(numSel) numSel.value=String(Math.min(existing.length+1,2));
+    if(existing.length>=2&&numSel) numSel.disabled=true;
+  } else {
+    if(alert2) alert2.style.display='none';
+    if(numSel){numSel.value='1';numSel.disabled=false;}
+  }
+}
+
+function ngBuildAsistList(cid){
+  var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(cid);});
+  var members=ngGetMembersOfComunidad(cid).sort(function(a,b){return listName(a).localeCompare(listName(b));});
+  var liderIds=((ng&&ng.liderIds)||[]).map(Number);
+  var colabIds=((ng&&ng.colaboradorIds)||[]).map(Number);
+  var roleIds=new Set([].concat(liderIds,colabIds));
+  var roleMembros=Array.from(roleIds).map(function(id){
+    return S.members.find(function(m){return Number(m.id)===Number(id);});
+  }).filter(function(m){return m&&m.estado!=='Baja';});
+  var mainMembers=members.filter(function(m){return !roleIds.has(Number(m.id));});
+  ngFacAtt={};
+  mainMembers.forEach(function(m){ngFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente',esLider:false};});
+  roleMembros.forEach(function(m){
+    ngFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente',
+      esLider:liderIds.includes(Number(m.id)),esColab:colabIds.includes(Number(m.id))};
+  });
+  var list=document.getElementById('ng-asist-list');
+  if(!list) return;
+  window.ngToggleBtn=function(id,btn){
+    var n=ngFacAtt[id].state==='presente'?'ausente':'presente';
+    ngFacAtt[id].state=n;
+    btn.className='toggle-btn '+n;
+    btn.textContent=n==='presente'?'Presente':'Ausente';
+  };
+  function buildRow(m,rol){
+    var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+    var genCol=m.genero==='H'?'#1E40AF':'#9D174D';
+    var rolBadge=rol?'<span style="font-size:10px;background:#D1FAE5;color:#065F46;padding:1px 6px;border-radius:4px;margin-left:4px">'+rol+'</span>':'';
+    return '<div class="member-row">'+
+      '<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:'+genBg+';color:'+genCol+';font-weight:600;flex-shrink:0">'+m.genero+'</span>'+
+      '<span class="member-name">'+listName(m)+rolBadge+'</span>'+
+      '<button class="toggle-btn ausente" onclick="ngToggleBtn('+m.id+',this)">Ausente</button>'+
+    '</div>';
+  }
+  var html='';
+  if(mainMembers.length){
+    html+='<div style="font-size:12px;font-weight:600;color:#6B7280;margin:8px 0 4px">Integrantes ('+mainMembers.length+')</div>';
+    html+=mainMembers.map(function(m){return buildRow(m,'');}).join('');
+  }
+  if(roleMembros.length){
+    html+='<div style="font-size:12px;font-weight:600;color:#6B7280;margin:12px 0 4px">Líderes y Colaboradores</div>';
+    html+=roleMembros.map(function(m){
+      return buildRow(m,liderIds.includes(Number(m.id))?'Líder':'Colaborador');
+    }).join('');
+  }
+  if(!html) html='<div style="color:#F59E0B;font-size:13px;padding:8px">No hay personas asignadas.</div>';
+  list.innerHTML=html;
+}
+
+
+function ngToggleAtt(mid,checked){
+  if(ngFacAtt[mid]) ngFacAtt[mid].state=checked?'presente':'ausente';
+}
+function ngAddNuevo(){
+  var inp=document.getElementById('ng-nuevo-nombre');
+  var nombre=(inp?.value||'').trim();
+  if(!nombre) return;
+  ngVisitsNew.push(nombre);
+  inp.value='';
+  ngRenderNuevosList();
+}
+
+function ngRenderNuevosList(){
+  var list=document.getElementById('ng-nuevos-list');
+  if(!list) return;
+  list.innerHTML=ngVisitsNew.map(function(n,i){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">'+
+      '<span>🌱 '+n+'</span>'+
+      '<button onclick="ngRemoveNuevo('+i+')" style="background:none;border:none;color:#DC2626;cursor:pointer;font-size:14px">×</button>'+
+    '</div>';
+  }).join('');
+}
+
+function ngRemoveNuevo(i){
+  ngVisitsNew.splice(i,1);
+  ngRenderNuevosList();
+}
+
+function getWeekKey(fecha){
+  var d=new Date(fecha+'T00:00:00');
+  var day=d.getDay();
+  var monday=new Date(d);
+  monday.setDate(d.getDate()-(day===0?6:day-1));
+  return monday.toISOString().slice(0,10);
+}
+
+async function ngSaveRecord(){
+  var fecha=document.getElementById('ng-fecha')?.value;
+  var cid=ngCurrentComunidadId;
+  var sinEnc=document.getElementById('ng-sin-enc')?.checked;
+  var encNum=parseInt(document.getElementById('ng-encuentro-num')?.value)||1;
+  if(!fecha||!cid){alert('Seleccioná la comunidad y la fecha');return;}
+  // Check for duplicate
+  var semana=getWeekKey(fecha);
+  var existing=S.ngRecords.filter(function(r){return Number(r.comunidadId)===Number(cid)&&getWeekKey(r.fecha)===semana&&!r.sinEncuentro;});
+  if(existing.length>=2&&!sinEnc){
+    alert('Ya hay 2 encuentros registrados esta semana para esta comunidad.');
+    return;
+  }
+  if(existing.length>=1&&!sinEnc){
+    if(!confirm('Ya hay un encuentro registrado esta semana. ¿Confirmás agregar el segundo encuentro del '+fecha+'?')) return;
+  }
+  // State already updated via ngToggleBtn - no need to re-read from DOM
+  // Tag each entry with esLider flag for dashboard filtering
+  var rec={
+    id:Date.now(),
+    comunidadId:cid,
+    fecha:fecha,
+    encuentroNum:encNum,
+    asistencia:Object.assign({},ngFacAtt),
+    visitsNew:[...ngVisitsNew],
+    sinEncuentro:!!sinEnc,
+    ts:new Date().toISOString()
+  };
+  S.ngRecords.push(rec);
+  await saveK(SK.ngRecords,S.ngRecords);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.ngRecords.pop();
+    var al=document.getElementById('ng-alert');
+    if(al){al.textContent='❌ Error al guardar. Verificá tu conexión.';al.classList.remove('hidden');}
+    return;
+  }
+  var al=document.getElementById('ng-alert');
+  if(al){
+    al.textContent=sinEnc?'⏸ Encuentro registrado sin asistencia.':'✅ Asistencia guardada ☁️';
+    al.style.background=sinEnc?'#FEF3C7':'';
+    al.style.color=sinEnc?'#92400E':'';
+    al.classList.remove('hidden');
+    setTimeout(function(){al.classList.add('hidden');al.style='';},4000);
+  }
+  ngVisitsNew=[];
+  ngFacAtt={};
+  ngRenderCargar(document.getElementById('ng-tab-content'));
+}
+
+// ── REGISTROS ──────────────────────────────────────────────────────
+function ngRenderRegistros(c){
+  if(!c) c=document.getElementById('ng-tab-content');
+  var hoy=today();
+  var d2w=(function(){var d=new Date();d.setDate(d.getDate()-14);return d.toISOString().slice(0,10);})();
+  var coms=isSuperAdmin()?S.ngComunidades:ngGetMisComunidades();
+  var comOpts=coms.map(function(ng){return '<option value="'+ng.id+'">'+ng.name+'</option>';}).join('');
+  c.innerHTML=
+    '<div class="card" style="margin-bottom:1rem">'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'+
+        '<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Comunidad</label>'+
+          '<select id="ng-rf-com" onchange="ngRenderRegistrosList()" style="min-width:140px"><option value="">Todas</option>'+comOpts+'</select></div>'+
+        '<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde</label>'+
+          '<input type="date" id="ng-rf-desde" value="'+d2w+'" onchange="ngRenderRegistrosList()"></div>'+
+        '<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Hasta</label>'+
+          '<input type="date" id="ng-rf-hasta" value="'+hoy+'" onchange="ngRenderRegistrosList()"></div>'+
+        '<button class="btn btn-sm" onclick="ngResetRegFiltros()">🔄</button>'+
+      '</div>'+
+    '</div>'+
+    '<div id="ng-registros-list"></div>';
+  ngRenderRegistrosList();
+}
+
+function ngResetRegFiltros(){
+  var d2w=(function(){var d=new Date();d.setDate(d.getDate()-14);return d.toISOString().slice(0,10);})();
+  var el;
+  if((el=document.getElementById('ng-rf-desde'))) el.value=d2w;
+  if((el=document.getElementById('ng-rf-hasta'))) el.value=today();
+  if((el=document.getElementById('ng-rf-com'))) el.value='';
+  ngRenderRegistrosList();
+}
+
+function ngRenderRegistrosList(){
+  var list=document.getElementById('ng-registros-list');
+  if(!list) return;
+  var desde=document.getElementById('ng-rf-desde')?.value||'';
+  var hasta=document.getElementById('ng-rf-hasta')?.value||'';
+  var comFil=document.getElementById('ng-rf-com')?.value?parseInt(document.getElementById('ng-rf-com').value):null;
+  var recs=(S.ngRecords||[]).filter(function(r){
+    if(desde&&r.fecha<desde) return false;
+    if(hasta&&r.fecha>hasta) return false;
+    if(comFil&&Number(r.comunidadId)!==Number(comFil)) return false;
+    return true;
+  }).sort(function(a,b){return b.fecha.localeCompare(a.fecha)||b.ts.localeCompare(a.ts||'');});
+  if(!recs.length){
+    list.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#9CA3AF">Sin registros para el período seleccionado</div>';
+    return;
+  }
+  list.innerHTML=recs.map(function(r){
+    var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(r.comunidadId);});
+    var comName=ng?ng.name:'—';
+    var presentes=Object.values(r.asistencia||{}).filter(function(a){return a.state==='presente';}).length;
+    var total=Object.keys(r.asistencia||{}).length;
+    var nuevos=(r.visitsNew||[]).length;
+    var encuentroLabel=r.encuentroNum===2?'2° Encuentro':'1° Encuentro';
+    return '<div class="card" style="margin-bottom:8px;padding:12px 16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'+
+        '<div>'+
+          '<div style="font-weight:700;color:#1F4E79;font-size:14px">'+comName+' — '+r.fecha+(r.sinEncuentro?' <span style="color:#92400E">(Sin encuentro)</span>':' · '+encuentroLabel)+'</div>'+
+          (!r.sinEncuentro?'<div style="font-size:12px;color:#6B7280">✅ '+presentes+'/'+total+' presentes'+(nuevos?' · 🌱 '+nuevos+' nuevo'+(nuevos>1?'s':''):'')+'</div>':'')+
+        '</div>'+
+        (isSuperAdmin()?'<button class="btn btn-sm" style="color:#DC2626;border-color:#FECACA" onclick="ngDeleteRecord('+r.id+')">🗑️</button>':'')+
+      '</div>'+
+      (!r.sinEncuentro?ngRenderAsistRow(r):'')+
+    '</div>';
+  }).join('');
+}
+
+function ngRenderAsistRow(r){
+  var presentes=Object.entries(r.asistencia||{}).filter(function(e){return e[1].state==='presente';}).map(function(e){
+    var m=S.members.find(function(x){return Number(x.id)===Number(e[0]);});
+    return m?listName(m):e[1].name||'?';
+  });
+  var ausentes=Object.entries(r.asistencia||{}).filter(function(e){return e[1].state!=='presente';}).map(function(e){
+    var m=S.members.find(function(x){return Number(x.id)===Number(e[0]);});
+    return m?listName(m):e[1].name||'?';
+  });
+  return '<div style="margin-top:8px;font-size:12px">'+
+    (presentes.length?'<div style="color:#16A34A;margin-bottom:4px">✅ '+presentes.join(', ')+'</div>':'')+
+    (ausentes.length?'<div style="color:#DC2626">❌ '+ausentes.join(', ')+'</div>':'')+
+    ((r.visitsNew||[]).length?'<div style="color:#7C3AED;margin-top:4px">🌱 Nuevos: '+(r.visitsNew||[]).join(', ')+'</div>':'')+
+  '</div>';
+}
+
+async function ngDeleteRecord(id){
+  if(!isSuperAdmin()) return;
+  if(!confirm('¿Eliminar este registro? Esta acción no se puede deshacer.')) return;
+  var idx=S.ngRecords.findIndex(function(r){return Number(r.id)===Number(id);});
+  if(idx<0) return;
+  var removed=S.ngRecords.splice(idx,1)[0];
+  await saveK(SK.ngRecords,S.ngRecords);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    ngRenderRegistrosList();
+    showToast('🗑️ Registro eliminado','#DC2626');
+  }catch(e){
+    S.ngRecords.splice(idx,0,removed);
+    alert('No se pudo eliminar. Verificá tu conexión.');
+  }
+}
+
+
+
 function canAccessMiembros(){
   return isSuperAdmin() || canScreen('miembros_ver') || canScreen('miembros_editar');
 }
@@ -1141,45 +2137,55 @@ function showHome(){
   renderModulesGrid();
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+// MODULES CONFIG
+// ══════════════════════════════════════════════════════════════════
+const DEFAULT_MODULES = [
+  {key:'miembros',   icon:'🐑',  name:'Rebaños',               desc:'Base centralizada de todos los miembros de la iglesia con sus roles, grupos y datos de contacto.', tag:'Módulo activo', tagClass:'tag-blue',   action:'openMiembros'},
+  {key:'nuevos',     icon:'🌱',  name:'Nuevos Contactos',      desc:'Seguimiento de personas nuevas en la iglesia. Primer contacto, integración y acompañamiento.', tag:'Módulo activo', tagClass:'tag-green',  action:'openNuevos'},
+  {key:'gdv',        icon:'🏘',  name:'Grupos de Vida',        desc:'Control de asistencia semanal, facilitadores y dashboards de los grupos.',           tag:'Módulo activo', tagClass:'tag-blue',   action:'openGdV'},
+  {key:'ng',         icon:'🌿',  name:'Nuevas Generaciones',   desc:'Gestión de comunidades juveniles, adolescentes, niños y preadolescentes.',            tag:'Módulo activo', tagClass:'tag-green',  action:'openNG'},
+  {key:'disc',       icon:'📖',  name:'Discipulado',           desc:'Seguimiento de niveles de discipulado. Pasos N1, N2 y N3 con asistencia y capítulos.', tag:'Módulo activo', tagClass:'tag-green',  action:'openDiscipulado'},
+  {key:'of',         icon:'👨‍👩‍👧',  name:'Orientación Familiar', desc:'Gestión de alumnos, asistencia, pagos y participación del curso.',                 tag:'Módulo activo', tagClass:'tag-purple', action:'openOF'},
+  {key:'config',     icon:'⚙️',  name:'Configuración',         desc:'Gestión de grupos, usuarios del sistema y roles. Solo accesible para Super Admin.',   tag:'Solo Super Admin', tagClass:'tag-green', action:'openConfig'},
+];
+
+function getModulesConfig(){
+  // Merge saved config with defaults (defaults provide action/icon/tagClass)
+  var saved=S.modulesConfig&&S.modulesConfig.length?S.modulesConfig:[];
+  return DEFAULT_MODULES.map(function(def){
+    var override=saved.find(function(s){return s.key===def.key;});
+    return Object.assign({},def,override?{name:override.name,desc:override.desc}:{});
+  });
+}
+
+async function saveModulesConfig(modules){
+  // Only save name+desc overrides (not icon/action which are hardcoded)
+  var toSave=modules.map(function(m){return {key:m.key,name:m.name,desc:m.desc};});
+  S.modulesConfig=toSave;
+  await saveK(SK.modulesConfig, S.modulesConfig);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    alert('No se pudo guardar en la nube. Verificá tu conexión.');
+    return false;
+  }
+  return true;
+}
+
 function renderModulesGrid(){
   const mgEl=document.getElementById('modules-grid');
     if(!mgEl) return;
-  const modules=[];
-  if(canAccessGdV()) modules.push({
-    icon:'🏘',name:'Grupos de Vida',
-    desc:'Control de asistencia semanal, facilitadores y dashboards de los grupos.',
-    tag:'Módulo activo',tagClass:'tag-blue',
-    action:'openGdV'
-  });
-  if(canAccessOF()) modules.push({
-    icon:'👨‍👩‍👧',name:'Orientación Familiar',
-    desc:'Gestión de alumnos, asistencia, pagos y participación del curso.',
-    tag:'Módulo activo',tagClass:'tag-purple',
-    action:'openOF'
-  });
-  if(canAccessMiembros()) modules.push({
-    icon:'🐑',name:'Rebaños',
-    desc:'Base centralizada de todos los miembros de la iglesia con sus roles, grupos y datos de contacto.',
-    tag:'Módulo activo',tagClass:'tag-blue',
-    action:'openMiembros'
-  });
-  if(canAccessConfig()) modules.push({
-    icon:'⚙️',name:'Configuración',
-    desc:'Gestión de grupos, usuarios del sistema y roles. Solo accesible para Super Admin.',
-    tag:'Solo Super Admin',tagClass:'tag-green',
-    action:'openConfig'
-  });
-  if(canAccessNuevos()) modules.push({
-    icon:'🌱',name:'Nuevos Contactos',
-    desc:'Seguimiento de personas nuevas en la iglesia. Primer contacto, integración y acompañamiento.',
-    tag:'Módulo activo',tagClass:'tag-green',
-    action:'openNuevos'
-  });
-  if(canAccessDisc()) modules.push({
-    icon:'📖',name:'Discipulado',
-    desc:'Seguimiento de niveles de discipulado. Pasos N1, N2 y N3 con asistencia y capítulos.',
-    tag:'Módulo activo',tagClass:'tag-green',
-    action:'openDiscipulado'
+  var allMods=getModulesConfig();
+  var modules=[];
+  var accessMap={
+    miembros:canAccessMiembros(), nuevos:canAccessNuevos(),
+    gdv:canAccessGdV(), ng:canAccessNG(),
+    disc:canAccessDisc(), of:canAccessOF(), config:canAccessConfig()
+  };
+  allMods.forEach(function(mod){
+    if(accessMap[mod.key]) modules.push(mod);
   });
 
   document.getElementById('modules-grid').innerHTML=modules.map(m=>`
@@ -1260,6 +2266,7 @@ function buildMiembrosHTML(){
     <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
       <input type="text" id="sa-member-search" placeholder="Buscar por nombre..." onkeyup="renderMiembrosStandalone()" style="flex:2;min-width:150px">
       <select id="sa-mfil-gen" onchange="renderMiembrosStandalone()" style="flex:1;min-width:110px"><option value="">Todos</option><option value="H">Hombres</option><option value="M">Mujeres</option></select>
+      <select id="sa-mfil-tipo-grupo" onchange="renderMiembrosStandalone()" style="flex:1;min-width:140px"><option value="">Todos los grupos</option><option value="gdv">Solo GdV</option><option value="ng">Solo Comunidades</option></select>
       <select id="sa-mfil-grupo" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px"><option value="">Todos los grupos</option></select>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
@@ -1267,12 +2274,11 @@ function buildMiembrosHTML(){
         <option value="">Todas las condiciones</option>
         <option value="Miembro">Miembro</option>
         <option value="Asistente Bautizado">Asistente Bautizado</option>
-              <option value="Asistente NO Bautizado">Asistente NO Bautizado</option>
-        <option value="Nuevo">Nuevo</option>
+        <option value="Asistente NO Bautizado">Asistente NO Bautizado</option>
+        <option value="Historico">Histórico</option>
       </select>
       <select id="sa-mfil-rol" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px"><option value="">Todas las funciones</option></select>
       <select id="sa-mfil-estado" onchange="renderMiembrosStandalone()" style="flex:1;min-width:110px">
-        <option value="">Todos</option>
         <option value="Activo">Activos</option>
         <option value="Baja">Bajas</option>
         <option value="">Todos</option>
@@ -1409,7 +2415,7 @@ function buildMiembrosHTML(){
       </div>
       <div class="form-row" id="sa-mf-fechaingreso-row" style="display:none">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de ingreso <span style="color:#9CA3AF;font-weight:400">(solo Super Admin)</span></label>
-          <input type="date" id="sa-mf-fechaingreso"></div>
+          <input type="text" id="sa-mf-fechaingreso" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" oninput="fmtFechaIngreso(this)" style="width:120px"></div>
       </div>
       <div id="sa-mf-motivo-row" style="display:none;margin-top:10px">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Motivo del cambio de estado <span style="color:#9CA3AF;font-weight:400">(mín. 10 caracteres)</span></label>
@@ -1663,16 +2669,22 @@ function renderMiembrosStandalone(){
     });
   }
   const search=(document.getElementById('sa-member-search')?.value||'').toLowerCase();
-  const fGrupo=parseInt(document.getElementById('sa-mfil-grupo')?.value)||null;
+  const _fGrupoRaw=document.getElementById('sa-mfil-grupo')?.value||'';
+  const fGrupo=_fGrupoRaw==='nogroup'?'nogroup':(parseInt(_fGrupoRaw)||null);
   const fGen=document.getElementById('sa-mfil-gen')?.value||'';
+  const fTipoGrupo=document.getElementById('sa-mfil-tipo-grupo')?.value||'';
   const fRol=document.getElementById('sa-mfil-rol')?.value||'';
   const fCond=document.getElementById('sa-mfil-condicion')?.value||'';
   const fEstado=document.getElementById('sa-mfil-estado')?.value;
   // Estado filter — default shows all
 
   const gsel=document.getElementById('sa-mfil-grupo');
-  if(gsel&&gsel.options.length<=1){
+  if(gsel&&gsel.options.length<=1||(gsel&&gsel.options.length>1&&!Array.from(gsel.options).some(o=>o.value==='nogroup'))){
+    while(gsel.options.length>1) gsel.remove(1); // reset keeping first "Todos" option
     S.groups.forEach(g=>{const o=document.createElement('option');o.value=g.id;o.textContent=g.name;gsel.appendChild(o);});
+    (S.ngComunidades||[]).forEach(function(ng){
+      const o=document.createElement('option');o.value=ng.id;o.textContent='🌱 '+ng.name;gsel.appendChild(o);
+    });
     const nogrp=document.createElement('option');nogrp.value='nogroup';nogrp.textContent='Sin grupo asignado';gsel.appendChild(nogrp);
   }
   const rsel=document.getElementById('sa-mfil-rol');
@@ -1681,9 +2693,23 @@ function renderMiembrosStandalone(){
   // Only show Asistente and Miembro - Nuevos have their own module
   let members=S.members.filter(m=>m.condicion!=='Nuevo');
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
-  if(fGrupo==='nogroup') members=members.filter(m=>!m.grupoId);
+  if(fGrupo==='nogroup'){
+    const _allGrps=[...(S.groups||[]),...(S.ngComunidades||[])];
+    members=members.filter(function(m){
+      if(!m.grupoId) return true; // explicitly no group
+      // also include members whose group no longer exists
+      return !_allGrps.find(function(g){return Number(g.id)===Number(m.grupoId);});
+    });
+  }
   else if(fGrupo) members=members.filter(m=>Number(m.grupoId)===Number(fGrupo) || (m.grupoIds||[]).map(Number).includes(Number(fGrupo)));
   if(fGen)   members=members.filter(m=>m.genero===fGen);
+  if(fTipoGrupo==='gdv'){
+    var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
+    members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});
+  } else if(fTipoGrupo==='ng'){
+    var ngIds=new Set((S.ngComunidades||[]).map(function(ng){return Number(ng.id);}));
+    members=members.filter(function(m){return m.grupoId&&ngIds.has(Number(m.grupoId));});
+  }
   if(fRol)   members=members.filter(m=>(m.roles||[]).includes(fRol));
   if(fCond)  members=members.filter(m=>m.condicion===fCond);
   // Estado filter
@@ -1704,7 +2730,8 @@ function renderMiembrosStandalone(){
 
   tbody.innerHTML=members.map(m=>{
     const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
-    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
+    const allAvailableGroups=[...(S.groups||[]),...(S.ngComunidades||[]).map(function(ng){return {id:ng.id,name:'🌱 '+ng.name};})];
+    const memberGroups=allGids.map(gid=>allAvailableGroups.find(x=>Number(x.id)===gid)).filter(Boolean);
     const genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
     const genColor=m.genero==='H'?'#1E40AF':'#9D174D';
     const isBaja=m.estado==='Baja';
@@ -1785,6 +2812,12 @@ async function saDeleteFormacion(memberId, key){
   if(!confirm('¿Eliminar este paso de Formación?')) return;
   m.formacion=m.formacion.filter(f=>!(f.fuente==='manual'&&(f.pasoId+'_'+f.fechaCompletado)===key));
   await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('saDeleteFormacion Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   saShowDetail(memberId,null);
   saDetailTab('formacion',document.querySelectorAll('#sa-detail-panel .nav-btn')[2]);
   showToast('🗑 Eliminado','#DC2626');
@@ -1938,7 +2971,8 @@ function saFilterGrupoOpts(q){
   const opts=document.getElementById('sa-grupo-opts');
   if(!opts) return;
   const current=parseInt(document.getElementById('sa-mf-grupo')?.value)||null;
-  const rows=[{id:'',name:'Sin grupo (por asignar)'},...S.groups].filter(g=>!q||g.name.toLowerCase().includes(q));
+  const allGrps=[{id:'',name:'Sin grupo (por asignar)'},...(S.groups||[]),...(S.ngComunidades||[]).map(function(ng){return {id:ng.id,name:'🌱 '+ng.name};})];
+  const rows=allGrps.filter(g=>!q||g.name.toLowerCase().includes(q));
   opts.innerHTML=rows.map(g=>{
     const active=Number(g.id)===current||(g.id===''&&!current);
     return `<div onclick="saSelectGrupo('${g.id||''}','${g.name||''}')" style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F9FAFB;background:${active?'#EFF6FF':'#fff'};color:${active?'#1D4ED8':'#374151'};font-weight:${active?'600':'400'}">${g.name}</div>`;
@@ -2051,7 +3085,7 @@ function saEditMember(id){
   if(fiRow&&fiInput){
     if(isSuperAdmin()){
       fiRow.style.display='block';
-      fiInput.value=m.fechaIngreso||'';
+      fiInput.value=m.fechaIngreso?fmtAA(m.fechaIngreso):'';
     } else {
       fiRow.style.display='none';
     }
@@ -2088,7 +3122,8 @@ async function saSaveMember(){
     tel:document.getElementById('sa-mf-tel').value.trim(),
     dir:document.getElementById('sa-mf-dir').value.trim(),
     fnac:document.getElementById('sa-mf-fnac')?.value||'',
-    roles:[...saSelectedRoles]
+    roles:[...saSelectedRoles],
+    _ts:Date.now()
   };
   // Fecha de ingreso: solo Super Admin puede modificarla
   if(isSuperAdmin()){
@@ -2141,8 +3176,17 @@ async function saDeleteMember(id){
   if(!confirm('¿Eliminar definitivamente a '+fullName(m)+'? Esta acción no se puede deshacer.')) return;
   S.members=S.members.filter(x=>Number(x.id)!==Number(id));
   await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.members.push(m); // revert
+    await saveK(SK.members,S.members);
+    alert('No se pudo eliminar en la nube. Verificá tu conexión.');
+    return;
+  }
   saCloseDetail();
   renderMiembrosStandalone();
+  showToast('🗑️ Eliminado','#DC2626');
 }
 
 async function saDarDeBaja(id){
@@ -2195,6 +3239,8 @@ function buildConfigHTML(){
     </div>
     <div style="display:flex;gap:8px;margin-bottom:1.5rem;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" id="cfg-tab-grupos" onclick="configTab('grupos',this)">🏘 Grupos</button>
+      <button class="btn btn-sm" id="cfg-tab-ng" onclick="configTab('ng',this)">🌱 Nuevas Generaciones</button>
+      <button class="btn btn-sm" id="cfg-tab-modulos" onclick="configTab('modulos',this)">📱 Módulos</button>
       <button class="btn btn-sm" id="cfg-tab-usuarios" onclick="configTab('usuarios',this)">👤 Usuarios</button>
       <button class="btn btn-sm" id="cfg-tab-roles" onclick="configTab('roles',this)">🎭 Roles</button>
       <button class="btn btn-sm" id="cfg-tab-permisos" onclick="configTab('permisos',this)">🔐 Permisos</button>
@@ -2224,6 +3270,16 @@ function configTab(sub, btn){
       <div id="cfg-grupos-list"></div>
     `;
     cfgRenderGrupos();
+  } else if(sub==='ng'){
+    wrap.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <span style="font-size:14px;font-weight:600;color:#1F4E79">🌱 Nuevas Generaciones</span>
+        <button class="btn btn-primary btn-sm" onclick="ngOpenForm()">+ Comunidad</button>
+      </div>
+      <div id="ng-comunidades-list"></div>`;
+    ngRenderList();
+  } else if(sub==='modulos'){
+    cfgRenderModulos(wrap);
   } else if(sub==='usuarios'){
     wrap.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
@@ -2350,11 +3406,296 @@ async function cfgToggleQrActualizar(enabled){
   // JSON.stringify(true)/(false) produce 'true'/'false' (no quotes), matching the
   // plain string check used in buildPublicActualizarForm.
   await saveK('gdv_qr_actualizar', !!enabled);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('cfgToggleQrActualizar Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   const label=document.getElementById('cfg-qr-actualizar-label');
   if(label) label.textContent=enabled?'Habilitado':'Inhabilitado';
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+// CONFIG: MÓDULOS
+// ══════════════════════════════════════════════════════════════════
+let cfgEditingModuloKey=null;
+
+function cfgRenderModulos(wrap){
+  if(!wrap) wrap=document.getElementById('cfg-content');
+  if(!wrap) return;
+  var mods=getModulesConfig();
+  var rows=mods.map(function(mod){
+    return '<div class="card" style="margin-bottom:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">'+
+      '<div style="display:flex;align-items:center;gap:12px">'+
+        '<span style="font-size:24px">'+mod.icon+'</span>'+
+        '<div>'+
+          '<div style="font-weight:700;color:#1F4E79;font-size:14px">'+mod.name+'</div>'+
+          '<div style="font-size:12px;color:#6B7280;max-width:320px">'+mod.desc+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<button class="btn btn-sm" onclick="cfgEditModulo(&quot;'+mod.key+'&quot;)">✏️ Editar</button>'+
+    '</div>';
+  }).join('');
+  wrap.innerHTML=
+    '<div style="margin-bottom:1rem;padding:10px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:13px;color:#1E40AF">'+
+      'ℹ️ Podés editar el <strong>Nombre</strong> y la <strong>Descripción</strong> de cada módulo tal como aparece en el inicio. El ícono se actualiza en futuras versiones.'+
+    '</div>'+
+    rows+
+    '<div id="cfg-modulo-form-wrap"></div>';
+}
+
+function cfgEditModulo(key){
+  cfgEditingModuloKey=key;
+  var mods=getModulesConfig();
+  var mod=mods.find(function(m){return m.key===key;});
+  if(!mod) return;
+  var fwrap=document.getElementById('cfg-modulo-form-wrap');
+  if(!fwrap) return;
+  fwrap.innerHTML=
+    '<div class="card" style="margin-top:1rem;border:2px solid #BFDBFE">'+
+      '<div style="font-size:14px;font-weight:700;color:#1F4E79;margin-bottom:1rem">'+
+        mod.icon+' Editar: '+mod.name+
+      '</div>'+
+      '<div style="margin-bottom:12px">'+
+        '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre del módulo</label>'+
+        '<input id="cfg-mod-name" type="text" maxlength="40" value="'+mod.name+'" style="width:100%">'+
+      '</div>'+
+      '<div style="margin-bottom:16px">'+
+        '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Descripción (texto debajo del nombre en el inicio)</label>'+
+        '<textarea id="cfg-mod-desc" rows="3" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical">'+mod.desc+'</textarea>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end">'+
+        '<button class="btn" onclick="cfgCancelModulo()">Cancelar</button>'+
+        '<button class="btn btn-primary" onclick="cfgSaveModulo()">Confirmar</button>'+
+      '</div>'+
+    '</div>';
+  fwrap.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function cfgCancelModulo(){
+  var fwrap=document.getElementById('cfg-modulo-form-wrap');
+  if(fwrap) fwrap.innerHTML='';
+  cfgEditingModuloKey=null;
+}
+
+async function cfgSaveModulo(){
+  if(!cfgEditingModuloKey) return;
+  var nombre=(document.getElementById('cfg-mod-name')?.value||'').trim();
+  var desc=(document.getElementById('cfg-mod-desc')?.value||'').trim();
+  if(!nombre){alert('El nombre no puede estar vacío');return;}
+  var mods=getModulesConfig();
+  var mod=mods.find(function(m){return m.key===cfgEditingModuloKey;});
+  if(mod){mod.name=nombre;mod.desc=desc;}
+  var ok=await saveModulesConfig(mods);
+  if(!ok) return;
+  cfgCancelModulo();
+  cfgRenderModulos();
+  renderModulesGrid(); // update home if open
+  showToast('✅ Módulo actualizado','#16A34A');
+}
+
 // Config: Grupos
+
+// ══════════════════════════════════════════════════════════════════
+// NUEVAS GENERACIONES CONFIG
+// ══════════════════════════════════════════════════════════════════
+let ngEditingId = null;
+let ngSelectedLideres = [];
+let ngSelectedColaboradores = [];
+
+const NG_TIPOS = ['Jóvenes','Adolescentes','Niños','Preadolescentes'];
+const NG_DIAS  = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const NG_HORARIOS = [
+  '08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30',
+  '12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30',
+  '16:00','16:30','17:00','17:30','18:00','18:30','19:00','19:30',
+  '20:00','20:30','21:00','21:30','22:00'
+];
+
+function ngRenderList(){
+  const c=document.getElementById('ng-comunidades-list');
+  if(!c) return;
+  if(!S.ngComunidades.length){
+    c.innerHTML='<p style="color:#9CA3AF;font-size:13px;text-align:center;padding:24px">Sin comunidades cargadas</p>';
+    return;
+  }
+  c.innerHTML=S.ngComunidades.map(function(ng){
+    const lideres=(ng.liderIds||[]).map(function(id){
+      var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+      return m?fullName(m):'?';
+    }).filter(Boolean).join(', ')||'—';
+    const colabs=(ng.colaboradorIds||[]).map(function(id){
+      var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+      return m?fullName(m):'?';
+    }).filter(Boolean).join(', ');
+    var colabPart=colabs?(' · Colaborador: '+colabs):'';
+    var diaHor=(ng.dia||'—')+' '+(ng.horario||'');
+    return '<div class="card" style="margin-bottom:8px;padding:12px 16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<div>'+
+          '<div style="font-weight:700;color:#1F4E79">'+ng.name+'</div>'+
+          '<div style="font-size:12px;color:#6B7280">Comunidad '+ng.tipo+' · '+diaHor+' · Líder: '+lideres+colabPart+'</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:6px">'+
+          '<button class="btn btn-sm" onclick="ngEditComunidad('+ng.id+')">✏️</button>'+
+          '<button onclick="ngDeleteComunidad('+ng.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:13px">🗑️</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function ngOpenForm(id){
+  ngEditingId = id||null;
+  const ng = id ? S.ngComunidades.find(function(x){return Number(x.id)===Number(id);}) : null;
+  const lider1Id = ng&&ng.liderIds&&ng.liderIds[0] ? ng.liderIds[0] : '';
+  const lider2Id = ng&&ng.liderIds&&ng.liderIds[1] ? ng.liderIds[1] : '';
+  const colab1Id = ng&&ng.colaboradorIds&&ng.colaboradorIds[0] ? ng.colaboradorIds[0] : '';
+  const colab2Id = ng&&ng.colaboradorIds&&ng.colaboradorIds[1] ? ng.colaboradorIds[1] : '';
+
+  const tipoOpts=NG_TIPOS.map(function(t){return '<option value="'+t+'"'+(ng&&ng.tipo===t?' selected':'')+'>'+t+'</option>';}).join('');
+  const diaOpts=NG_DIAS.map(function(d){return '<option value="'+d+'"'+(ng&&ng.dia===d?' selected':'')+'>'+d+'</option>';}).join('');
+  const horOpts=NG_HORARIOS.map(function(h){return '<option value="'+h+'"'+(ng&&ng.horario===h?' selected':'')+'>'+h+'</option>';}).join('');
+  const noAsig='<option value="">Sin asignar</option>';
+  const noApl='<option value="">No aplica</option>';
+  const membOpts=S.members.filter(function(m){return m.estado!=='Baja'&&m.condicion!=='Historico';})
+    .sort(function(a,b){return listName(a).localeCompare(listName(b));})
+    .map(function(m){return '<option value="'+m.id+'">'+listName(m)+'</option>';}).join('');
+
+  document.getElementById('cfg-ng-overlay').innerHTML=
+    '<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">'+
+      '<div style="font-size:15px;font-weight:700;color:#1F4E79">'+(id?'Editar':'Nueva')+' Comunidad</div>'+
+      '<button class="btn btn-sm" onclick="ngCloseForm()">✕</button>'+
+    '</div>'+
+    // Fila 1: Nombre + Tipo
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
+      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre *</label>'+
+        '<input id="ng-f-nombre" type="text" maxlength="50" value="'+(ng?ng.name:'')+'" placeholder="Nombre de la comunidad" style="width:100%"></div>'+
+      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo *</label>'+
+        '<select id="ng-f-tipo" style="width:100%">'+tipoOpts+'</select></div>'+
+    '</div>'+
+    // Fila 2: Día + Horario
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
+      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Día de reunión</label>'+
+        '<select id="ng-f-dia" style="width:100%"><option value="">— Día —</option>'+diaOpts+'</select></div>'+
+      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Horario</label>'+
+        '<select id="ng-f-horario" style="width:100%"><option value="">— Horario —</option>'+horOpts+'</select></div>'+
+    '</div>'+
+    // Líder
+    '<div style="margin-bottom:12px">'+
+      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Líder</label>'+
+      '<select id="ng-f-lider1" onchange="ngCheckLider2()" style="width:100%">'+noAsig+membOpts+'</select>'+
+    '</div>'+
+    '<div id="ng-lider2-row" style="display:none;margin-bottom:12px">'+
+      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Líder adicional <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'+
+      '<select id="ng-f-lider2" style="width:100%">'+noApl+membOpts+'</select>'+
+    '</div>'+
+    // Colaborador
+    '<div style="margin-bottom:12px">'+
+      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Colaborador</label>'+
+      '<select id="ng-f-colab1" onchange="ngCheckColab2()" style="width:100%">'+noAsig+membOpts+'</select>'+
+    '</div>'+
+    '<div id="ng-colab2-row" style="display:none;margin-bottom:16px">'+
+      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Colaborador adicional <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'+
+      '<select id="ng-f-colab2" style="width:100%">'+noApl+membOpts+'</select>'+
+    '</div>'+
+    // Botones
+    '<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px">'+
+      '<button class="btn" onclick="ngCloseForm()">Cancelar</button>'+
+      '<button class="btn btn-primary" onclick="ngSaveComunidad()">Confirmar</button>'+
+    '</div>'+
+  '</div>';
+
+  document.getElementById('cfg-ng-overlay').style.display='flex';
+  // Set values after render
+  const l1=document.getElementById('ng-f-lider1'); if(l1) l1.value=lider1Id;
+  const l2=document.getElementById('ng-f-lider2'); if(l2) l2.value=lider2Id;
+  const c1=document.getElementById('ng-f-colab1'); if(c1) c1.value=colab1Id;
+  const c2=document.getElementById('ng-f-colab2'); if(c2) c2.value=colab2Id;
+  ngCheckLider2();
+  ngCheckColab2();
+}
+
+function ngCheckLider2(){
+  var l1=document.getElementById('ng-f-lider1');
+  var row=document.getElementById('ng-lider2-row');
+  if(row) row.style.display=(l1&&l1.value)?'':'none';
+}
+function ngCheckColab2(){
+  var c1=document.getElementById('ng-f-colab1');
+  var row=document.getElementById('ng-colab2-row');
+  if(row) row.style.display=(c1&&c1.value)?'':'none';
+}
+
+function ngCloseForm(){
+  document.getElementById('cfg-ng-overlay').style.display='none';
+}
+
+
+
+
+function ngEditComunidad(id){
+  ngOpenForm(id);
+}
+
+async function ngSaveComunidad(){
+  const nombre=(document.getElementById('ng-f-nombre')?.value||'').trim();
+  const tipo=document.getElementById('ng-f-tipo')?.value||'';
+  const dia=document.getElementById('ng-f-dia')?.value||'';
+  const horario=document.getElementById('ng-f-horario')?.value||'';
+  if(!nombre||!tipo){ alert('Completá Nombre y Tipo'); return; }
+  var l1=document.getElementById('ng-f-lider1')?.value||'';
+  var l2=document.getElementById('ng-f-lider2')?.value||'';
+  var c1=document.getElementById('ng-f-colab1')?.value||'';
+  var c2=document.getElementById('ng-f-colab2')?.value||'';
+  var liderIds=[l1,l2].filter(function(x){return x&&x!=='';}).map(Number);
+  var colaboradorIds=[c1,c2].filter(function(x){return x&&x!=='';}).map(Number);
+  if(ngEditingId){
+    var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(ngEditingId);});
+    if(ng){ Object.assign(ng,{name:nombre,tipo,dia,horario,liderIds,colaboradorIds}); }
+  } else {
+    S.ngComunidades.push({id:Date.now(),name:nombre,tipo,dia,horario,
+      liderIds,colaboradorIds,estado:'Activo'});
+  }
+  await saveK(SK.ngComunidades, S.ngComunidades);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    alert('No se pudo guardar en la nube. Verificá tu conexión.');
+    return;
+  }
+  ngCloseForm();
+  ngRenderList();
+  showToast('✅ Comunidad guardada','#16A34A');
+}
+
+async function ngDeleteComunidad(id){
+  var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(id);});
+  if(!ng) return;
+  // Check for members using this community as group
+  var withMembers=S.members.filter(function(m){
+    return Number(m.grupoId)===Number(id)||(m.grupoIds||[]).map(Number).includes(Number(id));
+  });
+  if(withMembers.length>0){
+    alert('La comunidad "'+ng.name+'" tiene '+withMembers.length+' miembro'+(withMembers.length>1?'s':'')+' asignado'+(withMembers.length>1?'s':'')+'. Quitálos antes de eliminarla.');
+    return;
+  }
+  if(!confirm('¿Eliminar la comunidad "'+ng.name+'"? Esta acción no se puede deshacer.')) return;
+  S.ngComunidades=S.ngComunidades.filter(function(x){return Number(x.id)!==Number(id);});
+  try{
+    await saveK(SK.ngComunidades,S.ngComunidades);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    ngRenderList();
+    showToast('✅ Comunidad eliminada','#16A34A');
+  }catch(e){
+    S.ngComunidades.push(ng);
+    alert('No se pudo eliminar. Verificá tu conexión.');
+  }
+}
+
 let cfgEditingGroupId=null;
 
 async function cfgDeleteGroup(id){
@@ -2526,7 +3867,9 @@ function cfgCloseGroupForm(){
 let cfgEditingUserId=null;
 function cfgRenderUsuarios(){
   const ugSel=document.getElementById('cfg-uf-group');
-  if(ugSel) ugSel.innerHTML='<option value="">Sin grupo</option>'+S.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  if(ugSel) ugSel.innerHTML='<option value="">Sin grupo</option>'+
+    [...(S.groups||[]), ...(S.ngComunidades||[]).map(ng=>({id:ng.id,name:'🌱 '+ng.name}))]
+    .map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
 
   // Populate member selector — always fresh
   const memSel=document.getElementById('cfg-uf-member');
@@ -2612,7 +3955,9 @@ function cfgEditUser(id){
   const ugSel=document.getElementById('cfg-uf-group');
   if(ugSel){
     if(ugSel.options.length<=1)
-      ugSel.innerHTML='<option value="">Sin grupo</option>'+S.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+      ugSel.innerHTML='<option value="">Sin grupo</option>'+
+    [...(S.groups||[]), ...(S.ngComunidades||[]).map(ng=>({id:ng.id,name:'🌱 '+ng.name}))]
+    .map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
     if(u.groupId) ugSel.value=u.groupId;
   }
   // Show associated member as read-only when editing
@@ -2658,6 +4003,12 @@ async function cfgSaveUser(){
     S.users.push({id:Date.now(),name,user,pass,role,groupId,memberId:memberIdVal});
   }
   await saveK(SK.users,S.users);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('cfgSaveUser Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   try{if(typeof window.syncNow==="function")window.syncNow();}catch(_e){}
   cfgCloseUserForm();cfgRenderUsuarios();
 }
@@ -2665,6 +4016,12 @@ async function cfgDeleteUser(id){
   if(!confirm('¿Eliminar este usuario?'))return;
   S.users=S.users.filter(u=>u.id!==id);
   await saveK(SK.users,S.users);cfgRenderUsuarios();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('cfgDeleteUser Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
 }
 function cfgCloseUserForm(){document.getElementById('cfg-user-form').classList.add('hidden');cfgEditingUserId=null;}
 
@@ -2708,12 +4065,24 @@ async function cfgSaveRole(){
   if(cfgEditingRoleId) Object.assign(S.roles.find(x=>x.id===cfgEditingRoleId),{name,color,desc});
   else S.roles.push({id:name.toLowerCase().replace(/\s+/g,'_')+Date.now(),name,color,desc});
   await saveK(SK.roles,S.roles);cfgCloseRoleForm();cfgRenderRoles();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('cfgSaveRole Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
 }
 async function cfgDeleteRole(id){
   if(!confirm('¿Eliminar este rol? Se quitará de todos los miembros.'))return;
   S.roles=S.roles.filter(r=>r.id!==id);
   S.members.forEach(m=>{m.roles=(m.roles||[]).filter(rid=>rid!==id);});
   await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);cfgRenderRoles();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('cfgDeleteRole Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
 }
 function cfgCloseRoleForm(){document.getElementById('cfg-role-form').classList.add('hidden');cfgEditingRoleId=null;}
 
@@ -2722,7 +4091,8 @@ function cfgCloseRoleForm(){document.getElementById('cfg-role-form').classList.a
 // ════════════════════════════════════════════════════════════
 let gdvFacAtt={},gdvVisitsOther=[],gdvVisitsNew=[],gdvSelectedRoles=[];
 let gdvEditingGroupId=null,gdvEditingUserId=null,gdvEditingMemberId=null,gdvEditingRoleId=null;
-let gdvFilDesde='',gdvFilHasta='',gdvFilGrupos=null,gdvFilSexo='';
+var _d2w=(function(){var d=new Date();d.setDate(d.getDate()-14);return d.toISOString().slice(0,10);})();
+let gdvFilDesde=_d2w,gdvFilHasta='',gdvFilGrupos=null,gdvFilSexo='';
 let gdvMrSortAsc=true,gdvMrVisible=20;
 
 function buildGdVHTML(){
@@ -4117,8 +5487,12 @@ function gdvRenderBarsFiltered(recs){
 
 // GdV: Registros
 function gdvRenderRegistros(){
-  const fd=document.getElementById('gdv-reg-desde')?.value||'';
-  const fh=document.getElementById('gdv-reg-hasta')?.value||'';
+  // Default: last 2 weeks if no date set
+  var _regDesde=document.getElementById('gdv-reg-desde');
+  var _regHasta=document.getElementById('gdv-reg-hasta');
+  if(_regDesde&&!_regDesde.value){var _d=new Date();_d.setDate(_d.getDate()-14);_regDesde.value=_d.toISOString().slice(0,10);}
+  const fd=_regDesde?.value||'';
+  const fh=_regHasta?.value||'';
   const sel=document.getElementById('gdv-reg-grupo');
   const fg=sel?.value||'';
   if(sel.options.length<=1){
@@ -4175,6 +5549,12 @@ async function gdvDeleteRecord(id){
   if(!confirm('¿Eliminar este registro? El dashboard se actualizará.'))return;
   S.records=S.records.filter(r=>r.id!==id);
   await saveK(SK.records,S.records);gdvRenderRegistros();gdvRenderDashboard();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('gdvDeleteRecord Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
 }
 
 function gdvEditRecord(id){
@@ -4232,6 +5612,12 @@ async function gdvSaveEditRec(){
     if(cb) r.asistencia[k].state=cb.checked?'presente':'ausente';
   });
   await saveK(SK.records,S.records);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('gdvSaveEditRec Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   gdvCloseEditRec();
   gdvRenderRegistros();
   gdvRenderDashboard();
@@ -4253,7 +5639,8 @@ function gdvRenderMiembros(){
   document.getElementById('gdv-member-count').textContent=S.members.filter(m=>m.estado==='Activo').length;
   document.getElementById('gdv-member-tbody').innerHTML=members.map(m=>{
     const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
-    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
+    const allAvailableGroups=[...(S.groups||[]),...(S.ngComunidades||[]).map(function(ng){return {id:ng.id,name:'🌱 '+ng.name};})];
+    const memberGroups=allGids.map(gid=>allAvailableGroups.find(x=>Number(x.id)===gid)).filter(Boolean);
     return `<tr>
       <td><strong>${fullName(m)}</strong></td>
       <td><span style="background:${m.genero==='H'?'#DBEAFE':'#FCE7F3'};color:${m.genero==='H'?'#1E40AF':'#9D174D'};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${m.genero}</span></td>
@@ -4311,11 +5698,23 @@ async function gdvSaveMember(){
   if(gdvEditingMemberId)Object.assign(S.members.find(x=>x.id===gdvEditingMemberId),data);
   else S.members.push({id:Date.now(),...data});
   await saveK(SK.members,S.members);gdvCloseMemberForm();gdvRenderMiembros();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('gdvSaveMember Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
 }
 async function gdvDeleteMember(id){
   if(!confirm('¿Eliminar?'))return;
   S.members=S.members.filter(m=>m.id!==id);
   await saveK(SK.members,S.members);gdvRenderMiembros();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('gdvDeleteMember Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
 }
 function gdvCloseMemberForm(){document.getElementById('gdv-member-form').classList.add('hidden');gdvEditingMemberId=null;}
 
@@ -4368,13 +5767,21 @@ async function gdvSaveGroup(){
   if(gdvEditingGroupId)Object.assign(S.groups.find(x=>x.id===gdvEditingGroupId),data);
   else S.groups.push({id:Date.now(),...data});
   await saveK(SK.groups,S.groups);gdvCloseGroupForm();gdvRenderGrupos();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('gdvSaveGroup Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
 }
 function gdvCloseGroupForm(){document.getElementById('gdv-group-form').classList.add('hidden');gdvEditingGroupId=null;}
 
 // GdV: Usuarios
 function gdvRenderUsuarios(){
   const ugSel=document.getElementById('gdv-uf-group');
-  if(ugSel)ugSel.innerHTML='<option value="">Sin grupo</option>'+S.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  if(ugSel)ugSel.innerHTML='<option value="">Sin grupo</option>'+
+    [...(S.groups||[]), ...(S.ngComunidades||[]).map(ng=>({id:ng.id,name:'🌱 '+ng.name}))]
+    .map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
   document.getElementById('gdv-users-list').innerHTML=S.users.map(u=>{
     const g=S.groups.find(x=>x.id===u.groupId);
     return `<div class="row" style="cursor:default">
@@ -4419,11 +5826,23 @@ async function gdvSaveUser(){
   if(gdvEditingUserId)Object.assign(S.users.find(x=>x.id===gdvEditingUserId),{name,user,pass,role,groupId});
   else S.users.push({id:Date.now(),name,user,pass,role,groupId});
   await saveK(SK.users,S.users);gdvCloseUserForm();gdvRenderUsuarios();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('gdvSaveUser Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
 }
 async function gdvDeleteUser(id){
   if(!confirm('¿Eliminar?'))return;
   S.users=S.users.filter(u=>u.id!==id);
   await saveK(SK.users,S.users);gdvRenderUsuarios();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('gdvDeleteUser Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
 }
 function gdvCloseUserForm(){document.getElementById('gdv-user-form').classList.add('hidden');gdvEditingUserId=null;}
 
@@ -4460,12 +5879,24 @@ async function gdvSaveRole(){
   if(gdvEditingRoleId)Object.assign(S.roles.find(x=>x.id===gdvEditingRoleId),{name,color,desc});
   else S.roles.push({id:name.toLowerCase().replace(/\s+/g,'_')+Date.now(),name,color,desc});
   await saveK(SK.roles,S.roles);gdvCloseRoleForm();gdvRenderRoles();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('gdvSaveRole Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
 }
 async function gdvDeleteRole(id){
   if(!confirm('¿Eliminar este rol?'))return;
   S.roles=S.roles.filter(r=>r.id!==id);
   S.members.forEach(m=>{m.roles=(m.roles||[]).filter(rid=>rid!==id);});
   await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);gdvRenderRoles();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('gdvDeleteRole Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
 }
 function gdvCloseRoleForm(){document.getElementById('gdv-role-form').classList.add('hidden');gdvEditingRoleId=null;}
 
@@ -5634,6 +7065,7 @@ function renderNuevos(){
   const search=(document.getElementById('nv-search')?.value||'').toLowerCase();
   const fGrupo=parseInt(document.getElementById('nv-fil-grupo')?.value)||null;
   const fGen=document.getElementById('nv-fil-gen')?.value||'';
+  const fTipoGrupo=document.getElementById('nv-fil-tipo-grupo')?.value||'';
 
   const gsel=document.getElementById('nv-fil-grupo');
   if(gsel&&gsel.options.length<=1)
@@ -5661,6 +7093,13 @@ function renderNuevos(){
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
   if(fGen)   members=members.filter(m=>m.genero===fGen);
+  if(fTipoGrupo==='gdv'){
+    var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
+    members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});
+  } else if(fTipoGrupo==='ng'){
+    var ngIds=new Set((S.ngComunidades||[]).map(function(ng){return Number(ng.id);}));
+    members=members.filter(function(m){return m.grupoId&&ngIds.has(Number(m.grupoId));});
+  }
 
   // Sort: unassigned seguimiento first, then by registration date
   members.sort(function(a,b){
@@ -5686,7 +7125,8 @@ function renderNuevos(){
 
   wrap.innerHTML=members.map(m=>{
     const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
-    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
+    const allAvailableGroups=[...(S.groups||[]),...(S.ngComunidades||[]).map(function(ng){return {id:ng.id,name:'🌱 '+ng.name};})];
+    const memberGroups=allGids.map(gid=>allAvailableGroups.find(x=>Number(x.id)===gid)).filter(Boolean);
     const genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
     const genColor=m.genero==='H'?'#1E40AF':'#9D174D';
     const edad=saCalcEdad(m.fnac);
@@ -5724,6 +7164,7 @@ function renderNuevos(){
           <span style="background:#FEF3C7;color:#92400E;font-size:11px;padding:3px 10px;border-radius:99px;font-weight:600">🌱 Nuevo</span>
           <button class="btn btn-sm" onclick="nvAbrirEditar(${m.id})">✏️ Editar</button>
           ${canGestionarNuevos()||isContactar()?`<button class="btn btn-sm btn-primary" onclick="nvOpenPromote(${m.id})">Gestionar →</button>`:''}
+          ${isSuperAdmin()?`<button onclick="nvEliminarContacto(${m.id})" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:18px;padding:2px 6px" title="Eliminar registro">🗑️</button>`:''}
         </div>
       </div>
     </div>`;
@@ -5832,6 +7273,12 @@ async function nvGuardarComentario(){
   });
   document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('nvGuardarComentario Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   nvRenderComentarios(m);
   showToast('💬 Comentario guardado','#16A34A');
 }
@@ -5859,6 +7306,12 @@ async function nvPromover(condicion){
   });
   document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
+  // Upload to Firebase so condicion change persists across devices
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    showToast('⚠️ Guardado local OK pero no se pudo sincronizar con la nube. Verificá tu red.','#D97706');
+  }
   nvClosePromote();
   renderNuevos();
   showToast(condicion==='Nuevo'
@@ -5893,6 +7346,30 @@ async function nvDarDeBaja(){
   nvClosePromote();
   renderNuevos();
   showToast(fullName(m)+' pasado/a a Histórico','#6B7280');
+}
+
+async function nvEliminarContacto(id){
+  var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+  if(!m) return;
+  // Only allow deletion of Nuevo, Historico or Baja
+  var condOk=['Nuevo','Historico'].includes(m.condicion);
+  var estadoOk=m.estado==='Baja';
+  if(!condOk && !estadoOk){
+    alert('Solo se pueden eliminar contactos con condición Nuevo, Histórico o Estado Baja.');
+    return;
+  }
+  if(!confirm('¿Eliminar a '+fullName(m)+' definitivamente? Esta acción no se puede deshacer.')) return;
+  S.members=S.members.filter(function(x){return Number(x.id)!==Number(id);});
+  await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.members.push(m);
+    alert('No se pudo eliminar en la nube. Verificá tu conexión.');
+    return;
+  }
+  renderNuevos();
+  showToast('🗑️ Registro eliminado','#DC2626');
 }
 
 function nvAbrirEditar(id){
@@ -5936,6 +7413,12 @@ async function nvGuardarEditar(){
     if(fechaVal) m.fechaRegistro=fechaVal;
   }
   await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('nvGuardarEditar Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   nvCerrarEditar();
   renderNuevos();
   showToast('✅ Contacto actualizado','#16A34A');
@@ -6060,6 +7543,8 @@ function nvOpenInlineForm(prefill){
 function nvCloseInlineForm(){
   const overlay=document.getElementById('nv-form-overlay');
   if(overlay) overlay.style.display='none';
+  // Refresh list so newly added contacts appear immediately
+  if(typeof renderNuevos==='function') renderNuevos();
 }
 
 function nvOpenSeguimientoSelector(){
@@ -6078,7 +7563,8 @@ function nvOpenSeguimientoSelector(){
   const filtered=search?activos.filter(m=>fullName(m).toLowerCase().includes(search)):activos;
   wrap.innerHTML=filtered.slice(0,30).map(m=>{
     const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
-    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
+    const allAvailableGroups=[...(S.groups||[]),...(S.ngComunidades||[]).map(function(ng){return {id:ng.id,name:'🌱 '+ng.name};})];
+    const memberGroups=allGids.map(gid=>allAvailableGroups.find(x=>Number(x.id)===gid)).filter(Boolean);
     return `<div onclick="nvSelectSeguimiento(${m.id},'${fullName(m).replace(/'/g,"\'")}','${g?g.name:''}')"
       style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px;display:flex;align-items:center;gap:8px"
       onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background=''">
@@ -6124,24 +7610,14 @@ async function nvSaveInlineForm(){
       origen:'Carga manual'
     };
     S.members.push(nuevo);
-    // Save directly to localStorage - avoid full saveK to prevent stack overflow on large datasets
+    // Use saveK so _local_ts_ gets updated (protects against Firebase overwrite on next download)
+    await saveK(SK.members, S.members);
+    // Upload to Firebase immediately
     try{
-      localStorage.setItem('gdv_m5', JSON.stringify(S.members));
-    }catch(saveErr){
-      // If stringify fails (too large), try saving without formacion arrays
-      const slim=S.members.map(function(m){
-        var c=Object.assign({},m);
-        if(c.formacion&&c.formacion.length>50) c.formacion=c.formacion.slice(-50);
-        return c;
-      });
-      localStorage.setItem('gdv_m5', JSON.stringify(slim));
-    }
-    // Schedule Firebase upload via debounce
-    if(window.fbReady){
-      clearTimeout(window._fbSyncTimer);
-      window._fbSyncTimer=setTimeout(function(){
-        window.fbUpload&&window.fbUpload(false);
-      },500);
+      if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    }catch(e){
+      S.members=S.members.filter(function(m){return m.id!==nuevo.id;});
+      throw new Error('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     }
     nvCloseInlineForm();
     showToast('✅ '+nombre+' '+apellido+' agregado a Nuevos Contactos','#16A34A');
@@ -6347,7 +7823,12 @@ async function cfgSavePermisos(){
     return;
   }
   window._permisosEditing=false;
-  showToast('✅ Permisos guardados','#16A34A');
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    showToast('✅ Permisos guardados ☁️','#16A34A');
+  }catch(e){
+    showToast('⚠️ Permisos guardados localmente pero NO en la nube','#D97706');
+  }
   setTimeout(function(){
     document.querySelectorAll('[id^="cfg-tab-"]').forEach(b=>b.className='btn btn-sm');
     const wrap=document.getElementById('cfg-content');
@@ -6418,6 +7899,12 @@ async function saveRoleModal(){
     S.roles.push({id,name,color,desc});
   }
   await saveK(SK.roles,S.roles);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('saveRoleModal Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   closeRoleModal();
   if(roleModalCallback) roleModalCallback();
 }
@@ -6431,7 +7918,8 @@ function showRoleMembers(roleId, roleName){
   } else {
     list.innerHTML=members.map(m=>{
       const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
-    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
+    const allAvailableGroups=[...(S.groups||[]),...(S.ngComunidades||[]).map(function(ng){return {id:ng.id,name:'🌱 '+ng.name};})];
+    const memberGroups=allGids.map(gid=>allAvailableGroups.find(x=>Number(x.id)===gid)).filter(Boolean);
       const genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
       const genColor=m.genero==='H'?'#1E40AF':'#9D174D';
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F3F4F6">
@@ -6453,6 +7941,12 @@ async function deleteRoleGlobal(id, callback){
   S.roles=S.roles.filter(x=>x.id!==id);
   S.members.forEach(m=>{m.roles=(m.roles||[]).filter(rid=>rid!==id);});
   await saveK(SK.roles,S.roles);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('deleteRoleGlobal Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   await saveK(SK.members,S.members);
   if(callback) callback();
 }
@@ -6648,6 +8142,14 @@ function fmtFnac(el){
   el.value=v;
 }
 
+// Format dd/mm/aa for fechaIngreso field
+function fmtFechaIngreso(el){
+  var v=el.value.replace(/\D/g,'');
+  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
+  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
+  el.value=v;
+}
+
 function enviarForm(){
   var n=document.getElementById('f-nombre').value.trim();
   var a=document.getElementById('f-apellido').value.trim();
@@ -6664,20 +8166,21 @@ function enviarForm(){
     return;
   }
   err.style.display='none';
-  // Save to localStorage so it appears in Nuevos Contactos
+  // Save using S.members + saveK so _local_ts_ is updated and Firebase can't overwrite
   try{
-    var members=JSON.parse(localStorage.getItem('gdv_m5')||'[]');
-    members.push({
+    var nuevo={
       id:Date.now(),nombre:n,apellido:a,tel:cel,genero:genero,
       grupoId:null,condicion:'Nuevo',estado:'Activo',
       dir:barrio,fnac:fnac,roles:[],
       comoNosConocio:como,motivoContacto:motivo,
       fechaRegistro:todayAA(),
+      _ts:Date.now(),
       origen:'QR / Formulario web'
-    });
-    localStorage.setItem('gdv_m5',JSON.stringify(members));
-    // Upload to Firebase immediately so the contact isn't lost on next app load
-    if(window.fbUpload) window.fbUpload(true);
+    };
+    S.members.push(nuevo);
+    saveK(SK.members, S.members).then(function(){
+      if(window.fbUpload) window.fbUpload(true);
+    }).catch(function(){});
   }catch(e){}
   document.getElementById('form-wrap').style.display='none';
   document.getElementById('form-success').style.display='block';
@@ -6949,6 +8452,12 @@ async function discToggleCompletado(pasoId, memberId){
       if(!yaEnForm){
         miembro.formacion.push({pasoId,pasoNombre:paso.nombre,fechaCompletado:ultFecha,fuente:'auto'});
         await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('discToggleCompletado Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
       }
     }
   } else {
@@ -7100,6 +8609,12 @@ async function discSavePaso(){
   paso.miembros=[...document.querySelectorAll('.disc-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
   if(!paso.completados) paso.completados={};
   await saveK(SK.discPasos,S.discPasos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('discSavePaso Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   discCloseModal();
   discTab('pasos', document.getElementById('disc-tab-pasos'));
   showToast('✅ Paso guardado correctamente','#16A34A');
@@ -7110,6 +8625,12 @@ async function discToggleEstado(pasoId){
   if(!paso) return;
   paso.estado=paso.estado==='Activo'?'Inactivo':'Activo';
   await saveK(SK.discPasos,S.discPasos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('discToggleEstado Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   discTab('pasos', document.getElementById('disc-tab-pasos'));
 }
 
@@ -7238,6 +8759,12 @@ async function discDeleteRecord(id){
   if(!confirm('¿Eliminar este registro? Los dashboards se actualizarán.')) return;
   S.discRecords=S.discRecords.filter(function(r){return r.id!==id;});
   await saveK(SK.discRecords,S.discRecords);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('discDeleteRecord Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   var c=document.getElementById('disc-registros-wrap');
   if(c) discRenderRegistros(c);
   discRenderDashboard(document.getElementById('disc-dashboard-wrap'));
@@ -7294,6 +8821,12 @@ async function discSaveEdit(){
     if(sel) r.asistencia[k].state=sel.value;
   });
   await saveK(SK.discRecords,S.discRecords);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('discSaveEdit Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
   discCloseEdit();
   var c=document.getElementById('disc-registros-wrap');
   if(c) discRenderRegistros(c);
@@ -7684,10 +9217,18 @@ function exportNuevosExcel(){
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
   if(fGen)   members=members.filter(m=>m.genero===fGen);
+  if(fTipoGrupo==='gdv'){
+    var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
+    members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});
+  } else if(fTipoGrupo==='ng'){
+    var ngIds=new Set((S.ngComunidades||[]).map(function(ng){return Number(ng.id);}));
+    members=members.filter(function(m){return m.grupoId&&ngIds.has(Number(m.grupoId));});
+  }
 
   const rows=members.map(m=>{
     const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
-    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
+    const allAvailableGroups=[...(S.groups||[]),...(S.ngComunidades||[]).map(function(ng){return {id:ng.id,name:'🌱 '+ng.name};})];
+    const memberGroups=allGids.map(gid=>allAvailableGroups.find(x=>Number(x.id)===gid)).filter(Boolean);
     return {
       nombre:m.nombre,
       apellido:m.apellido,
@@ -7724,8 +9265,10 @@ function exportNuevosExcel(){
 
 function exportMiembrosExcel(){
   const search=(document.getElementById('sa-member-search')?.value||'').toLowerCase();
-  const fGrupo=parseInt(document.getElementById('sa-mfil-grupo')?.value)||null;
+  const _fGrupoRaw=document.getElementById('sa-mfil-grupo')?.value||'';
+  const fGrupo=_fGrupoRaw==='nogroup'?'nogroup':(parseInt(_fGrupoRaw)||null);
   const fGen=document.getElementById('sa-mfil-gen')?.value||'';
+  const fTipoGrupo=document.getElementById('sa-mfil-tipo-grupo')?.value||'';
   const fRol=document.getElementById('sa-mfil-rol')?.value||'';
   const fCond=document.getElementById('sa-mfil-condicion')?.value||'';
   const fEstado=document.getElementById('sa-mfil-estado')?.value;
@@ -7735,6 +9278,13 @@ function exportMiembrosExcel(){
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
   if(fGen)   members=members.filter(m=>m.genero===fGen);
+  if(fTipoGrupo==='gdv'){
+    var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
+    members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});
+  } else if(fTipoGrupo==='ng'){
+    var ngIds=new Set((S.ngComunidades||[]).map(function(ng){return Number(ng.id);}));
+    members=members.filter(function(m){return m.grupoId&&ngIds.has(Number(m.grupoId));});
+  }
   if(fRol)   members=members.filter(m=>(m.roles||[]).includes(fRol));
   if(fCond)  members=members.filter(m=>m.condicion===fCond);
   if(fEstado==='Activo') members=members.filter(m=>m.estado!=='Baja');
@@ -7742,7 +9292,8 @@ function exportMiembrosExcel(){
 
   const rows=members.map(m=>{
     const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
-    const memberGroups=allGids.map(gid=>S.groups.find(x=>Number(x.id)===gid)).filter(Boolean);
+    const allAvailableGroups=[...(S.groups||[]),...(S.ngComunidades||[]).map(function(ng){return {id:ng.id,name:'🌱 '+ng.name};})];
+    const memberGroups=allGids.map(gid=>allAvailableGroups.find(x=>Number(x.id)===gid)).filter(Boolean);
     const roles=(m.roles||[]).map(rid=>{
       const r=S.roles.find(x=>x.id===rid);
       return r?r.name:'';
@@ -7882,6 +9433,13 @@ async function importarTodo(event){
 // ════════════════════════════════════════════════════════════
 async function boot(){
   try{
+    // Show DEV badge if in development environment
+    const _PROD = ['vng-plataforma.vercel.app','iglesiavng.vercel.app'];
+    const _isDev = !_PROD.includes(window.location.hostname);
+    if(_isDev){
+      const badge=document.getElementById('dev-badge');
+      if(badge) badge.style.display='inline';
+    }
     if(window._savedSession){
       currentUser = window._savedSession;
       document.getElementById('screen-login').style.display='none';
@@ -8058,5 +9616,6 @@ boot();
         </div>
       </div>
     </div>
+<div id="cfg-ng-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem"></div>
 </body>
 </html>

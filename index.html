@@ -402,9 +402,24 @@ function mergeMembers(localStr, cloudStr){
   try{
     const local=JSON.parse(localStr||'[]');
     const cloud=JSON.parse(cloudStr||'[]');
-    const cloudIds=new Set(cloud.map(m=>m.id));
-    const localOnly=local.filter(m=>!cloudIds.has(m.id));
-    return JSON.stringify([...cloud,...localOnly]);
+    // Index local members by id for quick lookup
+    const localMap={};
+    local.forEach(function(m){ localMap[m.id]=m; });
+    const cloudMap={};
+    cloud.forEach(function(m){ cloudMap[m.id]=m; });
+    const allIds=new Set([...local.map(function(m){return m.id;}), ...cloud.map(function(m){return m.id;})]);
+    const merged=[];
+    allIds.forEach(function(id){
+      const l=localMap[id];
+      const c=cloudMap[id];
+      if(!l){ merged.push(c); return; } // solo en cloud → usar cloud
+      if(!c){ merged.push(l); return; } // solo en local → usar local
+      // Ambos existen → ganar el que tiene _ts más reciente
+      const lTs=parseInt(l._ts||'0');
+      const cTs=parseInt(c._ts||'0');
+      merged.push(lTs>cTs ? l : c);
+    });
+    return JSON.stringify(merged);
   }catch(e){ return cloudStr; }
 }
 window.fbDownload = async function() {
@@ -2400,7 +2415,7 @@ function buildMiembrosHTML(){
       </div>
       <div class="form-row" id="sa-mf-fechaingreso-row" style="display:none">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de ingreso <span style="color:#9CA3AF;font-weight:400">(solo Super Admin)</span></label>
-          <input type="date" id="sa-mf-fechaingreso"></div>
+          <input type="text" id="sa-mf-fechaingreso" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" oninput="fmtFechaIngreso(this)" style="width:120px"></div>
       </div>
       <div id="sa-mf-motivo-row" style="display:none;margin-top:10px">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Motivo del cambio de estado <span style="color:#9CA3AF;font-weight:400">(mín. 10 caracteres)</span></label>
@@ -3070,7 +3085,7 @@ function saEditMember(id){
   if(fiRow&&fiInput){
     if(isSuperAdmin()){
       fiRow.style.display='block';
-      fiInput.value=m.fechaIngreso||'';
+      fiInput.value=m.fechaIngreso?fmtAA(m.fechaIngreso):'';
     } else {
       fiRow.style.display='none';
     }
@@ -3107,7 +3122,8 @@ async function saSaveMember(){
     tel:document.getElementById('sa-mf-tel').value.trim(),
     dir:document.getElementById('sa-mf-dir').value.trim(),
     fnac:document.getElementById('sa-mf-fnac')?.value||'',
-    roles:[...saSelectedRoles]
+    roles:[...saSelectedRoles],
+    _ts:Date.now()
   };
   // Fecha de ingreso: solo Super Admin puede modificarla
   if(isSuperAdmin()){
@@ -7289,6 +7305,12 @@ async function nvPromover(condicion){
   });
   document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
+  // Upload to Firebase so condicion change persists across devices
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    showToast('⚠️ Guardado local OK pero no se pudo sincronizar con la nube. Verificá tu red.','#D97706');
+  }
   nvClosePromote();
   renderNuevos();
   showToast(condicion==='Nuevo'
@@ -7585,18 +7607,8 @@ async function nvSaveInlineForm(){
       origen:'Carga manual'
     };
     S.members.push(nuevo);
-    // Save directly to localStorage - avoid full saveK to prevent stack overflow on large datasets
-    try{
-      localStorage.setItem('gdv_m5', JSON.stringify(S.members));
-    }catch(saveErr){
-      // If stringify fails (too large), try saving without formacion arrays
-      const slim=S.members.map(function(m){
-        var c=Object.assign({},m);
-        if(c.formacion&&c.formacion.length>50) c.formacion=c.formacion.slice(-50);
-        return c;
-      });
-      localStorage.setItem('gdv_m5', JSON.stringify(slim));
-    }
+    // Use saveK so _local_ts_ gets updated (protects against Firebase overwrite on next download)
+    await saveK(SK.members, S.members);
     // Upload to Firebase immediately
     try{
       if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -8121,6 +8133,14 @@ textarea{min-height:80px;resize:vertical}
 </div>
 <script>
 function fmtFnac(el){
+  var v=el.value.replace(/\D/g,'');
+  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
+  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
+  el.value=v;
+}
+
+// Format dd/mm/aa for fechaIngreso field
+function fmtFechaIngreso(el){
   var v=el.value.replace(/\D/g,'');
   if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
   if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);

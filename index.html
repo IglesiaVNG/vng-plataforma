@@ -7542,6 +7542,8 @@ function nvOpenInlineForm(prefill){
 function nvCloseInlineForm(){
   const overlay=document.getElementById('nv-form-overlay');
   if(overlay) overlay.style.display='none';
+  // Refresh list so newly added contacts appear immediately
+  if(typeof renderNuevos==='function') renderNuevos();
 }
 
 function nvOpenSeguimientoSelector(){
@@ -8163,20 +8165,21 @@ function enviarForm(){
     return;
   }
   err.style.display='none';
-  // Save to localStorage so it appears in Nuevos Contactos
+  // Save using S.members + saveK so _local_ts_ is updated and Firebase can't overwrite
   try{
-    var members=JSON.parse(localStorage.getItem('gdv_m5')||'[]');
-    members.push({
+    var nuevo={
       id:Date.now(),nombre:n,apellido:a,tel:cel,genero:genero,
       grupoId:null,condicion:'Nuevo',estado:'Activo',
       dir:barrio,fnac:fnac,roles:[],
       comoNosConocio:como,motivoContacto:motivo,
       fechaRegistro:todayAA(),
+      _ts:Date.now(),
       origen:'QR / Formulario web'
-    });
-    localStorage.setItem('gdv_m5',JSON.stringify(members));
-    // Upload to Firebase immediately so the contact isn't lost on next app load
-    if(window.fbUpload) window.fbUpload(true);
+    };
+    S.members.push(nuevo);
+    saveK(SK.members, S.members).then(function(){
+      if(window.fbUpload) window.fbUpload(true);
+    }).catch(function(){});
   }catch(e){}
   document.getElementById('form-wrap').style.display='none';
   document.getElementById('form-success').style.display='block';

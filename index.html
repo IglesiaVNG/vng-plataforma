@@ -7065,6 +7065,7 @@ function renderNuevos(){
   const search=(document.getElementById('nv-search')?.value||'').toLowerCase();
   const fGrupo=parseInt(document.getElementById('nv-fil-grupo')?.value)||null;
   const fGen=document.getElementById('nv-fil-gen')?.value||'';
+  const fTipoGrupo=document.getElementById('nv-fil-tipo-grupo')?.value||'';
 
   const gsel=document.getElementById('nv-fil-grupo');
   if(gsel&&gsel.options.length<=1)

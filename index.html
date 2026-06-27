@@ -4564,13 +4564,8 @@ function gdvCheckDuplicateWeek(gid){
   });
   if(existe){
     alert.style.display='block';
-    if(isGdVAdmin()){
-      alert.innerHTML='⚠️ Ya existe un registro para la <strong>Semana '+semana+'</strong>. Como Admin podés guardar igual para corregir errores.';
-      alert.style.background='#FEF3C7';alert.style.borderColor='#FCD34D';alert.style.color='#92400E';
-    } else {
-      alert.innerHTML='🚫 Ya existe un registro para la <strong>Semana '+semana+'</strong>. No podés cargar la misma semana dos veces. Contactá al Admin GdV si hay un error.';
-      alert.style.background='#FEF2F2';alert.style.borderColor='#FCA5A5';alert.style.color='#991B1B';
-    }
+    alert.innerHTML='🚫 Ya existe un registro para la <strong>Semana '+semana+'</strong>. Editá o eliminá el existente si necesitás corregirlo.';
+    alert.style.background='#FEF2F2';alert.style.borderColor='#FCA5A5';alert.style.color='#991B1B';
   } else {
     alert.style.display='none';
   }

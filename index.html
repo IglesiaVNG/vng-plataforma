@@ -4826,16 +4826,8 @@ async function gdvSaveRecord(){
     return sem===semanaFecha && anio===anioFecha;
   });
   if(yaExiste){
-    if(!isSuperAdmin()){
-      // Facilitador y Admin GdV: bloquear completamente
-      alert('Ya existe un registro para la Semana '+semanaFecha+'. Contactá al Super Admin para corregirlo.');
-      return;
-    } else {
-      // Solo Super Admin: advertir pero permitir
-      if(!confirm('Ya existe un registro para la Semana '+semanaFecha+'. Como Super Admin podés cargar igual para corregir errores. ¿Continuás?')){
-        return;
-      }
-    }
+    alert('Ya existe un registro para la Semana '+semanaFecha+'.');
+    return;
   }
 
   if(!sinEncuentro&&!Object.keys(gdvFacAtt).length){alert('El grupo no tiene miembros cargados');return;}
@@ -8832,12 +8824,8 @@ async function discGuardarAsistencia(){
     return getISOWeek(r.fecha)===semana && new Date(r.fecha).getFullYear()===anio;
   });
   if(yaExiste){
-    if(isSuperAdmin()){
-      if(!confirm('Ya existe un registro para la Semana '+semana+' en este Paso. Como Super Admin podés guardar igual para corregir errores. ¿Continuar?')) return;
-    } else {
-      alert('Ya existe un registro para la Semana '+semana+' en este Paso. Contactá al Super Admin para corregirlo.');
-      return;
-    }
+    alert('Ya existe un registro para la Semana '+semana+' en este Paso.');
+    return;
   }
 
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});

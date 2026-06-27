@@ -702,10 +702,8 @@ function loadPermisos(){
     const saved=localStorage.getItem('gdv_permisos');
     if(saved){
       const parsed=JSON.parse(saved);
-      // Sanity check: if ALL permissions across ALL roles are 'ninguno', data is corrupted
-      const allVals=Object.values(parsed).flatMap(r=>Object.values(r||{}));
-      const allNinguno=allVals.length>0 && allVals.every(v=>v==='ninguno');
-      PERMISOS=allNinguno?JSON.parse(JSON.stringify(DEFAULT_PERMISOS)):parsed;
+      // Use saved config as-is — Super Admin has full authority to set any permission including ninguno
+      PERMISOS=parsed;
     } else {
       PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
     }

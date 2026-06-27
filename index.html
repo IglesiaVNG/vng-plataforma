@@ -398,30 +398,37 @@ window.fbUpload = async function(force) {
 };
 
 // ── Download: read all docs and merge to localStorage ──
-function mergeMembers(localStr, cloudStr){
+// Merge genérico por id+_ts: gana el registro más reciente de cada id
+// Funciona para members, records, discRecords, ngRecords, etc.
+function mergeByTs(localStr, cloudStr){
   try{
     const local=JSON.parse(localStr||'[]');
     const cloud=JSON.parse(cloudStr||'[]');
-    // Index local members by id for quick lookup
     const localMap={};
     local.forEach(function(m){ localMap[m.id]=m; });
     const cloudMap={};
     cloud.forEach(function(m){ cloudMap[m.id]=m; });
-    const allIds=new Set([...local.map(function(m){return m.id;}), ...cloud.map(function(m){return m.id;})]);
+    const allIds=new Set([
+      ...local.map(function(m){return m.id;}),
+      ...cloud.map(function(m){return m.id;})
+    ]);
     const merged=[];
     allIds.forEach(function(id){
       const l=localMap[id];
       const c=cloudMap[id];
-      if(!l){ merged.push(c); return; } // solo en cloud → usar cloud
-      if(!c){ merged.push(l); return; } // solo en local → usar local
-      // Ambos existen → ganar el que tiene _ts más reciente
-      const lTs=parseInt(l._ts||'0');
-      const cTs=parseInt(c._ts||'0');
+      if(!l){ merged.push(c); return; }
+      if(!c){ merged.push(l); return; }
+      // Ambos existen: gana el más reciente por _ts
+      const lTs=parseInt(l._ts||l.ts&&new Date(l.ts).getTime()||'0');
+      const cTs=parseInt(c._ts||c.ts&&new Date(c.ts).getTime()||'0');
       merged.push(lTs>cTs ? l : c);
     });
     return JSON.stringify(merged);
   }catch(e){ return cloudStr; }
 }
+
+// Alias para compatibilidad con código existente
+function mergeMembers(localStr, cloudStr){ return mergeByTs(localStr, cloudStr); }
 window.fbDownload = async function() {
   try {
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
@@ -439,12 +446,13 @@ window.fbDownload = async function() {
               // Only overwrite if Firebase is NEWER than last local explicit save
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
-              if(fbTs>=localTs){
-                if(k==='gdv_m5'){
-                  localStorage.setItem(k, mergeMembers(localStorage.getItem(k), data[k]));
-                } else {
-                  localStorage.setItem(k, data[k]);
-                }
+              // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_ng_records'];
+              if(MERGE_KEYS.includes(k)){
+                // Siempre mergear por id+ts, independientemente del timestamp del documento
+                localStorage.setItem(k, mergeByTs(localStorage.getItem(k), data[k]));
+              } else if(fbTs>=localTs){
+                localStorage.setItem(k, data[k]);
               }
             }
           }
@@ -1871,7 +1879,8 @@ async function ngSaveRecord(){
     asistencia:Object.assign({},ngFacAtt),
     visitsNew:[...ngVisitsNew],
     sinEncuentro:!!sinEnc,
-    ts:new Date().toISOString()
+    ts:new Date().toISOString(),
+    _ts:Date.now()
   };
   S.ngRecords.push(rec);
   await saveK(SK.ngRecords,S.ngRecords);
@@ -4778,7 +4787,8 @@ async function gdvSaveRecord(){
     asistencia:sinEncuentro?{}:{...gdvFacAtt},
     visitsOther:sinEncuentro?[]:[...gdvVisitsOther],
     visitsNew:sinEncuentro?[]:[...gdvVisitsNew],
-    ts:new Date().toISOString()};
+    ts:new Date().toISOString(),
+    _ts:Date.now()};
   S.records.push(rec);
   await saveK(SK.records,S.records);
   // Upload records to Firebase — block if fails
@@ -5611,6 +5621,7 @@ async function gdvSaveEditRec(){
     var cb=document.getElementById('gdv-edit-att-'+k);
     if(cb) r.asistencia[k].state=cb.checked?'presente':'ausente';
   });
+  r._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   await saveK(SK.records,S.records);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -7412,6 +7423,7 @@ async function nvGuardarEditar(){
     const fechaVal=document.getElementById('nv-edit-fecha')?.value.trim();
     if(fechaVal) m.fechaRegistro=fechaVal;
   }
+  m._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -8743,11 +8755,19 @@ async function discGuardarAsistencia(){
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   S.discRecords.push({
     id:Date.now(),pasoId,pasoNombre:paso?paso.nombre:'',
-    fecha,capitulo,asistencia:{...discFacAtt},ts:new Date().toISOString()
+    fecha,capitulo,asistencia:{...discFacAtt},ts:new Date().toISOString(),_ts:Date.now()
   });
   await saveK(SK.discRecords,S.discRecords);
   let dCloudOk=false;
-  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); dCloudOk=true; }catch(e){}
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    dCloudOk=true;
+  }catch(e){
+    S.discRecords.pop();
+    var alErr=document.getElementById('disc-alert');
+    if(alErr){alErr.textContent='❌ Error al guardar en la nube. Verificá tu conexión e intentá de nuevo.';alErr.classList.remove('hidden');}
+    return;
+  }
   var al=document.getElementById('disc-alert');
   al.textContent=dCloudOk?'✅ Asistencia guardada ☁️':'⚠️ Guardada sin sincronizar — reintentá';
   al.classList.remove('hidden');
@@ -8820,6 +8840,7 @@ async function discSaveEdit(){
     var sel=document.getElementById('disc-edit-'+k);
     if(sel) r.asistencia[k].state=sel.value;
   });
+  r._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   await saveK(SK.discRecords,S.discRecords);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);

@@ -2418,13 +2418,13 @@ function buildMiembrosHTML(){
       <div style="border-top:1px solid #E5E7EB;margin:14px 0 10px;padding-top:10px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">Datos personales (opcionales)</div>
       <div class="form-row">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de nacimiento</label>
-          <input type="text" id="sa-mf-fnac" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" oninput="fmtFnac(this)" style="width:120px"></div>
+          <input type="text" id="sa-mf-fnac" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFnac(this)" style="width:120px"></div>
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label>
           <input type="tel" id="sa-mf-tel" placeholder="+54 ..."></div>
       </div>
       <div class="form-row" id="sa-mf-fechaingreso-row" style="display:none">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de ingreso <span style="color:#9CA3AF;font-weight:400">(solo Super Admin)</span></label>
-          <input type="text" id="sa-mf-fechaingreso" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" oninput="fmtFechaIngreso(this)" style="width:120px"></div>
+          <input type="text" id="sa-mf-fechaingreso" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFechaIngreso(this)" style="width:120px"></div>
       </div>
       <div id="sa-mf-motivo-row" style="display:none;margin-top:10px">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Motivo del cambio de estado <span style="color:#9CA3AF;font-weight:400">(mín. 10 caracteres)</span></label>
@@ -3132,7 +3132,7 @@ async function saSaveMember(){
     dir:document.getElementById('sa-mf-dir').value.trim(),
     fnac:(function(){
       var v=document.getElementById('sa-mf-fnac')?.value||'';
-      if(v&&!validarFnac(v)){alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)');throw 'fnac inválido';}
+      if(v&&!validarFnac(v)){alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)');return '__INVALID__';}
       return v;
     })(),
     roles:[...saSelectedRoles],
@@ -3144,6 +3144,8 @@ async function saSaveMember(){
     if(fiInput) data.fechaIngreso=fiInput.value||'';
   }
 
+  if(data.fnac==='__INVALID__') return; // fnac inválido — alert ya mostrado
+  data.fnac=data.fnac||'';
   let target;
   if(saEditingMemberId){
     target=S.members.find(x=>Number(x.id)===Number(saEditingMemberId));
@@ -6990,7 +6992,7 @@ function buildNuevosHTML(){
           </div>
         </div>
         <div class="form-row" style="margin-top:8px">
-          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha nacimiento</label><input type="text" id="nv-edit-fnac" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" oninput="fmtFnac(this)" style="width:100%"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha nacimiento</label><input type="text" id="nv-edit-fnac" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFnac(this)" style="width:100%"></div>
           <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad</label><input type="text" id="nv-edit-barrio" style="width:100%"></div>
         </div>
         <div style="margin-top:8px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conoció?</label>

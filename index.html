@@ -4797,6 +4797,25 @@ async function gdvSaveRecord(){
   if(fecha>hoyStr){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+hoyStr+').');return;}
   if(fecha<minStr){alert('No podés cargar fechas de más de 14 días atrás. La fecha mínima es '+minStr+'.');return;}
 
+  // ── Control de semanas pendientes — no se puede saltear ──
+  if(!isSuperAdmin()){
+    var groupRecs=S.records.filter(function(r){return r.grupoId===gid;});
+    if(groupRecs.length>0){
+      var lastRec=groupRecs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
+      var lastWeekNum=getISOWeek(lastRec.fecha);
+      var lastYear=new Date(lastRec.fecha).getFullYear();
+      var fechaWeekNum=getISOWeek(fecha);
+      var fechaYear=new Date(fecha).getFullYear();
+      // Calcular diferencia de semanas
+      var weeksDiff=(fechaYear-lastYear)*52+(fechaWeekNum-lastWeekNum);
+      if(weeksDiff>1){
+        var pendingWeek=lastWeekNum+1;
+        alert('⚠️ Tenés semanas sin registrar. Debés cargar primero la Semana '+pendingWeek+' antes de poder cargar esta fecha. Usá el botón "→ Ir a Semana '+pendingWeek+'" del aviso naranja.');
+        return;
+      }
+    }
+  }
+
   // ── Control de duplicados por semana ──
   const semanaFecha=getISOWeek(fecha);
   const anioFecha=new Date(fecha).getFullYear();
@@ -4807,13 +4826,13 @@ async function gdvSaveRecord(){
     return sem===semanaFecha && anio===anioFecha;
   });
   if(yaExiste){
-    if(!isGdVAdmin()){
-      // Facilitador: bloquear completamente
-      alert('Ya existe un registro para la Semana '+semanaFecha+'. Contacta al Admin GdV para corregirlo.');
+    if(!isSuperAdmin()){
+      // Facilitador y Admin GdV: bloquear completamente
+      alert('Ya existe un registro para la Semana '+semanaFecha+'. Contactá al Super Admin para corregirlo.');
       return;
     } else {
-      // Admin GdV / Super Admin: advertir pero permitir
-      if(!confirm('Ya existe un registro para la Semana '+semanaFecha+'. Como Admin podés cargar igual para corregir errores?')){
+      // Solo Super Admin: advertir pero permitir
+      if(!confirm('Ya existe un registro para la Semana '+semanaFecha+'. Como Super Admin podés cargar igual para corregir errores. ¿Continuás?')){
         return;
       }
     }
@@ -5332,19 +5351,22 @@ function gdvRenderWeeklyStatus(){
 
   var statusByGroup = grupos.map(function(g){
     var recs = S.records.filter(function(r){ return r.grupoId===g.id && r.fecha>=startStr && r.fecha<=endStr; });
-    var hasSinEnc = recs.some(function(r){ return r.sinEncuentro; });
-    var hasReport = recs.some(function(r){ return !r.sinEncuentro; });
-    var status = hasReport ? 'reportado' : hasSinEnc ? 'sin-encuentro' : 'sin-reporte';
+    var sinEncCount = recs.filter(function(r){ return r.sinEncuentro; }).length;
     var encCount = recs.filter(function(r){ return !r.sinEncuentro; }).length;
-    return {g:g, status:status, encCount:encCount};
+    var hasSinEnc = sinEncCount > 0;
+    var hasReport = encCount > 0;
+    // Un grupo puede tener ambos: encuentros con asistencia Y encuentros sin encuentro
+    var status = hasReport && hasSinEnc ? 'mixto' : hasReport ? 'reportado' : hasSinEnc ? 'sin-encuentro' : 'sin-reporte';
+    return {g:g, status:status, encCount:encCount, sinEncCount:sinEncCount};
   });
 
-  var reportados  = statusByGroup.filter(function(x){ return x.status==='reportado'; }).length;
+  var reportados  = statusByGroup.filter(function(x){ return x.status==='reportado'||x.status==='mixto'; }).length;
   var sinEncs     = statusByGroup.filter(function(x){ return x.status==='sin-encuentro'; }).length;
   var sinReporte  = statusByGroup.filter(function(x){ return x.status==='sin-reporte'; }).length;
 
   var colores = {
     'reportado':     {bg:'#F0FDF4', border:'#86EFAC', dot:'#16A34A', label:'Reportó'},
+    'mixto':         {bg:'#F0FDF4', border:'#86EFAC', dot:'#16A34A', label:'Reportó'},
     'sin-encuentro': {bg:'#FFFBEB', border:'#FCD34D', dot:'#D97706', label:'Sin encuentro'},
     'sin-reporte':   {bg:'#FFF5F5', border:'#FCA5A5', dot:'#DC2626', label:'Sin reporte'}
   };
@@ -5374,13 +5396,18 @@ function gdvRenderWeeklyStatus(){
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:8px">';
   statusByGroup.forEach(function(item){
     var c = colores[item.status];
-    var enc = item.encCount > 1 ? ' · ' + item.encCount + ' encuentros' : '';
     var dia = item.g.dia ? ' · ' + item.g.dia : '';
+    var detalle = '';
+    if(item.status === 'mixto'){
+      detalle = ' · ' + item.encCount + ' con asistencia · ' + item.sinEncCount + ' sin encuentro';
+    } else if(item.encCount > 1){
+      detalle = ' · ' + item.encCount + ' encuentros';
+    }
     html += '<div style="background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px">';
     html += '<div style="width:10px;height:10px;border-radius:50%;background:' + c.dot + ';flex-shrink:0"></div>';
     html += '<div style="flex:1;min-width:0">';
     html += '<div style="font-size:12px;font-weight:600;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + item.g.name + '</div>';
-    html += '<div style="font-size:11px;color:#6B7280">' + c.label + enc + dia + '</div>';
+    html += '<div style="font-size:11px;color:#6B7280">' + c.label + detalle + dia + '</div>';
     html += '</div></div>';
   });
   html += '</div>';
@@ -8805,10 +8832,10 @@ async function discGuardarAsistencia(){
     return getISOWeek(r.fecha)===semana && new Date(r.fecha).getFullYear()===anio;
   });
   if(yaExiste){
-    if(isSuperAdmin()||canEjecutar('disc_pasos')){
-      if(!confirm('Ya existe un registro para la Semana '+semana+' en este Paso. Como Admin podés guardar igual para corregir errores. ¿Continuar?')) return;
+    if(isSuperAdmin()){
+      if(!confirm('Ya existe un registro para la Semana '+semana+' en este Paso. Como Super Admin podés guardar igual para corregir errores. ¿Continuar?')) return;
     } else {
-      alert('Ya existe un registro para la Semana '+semana+' en este Paso. Contactá al Admin si hay un error.');
+      alert('Ya existe un registro para la Semana '+semana+' en este Paso. Contactá al Super Admin para corregirlo.');
       return;
     }
   }

@@ -2418,7 +2418,7 @@ function buildMiembrosHTML(){
       <div style="border-top:1px solid #E5E7EB;margin:14px 0 10px;padding-top:10px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">Datos personales (opcionales)</div>
       <div class="form-row">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de nacimiento</label>
-          <input type="date" id="sa-mf-fnac"></div>
+          <input type="text" id="sa-mf-fnac" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" oninput="fmtFnac(this)" style="width:120px"></div>
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label>
           <input type="tel" id="sa-mf-tel" placeholder="+54 ..."></div>
       </div>
@@ -3080,7 +3080,7 @@ function saEditMember(id){
   document.getElementById('sa-mf-estado').value=saOriginalEstado;
   document.getElementById('sa-mf-tel').value=m.tel||'';
   document.getElementById('sa-mf-dir').value=m.dir||'';
-  const fnac=document.getElementById('sa-mf-fnac');if(fnac)fnac.value=m.fnac||'';
+  const fnac=document.getElementById('sa-mf-fnac');if(fnac)fnac.value=m.fnac?fmtAA(m.fnac):'';
   saBuildRoleSelector(m.roles||[]);
   saBuildGruposExtra(m.grupoIds||[]);
   // Motivo: oculto hasta que cambien el Estado
@@ -3130,7 +3130,11 @@ async function saSaveMember(){
     estado:nuevoEstado,
     tel:document.getElementById('sa-mf-tel').value.trim(),
     dir:document.getElementById('sa-mf-dir').value.trim(),
-    fnac:document.getElementById('sa-mf-fnac')?.value||'',
+    fnac:(function(){
+      var v=document.getElementById('sa-mf-fnac')?.value||'';
+      if(v&&!validarFnac(v)){alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)');throw 'fnac inválido';}
+      return v;
+    })(),
     roles:[...saSelectedRoles],
     _ts:Date.now()
   };
@@ -6986,7 +6990,7 @@ function buildNuevosHTML(){
           </div>
         </div>
         <div class="form-row" style="margin-top:8px">
-          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha nacimiento</label><input type="text" id="nv-edit-fnac" placeholder="DD/MM/AA" maxlength="8" style="width:100%"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha nacimiento</label><input type="text" id="nv-edit-fnac" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" oninput="fmtFnac(this)" style="width:100%"></div>
           <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad</label><input type="text" id="nv-edit-barrio" style="width:100%"></div>
         </div>
         <div style="margin-top:8px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conoció?</label>
@@ -7392,7 +7396,7 @@ function nvAbrirEditar(id){
   document.getElementById('nv-edit-apellido').value=m.apellido||'';
   document.getElementById('nv-edit-tel').value=m.tel||'';
   document.getElementById('nv-edit-genero').value=m.genero||'';
-  document.getElementById('nv-edit-fnac').value=m.fnac||'';
+  document.getElementById('nv-edit-fnac').value=m.fnac?fmtAA(m.fnac):'';
   document.getElementById('nv-edit-barrio').value=m.dir||'';
   document.getElementById('nv-edit-como').value=m.comoNosConocio||'';
   document.getElementById('nv-edit-motivo').value=m.motivoContacto||'';
@@ -7415,7 +7419,9 @@ async function nvGuardarEditar(){
   m.apellido=document.getElementById('nv-edit-apellido').value.trim();
   m.tel=document.getElementById('nv-edit-tel').value.trim();
   m.genero=document.getElementById('nv-edit-genero').value;
-  m.fnac=document.getElementById('nv-edit-fnac').value.trim();
+  var fnacEditVal=document.getElementById('nv-edit-fnac').value.trim();
+  if(fnacEditVal&&!validarFnac(fnacEditVal)){alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)');return;}
+  m.fnac=fnacEditVal;
   m.dir=document.getElementById('nv-edit-barrio').value.trim();
   m.comoNosConocio=document.getElementById('nv-edit-como').value;
   m.motivoContacto=document.getElementById('nv-edit-motivo').value.trim();
@@ -8152,6 +8158,18 @@ function fmtFnac(el){
   if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
   if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
   el.value=v;
+}
+
+// Valida que el valor sea dd/mm/aa con números reales
+function validarFnac(val){
+  if(!val) return true; // opcional — vacío es OK
+  var p=val.split('/');
+  if(p.length!==3) return false;
+  var d=parseInt(p[0]),m=parseInt(p[1]),a=parseInt(p[2]);
+  if(isNaN(d)||isNaN(m)||isNaN(a)) return false;
+  if(d<1||d>31||m<1||m>12||a<0||a>99) return false;
+  if(p[0].length!==2||p[1].length!==2||p[2].length!==2) return false;
+  return true;
 }
 
 // Format dd/mm/aa for fechaIngreso field

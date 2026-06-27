@@ -3132,7 +3132,7 @@ async function saSaveMember(){
     dir:document.getElementById('sa-mf-dir').value.trim(),
     fnac:(function(){
       var v=document.getElementById('sa-mf-fnac')?.value||'';
-      if(v&&!validarFnac(v)){alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)');return '__INVALID__';}
+      if(v&&!validarFnac(v)){markFieldError(document.getElementById('sa-mf-fnac'),'Usá el formato dd/mm/aa (ej: 15/03/90)');alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)');return '__INVALID__';}
       return v;
     })(),
     roles:[...saSelectedRoles],
@@ -7422,7 +7422,7 @@ async function nvGuardarEditar(){
   m.tel=document.getElementById('nv-edit-tel').value.trim();
   m.genero=document.getElementById('nv-edit-genero').value;
   var fnacEditVal=document.getElementById('nv-edit-fnac').value.trim();
-  if(fnacEditVal&&!validarFnac(fnacEditVal)){alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)');return;}
+  if(fnacEditVal&&!validarFnac(fnacEditVal)){markFieldError(document.getElementById('nv-edit-fnac'),'Usá el formato dd/mm/aa (ej: 15/03/90)');alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)');return;}
   m.fnac=fnacEditVal;
   m.dir=document.getElementById('nv-edit-barrio').value.trim();
   m.comoNosConocio=document.getElementById('nv-edit-como').value;
@@ -7466,12 +7466,7 @@ async function nvReactivar(){
   showToast('♻️ '+fullName(m)+' re-activado como Nuevo','#16A34A');
 }
 
-function fmtFnacM(el){
-  var v=el.value.replace(/[^0-9]/g,'');
-  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
-  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
-  el.value=v;
-}
+function fmtFnacM(el){ fmtFnac(el); }
 function nvCalcEdad(fnac){
   if(!fnac) return null;
   // fnac format: DD/MM/AA or DD/MM/AAAA
@@ -8155,11 +8150,29 @@ textarea{min-height:80px;resize:vertical}
   </div>
 </div>
 <script>
+
+// Marca un campo como inválido visualmente
+function markFieldError(el, msg){
+  if(!el) return;
+  el.style.border='2px solid #DC2626';
+  el.style.background='#FEF2F2';
+  el.title=msg||'Campo inválido';
+  el.focus();
+  setTimeout(function(){ el.style.border=''; el.style.background=''; el.title=''; }, 4000);
+}
 function fmtFnac(el){
-  var v=el.value.replace(/\D/g,'');
-  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
-  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
-  el.value=v;
+  var pos=el.selectionStart;
+  var raw=el.value.replace(/\D/g,'').slice(0,6); // solo 6 dígitos max
+  var out='';
+  for(var i=0;i<raw.length;i++){
+    if(i===2||i===4) out+='/';
+    out+=raw[i];
+  }
+  el.value=out;
+  // Ajustar cursor: si estamos justo después de una barra, avanzar uno
+  var newPos=pos;
+  if(out.length>pos && out[pos-1]==='/' && pos>0) newPos=pos+1;
+  try{ el.setSelectionRange(newPos,newPos); }catch(e){}
 }
 
 // Valida que el valor sea dd/mm/aa con números reales
@@ -8175,12 +8188,7 @@ function validarFnac(val){
 }
 
 // Format dd/mm/aa for fechaIngreso field
-function fmtFechaIngreso(el){
-  var v=el.value.replace(/\D/g,'');
-  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
-  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
-  el.value=v;
-}
+function fmtFechaIngreso(el){ fmtFnac(el); }
 
 function enviarForm(){
   var n=document.getElementById('f-nombre').value.trim();
@@ -9017,12 +9025,7 @@ function buildPublicNuevoForm(){
   </div>`;
 }
 
-async function pnvFmtFnac(el){
-  var v=el.value.replace(/[^0-9]/g,'');
-  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
-  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
-  el.value=v;
-}
+function pnvFmtFnac(el){ fmtFnac(el); }
 function pnvEnviar(){
   var n=(document.getElementById('pnv-nombre')||{value:''}).value.trim();
   var a=(document.getElementById('pnv-apellido')||{value:''}).value.trim();

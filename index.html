@@ -179,6 +179,41 @@ tr:hover td{background:#F9FAFB}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 </style>
 <script>
+
+// ── Funciones de formato de fecha — expuestas globalmente ──
+window.fmtFnac = function(el){
+  var pos=el.selectionStart;
+  var raw=el.value.replace(/\D/g,'').slice(0,6);
+  var out='';
+  for(var i=0;i<raw.length;i++){
+    if(i===2||i===4) out+='/';
+    out+=raw[i];
+  }
+  el.value=out;
+  try{ el.setSelectionRange(out.length,out.length); }catch(e){}
+};
+window.fmtFnacM = function(el){ window.fmtFnac(el); };
+window.fmtFechaIngreso = function(el){ window.fmtFnac(el); };
+window.pnvFmtFnac = function(el){ window.fmtFnac(el); };
+window.validarFnac = function(val){
+  if(!val) return true;
+  var p=val.split('/');
+  if(p.length!==3) return false;
+  var d=parseInt(p[0]),m=parseInt(p[1]),a=parseInt(p[2]);
+  if(isNaN(d)||isNaN(m)||isNaN(a)) return false;
+  if(d<1||d>31||m<1||m>12||a<0||a>99) return false;
+  if(p[0].length!==2||p[1].length!==2||p[2].length!==2) return false;
+  return true;
+};
+window.markFieldError = function(el, msg){
+  if(!el) return;
+  el.style.border='2px solid #DC2626';
+  el.style.background='#FEF2F2';
+  el.title=msg||'Campo inválido';
+  el.focus();
+  setTimeout(function(){ el.style.border=''; el.style.background=''; el.title=''; }, 4000);
+};
+
 // ── Instant session restore (runs before any other script) ──
 (function(){
   try{

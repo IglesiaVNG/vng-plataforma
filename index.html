@@ -179,6 +179,41 @@ tr:hover td{background:#F9FAFB}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 </style>
 <script>
+
+// ── Funciones de formato de fecha — expuestas globalmente ──
+window.fmtFnac = function(el){
+  var pos=el.selectionStart;
+  var raw=el.value.replace(/\D/g,'').slice(0,6);
+  var out='';
+  for(var i=0;i<raw.length;i++){
+    if(i===2||i===4) out+='/';
+    out+=raw[i];
+  }
+  el.value=out;
+  try{ el.setSelectionRange(out.length,out.length); }catch(e){}
+};
+window.fmtFnacM = function(el){ window.fmtFnac(el); };
+window.fmtFechaIngreso = function(el){ window.fmtFnac(el); };
+window.pnvFmtFnac = function(el){ window.fmtFnac(el); };
+window.validarFnac = function(val){
+  if(!val) return true;
+  var p=val.split('/');
+  if(p.length!==3) return false;
+  var d=parseInt(p[0]),m=parseInt(p[1]),a=parseInt(p[2]);
+  if(isNaN(d)||isNaN(m)||isNaN(a)) return false;
+  if(d<1||d>31||m<1||m>12||a<0||a>99) return false;
+  if(p[0].length!==2||p[1].length!==2||p[2].length!==2) return false;
+  return true;
+};
+window.markFieldError = function(el, msg){
+  if(!el) return;
+  el.style.border='2px solid #DC2626';
+  el.style.background='#FEF2F2';
+  el.title=msg||'Campo inválido';
+  el.focus();
+  setTimeout(function(){ el.style.border=''; el.style.background=''; el.title=''; }, 4000);
+};
+
 // ── Instant session restore (runs before any other script) ──
 (function(){
   try{
@@ -398,30 +433,37 @@ window.fbUpload = async function(force) {
 };
 
 // ── Download: read all docs and merge to localStorage ──
-function mergeMembers(localStr, cloudStr){
+// Merge genérico por id+_ts: gana el registro más reciente de cada id
+// Funciona para members, records, discRecords, ngRecords, etc.
+function mergeByTs(localStr, cloudStr){
   try{
     const local=JSON.parse(localStr||'[]');
     const cloud=JSON.parse(cloudStr||'[]');
-    // Index local members by id for quick lookup
     const localMap={};
     local.forEach(function(m){ localMap[m.id]=m; });
     const cloudMap={};
     cloud.forEach(function(m){ cloudMap[m.id]=m; });
-    const allIds=new Set([...local.map(function(m){return m.id;}), ...cloud.map(function(m){return m.id;})]);
+    const allIds=new Set([
+      ...local.map(function(m){return m.id;}),
+      ...cloud.map(function(m){return m.id;})
+    ]);
     const merged=[];
     allIds.forEach(function(id){
       const l=localMap[id];
       const c=cloudMap[id];
-      if(!l){ merged.push(c); return; } // solo en cloud → usar cloud
-      if(!c){ merged.push(l); return; } // solo en local → usar local
-      // Ambos existen → ganar el que tiene _ts más reciente
-      const lTs=parseInt(l._ts||'0');
-      const cTs=parseInt(c._ts||'0');
+      if(!l){ merged.push(c); return; }
+      if(!c){ merged.push(l); return; }
+      // Ambos existen: gana el más reciente por _ts
+      const lTs=parseInt(l._ts||l.ts&&new Date(l.ts).getTime()||'0');
+      const cTs=parseInt(c._ts||c.ts&&new Date(c.ts).getTime()||'0');
       merged.push(lTs>cTs ? l : c);
     });
     return JSON.stringify(merged);
   }catch(e){ return cloudStr; }
 }
+
+// Alias para compatibilidad con código existente
+function mergeMembers(localStr, cloudStr){ return mergeByTs(localStr, cloudStr); }
 window.fbDownload = async function() {
   try {
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
@@ -439,12 +481,13 @@ window.fbDownload = async function() {
               // Only overwrite if Firebase is NEWER than last local explicit save
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
-              if(fbTs>=localTs){
-                if(k==='gdv_m5'){
-                  localStorage.setItem(k, mergeMembers(localStorage.getItem(k), data[k]));
-                } else {
-                  localStorage.setItem(k, data[k]);
-                }
+              // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_ng_records'];
+              if(MERGE_KEYS.includes(k)){
+                // Siempre mergear por id+ts, independientemente del timestamp del documento
+                localStorage.setItem(k, mergeByTs(localStorage.getItem(k), data[k]));
+              } else if(fbTs>=localTs){
+                localStorage.setItem(k, data[k]);
               }
             }
           }
@@ -1871,7 +1914,8 @@ async function ngSaveRecord(){
     asistencia:Object.assign({},ngFacAtt),
     visitsNew:[...ngVisitsNew],
     sinEncuentro:!!sinEnc,
-    ts:new Date().toISOString()
+    ts:new Date().toISOString(),
+    _ts:Date.now()
   };
   S.ngRecords.push(rec);
   await saveK(SK.ngRecords,S.ngRecords);
@@ -2409,13 +2453,13 @@ function buildMiembrosHTML(){
       <div style="border-top:1px solid #E5E7EB;margin:14px 0 10px;padding-top:10px;font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em">Datos personales (opcionales)</div>
       <div class="form-row">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de nacimiento</label>
-          <input type="date" id="sa-mf-fnac"></div>
+          <input type="text" id="sa-mf-fnac" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFnac(this)" style="width:120px"></div>
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label>
           <input type="tel" id="sa-mf-tel" placeholder="+54 ..."></div>
       </div>
       <div class="form-row" id="sa-mf-fechaingreso-row" style="display:none">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de ingreso <span style="color:#9CA3AF;font-weight:400">(solo Super Admin)</span></label>
-          <input type="text" id="sa-mf-fechaingreso" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" oninput="fmtFechaIngreso(this)" style="width:120px"></div>
+          <input type="text" id="sa-mf-fechaingreso" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFechaIngreso(this)" style="width:120px"></div>
       </div>
       <div id="sa-mf-motivo-row" style="display:none;margin-top:10px">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Motivo del cambio de estado <span style="color:#9CA3AF;font-weight:400">(mín. 10 caracteres)</span></label>
@@ -3071,7 +3115,7 @@ function saEditMember(id){
   document.getElementById('sa-mf-estado').value=saOriginalEstado;
   document.getElementById('sa-mf-tel').value=m.tel||'';
   document.getElementById('sa-mf-dir').value=m.dir||'';
-  const fnac=document.getElementById('sa-mf-fnac');if(fnac)fnac.value=m.fnac||'';
+  const fnac=document.getElementById('sa-mf-fnac');if(fnac)fnac.value=m.fnac?fmtAA(m.fnac):'';
   saBuildRoleSelector(m.roles||[]);
   saBuildGruposExtra(m.grupoIds||[]);
   // Motivo: oculto hasta que cambien el Estado
@@ -3121,7 +3165,11 @@ async function saSaveMember(){
     estado:nuevoEstado,
     tel:document.getElementById('sa-mf-tel').value.trim(),
     dir:document.getElementById('sa-mf-dir').value.trim(),
-    fnac:document.getElementById('sa-mf-fnac')?.value||'',
+    fnac:(function(){
+      var v=document.getElementById('sa-mf-fnac')?.value||'';
+      if(v&&!validarFnac(v)){markFieldError(document.getElementById('sa-mf-fnac'),'Usá el formato dd/mm/aa (ej: 15/03/90)');alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)');return '__INVALID__';}
+      return v;
+    })(),
     roles:[...saSelectedRoles],
     _ts:Date.now()
   };
@@ -3131,6 +3179,8 @@ async function saSaveMember(){
     if(fiInput) data.fechaIngreso=fiInput.value||'';
   }
 
+  if(data.fnac==='__INVALID__') return; // fnac inválido — alert ya mostrado
+  data.fnac=data.fnac||'';
   let target;
   if(saEditingMemberId){
     target=S.members.find(x=>Number(x.id)===Number(saEditingMemberId));
@@ -4778,7 +4828,8 @@ async function gdvSaveRecord(){
     asistencia:sinEncuentro?{}:{...gdvFacAtt},
     visitsOther:sinEncuentro?[]:[...gdvVisitsOther],
     visitsNew:sinEncuentro?[]:[...gdvVisitsNew],
-    ts:new Date().toISOString()};
+    ts:new Date().toISOString(),
+    _ts:Date.now()};
   S.records.push(rec);
   await saveK(SK.records,S.records);
   // Upload records to Firebase — block if fails
@@ -5611,6 +5662,7 @@ async function gdvSaveEditRec(){
     var cb=document.getElementById('gdv-edit-att-'+k);
     if(cb) r.asistencia[k].state=cb.checked?'presente':'ausente';
   });
+  r._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   await saveK(SK.records,S.records);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -6975,7 +7027,7 @@ function buildNuevosHTML(){
           </div>
         </div>
         <div class="form-row" style="margin-top:8px">
-          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha nacimiento</label><input type="text" id="nv-edit-fnac" placeholder="DD/MM/AA" maxlength="8" style="width:100%"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha nacimiento</label><input type="text" id="nv-edit-fnac" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFnac(this)" style="width:100%"></div>
           <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad</label><input type="text" id="nv-edit-barrio" style="width:100%"></div>
         </div>
         <div style="margin-top:8px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conoció?</label>
@@ -7381,7 +7433,7 @@ function nvAbrirEditar(id){
   document.getElementById('nv-edit-apellido').value=m.apellido||'';
   document.getElementById('nv-edit-tel').value=m.tel||'';
   document.getElementById('nv-edit-genero').value=m.genero||'';
-  document.getElementById('nv-edit-fnac').value=m.fnac||'';
+  document.getElementById('nv-edit-fnac').value=m.fnac?fmtAA(m.fnac):'';
   document.getElementById('nv-edit-barrio').value=m.dir||'';
   document.getElementById('nv-edit-como').value=m.comoNosConocio||'';
   document.getElementById('nv-edit-motivo').value=m.motivoContacto||'';
@@ -7404,7 +7456,9 @@ async function nvGuardarEditar(){
   m.apellido=document.getElementById('nv-edit-apellido').value.trim();
   m.tel=document.getElementById('nv-edit-tel').value.trim();
   m.genero=document.getElementById('nv-edit-genero').value;
-  m.fnac=document.getElementById('nv-edit-fnac').value.trim();
+  var fnacEditVal=document.getElementById('nv-edit-fnac').value.trim();
+  if(fnacEditVal&&!validarFnac(fnacEditVal)){markFieldError(document.getElementById('nv-edit-fnac'),'Usá el formato dd/mm/aa (ej: 15/03/90)');alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)');return;}
+  m.fnac=fnacEditVal;
   m.dir=document.getElementById('nv-edit-barrio').value.trim();
   m.comoNosConocio=document.getElementById('nv-edit-como').value;
   m.motivoContacto=document.getElementById('nv-edit-motivo').value.trim();
@@ -7412,6 +7466,7 @@ async function nvGuardarEditar(){
     const fechaVal=document.getElementById('nv-edit-fecha')?.value.trim();
     if(fechaVal) m.fechaRegistro=fechaVal;
   }
+  m._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -7446,12 +7501,7 @@ async function nvReactivar(){
   showToast('♻️ '+fullName(m)+' re-activado como Nuevo','#16A34A');
 }
 
-function fmtFnacM(el){
-  var v=el.value.replace(/[^0-9]/g,'');
-  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
-  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
-  el.value=v;
-}
+function fmtFnacM(el){ fmtFnac(el); }
 function nvCalcEdad(fnac){
   if(!fnac) return null;
   // fnac format: DD/MM/AA or DD/MM/AAAA
@@ -8135,20 +8185,45 @@ textarea{min-height:80px;resize:vertical}
   </div>
 </div>
 <script>
+
+// Marca un campo como inválido visualmente
+function markFieldError(el, msg){
+  if(!el) return;
+  el.style.border='2px solid #DC2626';
+  el.style.background='#FEF2F2';
+  el.title=msg||'Campo inválido';
+  el.focus();
+  setTimeout(function(){ el.style.border=''; el.style.background=''; el.title=''; }, 4000);
+}
 function fmtFnac(el){
-  var v=el.value.replace(/\D/g,'');
-  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
-  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
-  el.value=v;
+  var pos=el.selectionStart;
+  var raw=el.value.replace(/\D/g,'').slice(0,6); // solo 6 dígitos max
+  var out='';
+  for(var i=0;i<raw.length;i++){
+    if(i===2||i===4) out+='/';
+    out+=raw[i];
+  }
+  el.value=out;
+  // Ajustar cursor: si estamos justo después de una barra, avanzar uno
+  var newPos=pos;
+  if(out.length>pos && out[pos-1]==='/' && pos>0) newPos=pos+1;
+  try{ el.setSelectionRange(newPos,newPos); }catch(e){}
+}
+
+// Valida que el valor sea dd/mm/aa con números reales
+function validarFnac(val){
+  if(!val) return true; // opcional — vacío es OK
+  var p=val.split('/');
+  if(p.length!==3) return false;
+  var d=parseInt(p[0]),m=parseInt(p[1]),a=parseInt(p[2]);
+  if(isNaN(d)||isNaN(m)||isNaN(a)) return false;
+  if(d<1||d>31||m<1||m>12||a<0||a>99) return false;
+  if(p[0].length!==2||p[1].length!==2||p[2].length!==2) return false;
+  return true;
 }
 
 // Format dd/mm/aa for fechaIngreso field
-function fmtFechaIngreso(el){
-  var v=el.value.replace(/\D/g,'');
-  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
-  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
-  el.value=v;
-}
+function fmtFechaIngreso(el){ fmtFnac(el); }
 
 function enviarForm(){
   var n=document.getElementById('f-nombre').value.trim();
@@ -8743,11 +8818,19 @@ async function discGuardarAsistencia(){
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   S.discRecords.push({
     id:Date.now(),pasoId,pasoNombre:paso?paso.nombre:'',
-    fecha,capitulo,asistencia:{...discFacAtt},ts:new Date().toISOString()
+    fecha,capitulo,asistencia:{...discFacAtt},ts:new Date().toISOString(),_ts:Date.now()
   });
   await saveK(SK.discRecords,S.discRecords);
   let dCloudOk=false;
-  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); dCloudOk=true; }catch(e){}
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    dCloudOk=true;
+  }catch(e){
+    S.discRecords.pop();
+    var alErr=document.getElementById('disc-alert');
+    if(alErr){alErr.textContent='❌ Error al guardar en la nube. Verificá tu conexión e intentá de nuevo.';alErr.classList.remove('hidden');}
+    return;
+  }
   var al=document.getElementById('disc-alert');
   al.textContent=dCloudOk?'✅ Asistencia guardada ☁️':'⚠️ Guardada sin sincronizar — reintentá';
   al.classList.remove('hidden');
@@ -8820,6 +8903,7 @@ async function discSaveEdit(){
     var sel=document.getElementById('disc-edit-'+k);
     if(sel) r.asistencia[k].state=sel.value;
   });
+  r._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   await saveK(SK.discRecords,S.discRecords);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -8976,12 +9060,7 @@ function buildPublicNuevoForm(){
   </div>`;
 }
 
-async function pnvFmtFnac(el){
-  var v=el.value.replace(/[^0-9]/g,'');
-  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
-  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5,7);
-  el.value=v;
-}
+function pnvFmtFnac(el){ fmtFnac(el); }
 function pnvEnviar(){
   var n=(document.getElementById('pnv-nombre')||{value:''}).value.trim();
   var a=(document.getElementById('pnv-apellido')||{value:''}).value.trim();

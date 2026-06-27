@@ -1,6 +1,6 @@
 # VNG Plataforma Ministerial — Roadmap
 
-> Última actualización: 26/06/25
+> Última actualización: 27/06/25
 > Estado general: En uso interno (Iglesia Vida Nueva, Gerli). Pre-comercialización.
 
 ---
@@ -24,14 +24,26 @@
 - Login con usuario y contraseña (sistema propio, usuarios guardados en Firebase)
 
 ### Fixes aplicados (26/06/25)
-- `mergeMembers` — ahora compara `_ts` por miembro, el más reciente gana (ya no se pisan condiciones entre dispositivos)
+- `mergeMembers` — compara `_ts` por miembro, el más reciente gana
 - `_ts` agregado a cada miembro al guardar
 - `nvSaveInlineForm` — usa `saveK` en lugar de `localStorage` directo
-- `nvPromover` — ahora hace `fbUpload` inmediatamente al cambiar condición
+- `nvPromover` — hace `fbUpload` inmediatamente al cambiar condición
 - `enviarForm` (QR) — usa `S.members + saveK` en lugar de `localStorage` directo
-- `nvCloseInlineForm` — ahora llama a `renderNuevos()` para refrescar lista
-- `renderNuevos` — `fTipoGrupo` declarada con fallback seguro (evitaba crash al dar de alta)
+- `nvCloseInlineForm` — llama a `renderNuevos()` para refrescar lista
+- `renderNuevos` — `fTipoGrupo` declarada con fallback seguro
 - Campo `fechaIngreso` — cambiado a `type="text"` con formato `dd/mm/aa`, solo numérico
+
+### Fixes aplicados (27/06/25) — Guardado de datos críticos
+- `mergeByTs` genérico — merge registro por registro para todos los arrays críticos
+- `fbDownload` — protege `gdv_r5`, `gdv_disc_records`, `gdv_ng_records` con merge inteligente (ya no se pisan en bloque)
+- `_ts` agregado a registros nuevos de GdV, Discipulado y Nuevas Generaciones
+- `_ts` agregado al editar registros existentes de GdV, Discipulado y Nuevos Contactos
+- `discGuardarAsistencia` — fbUpload falla ruidosamente si hay error (ya no silencioso)
+- Funciones de formato de fecha (`fmtFnac`, `validarFnac`, etc.) expuestas en `window` — corrige error "is not defined"
+- Campo `sa-mf-fnac` (Rebaños) — cambiado a `type="text"` con autoformato `dd/mm/aa`
+- Campo `nv-edit-fnac` (Nuevos Contactos) — agregado autoformato y validación
+- `markFieldError` — resalta visualmente campos inválidos al intentar guardar
+- Todas las funciones de formato unificadas en una sola (`fmtFnac`)
 
 ---
 
@@ -39,12 +51,10 @@
 
 ### Auth real (Firebase Auth email/password)
 - Hoy las contraseñas se guardan en texto plano en Firebase
-- Cualquiera con acceso directo a Firebase ve las credenciales
 - Sin recupero de contraseña por email
-- **Hacer junto con multi-tenancy**
+- **Hacer junto con multi-tenancy para evitar doble migración**
 
 ### Multi-tenancy
-- Hoy todos los datos de todas las iglesias estarían mezclados
 - Cada iglesia necesita su colección separada en Firebase (`vng_{orgId}/...`)
 - Requiere panel de super-admin para gestionar organizaciones
 - Onboarding automático para nuevas iglesias
@@ -60,22 +70,19 @@
 
 ### Indicador visible de sincronización
 - Mostrar "✅ Guardado en la nube" o "⚠️ Sin conexión" en tiempo real
-- Hoy el usuario no sabe si sus datos subieron correctamente
+- Hoy el usuario no sabe visualmente si sus datos subieron
 
 ### Historial de cambios visible
 - Que el usuario vea quién modificó cada registro y cuándo
-- Genera confianza inmediata en equipos de trabajo
 
 ### Mensaje de estado al abrir
 - Mostrar "Datos actualizados al DD/MM/AA HH:MM" al iniciar sesión
 
 ### Export / Backup manual
 - Botón para descargar todos los datos en Excel o PDF
-- Si el usuario siente que puede llevarse sus datos, confía más
 
 ### Backup automático
-- Al menos un export semanal automático a Google Drive o similar
-- Hoy si alguien borra datos por error, no hay forma de recuperarlos
+- Export semanal automático a Google Drive o similar
 
 ### Módulo de Comunicaciones / Eventos
 - Pendiente de desarrollo
@@ -92,6 +99,7 @@
 
 ## 🟢 Backlog — Ideas y mejoras futuras
 
+- Entorno DEMO con datos ficticios (para ventas y pruebas)
 - Notificaciones (email o push) para líderes
 - Export PDF de dashboards para informes
 - App instalable (PWA) para celular
@@ -104,9 +112,9 @@
 
 ## 📋 Cómo trabajar con este archivo
 
-- **Bugs urgentes** → abrir sesión de corrección, referenciar este archivo
+- **Bugs urgentes** → abrir sesión de corrección, compartir este archivo al inicio
 - **Features nuevas** → mover de Backlog a Importante/Crítico cuando corresponda
-- **Al cerrar cada sesión** → actualizar este archivo con lo resuelto y lo nuevo que aparezca
+- **Al cerrar cada sesión** → actualizar este archivo con lo resuelto y lo nuevo
 - **Al abrir un chat nuevo** → compartir este archivo como primer contexto
 
 ---

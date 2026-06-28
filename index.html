@@ -536,24 +536,22 @@ console.log('Firebase: initialized OK');
 
 // Auto-download when Firebase is ready (fixes mobile timing issue)
 window.fbDownload().then(function(hasData) {
-  // Cargar permisos desde Firebase separadamente (tienen su propio canal)
-  if(typeof window.fbSavePermisos === 'function'){
-    // Leer permisos desde vng/config directamente
-    (async function(){
-      try{
-        var snap = await getDoc(doc(db, VNG_COL, 'config'));
-        if(snap.exists() && snap.data().gdv_permisos){
-          var fbPTs = parseInt(snap.data().gdv_permisos_ts||'0');
-          var localPTs = parseInt(localStorage.getItem('_local_ts_gdv_permisos')||'0');
-          if(fbPTs > localPTs){
-            localStorage.setItem('gdv_permisos', snap.data().gdv_permisos);
-            localStorage.setItem('_local_ts_gdv_permisos', String(fbPTs));
-            console.log('Firebase: permisos actualizados desde nube');
-            if(typeof loadPermisos==='function') loadPermisos();
-          }
+  // Cargar permisos desde Firebase separadamente via fbLoadPermisos (tiene acceso al scope correcto)
+  if(typeof window.fbLoadPermisos === 'function'){
+    window.fbLoadPermisos().then(function(data){
+      if(data && data.gdv_permisos){
+        var fbPTs = parseInt(data.gdv_permisos_ts||'0');
+        var localPTs = parseInt(localStorage.getItem('_local_ts_gdv_permisos')||'0');
+        if(fbPTs > localPTs){
+          localStorage.setItem('gdv_permisos', data.gdv_permisos);
+          localStorage.setItem('_local_ts_gdv_permisos', String(fbPTs));
+          console.log('Firebase: permisos actualizados desde nube ts='+fbPTs);
+          if(typeof loadPermisos==='function') loadPermisos();
+        } else {
+          console.log('Firebase: permisos locales son más recientes, no se pisan');
         }
-      }catch(e){ console.error('Error cargando permisos:', e); }
-    })();
+      }
+    }).catch(function(e){ console.error('Error cargando permisos:', e); });
   }
   if(hasData) {
     console.log('Firebase: auto-download complete');

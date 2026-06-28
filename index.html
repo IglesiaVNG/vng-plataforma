@@ -383,7 +383,7 @@ try {
 
 // ── Keys grouped by document (max ~900KB each) ──
 const KEY_GROUPS = {
-  'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_permisos','gdv_qr_actualizar'],
+  'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_qr_actualizar'], // gdv_permisos se maneja via fbSavePermisos con su propio timestamp
   'members': ['gdv_m5'],
   'records': ['gdv_r5'],
   'disc':    ['gdv_disc_pasos','gdv_disc_records'],
@@ -473,10 +473,8 @@ window.fbDownload = async function() {
         keys.forEach(k => {
           if(data[k]){
             if(k==='gdv_permisos'){
-              // Only write permisos from Firebase if no local config exists yet
-              if(!localStorage.getItem('gdv_permisos')){
-                localStorage.setItem(k, data[k]);
-              }
+              // gdv_permisos se maneja exclusivamente via fbSavePermisos/fbLoadPermisos
+              // No se pisa desde el download general
             } else {
               // Only overwrite if Firebase is NEWER than last local explicit save
               var fbTs=parseInt(data['_ts']||'0');
@@ -538,6 +536,23 @@ console.log('Firebase: initialized OK');
 
 // Auto-download when Firebase is ready (fixes mobile timing issue)
 window.fbDownload().then(function(hasData) {
+  // Cargar permisos desde Firebase separadamente via fbLoadPermisos (tiene acceso al scope correcto)
+  if(typeof window.fbLoadPermisos === 'function'){
+    window.fbLoadPermisos().then(function(data){
+      if(data && data.gdv_permisos){
+        var fbPTs = parseInt(data.gdv_permisos_ts||'0');
+        var localPTs = parseInt(localStorage.getItem('_local_ts_gdv_permisos')||'0');
+        if(fbPTs > localPTs){
+          localStorage.setItem('gdv_permisos', data.gdv_permisos);
+          localStorage.setItem('_local_ts_gdv_permisos', String(fbPTs));
+          console.log('Firebase: permisos actualizados desde nube ts='+fbPTs);
+          if(typeof loadPermisos==='function') loadPermisos();
+        } else {
+          console.log('Firebase: permisos locales son más recientes, no se pisan');
+        }
+      }
+    }).catch(function(e){ console.error('Error cargando permisos:', e); });
+  }
   if(hasData) {
     console.log('Firebase: auto-download complete');
     // Firebase downloaded new data into localStorage (protected by per-key timestamps).
@@ -700,14 +715,17 @@ function loadPermisos(){
   if(window._permisosEditing) return;
   try{
     const saved=localStorage.getItem('gdv_permisos');
+    console.log('[PERMISOS] loadPermisos - saved existe:', !!saved);
     if(saved){
       const parsed=JSON.parse(saved);
-      // Use saved config as-is — Super Admin has full authority to set any permission including ninguno
+      console.log('[PERMISOS] facilitador.disc_cargar:', parsed.facilitador?.disc_cargar);
       PERMISOS=parsed;
     } else {
+      console.log('[PERMISOS] ⚠️ no hay saved - usando DEFAULT');
       PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
     }
   }catch(e){
+    console.log('[PERMISOS] ⚠️ error parse - usando DEFAULT:', e.message);
     PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
   }
 }
@@ -715,34 +733,26 @@ function loadPermisos(){
 async function migratePermisos(){
   var needsSave=false;
   // Add any DEFAULT roles missing from PERMISOS
-  Object.keys(DEFAULT_PERMISOS).forEach(function(role){
-    if(!PERMISOS[role]){
-      PERMISOS[role]=JSON.parse(JSON.stringify(DEFAULT_PERMISOS[role]));
-      needsSave=true;
-    } else {
-      // Add any missing screen keys
-      Object.keys(DEFAULT_PERMISOS[role]).forEach(function(k){
-        if(PERMISOS[role][k]===undefined){
-          PERMISOS[role][k]=DEFAULT_PERMISOS[role][k];
-          needsSave=true;
-        }
-      });
-    }
-  });
-  // Add any custom S.roles not covered by DEFAULT
+  // Solo agregar roles completamente nuevos que no existen en absoluto
+  // NUNCA modificar permisos existentes — el Super Admin tiene control total
   (S.roles||[]).forEach(function(role){
     if(!PERMISOS[role.id]){
-      PERMISOS[role.id]=JSON.parse(JSON.stringify(DEFAULT_PERMISOS[role.id]||DEFAULT_PERMISOS['lider']||{}));
+      // Rol nuevo sin configuración: inicializar todo en 'ninguno'
+      var emptyPerms={};
+      SCREENS.forEach(function(s){ emptyPerms[s.key||s]='ninguno'; });
+      PERMISOS[role.id]=emptyPerms;
       needsSave=true;
     }
   });
-  // If anything was missing, persist it so Firebase gets the full config
   if(needsSave) await saveK('gdv_permisos', PERMISOS);
 }
 
 async function savePermisos(){
   if(!PERMISOS || !Object.keys(PERMISOS).length) return;
+  const ts=Date.now();
   await saveK('gdv_permisos', PERMISOS);
+  // Actualizar timestamp local para que otros dispositivos descarguen la versión nueva
+  localStorage.setItem('_local_ts_gdv_permisos', String(ts));
 }
 
 function getPerm(roleId, screen){
@@ -1046,7 +1056,7 @@ let gdvCharts={};
 // HELPERS
 // ════════════════════════════════════════════════════════════
 async function initStorage(){
-  try{ localStorage.removeItem('gdv_permisos'); }catch(e){}
+  // NUNCA borrar gdv_permisos al iniciar — el Super Admin configura permisos que deben persistir
   S.users      =load(SK.users,      DEFAULT_USERS);
   S.groups     =load(SK.groups,     DEFAULT_GROUPS);
   S.records    =load(SK.records,    []);
@@ -4644,6 +4654,9 @@ function gdvInitFacForm(){
       document.getElementById('gdv-group-info').textContent=g?`${g.name} — ${members.length} miembros activos`:'Sin grupo asignado. Verificá la configuración.';
       members.forEach(m=>{gdvFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
       gdvRenderFacMembers(members);
+      // Chequear duplicado con la fecha por defecto (hoy)
+      if(facGid) gdvCheckDuplicateWeek(facGid);
+      if(facGid) gdvCheckPendingWeeks(facGid);
     }
   }
   }catch(err){
@@ -7881,6 +7894,7 @@ function cfgOpenSection(sec){
   }
 }
 async function cfgSavePermisos(){
+  // Guardar en localStorage primero
   await savePermisos();
   const verificado=localStorage.getItem('gdv_permisos');
   if(!verificado||verificado==='{}'){
@@ -7888,8 +7902,17 @@ async function cfgSavePermisos(){
     return;
   }
   window._permisosEditing=false;
+  // Usar fbSavePermisos para subir con gdv_permisos_ts correcto
+  // Esto garantiza que el timestamp específico de permisos se guarda en Firebase
+  // y el download no los pisa al recargar
   try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    const ts=Date.now();
+    if(typeof window.fbSavePermisos==='function'){
+      await window.fbSavePermisos(verificado);
+    } else {
+      await window.fbUpload(true);
+    }
+    localStorage.setItem('_local_ts_gdv_permisos', String(ts));
     showToast('✅ Permisos guardados ☁️','#16A34A');
   }catch(e){
     showToast('⚠️ Permisos guardados localmente pero NO en la nube','#D97706');

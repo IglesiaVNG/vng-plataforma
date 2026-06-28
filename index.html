@@ -383,7 +383,7 @@ try {
 
 // ── Keys grouped by document (max ~900KB each) ──
 const KEY_GROUPS = {
-  'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_permisos','gdv_qr_actualizar'],
+  'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_qr_actualizar'], // gdv_permisos se maneja via fbSavePermisos con su propio timestamp
   'members': ['gdv_m5'],
   'records': ['gdv_r5'],
   'disc':    ['gdv_disc_pasos','gdv_disc_records'],
@@ -473,13 +473,8 @@ window.fbDownload = async function() {
         keys.forEach(k => {
           if(data[k]){
             if(k==='gdv_permisos'){
-              // Permisos: usar timestamp para sincronizar correctamente entre dispositivos
-              var fbPTs=parseInt(data['gdv_permisos_ts']||data['_ts']||'0');
-              var localPTs=parseInt(localStorage.getItem('_local_ts_gdv_permisos')||'0');
-              if(fbPTs>localPTs){
-                localStorage.setItem('gdv_permisos', data[k]);
-                localStorage.setItem('_local_ts_gdv_permisos', String(fbPTs));
-              }
+              // gdv_permisos se maneja exclusivamente via fbSavePermisos/fbLoadPermisos
+              // No se pisa desde el download general
             } else {
               // Only overwrite if Firebase is NEWER than last local explicit save
               var fbTs=parseInt(data['_ts']||'0');
@@ -541,6 +536,25 @@ console.log('Firebase: initialized OK');
 
 // Auto-download when Firebase is ready (fixes mobile timing issue)
 window.fbDownload().then(function(hasData) {
+  // Cargar permisos desde Firebase separadamente (tienen su propio canal)
+  if(typeof window.fbSavePermisos === 'function'){
+    // Leer permisos desde vng/config directamente
+    (async function(){
+      try{
+        var snap = await getDoc(doc(db, VNG_COL, 'config'));
+        if(snap.exists() && snap.data().gdv_permisos){
+          var fbPTs = parseInt(snap.data().gdv_permisos_ts||'0');
+          var localPTs = parseInt(localStorage.getItem('_local_ts_gdv_permisos')||'0');
+          if(fbPTs > localPTs){
+            localStorage.setItem('gdv_permisos', snap.data().gdv_permisos);
+            localStorage.setItem('_local_ts_gdv_permisos', String(fbPTs));
+            console.log('Firebase: permisos actualizados desde nube');
+            if(typeof loadPermisos==='function') loadPermisos();
+          }
+        }
+      }catch(e){ console.error('Error cargando permisos:', e); }
+    })();
+  }
   if(hasData) {
     console.log('Firebase: auto-download complete');
     // Firebase downloaded new data into localStorage (protected by per-key timestamps).

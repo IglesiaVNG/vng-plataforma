@@ -473,9 +473,12 @@ window.fbDownload = async function() {
         keys.forEach(k => {
           if(data[k]){
             if(k==='gdv_permisos'){
-              // Only write permisos from Firebase if no local config exists yet
-              if(!localStorage.getItem('gdv_permisos')){
-                localStorage.setItem(k, data[k]);
+              // Permisos: usar timestamp para sincronizar correctamente entre dispositivos
+              var fbPTs=parseInt(data['gdv_permisos_ts']||data['_ts']||'0');
+              var localPTs=parseInt(localStorage.getItem('_local_ts_gdv_permisos')||'0');
+              if(fbPTs>localPTs){
+                localStorage.setItem('gdv_permisos', data[k]);
+                localStorage.setItem('_local_ts_gdv_permisos', String(fbPTs));
               }
             } else {
               // Only overwrite if Firebase is NEWER than last local explicit save
@@ -715,34 +718,26 @@ function loadPermisos(){
 async function migratePermisos(){
   var needsSave=false;
   // Add any DEFAULT roles missing from PERMISOS
-  Object.keys(DEFAULT_PERMISOS).forEach(function(role){
-    if(!PERMISOS[role]){
-      PERMISOS[role]=JSON.parse(JSON.stringify(DEFAULT_PERMISOS[role]));
-      needsSave=true;
-    } else {
-      // Add any missing screen keys
-      Object.keys(DEFAULT_PERMISOS[role]).forEach(function(k){
-        if(PERMISOS[role][k]===undefined){
-          PERMISOS[role][k]=DEFAULT_PERMISOS[role][k];
-          needsSave=true;
-        }
-      });
-    }
-  });
-  // Add any custom S.roles not covered by DEFAULT
+  // Solo agregar roles completamente nuevos que no existen en absoluto
+  // NUNCA modificar permisos existentes — el Super Admin tiene control total
   (S.roles||[]).forEach(function(role){
     if(!PERMISOS[role.id]){
-      PERMISOS[role.id]=JSON.parse(JSON.stringify(DEFAULT_PERMISOS[role.id]||DEFAULT_PERMISOS['lider']||{}));
+      // Rol nuevo sin configuración: inicializar todo en 'ninguno'
+      var emptyPerms={};
+      SCREENS.forEach(function(s){ emptyPerms[s]='ninguno'; });
+      PERMISOS[role.id]=emptyPerms;
       needsSave=true;
     }
   });
-  // If anything was missing, persist it so Firebase gets the full config
   if(needsSave) await saveK('gdv_permisos', PERMISOS);
 }
 
 async function savePermisos(){
   if(!PERMISOS || !Object.keys(PERMISOS).length) return;
+  const ts=Date.now();
   await saveK('gdv_permisos', PERMISOS);
+  // Actualizar timestamp local para que otros dispositivos descarguen la versión nueva
+  localStorage.setItem('_local_ts_gdv_permisos', String(ts));
 }
 
 function getPerm(roleId, screen){

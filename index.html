@@ -4644,6 +4644,9 @@ function gdvInitFacForm(){
       document.getElementById('gdv-group-info').textContent=g?`${g.name} — ${members.length} miembros activos`:'Sin grupo asignado. Verificá la configuración.';
       members.forEach(m=>{gdvFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
       gdvRenderFacMembers(members);
+      // Chequear duplicado con la fecha por defecto (hoy)
+      if(facGid) gdvCheckDuplicateWeek(facGid);
+      if(facGid) gdvCheckPendingWeeks(facGid);
     }
   }
   }catch(err){

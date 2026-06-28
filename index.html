@@ -724,7 +724,7 @@ async function migratePermisos(){
     if(!PERMISOS[role.id]){
       // Rol nuevo sin configuración: inicializar todo en 'ninguno'
       var emptyPerms={};
-      SCREENS.forEach(function(s){ emptyPerms[s]='ninguno'; });
+      SCREENS.forEach(function(s){ emptyPerms[s.key||s]='ninguno'; });
       PERMISOS[role.id]=emptyPerms;
       needsSave=true;
     }

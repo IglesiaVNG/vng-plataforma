@@ -7879,6 +7879,7 @@ function cfgOpenSection(sec){
   }
 }
 async function cfgSavePermisos(){
+  // Guardar en localStorage primero
   await savePermisos();
   const verificado=localStorage.getItem('gdv_permisos');
   if(!verificado||verificado==='{}'){
@@ -7886,8 +7887,17 @@ async function cfgSavePermisos(){
     return;
   }
   window._permisosEditing=false;
+  // Usar fbSavePermisos para subir con gdv_permisos_ts correcto
+  // Esto garantiza que el timestamp específico de permisos se guarda en Firebase
+  // y el download no los pisa al recargar
   try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    const ts=Date.now();
+    if(typeof window.fbSavePermisos==='function'){
+      await window.fbSavePermisos(verificado);
+    } else {
+      await window.fbUpload(true);
+    }
+    localStorage.setItem('_local_ts_gdv_permisos', String(ts));
     showToast('✅ Permisos guardados ☁️','#16A34A');
   }catch(e){
     showToast('⚠️ Permisos guardados localmente pero NO en la nube','#D97706');

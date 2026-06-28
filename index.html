@@ -715,14 +715,17 @@ function loadPermisos(){
   if(window._permisosEditing) return;
   try{
     const saved=localStorage.getItem('gdv_permisos');
+    console.log('[PERMISOS] loadPermisos - saved existe:', !!saved);
     if(saved){
       const parsed=JSON.parse(saved);
-      // Use saved config as-is — Super Admin has full authority to set any permission including ninguno
+      console.log('[PERMISOS] facilitador.disc_cargar:', parsed.facilitador?.disc_cargar);
       PERMISOS=parsed;
     } else {
+      console.log('[PERMISOS] ⚠️ no hay saved - usando DEFAULT');
       PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
     }
   }catch(e){
+    console.log('[PERMISOS] ⚠️ error parse - usando DEFAULT:', e.message);
     PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
   }
 }
@@ -1053,7 +1056,7 @@ let gdvCharts={};
 // HELPERS
 // ════════════════════════════════════════════════════════════
 async function initStorage(){
-  try{ localStorage.removeItem('gdv_permisos'); }catch(e){}
+  // NUNCA borrar gdv_permisos al iniciar — el Super Admin configura permisos que deben persistir
   S.users      =load(SK.users,      DEFAULT_USERS);
   S.groups     =load(SK.groups,     DEFAULT_GROUPS);
   S.records    =load(SK.records,    []);

@@ -1,6 +1,6 @@
 # VNG Plataforma Ministerial — Roadmap
 
-> Última actualización: 27/06/25
+> Última actualización: 28/06/26
 > Estado general: En uso interno (Iglesia Vida Nueva, Gerli). Pre-comercialización.
 
 ---
@@ -23,7 +23,7 @@
 - DEV: `vng-plataforma-git-development-iglesiavngs-projects.vercel.app` → rama `development`
 - Login con usuario y contraseña (sistema propio, usuarios guardados en Firebase)
 
-### Fixes aplicados (26/06/25)
+### Fixes aplicados (26/06/26)
 - `mergeMembers` — compara `_ts` por miembro, el más reciente gana
 - `_ts` agregado a cada miembro al guardar
 - `nvSaveInlineForm` — usa `saveK` en lugar de `localStorage` directo
@@ -32,18 +32,44 @@
 - `nvCloseInlineForm` — llama a `renderNuevos()` para refrescar lista
 - `renderNuevos` — `fTipoGrupo` declarada con fallback seguro
 - Campo `fechaIngreso` — cambiado a `type="text"` con formato `dd/mm/aa`, solo numérico
+- Permisos: eliminado `allNinguno` check que pisaba configuración del Super Admin
 
-### Fixes aplicados (27/06/25) — Guardado de datos críticos
+### Fixes aplicados (27/06/26) — Guardado de datos críticos
 - `mergeByTs` genérico — merge registro por registro para todos los arrays críticos
-- `fbDownload` — protege `gdv_r5`, `gdv_disc_records`, `gdv_ng_records` con merge inteligente (ya no se pisan en bloque)
-- `_ts` agregado a registros nuevos de GdV, Discipulado y Nuevas Generaciones
-- `_ts` agregado al editar registros existentes de GdV, Discipulado y Nuevos Contactos
-- `discGuardarAsistencia` — fbUpload falla ruidosamente si hay error (ya no silencioso)
-- Funciones de formato de fecha (`fmtFnac`, `validarFnac`, etc.) expuestas en `window` — corrige error "is not defined"
-- Campo `sa-mf-fnac` (Rebaños) — cambiado a `type="text"` con autoformato `dd/mm/aa`
-- Campo `nv-edit-fnac` (Nuevos Contactos) — agregado autoformato y validación
-- `markFieldError` — resalta visualmente campos inválidos al intentar guardar
-- Todas las funciones de formato unificadas en una sola (`fmtFnac`)
+- `fbDownload` — protege `gdv_r5`, `gdv_disc_records`, `gdv_ng_records` con merge inteligente
+- `_ts` agregado a registros nuevos y editados de GdV, Discipulado y Nuevas Generaciones
+- `discGuardarAsistencia` — fbUpload falla ruidosamente si hay error
+- Funciones de formato de fecha (`fmtFnac`, `validarFnac`, etc.) expuestas en `window`
+- Campo `sa-mf-fnac` y `nv-edit-fnac` — autoformato `dd/mm/aa` con validación
+- `markFieldError` — resalta visualmente campos inválidos al guardar
+- Dashboard GdV — grupos con encuentros y sin-encuentro en mismo período se muestran correctamente (estado `mixto`)
+- Control semanas ISO — no se puede duplicar ni saltear una semana
+- Mensajes diferenciados por rol en control de semana duplicada
+- `nvCloseInlineForm` — llama `renderNuevos()` al cerrar
+- Bloqueo de semanas pendientes al guardar en GdV
+
+### Fixes aplicados (28/06/26) — Permisos y Configuración
+- **Fix crítico:** `initStorage` borraba `gdv_permisos` en cada inicio de app — eliminado
+- Permisos ahora persisten correctamente entre sesiones y dispositivos
+- `cfgSavePermisos` usa `fbSavePermisos` con `gdv_permisos_ts` propio
+- `gdv_permisos` excluido del upload/download general — canal propio
+- `loadPermisos` — Super Admin tiene control total, sin relleno automático con defaults
+- Roles nuevos se inicializan con todo en `ninguno` (no con defaults)
+- Fix `[object Object]` en inicialización de permisos de rol nuevo
+
+---
+
+## 🔴 Crítico — Resolver próxima sesión
+
+### `gdvRenderChart is not defined` en Dashboard GdV
+- Error al tocar el Dashboard de GdV
+- `gdvRenderChart` no está expuesta en `window` o no está definida en el scope correcto
+- Mismo patrón que el bug de `fmtFnac` — función no accesible desde HTML
+
+### Control semana ISO para Darío Codina (facilitador)
+- Sigue pudiendo cargar dos veces en la misma semana ISO
+- El chequeo al abrir el formulario puede no estar funcionando para facilitadores
+- Revisar `gdvInitFacForm` y el chequeo automático al seleccionar grupo
 
 ---
 
@@ -52,13 +78,12 @@
 ### Auth real (Firebase Auth email/password)
 - Hoy las contraseñas se guardan en texto plano en Firebase
 - Sin recupero de contraseña por email
-- **Hacer junto con multi-tenancy para evitar doble migración**
+- **Hacer junto con multi-tenancy**
 
 ### Multi-tenancy
 - Cada iglesia necesita su colección separada en Firebase (`vng_{orgId}/...`)
 - Requiere panel de super-admin para gestionar organizaciones
 - Onboarding automático para nuevas iglesias
-- **Es el paso más importante antes de vender a otras iglesias**
 
 ### URL propia
 - Definir nombre comercial de la plataforma
@@ -70,7 +95,6 @@
 
 ### Indicador visible de sincronización
 - Mostrar "✅ Guardado en la nube" o "⚠️ Sin conexión" en tiempo real
-- Hoy el usuario no sabe visualmente si sus datos subieron
 
 ### Historial de cambios visible
 - Que el usuario vea quién modificó cada registro y cuándo
@@ -84,16 +108,12 @@
 ### Backup automático
 - Export semanal automático a Google Drive o similar
 
-### Módulo de Comunicaciones / Eventos
-- Pendiente de desarrollo
-
 ### Nuevas Generaciones
 - Terminar ajustes en DEV
 - Pasar a PROD cuando esté estable
 
 ### Edición de registros existentes (Super Admin)
 - En GdV, NG y Discipulado
-- Pendiente
 
 ---
 
@@ -112,10 +132,9 @@
 
 ## 📋 Cómo trabajar con este archivo
 
-- **Bugs urgentes** → abrir sesión de corrección, compartir este archivo al inicio
-- **Features nuevas** → mover de Backlog a Importante/Crítico cuando corresponda
-- **Al cerrar cada sesión** → actualizar este archivo con lo resuelto y lo nuevo
 - **Al abrir un chat nuevo** → compartir este archivo como primer contexto
+- **Bugs urgentes** → abrir sesión de corrección, referenciar este archivo
+- **Al cerrar cada sesión** → actualizar este archivo con lo resuelto y lo nuevo
 
 ---
 
@@ -127,7 +146,7 @@
 | Completo | USD 45/mes | Hasta 300 miembros, todos los módulos |
 | Grande | USD 80/mes | Miembros ilimitados + soporte prioritario |
 
-Mercado objetivo inicial: iglesias de 50-500 miembros en Argentina, Uruguay, Chile, Paraguay.
+Mercado objetivo: iglesias de 50-500 miembros en Argentina, Uruguay, Chile, Paraguay.
 
 ---
 

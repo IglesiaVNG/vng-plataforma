@@ -2312,7 +2312,7 @@ function buildMiembrosHTML(){
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="saShowActualizarQR()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">📱 QR Actualizar datos</button>
         <button class="btn btn-sm" onclick="exportMiembrosExcel()" style="background:#F0FDF4;border-color:#86EFAC;color:#166634;font-weight:600">📥 Exportar Excel</button>
-        ${canEditMiembros()?`<button class="btn btn-primary btn-sm" onclick="saOpenNewMember()">+ Nuevo miembro</button>`:''}
+        ${canEditMiembros()?`<button class="btn btn-primary btn-sm" onclick="saOpenNewMember()">+ Nueva persona</button>`:''}
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
@@ -2421,7 +2421,7 @@ function buildMiembrosHTML(){
     <div id="sa-member-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;display:none;align-items:center;justify-content:center;padding:1rem">
       <div id="sa-member-form" style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <div class="card-title" id="sa-mf-title" style="margin:0">Nuevo miembro</div>
+        <div class="card-title" id="sa-mf-title" style="margin:0">Nueva persona</div>
         <button class="btn btn-sm" onclick="saCloseMemberForm()">✕</button>
       </div>
       <div class="form-row">
@@ -2465,11 +2465,9 @@ function buildMiembrosHTML(){
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label>
           <input type="tel" id="sa-mf-tel" placeholder="+54 ..."></div>
       </div>
-      <div class="form-row">
+      <div class="form-row" id="sa-mf-fechaingreso-row" style="display:none">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">DNI <span style="color:#9CA3AF;font-weight:400">(opcional)</span></label>
           <input type="text" id="sa-mf-dni" placeholder="Ej: 12345678" maxlength="9" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" style="width:140px"></div>
-      </div>
-      <div class="form-row" id="sa-mf-fechaingreso-row" style="display:none">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de ingreso <span style="color:#9CA3AF;font-weight:400">(solo Super Admin)</span></label>
           <input type="text" id="sa-mf-fechaingreso" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFechaIngreso(this)" style="width:120px"></div>
       </div>
@@ -3082,7 +3080,7 @@ function saToggleGrupoExtra(gid,el){
 
 function saOpenNewMember(){
   saEditingMemberId=null;
-  document.getElementById('sa-mf-title').textContent='Nuevo miembro';
+  document.getElementById('sa-mf-title').textContent='Nueva persona';
   ['sa-mf-nombre','sa-mf-apellido','sa-mf-tel','sa-mf-dir'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const fnac=document.getElementById('sa-mf-fnac');if(fnac)fnac.value='';
   const dniReset=document.getElementById('sa-mf-dni');if(dniReset)dniReset.value='';
@@ -7065,6 +7063,12 @@ function buildNuevosHTML(){
           <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha nacimiento</label><input type="text" id="nv-edit-fnac" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFnac(this)" style="width:100%"></div>
           <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad</label><input type="text" id="nv-edit-barrio" style="width:100%"></div>
         </div>
+        <div class="form-row" style="margin-top:8px">
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">DNI <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+            <input type="text" id="nv-edit-dni" placeholder="Ej: 12345678" maxlength="9" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" style="width:100%"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Grupo / Comunidad <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+            <select id="nv-edit-grupo" style="width:100%"><option value="">— Sin asignar —</option></select></div>
+        </div>
         <div style="margin-top:8px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conoció?</label>
           <select id="nv-edit-como" style="width:100%">
             <option value="">—</option><option>Por un amigo o familiar</option><option>Instagram (@iglesiavng)</option>
@@ -7472,6 +7476,8 @@ function nvAbrirEditar(id){
   document.getElementById('nv-edit-barrio').value=m.dir||'';
   document.getElementById('nv-edit-como').value=m.comoNosConocio||'';
   document.getElementById('nv-edit-motivo').value=m.motivoContacto||'';
+  const dniEditEl=document.getElementById('nv-edit-dni'); if(dniEditEl) dniEditEl.value=m.dni||'';
+  nvBuildGrupoSelector('nv-edit-grupo', nvGetGrupoValFromMember(m));
   // Fecha ingreso - only editable by Super Admin
   const fechaWrap=document.getElementById('nv-edit-fecha-wrap');
   const fechaInput=document.getElementById('nv-edit-fecha');
@@ -7497,6 +7503,10 @@ async function nvGuardarEditar(){
   m.dir=document.getElementById('nv-edit-barrio').value.trim();
   m.comoNosConocio=document.getElementById('nv-edit-como').value;
   m.motivoContacto=document.getElementById('nv-edit-motivo').value.trim();
+  m.dni=(document.getElementById('nv-edit-dni')?.value||'').trim();
+  var grupoVals=nvGetGrupoIdFromVal(document.getElementById('nv-edit-grupo')?.value||'');
+  m.grupoId=grupoVals.grupoId;
+  m.ngComunidadId=grupoVals.ngComunidadId;
   if(isSuperAdmin()){
     const fechaVal=document.getElementById('nv-edit-fecha')?.value.trim();
     if(fechaVal) m.fechaRegistro=fechaVal;
@@ -7603,6 +7613,54 @@ function nvAgregarNuevo(){
   nvOpenInlineForm();
 }
 
+function nvBuildGrupoSelector(selId, selectedId){
+  var sel=document.getElementById(selId);
+  if(!sel) return;
+  // Limpiar opciones excepto la primera
+  while(sel.options.length>1) sel.remove(1);
+  // Grupos GdV
+  var gdvGroups=S.groups.filter(function(g){return g.type!=='ng';});
+  if(gdvGroups.length){
+    var ogGdv=document.createElement('optgroup');
+    ogGdv.label='Grupos de Vida';
+    gdvGroups.forEach(function(g){
+      var o=document.createElement('option');
+      o.value='gdv_'+g.id;
+      o.textContent=g.name+(g.type?' ('+g.type+')':'');
+      if(selectedId==='gdv_'+g.id) o.selected=true;
+      ogGdv.appendChild(o);
+    });
+    sel.appendChild(ogGdv);
+  }
+  // Comunidades NG
+  var ngGroups=S.ngComunidades||[];
+  if(ngGroups.length){
+    var ogNg=document.createElement('optgroup');
+    ogNg.label='Nuevas Generaciones';
+    ngGroups.forEach(function(g){
+      var o=document.createElement('option');
+      o.value='ng_'+g.id;
+      o.textContent=g.nombre||g.name;
+      if(selectedId==='ng_'+g.id) o.selected=true;
+      ogNg.appendChild(o);
+    });
+    sel.appendChild(ogNg);
+  }
+}
+
+function nvGetGrupoIdFromVal(val){
+  if(!val) return {grupoId:null, ngComunidadId:null};
+  if(val.startsWith('gdv_')) return {grupoId:parseInt(val.replace('gdv_','')), ngComunidadId:null};
+  if(val.startsWith('ng_')) return {grupoId:null, ngComunidadId:parseInt(val.replace('ng_',''))};
+  return {grupoId:null, ngComunidadId:null};
+}
+
+function nvGetGrupoValFromMember(m){
+  if(m.grupoId) return 'gdv_'+m.grupoId;
+  if(m.ngComunidadId) return 'ng_'+m.ngComunidadId;
+  return '';
+}
+
 function nvOpenInlineForm(prefill){
   // nv-form-overlay is in static HTML - always available
   const overlay=document.getElementById('nv-form-overlay');
@@ -7614,6 +7672,7 @@ function nvOpenInlineForm(prefill){
     const fnacEl=document.getElementById('nv-mf-fnac'); if(fnacEl) fnacEl.value='';
     const genEl=document.getElementById('nv-mf-genero'); if(genEl) genEl.value='';
     const dniNvEl=document.getElementById('nv-mf-dni'); if(dniNvEl) dniNvEl.value='';
+    nvBuildGrupoSelector('nv-mf-grupo', prefill?.grupoId?'gdv_'+prefill.grupoId:'');
     const como=document.getElementById('nv-mf-como'); if(como) como.value='';
     const seg=document.getElementById('nv-mf-seguimiento-id'); if(seg) seg.value='';
     document.getElementById('nv-mf-seguimiento-label').textContent='Pendiente de asignar';
@@ -7695,7 +7754,8 @@ async function nvSaveInlineForm(){
       seguimientoNombre:segId?segLabel:'',
       fechaRegistro:todayAA(),
       origen:'Carga manual',
-      dni:dni
+      dni:dni,
+      ...nvGetGrupoIdFromVal(document.getElementById('nv-mf-grupo')?.value||'')
     };
     S.members.push(nuevo);
     // Use saveK so _local_ts_ gets updated (protects against Firebase overwrite on next download)
@@ -9710,6 +9770,11 @@ boot();
         </div>
         <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad *</label>
           <input type="text" id="nv-mf-barrio" placeholder="Desde donde nos escribe..."></div>
+        <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Grupo / Comunidad <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+          <select id="nv-mf-grupo" style="width:100%">
+            <option value="">— Sin asignar —</option>
+          </select>
+        </div>
         <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conociste? *</label>
           <select id="nv-mf-como">
             <option value="">— Seleccioná —</option>

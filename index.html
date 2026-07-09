@@ -2071,8 +2071,9 @@ function canCargarAsistencia(){
 
 // ── Role helper ────────────────────────────────────────────
 function userRoles(){
+  if(!currentUser||!currentUser.name) return currentUser&&currentUser.role?[currentUser.role]:[];
   const linked=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
-  return linked?linked.roles:[];
+  return linked?linked.roles:(currentUser.role?[currentUser.role]:[]);
 }
 function hasRole(...rols){ const r=userRoles(); return rols.some(x=>r.includes(x)||currentUser.role===x); }
 

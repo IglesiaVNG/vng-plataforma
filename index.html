@@ -2465,6 +2465,10 @@ function buildMiembrosHTML(){
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label>
           <input type="tel" id="sa-mf-tel" placeholder="+54 ..."></div>
       </div>
+      <div class="form-row">
+        <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">DNI <span style="color:#9CA3AF;font-weight:400">(opcional)</span></label>
+          <input type="text" id="sa-mf-dni" placeholder="Ej: 12345678" maxlength="9" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" style="width:140px"></div>
+      </div>
       <div class="form-row" id="sa-mf-fechaingreso-row" style="display:none">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de ingreso <span style="color:#9CA3AF;font-weight:400">(solo Super Admin)</span></label>
           <input type="text" id="sa-mf-fechaingreso" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFechaIngreso(this)" style="width:120px"></div>
@@ -3081,6 +3085,7 @@ function saOpenNewMember(){
   document.getElementById('sa-mf-title').textContent='Nuevo miembro';
   ['sa-mf-nombre','sa-mf-apellido','sa-mf-tel','sa-mf-dir'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const fnac=document.getElementById('sa-mf-fnac');if(fnac)fnac.value='';
+  const dniReset=document.getElementById('sa-mf-dni');if(dniReset)dniReset.value='';
   document.getElementById('sa-mf-genero').value='H';
   document.getElementById('sa-mf-condicion').value='Asistente';
   document.getElementById('sa-mf-estado').value='Activo';
@@ -3124,6 +3129,7 @@ function saEditMember(id){
   document.getElementById('sa-mf-tel').value=m.tel||'';
   document.getElementById('sa-mf-dir').value=m.dir||'';
   const fnac=document.getElementById('sa-mf-fnac');if(fnac)fnac.value=m.fnac?fmtAA(m.fnac):'';
+  const dniEl=document.getElementById('sa-mf-dni');if(dniEl)dniEl.value=m.dni||'';
   saBuildRoleSelector(m.roles||[]);
   saBuildGruposExtra(m.grupoIds||[]);
   // Motivo: oculto hasta que cambien el Estado
@@ -3179,6 +3185,7 @@ async function saSaveMember(){
       return v;
     })(),
     roles:[...saSelectedRoles],
+    dni:(document.getElementById('sa-mf-dni')?.value||'').trim(),
     _ts:Date.now()
   };
   // Fecha de ingreso: solo Super Admin puede modificarla
@@ -7606,6 +7613,7 @@ function nvOpenInlineForm(prefill){
     });
     const fnacEl=document.getElementById('nv-mf-fnac'); if(fnacEl) fnacEl.value='';
     const genEl=document.getElementById('nv-mf-genero'); if(genEl) genEl.value='';
+    const dniNvEl=document.getElementById('nv-mf-dni'); if(dniNvEl) dniNvEl.value='';
     const como=document.getElementById('nv-mf-como'); if(como) como.value='';
     const seg=document.getElementById('nv-mf-seguimiento-id'); if(seg) seg.value='';
     document.getElementById('nv-mf-seguimiento-label').textContent='Pendiente de asignar';
@@ -7667,6 +7675,7 @@ async function nvSaveInlineForm(){
     const motivo=(document.getElementById('nv-mf-motivo')?.value||'').trim();
     const segId=document.getElementById('nv-mf-seguimiento-id')?.value||'';
     const segLabel=document.getElementById('nv-mf-seguimiento-label')?.textContent||'';
+    const dni=(document.getElementById('nv-mf-dni')?.value||'').trim();
     const err=document.getElementById('nv-form-error');
     if(!nombre||!apellido||!cel){
       const msg='Completá los campos obligatorios: Nombre, Apellido y Celular (*)';
@@ -7685,7 +7694,8 @@ async function nvSaveInlineForm(){
       seguimientoId:segId?parseInt(segId):null,
       seguimientoNombre:segId?segLabel:'',
       fechaRegistro:todayAA(),
-      origen:'Carga manual'
+      origen:'Carga manual',
+      dni:dni
     };
     S.members.push(nuevo);
     // Use saveK so _local_ts_ gets updated (protects against Firebase overwrite on next download)
@@ -9695,6 +9705,8 @@ boot();
           <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Género *</label>
             <select id="nv-mf-genero" style="width:100%"><option value="">—</option><option value="H">Hombre</option><option value="M">Mujer</option></select>
           </div>
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">DNI <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+            <input type="text" id="nv-mf-dni" placeholder="Ej: 12345678" maxlength="9" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" style="width:100%"></div>
         </div>
         <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Barrio / Ciudad *</label>
           <input type="text" id="nv-mf-barrio" placeholder="Desde donde nos escribe..."></div>

@@ -4068,31 +4068,30 @@ async function cfgSaveUser(){
     Object.assign(existing,{name,user,pass,role,groupId,memberId:resolvedMemberId});
     // Sincronizar función con S.members para que se vea en Rebaños
     var memberId=resolvedMemberId;
+    console.log('[CFG] memberId resuelto:', memberId, 'role:', role);
     if(memberId){
       var mem=S.members.find(function(m){return Number(m.id)===Number(memberId);});
+      console.log('[CFG] miembro encontrado:', mem?fullName(mem):'NO ENCONTRADO');
       if(mem){
-        var roles=mem.roles||[];
-        // Quitar roles de usuario previos y agregar el nuevo
-        var userRoleIds=S.roles.map(function(r){return r.id;});
-        roles=roles.filter(function(r){return !userRoleIds.includes(r);});
-        if(role) roles.push(role);
-        mem.roles=roles;
+        if(!mem.roles) mem.roles=[];
+        if(!mem.roles.includes(role)) mem.roles.push(role);
         mem._ts=Date.now();
+        console.log('[CFG] roles actualizados:', mem.roles);
       }
     }
   } else {
     var newUser={id:Date.now(),name,user,pass,role,groupId,memberId:memberIdVal};
     S.users.push(newUser);
-    // Sincronizar rol con S.members para que se vea en Rebaños
+    // Sincronizar función con S.members para que se vea en Rebaños
+    console.log('[CFG] nuevo usuario, memberIdVal:', memberIdVal, 'role:', role);
     if(memberIdVal){
       var mem=S.members.find(function(m){return Number(m.id)===Number(memberIdVal);});
+      console.log('[CFG] miembro encontrado:', mem?fullName(mem):'NO ENCONTRADO');
       if(mem){
-        var roles=mem.roles||[];
-        var userRoleIds=S.roles.map(function(r){return r.id;});
-        roles=roles.filter(function(r){return !userRoleIds.includes(r);});
-        if(role) roles.push(role);
-        mem.roles=roles;
+        if(!mem.roles) mem.roles=[];
+        if(!mem.roles.includes(role)) mem.roles.push(role);
         mem._ts=Date.now();
+        console.log('[CFG] roles actualizados:', mem.roles);
       }
     }
   }

@@ -3306,7 +3306,7 @@ function buildConfigHTML(){
       <button class="btn btn-sm" id="cfg-tab-ng" onclick="configTab('ng',this)">🌱 Nuevas Generaciones</button>
       <button class="btn btn-sm" id="cfg-tab-modulos" onclick="configTab('modulos',this)">📱 Módulos</button>
       <button class="btn btn-sm" id="cfg-tab-usuarios" onclick="configTab('usuarios',this)">👤 Usuarios</button>
-      <button class="btn btn-sm" id="cfg-tab-roles" onclick="configTab('roles',this)">🎭 Roles</button>
+      <button class="btn btn-sm" id="cfg-tab-roles" onclick="configTab('roles',this)">🎭 Funciones</button>
       <button class="btn btn-sm" id="cfg-tab-permisos" onclick="configTab('permisos',this)">🔐 Permisos</button>
       <button class="btn btn-sm" id="cfg-tab-exportar" onclick="configTab('exportar',this)">💾 Datos</button>
       <button class="btn btn-sm" id="cfg-tab-restaurar" onclick="configTab('restaurar',this)" style="color:#DC2626;border-color:#FECACA">🔄 Restaurar permisos</button>
@@ -3724,7 +3724,32 @@ async function ngSaveComunidad(){
     S.ngComunidades.push({id:Date.now(),name:nombre,tipo,dia,horario,
       liderIds,colaboradorIds,estado:'Activo'});
   }
+  // Sincronizar funciones NG con S.members para que se vean en Rebaños
+  // El rol 'lider' = 'Líder NG' en el sistema
+  // Recolectar todos los ids de líderes y colaboradores actuales en NG
+  var ngLiderIds=new Set();
+  var ngColabIds=new Set();
+  S.ngComunidades.forEach(function(ng){
+    (ng.liderIds||[]).forEach(function(id){ ngLiderIds.add(Number(id)); });
+    (ng.colaboradorIds||[]).forEach(function(id){ ngColabIds.add(Number(id)); });
+  });
+  // Actualizar roles en S.members
+  S.members.forEach(function(m){
+    if(!m.roles) m.roles=[];
+    var id=Number(m.id);
+    if(ngLiderIds.has(id)||ngColabIds.has(id)){
+      if(!m.roles.includes('lider')){ m.roles.push('lider'); m._ts=Date.now(); }
+    } else {
+      // Solo quitar 'lider' si no lo tiene asignado por otro motivo (ej: Configuración Usuarios)
+      var tieneUserLider=S.users.some(function(u){return Number(u.memberId)===id && u.role==='lider';});
+      if(!tieneUserLider && m.roles.includes('lider')){
+        m.roles=m.roles.filter(function(r){return r!=='lider';});
+        m._ts=Date.now();
+      }
+    }
+  });
   await saveK(SK.ngComunidades, S.ngComunidades);
+  await saveK(SK.members, S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
@@ -9539,7 +9564,7 @@ function exportMiembrosExcel(){
     {key:'direccion', label:'Barrio / Ciudad', width:24},
     {key:'fnac',      label:'Fecha Nac.',   width:14},
     {key:'edad',      label:'Edad',         width:8},
-    {key:'roles',     label:'Roles',        width:30},
+    {key:'roles',     label:'Funciones',        width:30},
     {key:'fechaBaja', label:'Fecha Baja',   width:14},
   ];
   const fecha=todayAA().replace(/\//g,'-');

@@ -3729,25 +3729,30 @@ async function ngSaveComunidad(){
   // El rol 'lider' = 'Líder NG' en el sistema
   // Recolectar todos los ids de líderes y colaboradores actuales en NG
   // Usar strings para evitar problemas de precisión con IDs grandes
+  var NG_ROL_LIDER='lider';
+  var NG_ROL_COLAB='colaborador1783645248659';
   var ngLiderIds=new Set();
   var ngColabIds=new Set();
   S.ngComunidades.forEach(function(ng){
     (ng.liderIds||[]).forEach(function(id){ ngLiderIds.add(String(id)); });
     (ng.colaboradorIds||[]).forEach(function(id){ ngColabIds.add(String(id)); });
   });
-  console.log('[NG SYNC] liderIds:', Array.from(ngLiderIds), 'colabIds:', Array.from(ngColabIds));
-  // Actualizar roles en S.members
+  // Quitar funciones NG previas de todos los miembros
+  S.members.forEach(function(m){
+    if(!m.roles) return;
+    var tieneUserLider=S.users.some(function(u){return String(u.memberId)===String(m.id) && u.role===NG_ROL_LIDER;});
+    if(!tieneUserLider) m.roles=m.roles.filter(function(r){return r!==NG_ROL_LIDER;});
+    m.roles=m.roles.filter(function(r){return r!==NG_ROL_COLAB;});
+  });
+  // Asignar función correcta según rol en NG
   S.members.forEach(function(m){
     if(!m.roles) m.roles=[];
     var id=String(m.id);
-    if(ngLiderIds.has(id)||ngColabIds.has(id)){
-      if(!m.roles.includes('lider')){ m.roles.push('lider'); m._ts=Date.now(); console.log('[NG SYNC] asignando lider a', m.nombre, m.apellido); }
-    } else {
-      var tieneUserLider=S.users.some(function(u){return String(u.memberId)===id && u.role==='lider';});
-      if(!tieneUserLider && m.roles.includes('lider')){
-        m.roles=m.roles.filter(function(r){return r!=='lider';});
-        m._ts=Date.now();
-      }
+    if(ngLiderIds.has(id)){
+      if(!m.roles.includes(NG_ROL_LIDER)){ m.roles.push(NG_ROL_LIDER); m._ts=Date.now(); }
+    }
+    if(ngColabIds.has(id)){
+      if(!m.roles.includes(NG_ROL_COLAB)){ m.roles.push(NG_ROL_COLAB); m._ts=Date.now(); }
     }
   });
   await saveK(SK.ngComunidades, S.ngComunidades);

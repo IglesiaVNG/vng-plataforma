@@ -4062,9 +4062,12 @@ async function cfgSaveUser(){
     const existing=S.users.find(x=>Number(x.id)===Number(cfgEditingUserId));
     if(!existing){alert('Error: usuario no encontrado');return;}
     // Keep existing memberId when editing (member is read-only)
-    Object.assign(existing,{name,user,pass,role,groupId,memberId:existing.memberId||memberIdVal});
-    // Sincronizar rol con S.members para que se vea en Rebaños
-    var memberId=existing.memberId||memberIdVal;
+    // Also try reading selector directly in case memberId was never saved
+    var selectorMemberId=parseInt(document.getElementById('cfg-uf-member')?.value)||null;
+    var resolvedMemberId=existing.memberId||memberIdVal||selectorMemberId;
+    Object.assign(existing,{name,user,pass,role,groupId,memberId:resolvedMemberId});
+    // Sincronizar función con S.members para que se vea en Rebaños
+    var memberId=resolvedMemberId;
     if(memberId){
       var mem=S.members.find(function(m){return Number(m.id)===Number(memberId);});
       if(mem){

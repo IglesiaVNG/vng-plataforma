@@ -1,6 +1,6 @@
 # VNG Plataforma Ministerial — Roadmap
 
-> Última actualización: 28/06/26
+> Última actualización: 09/07/26
 > Estado general: En uso interno (Iglesia Vida Nueva, Gerli). Pre-comercialización.
 
 ---
@@ -24,52 +24,50 @@
 - Login con usuario y contraseña (sistema propio, usuarios guardados en Firebase)
 
 ### Fixes aplicados (26/06/26)
-- `mergeMembers` — compara `_ts` por miembro, el más reciente gana
-- `_ts` agregado a cada miembro al guardar
-- `nvSaveInlineForm` — usa `saveK` en lugar de `localStorage` directo
-- `nvPromover` — hace `fbUpload` inmediatamente al cambiar condición
-- `enviarForm` (QR) — usa `S.members + saveK` en lugar de `localStorage` directo
-- `nvCloseInlineForm` — llama a `renderNuevos()` para refrescar lista
-- `renderNuevos` — `fTipoGrupo` declarada con fallback seguro
-- Campo `fechaIngreso` — cambiado a `type="text"` con formato `dd/mm/aa`, solo numérico
-- Permisos: eliminado `allNinguno` check que pisaba configuración del Super Admin
-
-### Fixes aplicados (27/06/26) — Guardado de datos críticos
 - `mergeByTs` genérico — merge registro por registro para todos los arrays críticos
 - `fbDownload` — protege `gdv_r5`, `gdv_disc_records`, `gdv_ng_records` con merge inteligente
 - `_ts` agregado a registros nuevos y editados de GdV, Discipulado y Nuevas Generaciones
-- `discGuardarAsistencia` — fbUpload falla ruidosamente si hay error
-- Funciones de formato de fecha (`fmtFnac`, `validarFnac`, etc.) expuestas en `window`
-- Campo `sa-mf-fnac` y `nv-edit-fnac` — autoformato `dd/mm/aa` con validación
-- `markFieldError` — resalta visualmente campos inválidos al guardar
-- Dashboard GdV — grupos con encuentros y sin-encuentro en mismo período se muestran correctamente (estado `mixto`)
-- Control semanas ISO — no se puede duplicar ni saltear una semana
+- Funciones de formato de fecha expuestas en `window` — corrige "is not defined"
+- Campos fecha unificados a `dd/mm/aa` en todos los formularios
+- Control semanas ISO — no se puede duplicar ni saltear
 - Mensajes diferenciados por rol en control de semana duplicada
-- `nvCloseInlineForm` — llama `renderNuevos()` al cerrar
-- Bloqueo de semanas pendientes al guardar en GdV
+- Dashboard GdV — grupos mixtos (con y sin encuentro) se muestran correctamente
+- Permisos: `initStorage` ya no borra `gdv_permisos` al iniciar
+- `cfgSavePermisos` usa canal propio `fbSavePermisos` con timestamp correcto
+- Permisos: Super Admin tiene control total sin relleno automático de defaults
 
-### Fixes aplicados (28/06/26) — Permisos y Configuración
-- **Fix crítico:** `initStorage` borraba `gdv_permisos` en cada inicio de app — eliminado
-- Permisos ahora persisten correctamente entre sesiones y dispositivos
-- `cfgSavePermisos` usa `fbSavePermisos` con `gdv_permisos_ts` propio
-- `gdv_permisos` excluido del upload/download general — canal propio
-- `loadPermisos` — Super Admin tiene control total, sin relleno automático con defaults
-- Roles nuevos se inicializan con todo en `ninguno` (no con defaults)
-- Fix `[object Object]` en inicialización de permisos de rol nuevo
+### Fixes aplicados (09/07/26)
+- **Campo DNI** — agregado en formulario Nueva Persona (Rebaños) y Alta/Editar en Nuevos Contactos
+  - Opcional, máx 9 dígitos, solo numérico
+  - No afecta datos existentes
+- **Selector Grupo/Comunidad** en Nuevos Contactos — permite asignar GdV o comunidad NG al dar de alta o editar
+- **Botón renombrado** — "Nuevo miembro" → "Nueva persona" en Rebaños
+- **DNI y Fecha Ingreso** en la misma fila en formulario Rebaños (solo visible para Super Admin)
+- **Tab "Roles" → "Funciones"** en Configuración
+- **Imagen de fondo** en pantalla de login y toda la app
+- **Logo** con fondo transparente — pendiente reemplazo (logo nuevo llega mañana)
+- **Sincronización Funciones → Rebaños** — al asignar función en Configuración Usuarios o en comunidad NG, se refleja automáticamente en Rebaños
+  - Líder NG y Colaborador se distinguen correctamente
+  - Usa comparación por String para evitar problemas de precisión con IDs grandes
+- **`userRoles` y `hasRole`** — protegidos contra `currentUser.name/role` null
+- **Duplicados en S.members** eliminados (Leandro Perez y Maia Iañez)
 
 ---
 
 ## 🔴 Crítico — Resolver próxima sesión
 
 ### `gdvRenderChart is not defined` en Dashboard GdV
-- Error al tocar el Dashboard de GdV
-- `gdvRenderChart` no está expuesta en `window` o no está definida en el scope correcto
-- Mismo patrón que el bug de `fmtFnac` — función no accesible desde HTML
+- Error al tocar la pestaña de gráficos del Dashboard GdV
+- Función no expuesta en `window`
 
-### Control semana ISO para Darío Codina (facilitador)
-- Sigue pudiendo cargar dos veces en la misma semana ISO
-- El chequeo al abrir el formulario puede no estar funcionando para facilitadores
-- Revisar `gdvInitFacForm` y el chequeo automático al seleccionar grupo
+### Logo con fondo transparente
+- Logo actual tiene fondo negro que se mezcla con la imagen de fondo
+- Pendiente: reemplazar con PNG transparente que llega mañana
+- Una vez reemplazado → subir todo a PROD
+
+### Sincronización Configuración Usuarios → Rebaños
+- Al guardar usuario en Configuración, el rol se sincroniza con `m.roles`
+- Verificar que funciona correctamente para todos los casos (edición y alta)
 
 ---
 
@@ -93,14 +91,16 @@
 
 ## 🟡 Importante — Mejora confianza y experiencia
 
+### IDs de personas
+- Los IDs nuevos usan `Date.now()` (timestamp) → números muy grandes
+- A futuro: implementar secuencia incremental simple (1, 2, 3...)
+- No es urgente pero mejora legibilidad y debugging
+
 ### Indicador visible de sincronización
 - Mostrar "✅ Guardado en la nube" o "⚠️ Sin conexión" en tiempo real
 
 ### Historial de cambios visible
 - Que el usuario vea quién modificó cada registro y cuándo
-
-### Mensaje de estado al abrir
-- Mostrar "Datos actualizados al DD/MM/AA HH:MM" al iniciar sesión
 
 ### Export / Backup manual
 - Botón para descargar todos los datos en Excel o PDF

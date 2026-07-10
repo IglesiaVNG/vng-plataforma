@@ -2075,7 +2075,7 @@ function userRoles(){
   const linked=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
   return linked?linked.roles:(currentUser.role?[currentUser.role]:[]);
 }
-function hasRole(...rols){ const r=userRoles(); return rols.some(x=>r.includes(x)||currentUser.role===x); }
+function hasRole(...rols){ const r=userRoles(); return rols.some(x=>r.includes(x)||(currentUser&&currentUser.role&&currentUser.role===x)); }
 
 // ── Permission functions ────────────────────────────────────
 // SUPER ADMIN: todo
@@ -3725,6 +3725,7 @@ async function ngSaveComunidad(){
       liderIds,colaboradorIds,estado:'Activo'});
   }
   // Sincronizar funciones NG con S.members para que se vean en Rebaños
+  console.log('[NG SYNC] Iniciando sincronización de funciones NG→Rebaños');
   // El rol 'lider' = 'Líder NG' en el sistema
   // Recolectar todos los ids de líderes y colaboradores actuales en NG
   var ngLiderIds=new Set();

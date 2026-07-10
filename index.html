@@ -3728,21 +3728,22 @@ async function ngSaveComunidad(){
   console.log('[NG SYNC] Iniciando sincronización de funciones NG→Rebaños');
   // El rol 'lider' = 'Líder NG' en el sistema
   // Recolectar todos los ids de líderes y colaboradores actuales en NG
+  // Usar strings para evitar problemas de precisión con IDs grandes
   var ngLiderIds=new Set();
   var ngColabIds=new Set();
   S.ngComunidades.forEach(function(ng){
-    (ng.liderIds||[]).forEach(function(id){ ngLiderIds.add(Number(id)); });
-    (ng.colaboradorIds||[]).forEach(function(id){ ngColabIds.add(Number(id)); });
+    (ng.liderIds||[]).forEach(function(id){ ngLiderIds.add(String(id)); });
+    (ng.colaboradorIds||[]).forEach(function(id){ ngColabIds.add(String(id)); });
   });
+  console.log('[NG SYNC] liderIds:', Array.from(ngLiderIds), 'colabIds:', Array.from(ngColabIds));
   // Actualizar roles en S.members
   S.members.forEach(function(m){
     if(!m.roles) m.roles=[];
-    var id=Number(m.id);
+    var id=String(m.id);
     if(ngLiderIds.has(id)||ngColabIds.has(id)){
-      if(!m.roles.includes('lider')){ m.roles.push('lider'); m._ts=Date.now(); }
+      if(!m.roles.includes('lider')){ m.roles.push('lider'); m._ts=Date.now(); console.log('[NG SYNC] asignando lider a', m.nombre, m.apellido); }
     } else {
-      // Solo quitar 'lider' si no lo tiene asignado por otro motivo (ej: Configuración Usuarios)
-      var tieneUserLider=S.users.some(function(u){return Number(u.memberId)===id && u.role==='lider';});
+      var tieneUserLider=S.users.some(function(u){return String(u.memberId)===id && u.role==='lider';});
       if(!tieneUserLider && m.roles.includes('lider')){
         m.roles=m.roles.filter(function(r){return r!=='lider';});
         m._ts=Date.now();

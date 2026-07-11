@@ -2602,6 +2602,23 @@ function fmtAA(d){
   return d;
 }
 
+function fgPopup(e,fecha,fuente){
+  e.stopPropagation();
+  document.querySelectorAll('.fg-popup').forEach(x=>x.remove());
+  const div=document.createElement('div');
+  div.className='fg-popup';
+  div.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px 18px;box-shadow:0 4px 20px rgba(0,0,0,0.18);font-size:13px;min-width:160px;text-align:left';
+  div.innerHTML=`<div style="font-weight:700;color:#1F4E79;margin-bottom:8px">✅ Completado</div>
+    <div style="color:#6B7280;font-size:11px;margin-bottom:4px">Fecha</div>
+    <div style="font-weight:600;margin-bottom:10px">${fecha}</div>
+    <div style="color:#6B7280;font-size:11px;margin-bottom:4px">Origen</div>
+    <div style="font-weight:600">${fuente}</div>`;
+  const r=e.target.getBoundingClientRect();
+  div.style.top=(r.bottom+6)+'px';
+  div.style.left=Math.max(8,r.left-40)+'px';
+  document.body.appendChild(div);
+  setTimeout(()=>document.addEventListener('click',function h(){div.remove();document.removeEventListener('click',h);}),50);
+}
 function renderFormacionGrid(){
   const wrap=document.getElementById('sa-formacion-grid-wrap');
   if(!wrap) return;
@@ -2619,10 +2636,11 @@ function renderFormacionGrid(){
     const cols=pasos.map(p=>{
       const entry=(m.formacion||[]).find(f=>String(f.pasoId)===String(p.id));
       if(entry){
-        const badge=entry.fuente==='auto'
-          ?`<span style="font-size:9px;background:#D1FAE5;color:#065F46;padding:1px 5px;border-radius:99px;display:block;margin-top:2px">Auto</span>`
-          :`<span style="font-size:9px;background:#E0F2FE;color:#0369A1;padding:1px 5px;border-radius:99px;display:block;margin-top:2px">Manual</span>`;
-        return `<td style="text-align:center;font-size:11px;color:#065F46;font-weight:600;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB">${fmtAA(entry.fechaCompletado)||'✓'}${badge}</td>`;
+        // COMPLETADO — cliqueando muestra popup con fecha y fuente
+        const fecha=entry.fechaCompletado||'—';
+        const fuente=entry.fuente==='auto'?'Cursado':'Manual';
+        const popup=`fgPopup(event,'${fecha}','${fuente}')`;
+        return `<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="${popup}">✅ Completado</td>`;
       }
       // Calcular asistencia del miembro en este paso
       const registros=S.discRecords.filter(r=>String(r.pasoId)===String(p.id)&&r.asistencia);
@@ -2630,18 +2648,22 @@ function renderFormacionGrid(){
       const asistidas=registros.filter(r=>r.asistencia[m.id]).length;
       const pct=totalClases>0?Math.round(asistidas/totalClases*100):0;
       const tieneAsistencia=totalClases>0&&asistidas>0;
-      // ¿Completado automático por 75%?
+      // El paso está activo ahora mismo (ya filtramos pasos activos arriba, pero lo confirmamos)
+      const pasoActivo=p.estado==='Activo';
+      // Auto-completar si llegó al 75%
       if(tieneAsistencia&&pct>=75){
-        // Auto-completar si no está ya en m.formacion
         if(!(m.formacion||[]).find(f=>String(f.pasoId)===String(p.id))){
           if(!m.formacion) m.formacion=[];
           m.formacion.push({pasoId:p.id,pasoNombre:p.nombre,fechaCompletado:'',fuente:'auto'});
           (async()=>{ await saveK(SK.members,S.members); if(typeof window.fbUpload==='function') await window.fbUpload(true); })();
         }
-        return `<td style="text-align:center;font-size:11px;color:#065F46;font-weight:600;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB">✓ Auto (${pct}%)</td>`;
+        const popup2=`fgPopup(event,'—','Cursado')`;
+        return `<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="${popup2}">✅ Completado</td>`;
       }
-      if(tieneAsistencia) return `<td style="text-align:center;font-size:11px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso (${pct}%)</td>`;
-      return `<td style="text-align:center;font-size:11px;color:#9CA3AF;padding:7px 4px;background:#fff;border-left:1px solid #F3F4F6">Pendiente</td>`;
+      // EN CURSO — solo si el paso está activo Y tiene asistencia pero no llegó al 75%
+      if(pasoActivo&&tieneAsistencia) return `<td style="text-align:center;font-size:12px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso</td>`;
+      // PENDIENTE — paso inactivo sin completar, o activo sin asistencia
+      return `<td style="text-align:center;font-size:12px;color:#9CA3AF;padding:7px 4px;background:#fff;border-left:1px solid #F3F4F6">Pendiente</td>`;
     }).join('');
     return `<tr style="${rowBg}">
       <td style="min-width:150px;max-width:180px;padding:7px 8px;background:#fff;border-bottom:1px solid #F3F4F6">

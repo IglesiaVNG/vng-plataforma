@@ -2642,8 +2642,8 @@ function renderFormacionGrid(){
       const asistidas=registros.filter(r=>r.asistencia[m.id]).length;
       const pct=totalClases>0?Math.round(asistidas/totalClases*100):0;
       const tieneAsistencia=totalClases>0&&asistidas>0;
-      // EN CURSO — paso Activo con asistencia y sin llegar al 75%: asistencia manda sobre entry
-      if(pasoActivo&&tieneAsistencia&&pct<75){
+      // EN CURSO — paso Activo con asistencia: siempre En curso, nunca auto-completa
+      if(pasoActivo&&tieneAsistencia){
         return `<td style="text-align:center;font-size:12px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso</td>`;
       }
       // COMPLETADO manual — entrada cargada a mano, siempre vale
@@ -2652,18 +2652,12 @@ function renderFormacionGrid(){
         const popup=`fgPopup(event,'${fecha}','Manual')`;
         return `<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="${popup}">✅ Completado</td>`;
       }
-      // COMPLETADO auto — paso cerrado (Inactivo) y llegó al 75%, o paso activo con ≥75%
-      if(tieneAsistencia&&pct>=75){
-        // Guardar en formacion si no existe aún
-        if(!entry){
-          if(!m.formacion) m.formacion=[];
-          m.formacion.push({pasoId:p.id,pasoNombre:p.nombre,fechaCompletado:'',fuente:'auto'});
-          (async()=>{ await saveK(SK.members,S.members); if(typeof window.fbUpload==='function') await window.fbUpload(true); })();
-        }
+      // COMPLETADO auto — solo cuando el paso ya cerró (Inactivo) y llegó al 75%
+      if(!pasoActivo&&tieneAsistencia&&pct>=75){
         const popup2=`fgPopup(event,'—','Cursado')`;
         return `<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="${popup2}">✅ Completado</td>`;
       }
-      // PENDIENTE
+      // PENDIENTE — paso activo sin asistencia, o paso cerrado sin completar
       return `<td style="text-align:center;font-size:12px;color:#9CA3AF;padding:7px 4px;background:#fff;border-left:1px solid #F3F4F6">Pendiente</td>`;
     }).join('');
     return `<tr style="${rowBg}">

@@ -2624,8 +2624,23 @@ function renderFormacionGrid(){
           :`<span style="font-size:9px;background:#E0F2FE;color:#0369A1;padding:1px 5px;border-radius:99px;display:block;margin-top:2px">Manual</span>`;
         return `<td style="text-align:center;font-size:11px;color:#065F46;font-weight:600;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB">${fmtAA(entry.fechaCompletado)||'✓'}${badge}</td>`;
       }
-      const enCurso=S.discRecords.some(r=>String(r.pasoId)===String(p.id)&&r.asistencia&&r.asistencia[m.id]);
-      if(enCurso) return `<td style="text-align:center;font-size:11px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso</td>`;
+      // Calcular asistencia del miembro en este paso
+      const registros=S.discRecords.filter(r=>String(r.pasoId)===String(p.id)&&r.asistencia);
+      const totalClases=registros.length;
+      const asistidas=registros.filter(r=>r.asistencia[m.id]).length;
+      const pct=totalClases>0?Math.round(asistidas/totalClases*100):0;
+      const tieneAsistencia=totalClases>0&&asistidas>0;
+      // ¿Completado automático por 75%?
+      if(tieneAsistencia&&pct>=75){
+        // Auto-completar si no está ya en m.formacion
+        if(!(m.formacion||[]).find(f=>String(f.pasoId)===String(p.id))){
+          if(!m.formacion) m.formacion=[];
+          m.formacion.push({pasoId:p.id,pasoNombre:p.nombre,fechaCompletado:'',fuente:'auto'});
+          saveK(SK.members,S.members).then(()=>{ if(typeof window.fbUpload==='function') window.fbUpload(true); });
+        }
+        return `<td style="text-align:center;font-size:11px;color:#065F46;font-weight:600;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB">✓ Auto (${pct}%)</td>`;
+      }
+      if(tieneAsistencia) return `<td style="text-align:center;font-size:11px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso (${pct}%)</td>`;
       return `<td style="text-align:center;font-size:11px;color:#9CA3AF;padding:7px 4px;background:#fff;border-left:1px solid #F3F4F6">Pendiente</td>`;
     }).join('');
     return `<tr style="${rowBg}">
@@ -2823,10 +2838,17 @@ async function saAddFormacion(memberId){
   if(yaExiste){showToast('Ya existe ese Paso en Formación','#D97706');return;}
   m.formacion.push({pasoId,pasoNombre:paso?paso.nombre:'Paso desconocido',fechaCompletado:fmtAA(fecha),fuente:'manual'});
   await saveK(SK.members,S.members);
-  // Re-render formacion tab
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    console.error('saAddFormacion Firebase error:',e);
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
+  // Re-render grilla y detalle
   saShowDetail(memberId,null);
   saDetailTab('formacion',document.querySelectorAll('#sa-detail-panel .nav-btn')[2]);
-  showToast('✅ Formación agregada','#16A34A');
+  if(typeof renderFormacionGrid==='function') renderFormacionGrid();
+  showToast('✅ Formación guardada','#16A34A');
 }
 
 async function saDeleteFormacion(memberId, key){

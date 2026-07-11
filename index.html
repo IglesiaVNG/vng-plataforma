@@ -2634,25 +2634,28 @@ function renderFormacionGrid(){
     const isBaja=m.estado==='Baja';
     const rowBg=isBaja?'background:#FEF2F2':'background:#fff';
     const cols=pasos.map(p=>{
+      const pasoActivo=p.estado==='Activo';
       const entry=(m.formacion||[]).find(f=>String(f.pasoId)===String(p.id));
-      if(entry){
-        // COMPLETADO — cliqueando muestra popup con fecha y fuente
-        const fecha=entry.fechaCompletado||'—';
-        const fuente=entry.fuente==='auto'?'Cursado':'Manual';
-        const popup=`fgPopup(event,'${fecha}','${fuente}')`;
-        return `<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="${popup}">✅ Completado</td>`;
-      }
-      // Calcular asistencia del miembro en este paso
+      // Calcular asistencia siempre — determina si está En curso
       const registros=S.discRecords.filter(r=>String(r.pasoId)===String(p.id)&&r.asistencia);
       const totalClases=registros.length;
       const asistidas=registros.filter(r=>r.asistencia[m.id]).length;
       const pct=totalClases>0?Math.round(asistidas/totalClases*100):0;
       const tieneAsistencia=totalClases>0&&asistidas>0;
-      // El paso está activo ahora mismo (ya filtramos pasos activos arriba, pero lo confirmamos)
-      const pasoActivo=p.estado==='Activo';
-      // Auto-completar si llegó al 75%
+      // EN CURSO — paso Activo con asistencia y sin llegar al 75%: asistencia manda sobre entry
+      if(pasoActivo&&tieneAsistencia&&pct<75){
+        return `<td style="text-align:center;font-size:12px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso</td>`;
+      }
+      // COMPLETADO manual — entrada cargada a mano, siempre vale
+      if(entry&&entry.fuente==='manual'){
+        const fecha=entry.fechaCompletado||'—';
+        const popup=`fgPopup(event,'${fecha}','Manual')`;
+        return `<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="${popup}">✅ Completado</td>`;
+      }
+      // COMPLETADO auto — paso cerrado (Inactivo) y llegó al 75%, o paso activo con ≥75%
       if(tieneAsistencia&&pct>=75){
-        if(!(m.formacion||[]).find(f=>String(f.pasoId)===String(p.id))){
+        // Guardar en formacion si no existe aún
+        if(!entry){
           if(!m.formacion) m.formacion=[];
           m.formacion.push({pasoId:p.id,pasoNombre:p.nombre,fechaCompletado:'',fuente:'auto'});
           (async()=>{ await saveK(SK.members,S.members); if(typeof window.fbUpload==='function') await window.fbUpload(true); })();
@@ -2660,9 +2663,7 @@ function renderFormacionGrid(){
         const popup2=`fgPopup(event,'—','Cursado')`;
         return `<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="${popup2}">✅ Completado</td>`;
       }
-      // EN CURSO — solo si el paso está activo Y tiene asistencia pero no llegó al 75%
-      if(pasoActivo&&tieneAsistencia) return `<td style="text-align:center;font-size:12px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso</td>`;
-      // PENDIENTE — paso inactivo sin completar, o activo sin asistencia
+      // PENDIENTE
       return `<td style="text-align:center;font-size:12px;color:#9CA3AF;padding:7px 4px;background:#fff;border-left:1px solid #F3F4F6">Pendiente</td>`;
     }).join('');
     return `<tr style="${rowBg}">

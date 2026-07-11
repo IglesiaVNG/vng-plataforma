@@ -2653,8 +2653,8 @@ function renderFormacionGrid(){
       const asistidas=registros.filter(r=>r.asistencia[m.id]).length;
       const pct=totalClases>0?Math.round(asistidas/totalClases*100):0;
       const tieneAsistencia=totalClases>0&&asistidas>0;
-      // EN CURSO — paso Activo con asistencia: siempre En curso
-      if(pasoActivo&&tieneAsistencia&&pct<75){
+      // EN CURSO — paso Activo con asistencia: siempre En curso, sin importar %
+      if(pasoActivo&&tieneAsistencia){
         return `<td style="text-align:center;font-size:12px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso</td>`;
       }
       // COMPLETADO manual

@@ -2676,8 +2676,6 @@ function renderFormacionGrid(){
 
 
 
-
-
 function saMembrosTab(tab, btn){
   document.querySelectorAll('.nav-btn[onclick*="saMembrosTab"]').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
@@ -8185,12 +8183,14 @@ function renderHomeCumples(){
 
   // Get members with birthdate, calculate days until next birthday
   var conCumple=S.members.filter(function(m){
-    return m.estado!=='Baja' && m.fnac && m.fnac.length>=7;
+    return m.estado!=='Baja' && m.fnac && m.fnac.length>=5;
   }).map(function(m){
-    var parts=m.fnac.split('-');
-    var mes=parseInt(parts[1]);
-    var dia=parseInt(parts[2]);
-    var anio=parseInt(parts[0]);
+    var mes,dia,anio;
+    if(m.fnac.indexOf('/')>=0){
+      var pp=m.fnac.split('/');dia=parseInt(pp[0]);mes=parseInt(pp[1]);anio=parseInt(pp[2]);if(anio<100)anio+=2000;
+    } else {
+      var parts=m.fnac.split('-');mes=parseInt(parts[1]);dia=parseInt(parts[2]);anio=parseInt(parts[0]);
+    }
     // Calculate age this year
     var edadEsteAnio=hoy.getFullYear()-anio;
 

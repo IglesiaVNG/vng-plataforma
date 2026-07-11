@@ -2642,8 +2642,8 @@ function renderFormacionGrid(){
       const asistidas=registros.filter(r=>r.asistencia[m.id]).length;
       const pct=totalClases>0?Math.round(asistidas/totalClases*100):0;
       const tieneAsistencia=totalClases>0&&asistidas>0;
-      // EN CURSO — paso Activo con asistencia y sin llegar al 75%: asistencia manda sobre entry
-      if(pasoActivo&&tieneAsistencia&&pct<75){
+      // EN CURSO — paso Activo con asistencia: siempre En curso, nunca auto-completa
+      if(pasoActivo&&tieneAsistencia){
         return `<td style="text-align:center;font-size:12px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso</td>`;
       }
       // COMPLETADO manual — entrada cargada a mano, siempre vale

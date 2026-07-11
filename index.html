@@ -62,7 +62,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#2E75B6}
 
 /* ══ GRUPOS DE VIDA STYLES ══ */
 .gdv-app{max-width:720px;margin:0 auto;padding:1rem}
-.card{background:rgba(255,255,255,0.93);border:1px solid rgba(255,255,255,0.7);border-radius:12px;padding:1.25rem;margin-bottom:1rem;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+.card{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:1.25rem;margin-bottom:1rem;box-shadow:0 2px 12px rgba(0,0,0,0.2)}
 .card-title{font-size:15px;font-weight:600;color:#1F4E79;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1rem}
 .stat{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px;text-align:center}
@@ -97,9 +97,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#2E75B6}
 .chart-wrap{height:200px;position:relative;margin-bottom:.5rem}
 .empty{text-align:center;padding:2rem 1rem;color:#9CA3AF;font-size:14px}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-table{width:100%;border-collapse:collapse;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
 th{background:#1F4E79;color:#fff;padding:8px 10px;text-align:left;font-weight:600}
-td{padding:7px 10px;border-bottom:1px solid #F3F4F6;vertical-align:middle}
+td{padding:7px 10px;border-bottom:1px solid #F3F4F6;vertical-align:middle;background:#fff}
 tr:hover td{background:#F9FAFB}
 .role-chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;margin:2px;white-space:nowrap}
 .role-selector{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
@@ -108,14 +108,14 @@ tr:hover td{background:#F9FAFB}
 .role-option input{width:auto;margin:0}
 
 /* ══ ORIENTACION FAMILIAR STYLES ══ */
-.of-app{max-width:960px;margin:0 auto;padding:1rem}
+.of-app{max-width:960px;margin:0 auto;padding:1rem;background:#fff;border-radius:12px}
 .of-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem}
 @media(max-width:600px){.of-stats{grid-template-columns:repeat(2,1fr)}}
 .of-stat{background:#F5F5F5;border-radius:10px;padding:12px}
 .of-stat-label{font-size:11px;color:#666;margin-bottom:4px}
 .of-stat-value{font-size:20px;font-weight:600}
 .of-stat-sub{font-size:11px;color:#666;margin-top:2px}
-.of-tabs{display:flex;gap:2px;margin-bottom:1.5rem;border-bottom:1px solid #E0E0E0;flex-wrap:wrap}
+.of-tabs{display:flex;gap:2px;margin-bottom:1.5rem;border-bottom:1px solid #E0E0E0;flex-wrap:wrap;background:#fff;padding:4px 8px 0;border-radius:8px 8px 0 0}
 .of-tab{padding:8px 14px;font-size:13px;cursor:pointer;border:none;background:transparent;color:#666;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:Arial,sans-serif}
 .of-tab.active{color:#3C3489;border-bottom-color:#3C3489;font-weight:600}
 .of-section{display:none}.of-section.active{display:block}
@@ -235,6 +235,7 @@ window.markFieldError = function(el, msg){
 <div id="dev-badge" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10001;background:#F59E0B;color:#fff;text-align:center;padding:6px;font-size:12px;font-weight:700;letter-spacing:1px">
   🔧 MODO DESARROLLO — los datos NO son los reales
 </div>
+<div id="dev-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10001;background:#7C3AED;color:#fff;text-align:center;padding:6px 16px;font-size:12px;font-weight:700">🚧 SITIO DE DESARROLLO — No afecta PROD</div>
 <div id="sync-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10000;background:#DC2626;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:600">
   ⚠️ Hay datos sin sincronizar. No cerrés la app.
   <button onclick="forceSyncNow()" style="margin-left:12px;background:#fff;color:#DC2626;border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-weight:700">☁️ Sincronizar ahora</button>
@@ -386,7 +387,7 @@ const KEY_GROUPS = {
   'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_qr_actualizar'], // gdv_permisos se maneja via fbSavePermisos con su propio timestamp
   'members': ['gdv_m5'],
   'records': ['gdv_r5'],
-  'disc':    ['gdv_disc_pasos','gdv_disc_records'],
+  'disc':    ['gdv_disc_pasos','gdv_disc_records','gdv_disc_cursadas'],
   'ng':      ['gdv_ng5','gdv_ng_records'],
   'modules': ['gdv_modules5'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
@@ -480,7 +481,7 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_ng_records'];
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_ng_records'];
               if(MERGE_KEYS.includes(k)){
                 // Siempre mergear por id+ts, independientemente del timestamp del documento
                 localStorage.setItem(k, mergeByTs(localStorage.getItem(k), data[k]));
@@ -566,7 +567,7 @@ window.fbDownload().then(function(hasData) {
         S.members     = _ld('gdv_m5',            S.members     ||[]);
         S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
         S.discPasos      = _ld('gdv_disc_pasos',    S.discPasos      ||[]);
-        S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);
+        S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);S.discCursadas=_ld('gdv_disc_cursadas',S.discCursadas||[]);
   S.ngComunidades  = _ld('gdv_ng5',           S.ngComunidades  ||[]);
   S.ngRecords      = _ld('gdv_ng_records',    S.ngRecords      ||[]);
   S.modulesConfig  = _ld('gdv_modules5',      S.modulesConfig  ||[]);
@@ -810,7 +811,7 @@ function recordInWeek(fechaStr, offsetWeeks=0){
 // STORAGE
 // ════════════════════════════════════════════════════════════
 const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles:'gdv_roles5',
-  discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records',
+  discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records',discCursadas:'gdv_disc_cursadas',
   ngComunidades:'gdv_ng5',ngRecords:'gdv_ng_records',
   modulesConfig:'gdv_modules5'};
 
@@ -1045,7 +1046,7 @@ const DEFAULT_USERS=[
 // ════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════
-let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],ngComunidades:[],ngRecords:[],modulesConfig:[]};
+let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],ngComunidades:[],ngRecords:[],modulesConfig:[]};
 let currentUser=null;
 let gdvCharts={};
 
@@ -1063,7 +1064,7 @@ async function initStorage(){
   S.members    =load(SK.members,    DEFAULT_MEMBERS);
   S.roles      =load(SK.roles,      DEFAULT_ROLES);
   S.discPasos  =load(SK.discPasos,  DEFAULT_DISC_PASOS);
-  S.discRecords=load(SK.discRecords,[]);
+  S.discRecords=load(SK.discRecords,[]);S.discCursadas=load('gdv_disc_cursadas',[]);
   await cleanMembers();
   loadPermisos();
   // ── Migrar roles nuevos si no existen ──
@@ -2148,7 +2149,7 @@ function isGdVFacilitador(){
 // ════════════════════════════════════════════════════════════
 // AUTH
 // ════════════════════════════════════════════════════════════
-function doLogin(){
+(function(){if(typeof _isProd!=='undefined'&&!_isProd){document.addEventListener('DOMContentLoaded',function(){var b=document.getElementById('dev-banner');if(b){b.style.display='block';document.body.style.paddingTop='32px';}});}})();function doLogin(){
   const u=document.getElementById('inp-user').value.trim();
   const p=document.getElementById('inp-pass').value;
   const found=S.users.find(x=>x.user===u&&x.pass===p);
@@ -2309,7 +2310,7 @@ function openMiembros(){
 function buildMiembrosHTML(){
   return `<div class="gdv-app">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-      <span style="font-size:14px;font-weight:600;color:#1F4E79">Base de Miembros (<span id="sa-member-count">0</span>)</span>
+      <span style="font-size:14px;font-weight:700;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,0.8)">Base de Miembros (<span id="sa-member-count">0</span>)</span>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="saShowActualizarQR()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">📱 QR Actualizar datos</button>
         <button class="btn btn-sm" onclick="exportMiembrosExcel()" style="background:#F0FDF4;border-color:#86EFAC;color:#166634;font-weight:600">📥 Exportar Excel</button>
@@ -2372,7 +2373,7 @@ function buildMiembrosHTML(){
         <tbody id="sa-member-tbody-personales"></tbody>
       </table>
     </div>
-    <div id="sa-panel-formacion" style="display:none">
+    <div id="sa-panel-formacion" class="card" style="display:none;padding:0;overflow:hidden">
       <div style="overflow-x:auto" id="sa-formacion-grid-wrap">
         <div class="empty" style="padding:1rem;color:#9CA3AF">Cargando grilla...</div>
       </div>
@@ -2603,80 +2604,79 @@ function fmtAA(d){
 }
 
 function renderFormacionGrid(){
-  const wrap=document.getElementById('sa-formacion-grid-wrap');
+  var wrap=document.getElementById('sa-formacion-grid-wrap');
   if(!wrap) return;
-  const pasos=(S.discPasos||[]).filter(p=>p.estado==='Activo').sort((a,b)=>a.id-b.id);
-  const members=(window._saMembrosFiltered||[]).filter(m=>m.condicion!=='Nuevo'&&m.condicion!=='Historico');
-  if(!pasos.length){
-    wrap.innerHTML='<div class="empty" style="padding:2rem">Sin Pasos de Discipulado configurados.</div>';
-    return;
-  }
-  // Separar pasos por nivel para encabezado agrupado
-  const pasosInic=pasos.filter(p=>!/intermedio|avanzado/i.test(p.nombre));
-  const pasosProx=pasos.filter(p=>/intermedio|avanzado/i.test(p.nombre));
-
-  // Fila 1: grupos de nivel
-  const grupoHeader=
-    (pasosInic.length?`<th colspan="${pasosInic.length}" style="text-align:center;padding:6px 4px;background:#DBEAFE;color:#1E40AF;font-size:11px;font-weight:700;border-bottom:2px solid #93C5FD;letter-spacing:.04em">🔵 INICIAL</th>`:'')
-    +(pasosProx.map(p=>{
-        const isAdv=/avanzado/i.test(p.nombre);
-        return `<th style="text-align:center;padding:6px 4px;background:${isAdv?'#FCE7F3':'#EDE9FE'};color:${isAdv?'#9D174D':'#5B21B6'};font-size:11px;font-weight:700;border-bottom:2px solid ${isAdv?'#F9A8D4':'#C4B5FD'};letter-spacing:.04em">${isAdv?'🩷 AVANZADO':'🟣 INTERMEDIO'}</th>`;
-      }).join(''));
-
-  // Fila 2: nombres individuales de cada paso
-  const headerCols=
-    pasosInic.map(p=>`<th style="min-width:90px;text-align:center;font-size:11px;padding:7px 4px;background:#F0F9FF;color:#0369A1;font-weight:600">${p.nombre}</th>`).join('')
-    +pasosProx.map(p=>'/').join(''); // placeholder, se reemplaza abajo por celda vacía en fila 2
-  // (construimos las filas de header separadas)
-  const header2Cols=
-    pasosInic.map(p=>`<th style="min-width:90px;text-align:center;font-size:11px;padding:7px 4px;background:#F0F9FF;color:#0369A1;font-weight:600">${p.nombre}</th>`).join('')
-    +pasosProx.map(p=>{
-        const isAdv=/avanzado/i.test(p.nombre);
-        return `<th style="min-width:100px;text-align:center;font-size:11px;padding:7px 4px;background:${isAdv?'#FDF2F8':'#FAF5FF'};color:${isAdv?'#9D174D':'#5B21B6'};font-weight:600">${p.nombre}</th>`;
-      }).join('');
-  const rows=members.map(m=>{
-    const isBaja=m.estado==='Baja';
-    const rowStyle=isBaja?'opacity:0.55;background:#FEF2F2':'';
-    const cols=pasos.map(p=>{
-      const entry=(m.formacion||[]).find(f=>String(f.pasoId)===String(p.id));
-      if(entry){
-        // Completado ✓
-        const badge=entry.fuente==='auto'
-          ?`<span style="font-size:9px;background:#D1FAE5;color:#065F46;padding:1px 5px;border-radius:99px;display:block;margin-top:2px">Auto</span>`
-          :`<span style="font-size:9px;background:#E0F2FE;color:#0369A1;padding:1px 5px;border-radius:99px;display:block;margin-top:2px">Manual</span>`;
-        return `<td style="text-align:center;font-size:11px;color:#065F46;font-weight:600;padding:6px 4px;background:#F0FDF4">${fmtAA(entry.fechaCompletado)||'✓'}${badge}</td>`;
-      } else {
-        // ¿En Curso? → tiene registros pero no está completado
-        const enCurso=S.discRecords.some(r=>String(r.pasoId)===String(p.id)&&r.asistencia&&r.asistencia[m.id]);
-        if(enCurso){
-          return `<td style="text-align:center;font-size:11px;color:#92400E;font-weight:600;padding:6px 4px;background:#FFFBEB">🟡 En curso</td>`;
-        }
-        // Próximamente solo para pasos cuyo nombre incluye "Intermedio" o "Avanzado"
-        const esProx=/intermedio|avanzado/i.test(p.nombre);
-        if(esProx){
-          return `<td style="text-align:center;font-size:10px;color:#C4B5FD;padding:6px 4px">🚧 Próximamente</td>`;
-        }
-        return `<td style="text-align:center;font-size:11px;color:#D1D5DB;padding:6px 4px">Pendiente</td>`;
-      }
+  var pasos=(S.discPasos||[]).filter(function(p){return p.estado==='Activo';}).sort(function(a,b){return a.id-b.id;});
+  var members=(window._saMembrosFiltered||[]).filter(function(m){return m.condicion!=='Nuevo'&&m.condicion!=='Historico';});
+  if(!pasos.length){wrap.innerHTML='<div class="empty" style="padding:2rem">Sin Pasos de Discipulado configurados.</div>';return;}
+  var hdr=pasos.map(function(p){return '<th style="min-width:110px;text-align:center;font-size:12px;padding:9px 6px;background:#1F4E79;color:#fff;font-weight:600;border-left:1px solid rgba(255,255,255,0.2)">'+p.nombre+'</th>';}).join('');
+  var rows=members.map(function(m){
+    var rowBg=m.estado==='Baja'?'background:#FEF2F2':'background:#fff';
+    var cols=pasos.map(function(p){
+      var entry=(m.formacion||[]).find(function(f){return String(f.pasoId)===String(p.id);});
+      var recs=S.discRecords.filter(function(r){return String(r.pasoId)===String(p.id)&&r.asistencia;});
+      var total=recs.length;var asist=recs.filter(function(r){return r.asistencia[m.id];}).length;
+      var pct=total>0?Math.round(asist/total*100):0;
+      if(p.estado==='Activo'&&total>0&&asist>0)return '<td style="text-align:center;font-size:12px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso</td>';
+      if(entry&&entry.fuente==='manual'){var fn='fgPopup(event,\'+'+(entry.fechaCompletado||'—')+'\',\'Manual\')';return '<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="'+fn+'">✅ Completado</td>';}
+      if(p.estado!=='Activo'&&total>0&&pct>=75)return '<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="fgPopup(event,\'—\',\'Cursado\')">✅ Completado</td>';
+      return '<td style="text-align:center;font-size:12px;color:#9CA3AF;padding:7px 4px;background:#fff;border-left:1px solid #F3F4F6">Pendiente</td>';
     }).join('');
-    return `<tr style="${rowStyle}">
-      <td style="min-width:150px;max-width:180px;padding:7px 8px">
-        <span style="cursor:pointer;color:#1F4E79;font-weight:600;font-size:13px" onclick="saShowDetail(${m.id},event)">${listName(m)}</span>
-      </td>
-      ${cols}
-    </tr>`;
+    return '<tr style="'+rowBg+'"><td style="min-width:150px;max-width:180px;padding:7px 8px;background:#fff;border-bottom:1px solid #F3F4F6"><span style="cursor:pointer;color:#1F4E79;font-weight:600;font-size:13px" onclick="saShowDetail('+m.id+',event)">'+listName(m)+'</span></td>'+cols+'</tr>';
   }).join('');
-  wrap.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px">
-    <thead>
-      <tr>
-        <th rowspan="2" style="min-width:150px;text-align:left;padding:8px;background:#F9FAFB;border-bottom:2px solid #E5E7EB;position:sticky;left:0;z-index:1;vertical-align:middle">Nombre y Apellido</th>
-        ${grupoHeader}
-      </tr>
-      <tr>${header2Cols}</tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+  wrap.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;background:#fff"><thead><tr><th style="min-width:150px;text-align:left;padding:9px 10px;background:#1F4E79;color:#fff;font-size:12px;font-weight:600">Nombre y Apellido</th>'+hdr+'</tr></thead><tbody>'+rows+'</tbody></table>';
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function saMembrosTab(tab, btn){
   document.querySelectorAll('.nav-btn[onclick*="saMembrosTab"]').forEach(b=>b.classList.remove('active'));
@@ -8525,7 +8525,7 @@ function buildDiscipuladoHTML(){
       <button id="disc-tab-dashboard" class="btn btn-primary btn-sm" onclick="discTab('dashboard',this)">📊 Dashboard</button>
       ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-pasos" class="btn btn-sm" onclick="discTab('pasos',this)">📋 Pasos</button>`:''}
       <button id="disc-tab-cargar" class="btn btn-sm" onclick="discTab('cargar',this)">✏️ Cargar</button>
-      <button id="disc-tab-registros" class="btn btn-sm" onclick="discTab('registros',this)">📄 Registros</button>
+      <button id="disc-tab-registros" class="btn btn-sm" onclick="discTab('registros',this)">📄 Registros</button><button id="disc-tab-historico" class="btn btn-sm" onclick="discTab('historico',this)">📁 Histórico</button>
     </div>
     <div id="disc-content"></div>
 
@@ -8556,7 +8556,7 @@ function discTab(tab, btn){
   if(tab==='dashboard') discRenderDashboard(c);
   else if(tab==='pasos') discRenderPasos(c);
   else if(tab==='cargar') discRenderCargar(c);
-  else if(tab==='registros') discRenderRegistros(c);
+  else if(tab==='registros') discRenderRegistros(c);else if(tab==='historico') discRenderHistorico(c);
 }
 
 function discRenderDashboard(c){
@@ -8582,7 +8582,7 @@ function discRenderDashboard(c){
   var html='';
   pasosToShow.forEach(function(paso){
     var disc=paso.discipuladorId?S.members.find(function(m){return m.id===paso.discipuladorId;}):null;
-    var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+    var mems=(cursada?cursada.miembros:(paso?paso.miembros:[])).map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
     var recs=S.discRecords.filter(function(r){return r.pasoId===paso.id;});
 
     // Stats
@@ -8717,6 +8717,11 @@ async function discToggleCompletado(pasoId, memberId){
     paso.completados[memberId]?'#16A34A':'#6B7280');
 }
 
+function fgPopup(e,fecha,fuente){e.stopPropagation();document.querySelectorAll('.fg-popup').forEach(function(x){x.remove();});var div=document.createElement('div');div.className='fg-popup';div.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px 18px;box-shadow:0 4px 20px rgba(0,0,0,0.18);font-size:13px;min-width:160px';div.innerHTML='<div style="font-weight:700;color:#1F4E79;margin-bottom:8px">✅ Completado</div><div style="color:#6B7280;font-size:11px;margin-bottom:4px">Fecha</div><div style="font-weight:600;margin-bottom:10px">'+fecha+'</div><div style="color:#6B7280;font-size:11px;margin-bottom:4px">Origen</div><div style="font-weight:600">'+fuente+'</div>';var r=e.target.getBoundingClientRect();div.style.top=(r.bottom+6)+'px';div.style.left=Math.max(8,r.left-40)+'px';document.body.appendChild(div);setTimeout(function(){document.addEventListener('click',function h(){div.remove();document.removeEventListener('click',h);});},50);}
+function discGenLabel(pasoId,anio){var ant=(S.discCursadas||[]).filter(function(c){return c.pasoId===pasoId&&c.anio===anio;}).length;var p=S.discPasos.find(function(x){return x.id===pasoId;});return (p?p.nombre:'Paso')+' — '+(ant+1)+'/'+anio;}
+async function discAbrirCursada(pasoId){var paso=S.discPasos.find(function(p){return p.id===pasoId;});if(!paso)return;var activa=(S.discCursadas||[]).find(function(c){return c.pasoId===pasoId&&c.estado==='Activo';});if(activa){showToast('Ya hay una cursada activa para '+paso.nombre,'#D97706');return;}var anio=new Date().getFullYear();if(!S.discCursadas)S.discCursadas=[];S.discCursadas.push({id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorId:paso.discipuladorId||null,miembros:[...(paso.miembros||[])],estado:'Activo',fechaInicio:todayAA(),fechaCierre:''});await saveK('gdv_disc_cursadas',S.discCursadas);try{if(typeof window.fbUpload==='function')await window.fbUpload(true);}catch(e){}showToast('✅ Cursada iniciada','#16A34A');var c=document.getElementById('disc-content');if(c)discRenderPasos(c);}
+async function discCerrarCursada(cursadaId){var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});if(!cursada)return;if(!confirm('¿Cerrar la cursada "'+cursada.label+'"?\nLos miembros con ≥75% serán marcados Completado.'))return;var recs=S.discRecords.filter(function(r){return r.cursadaId===cursadaId&&r.asistencia;});var total=recs.length;var completados=0;cursada.miembros.forEach(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;if(!m.formacion)m.formacion=[];m.formacion=m.formacion.filter(function(f){return !(String(f.pasoId)===String(cursada.pasoId)&&f.fuente==='auto');});if(pct>=75){m.formacion.push({pasoId:cursada.pasoId,cursadaId:cursadaId,cursadaLabel:cursada.label,pasoNombre:cursada.pasoNombre,fechaCompletado:todayAA(),fuente:'cursado'});completados++;}});cursada.estado='Completado';cursada.fechaCierre=todayAA();await saveK('gdv_disc_cursadas',S.discCursadas);await saveK('gdv_m5',S.members);try{if(typeof window.fbUpload==='function')await window.fbUpload(true);}catch(e){}showToast('✅ Cursada cerrada — '+completados+' completados','#16A34A');var c=document.getElementById('disc-content');if(c)discRenderPasos(c);}
+function discRenderHistorico(c){var done=(S.discCursadas||[]).filter(function(cu){return cu.estado==='Completado';}).sort(function(a,b){return b.id-a.id;});if(!done.length){c.innerHTML='<div class="empty" style="padding:2rem">No hay cursadas completadas aún.</div>';return;}var html='';done.forEach(function(cursada){var disc=cursada.discipuladorId?S.members.find(function(m){return m.id===cursada.discipuladorId;}):null;var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&r.asistencia;});var total=recs.length;var stats=cursada.miembros.map(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return null;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;return {m:m,asist:asist,pct:pct,ok:pct>=75};}).filter(Boolean);var nOk=stats.filter(function(x){return x.ok;}).length;html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #9CA3AF"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+cursada.label+'</div><div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+(disc?fullName(disc):'Sin asignar')+'</strong> · Inicio: '+(cursada.fechaInicio||'—')+' · Cierre: '+(cursada.fechaCierre||'—')+'</div></div><span class="badge b-muted">Completada</span></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+cursada.miembros.length+'</span><span class="stat-lbl">Alumnos</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+total+'</span><span class="stat-lbl">Encuentros</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem;color:#16A34A">'+nOk+'/'+cursada.miembros.length+'</span><span class="stat-lbl">Completados</span></div></div>';stats.forEach(function(s){var bc=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;flex:1">'+fullName(s.m)+'</span><div style="flex:2;min-width:120px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#6B7280">'+s.asist+'/'+total+' enc.</span><strong style="color:'+bc+'">'+s.pct+'%</strong></div><div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+bc+';width:'+s.pct+'%"></div></div></div><span style="font-size:11px;padding:3px 10px;border-radius:6px;'+(s.ok?'background:#D1FAE5;color:#065F46':'background:#FEE2E2;color:#991B1B')+'">'+( s.ok?'✅ Completado':'❌ No completó')+'</span></div>';});if(recs.length){html+='<details style="margin-top:1rem"><summary style="font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;padding:6px 0">Ver encuentros ('+recs.length+')</summary><div style="margin-top:8px">';recs.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(r){var pres=Object.values(r.asistencia||{}).filter(function(a){return a&&a.state==='presente';}).length;html+='<div style="padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:12px;display:flex;justify-content:space-between"><span>'+(fmtAA(r.fecha)||r.fecha)+' — '+r.capitulo+'</span><span style="color:#6B7280">'+pres+' presentes</span></div>';});html+='</div></details>';}html+='</div>';});c.innerHTML=html;}
 function discRenderPasos(c){
   var html='';
   S.discPasos.forEach(function(paso){
@@ -8734,8 +8739,9 @@ function discRenderPasos(c){
     html+='<div style="display:flex;gap:8px;align-items:center">';
     html+='<span class="badge '+(isActivo?'b-ok':'b-muted')+'">'+(isActivo?'Activo':'Inactivo')+'</span>';
     if(canAdminDisc()){
+      var _ca=(S.discCursadas||[]).find(function(cu){return cu.pasoId===paso.id&&cu.estado==='Activo';});
       html+='<button class="btn btn-sm btn-primary" onclick="discOpenModal('+paso.id+')">✏️ Editar</button>';
-      html+='<button class="btn btn-sm" onclick="discToggleEstado('+paso.id+')" style="'+(isActivo?'color:#DC2626':'color:#16A34A')+'">'+(isActivo?'Desactivar':'Activar')+'</button>';
+      if(!_ca){html+='<button class="btn btn-sm" onclick="discAbrirCursada('+paso.id+')" style="background:#7C3AED;color:#fff;border:none">▶ Iniciar Cursada</button>';}else{html+='<button class="btn btn-sm" onclick="discCerrarCursada('+_ca.id+')" style="color:#DC2626">⏹ Cerrar Cursada</button>';}
     }
     html+='</div></div>';
     // Members list
@@ -8885,10 +8891,10 @@ var discFacAtt={};
 var discSelectedPasoId=null;
 
 function discRenderCargar(c){
-  var pasosActivos=S.discPasos.filter(function(p){return p.estado==='Activo';});
-  var pasoOpts=pasosActivos.map(function(p){
-    return '<option value="'+p.id+'">'+p.nombre+'</option>';
-  }).join('');
+  var cursadasActivas=(S.discCursadas||[]).filter(function(cu){return cu.estado==='Activo';});
+  var pasoOpts=cursadasActivas.map(function(cu){
+    return '<option value="'+cu.id+'">'+cu.label+'</option>';
+  }).join('');if(!pasoOpts)pasoOpts='<option value="">— No hay cursadas activas —</option>';
 
   var hoy=today();
   c.innerHTML=
@@ -8906,9 +8912,9 @@ function discRenderCargar(c){
 }
 
 function discLoadPasoForm(){
-  var pasoId=parseInt(document.getElementById('disc-sel-paso').value)||null;
-  discSelectedPasoId=pasoId;
-  var paso=pasoId?S.discPasos.find(function(p){return p.id===pasoId;}):null;
+  var cursadaId=parseInt(document.getElementById('disc-sel-paso').value)||null;
+  discSelectedPasoId=cursadaId;
+  var cursada=cursadaId?(S.discCursadas||[]).find(function(cu){return cu.id===cursadaId;}):null;var paso=cursada?S.discPasos.find(function(p){return p.id===cursada.pasoId;}):null;
 
   // Load chapters
   var capSel=document.getElementById('disc-sel-cap');
@@ -8922,8 +8928,8 @@ function discLoadPasoForm(){
 
   // Load members
   var wrap=document.getElementById('disc-asistencia-wrap');
-  if(!paso||!paso.miembros.length){
-    wrap.innerHTML='<div class="empty">Seleccioná un paso con miembros asignados</div>';
+  if(!cursada||!cursada.miembros.length){
+    wrap.innerHTML='<div class="empty">Seleccioná una cursada con miembros asignados</div>';
     discFacAtt={};
     return;
   }
@@ -8974,7 +8980,7 @@ async function discGuardarAsistencia(){
   var semana=getISOWeek(fecha);
   var anio=new Date(fecha).getFullYear();
   var yaExiste=S.discRecords.find(function(r){
-    if(r.pasoId!==pasoId) return false;
+    if((r.cursadaId||r.pasoId)!==pasoId) return false;
     return getISOWeek(r.fecha)===semana && new Date(r.fecha).getFullYear()===anio;
   });
   if(yaExiste){
@@ -8982,9 +8988,9 @@ async function discGuardarAsistencia(){
     return;
   }
 
-  var paso=S.discPasos.find(function(p){return p.id===pasoId;});
+  var cursada=(S.discCursadas||[]).find(function(cu){return cu.id===pasoId;});var paso=cursada?S.discPasos.find(function(p){return p.id===cursada.pasoId;}):null;var realPasoId=cursada?cursada.pasoId:pasoId;
   S.discRecords.push({
-    id:Date.now(),pasoId,pasoNombre:paso?paso.nombre:'',
+    id:Date.now(),pasoId:realPasoId,cursadaId:pasoId,pasoNombre:cursada?cursada.label:(paso?paso.nombre:''),
     fecha,capitulo,asistencia:{...discFacAtt},ts:new Date().toISOString(),_ts:Date.now()
   });
   await saveK(SK.discRecords,S.discRecords);

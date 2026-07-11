@@ -8582,7 +8582,7 @@ function discRenderDashboard(c){
   var html='';
   pasosToShow.forEach(function(paso){
     var disc=paso.discipuladorId?S.members.find(function(m){return m.id===paso.discipuladorId;}):null;
-    var mems=(cursada?cursada.miembros:(paso?paso.miembros:[])).map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+    var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
     var recs=S.discRecords.filter(function(r){return r.pasoId===paso.id;});
 
     // Stats

@@ -2373,7 +2373,7 @@ function buildMiembrosHTML(){
       </table>
     </div>
     <div id="sa-panel-formacion" style="display:none">
-      <div style="overflow-x:auto" id="sa-formacion-grid-wrap">
+      <div style="overflow-x:auto;background:#fff;border-radius:8px" id="sa-formacion-grid-wrap">
         <div class="empty" style="padding:1rem;color:#9CA3AF">Cargando grilla...</div>
       </div>
     </div>
@@ -2660,16 +2660,16 @@ function renderFormacionGrid(){
       }
     }).join('');
     return `<tr style="${rowStyle}">
-      <td style="min-width:150px;max-width:180px;padding:7px 8px">
+      <td style="min-width:150px;max-width:180px;padding:7px 8px;background:#fff;position:sticky;left:0;z-index:1">
         <span style="cursor:pointer;color:#1F4E79;font-weight:600;font-size:13px" onclick="saShowDetail(${m.id},event)">${listName(m)}</span>
       </td>
       ${cols}
     </tr>`;
   }).join('');
-  wrap.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px">
+  wrap.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px;background:#fff">
     <thead>
       <tr>
-        <th rowspan="2" style="min-width:150px;text-align:left;padding:8px;background:#F9FAFB;border-bottom:2px solid #E5E7EB;position:sticky;left:0;z-index:1;vertical-align:middle">Nombre y Apellido</th>
+        <th rowspan="2" style="min-width:150px;text-align:left;padding:8px;background:#1F4E79;color:#fff;border-bottom:2px solid #E5E7EB;position:sticky;left:0;z-index:1;vertical-align:middle">Nombre y Apellido</th>
         ${grupoHeader}
       </tr>
       <tr>${header2Cols}</tr>

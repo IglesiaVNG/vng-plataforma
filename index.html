@@ -2617,7 +2617,7 @@ function renderFormacionGrid(){
 
   // Fila 1: grupos de nivel
   const grupoHeader=
-    (pasosInic.length?`<th colspan="${pasosInic.length}" style="text-align:center;padding:6px 4px;background:#DBEAFE;color:#1E40AF;font-size:11px;font-weight:700;border-bottom:2px solid #93C5FD;letter-spacing:.04em">🔵 INICIAL</th>`:'')
+    (pasosInic.length?`<th colspan="${pasosInic.length}" style="text-align:center;padding:6px 4px;background:#DBEAFE;color:#1E40AF;font-size:11px;font-weight:700;border-bottom:2px solid #93C5FD;letter-spacing:.04em;border-left:1px solid #E5E7EB">🔵 INICIAL</th>`:'')
     +(pasosProx.map(p=>{
         const isAdv=/avanzado/i.test(p.nombre);
         return `<th style="text-align:center;padding:6px 4px;background:${isAdv?'#FCE7F3':'#EDE9FE'};color:${isAdv?'#9D174D':'#5B21B6'};font-size:11px;font-weight:700;border-bottom:2px solid ${isAdv?'#F9A8D4':'#C4B5FD'};letter-spacing:.04em">${isAdv?'🩷 AVANZADO':'🟣 INTERMEDIO'}</th>`;
@@ -2625,11 +2625,11 @@ function renderFormacionGrid(){
 
   // Fila 2: nombres individuales de cada paso
   const headerCols=
-    pasosInic.map(p=>`<th style="min-width:90px;text-align:center;font-size:11px;padding:7px 4px;background:#F0F9FF;color:#0369A1;font-weight:600">${p.nombre}</th>`).join('')
+    pasosInic.map(p=>`<th style="min-width:90px;text-align:center;font-size:11px;padding:7px 4px;background:#F0F9FF;color:#0369A1;font-weight:600;border-left:1px solid #E5E7EB">${p.nombre}</th>`).join('')
     +pasosProx.map(p=>'/').join(''); // placeholder, se reemplaza abajo por celda vacía en fila 2
   // (construimos las filas de header separadas)
   const header2Cols=
-    pasosInic.map(p=>`<th style="min-width:90px;text-align:center;font-size:11px;padding:7px 4px;background:#F0F9FF;color:#0369A1;font-weight:600">${p.nombre}</th>`).join('')
+    pasosInic.map(p=>`<th style="min-width:90px;text-align:center;font-size:11px;padding:7px 4px;background:#F0F9FF;color:#0369A1;font-weight:600;border-left:1px solid #E5E7EB">${p.nombre}</th>`).join('')
     +pasosProx.map(p=>{
         const isAdv=/avanzado/i.test(p.nombre);
         return `<th style="min-width:100px;text-align:center;font-size:11px;padding:7px 4px;background:${isAdv?'#FDF2F8':'#FAF5FF'};color:${isAdv?'#9D174D':'#5B21B6'};font-weight:600">${p.nombre}</th>`;
@@ -2644,22 +2644,22 @@ function renderFormacionGrid(){
         const badge=entry.fuente==='auto'
           ?`<span style="font-size:9px;background:#D1FAE5;color:#065F46;padding:1px 5px;border-radius:99px;display:block;margin-top:2px">Auto</span>`
           :`<span style="font-size:9px;background:#E0F2FE;color:#0369A1;padding:1px 5px;border-radius:99px;display:block;margin-top:2px">Manual</span>`;
-        return `<td style="text-align:center;font-size:11px;color:#065F46;font-weight:600;padding:6px 4px;background:#F0FDF4">${fmtAA(entry.fechaCompletado)||'✓'}${badge}</td>`;
+        return `<td style="text-align:center;font-size:11px;color:#065F46;font-weight:600;padding:6px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB">${fmtAA(entry.fechaCompletado)||'✓'}${badge}</td>`;
       } else {
         // ¿En Curso? → tiene registros pero no está completado
         const enCurso=S.discRecords.some(r=>String(r.pasoId)===String(p.id)&&r.asistencia&&r.asistencia[m.id]);
         if(enCurso){
-          return `<td style="text-align:center;font-size:11px;color:#92400E;font-weight:600;padding:6px 4px;background:#FFFBEB">🟡 En curso</td>`;
+          return `<td style="text-align:center;font-size:11px;color:#92400E;font-weight:600;padding:6px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso</td>`;
         }
         // Próximamente solo para pasos cuyo nombre incluye "Intermedio" o "Avanzado"
         const esProx=/intermedio|avanzado/i.test(p.nombre);
         if(esProx){
-          return `<td style="text-align:center;font-size:10px;color:#C4B5FD;padding:6px 4px">🚧 Próximamente</td>`;
+          return `<td style="text-align:center;font-size:10px;color:#7C3AED;padding:6px 4px;background:#FAF5FF;border-left:1px solid #E5E7EB">🚧 Próximamente</td>`;
         }
-        return `<td style="text-align:center;font-size:11px;color:#D1D5DB;padding:6px 4px">Pendiente</td>`;
+        return `<td style="text-align:center;font-size:11px;color:#9CA3AF;padding:6px 4px;background:#fff;border-left:1px solid #F3F4F6">Pendiente</td>`;
       }
     }).join('');
-    return `<tr style="${rowStyle}">
+    return `<tr style="background:#fff;${rowStyle}">
       <td style="min-width:150px;max-width:180px;padding:7px 8px;background:#fff;position:sticky;left:0;z-index:1">
         <span style="cursor:pointer;color:#1F4E79;font-weight:600;font-size:13px" onclick="saShowDetail(${m.id},event)">${listName(m)}</span>
       </td>

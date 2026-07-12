@@ -25,7 +25,7 @@ body{font-family:Arial,sans-serif;background:#F5F7FA;color:#1F2937;background-im
 .home-greeting{flex:1}
 .home-greeting-name{font-weight:600;font-size:15px}
 .home-greeting-role{font-size:12px;color:#6B7280;margin-top:2px}
-.home-section-title{font-size:13px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem}
+.home-section-title{font-size:13px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.6);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem}
 .modules-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin-bottom:2rem}
 .module-card{background:rgba(255,255,255,0.93);border:1px solid rgba(255,255,255,0.7);border-radius:14px;padding:1.5rem;cursor:pointer;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
 .module-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.1);border-color:#2E75B6}
@@ -667,6 +667,14 @@ async function cleanMembers(){
   S.members.forEach(m=>{
     if(m.condicion==='Nuevo' && !m.fechaRegistro){
       m.fechaRegistro=todayAA();
+      changed=true;
+    }
+  });
+  // Migration: legacy 'Nuevo' contacts without subEstado start as 'Ingresado'
+  const VALID_SUBESTADOS=['Ingresado','Contactado','Participando'];
+  S.members.forEach(m=>{
+    if(m.condicion==='Nuevo' && !VALID_SUBESTADOS.includes(m.subEstado)){
+      m.subEstado='Ingresado';
       changed=true;
     }
   });
@@ -4929,15 +4937,16 @@ async function gdvSaveRecord(){
 
   // ── Auto-assign group to "Nuevos" so they appear in next encounter ──
   var membersUpdated=false;
-  gdvVisitsNew.forEach(function(nombre){
+  for(const nombre of gdvVisitsNew){
     var m=S.members.find(function(x){
       return fullName(x).toLowerCase()===nombre.toLowerCase();
     });
     if(m&&!m.grupoId){
       m.grupoId=gid; // Assign to this group
+      await nvAplicarParticipando(m);
       membersUpdated=true;
     }
-  });
+  }
   if(membersUpdated) await saveK(SK.members,S.members);
 
   const al=document.getElementById('gdv-fac-alert');
@@ -7059,25 +7068,43 @@ function buildNuevosHTML(){
       <button class="nav-btn active" id="nv-btn-u30" onclick="nvSetFiltro('ultimos30',this)">📅 Últimos 30 días</button>
       <button class="nav-btn" id="nv-btn-m30" onclick="nvSetFiltro('mas30',this)">🕐 Más de 30 días</button>
       <button class="nav-btn" id="nv-btn-hist" onclick="nvSetFiltro('historico',this)">📁 Histórico</button>
+      <button class="nav-btn" id="nv-btn-dash" onclick="nvSetFiltro('dashboard',this)">📊 Dashboard</button>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:1rem;align-items:center;flex-wrap:nowrap">
-      <input type="text" id="nv-search" placeholder="Buscar nombre..." onkeyup="renderNuevos()" style="flex:2;min-width:0">
-      <select id="nv-fil-gen" onchange="renderNuevos()" style="flex:0 0 70px">
+
+    <div id="nv-list-section">
+    <div style="display:flex;gap:6px;margin-bottom:1rem;align-items:center;flex-wrap:nowrap">
+      <input type="text" id="nv-search" placeholder="Buscar..." onkeyup="renderNuevos()" style="flex:1.4;min-width:0">
+      <select id="nv-fil-gen" onchange="renderNuevos()" style="flex:0 0 62px;padding-left:4px;padding-right:2px">
         <option value="">H y M</option>
         <option value="H">Hombres</option>
         <option value="M">Mujeres</option>
       </select>
-      <select id="nv-fil-grupo" onchange="renderNuevos()" style="flex:1;min-width:0">
+      <select id="nv-fil-grupo" onchange="renderNuevos()" style="flex:1.6;min-width:0;text-overflow:ellipsis;white-space:nowrap;overflow:hidden">
         <option value="">Todos los grupos</option>
+      </select>
+      <select id="nv-fil-subestado" onchange="renderNuevos()" style="flex:0.8;min-width:0;text-overflow:ellipsis;white-space:nowrap;overflow:hidden">
+        <option value="">Sub-estados</option>
+        <option value="Ingresado">🆕 Ingresado</option>
+        <option value="Contactado">📞 Contactado</option>
+        <option value="Participando">🌱 Participando</option>
+      </select>
+      <select id="nv-fil-responsable" onchange="renderNuevos()" style="flex:0.8;min-width:0;text-overflow:ellipsis;white-space:nowrap;overflow:hidden">
+        <option value="">Responsables</option>
+        <option value="sin-asignar">⏳ Sin asignar</option>
       </select>
     </div>
 
     <!-- Contador -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-      <span style="font-size:14px;font-weight:600;color:#1F4E79">
-        Nuevos activos: <span id="nv-count" style="color:#16A34A">0</span>
-      </span>
-      <div style="display:flex;gap:8px">
+    <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:12px 16px;box-shadow:0 2px 12px rgba(0,0,0,0.12);margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:14px;font-weight:600;color:#1F4E79">
+          Nuevos activos: <span id="nv-count" style="color:#16A34A">0</span>
+        </span>
+        ${isSuperAdmin()?`<span style="font-size:12px;color:#374151;display:flex;align-items:center;gap:4px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:4px 8px">⚙️ Alertar tras
+          <input type="number" min="1" max="30" value="${nvDiasAlerta()}" onchange="nvSetDiasAlerta(this.value)" style="width:48px;padding:3px 6px;font-size:12px">
+          días sin contactar</span>`:''}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
         <button class="btn btn-sm" onclick="gdvShowQRModal()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">
           📱 Generar QR / Formulario
         </button>
@@ -7090,6 +7117,34 @@ function buildNuevosHTML(){
 
     <!-- Lista -->
     <div id="nv-list"></div>
+    </div>
+
+    <!-- Dashboard de análisis (fecha de Alta/Ingreso) -->
+    <div id="nv-dashboard-section" style="display:none">
+      <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:12px 16px;box-shadow:0 2px 12px rgba(0,0,0,0.12);margin-bottom:1rem">
+        <div style="font-size:12px;color:#6B7280;margin-bottom:10px">Analiza a todas las personas por su fecha de Alta/Ingreso (QR, Link o carga manual), sin importar su condición actual.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde</label>
+            <input type="date" id="nv-dash-desde" onchange="nvRenderDashboard()"></div>
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Hasta</label>
+            <input type="date" id="nv-dash-hasta" onchange="nvRenderDashboard()"></div>
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Sexo</label>
+            <select id="nv-dash-sexo" onchange="nvRenderDashboard()">
+              <option value="">Todos</option><option value="H">Hombres</option><option value="M">Mujeres</option>
+            </select></div>
+          <button class="btn btn-sm" onclick="nvResetDashboardFiltros()">↺ Reset (último mes)</button>
+        </div>
+      </div>
+      <div class="stat-grid" id="nv-dash-stats" style="margin-bottom:1rem"></div>
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-title">⏱ Tiempo hasta el primer contacto</div>
+        <div id="nv-dash-tiempos"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔄 Conversión desde el Ingreso</div>
+        <div id="nv-dash-conversion"></div>
+      </div>
+    </div>
 
     <!-- MODAL: Agregar nuevo contacto manualmente -->
 <!-- nv-form-overlay moved to static HTML body -->
@@ -7153,75 +7208,169 @@ function buildNuevosHTML(){
 
     <!-- Modal promover condición -->
     <div id="nv-promote-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:1rem">
-      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:420px;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <div style="font-size:15px;font-weight:600;color:#1F4E79" id="nv-promote-name">—</div>
           <button onclick="nvClosePromote()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1" title="Cerrar">✕</button>
         </div>
         <div style="display:none" id="nv-promote-name-old">—</div>
         <div style="font-size:13px;color:#6B7280;margin-bottom:.75rem">Cambiar condición o asignar seguimiento</div>
+        <div id="nv-promote-subestado-wrap" style="display:none;margin-bottom:1rem">
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Sub-estado</label>
+          <select id="nv-promote-subestado-select" style="width:100%">
+            <option value="Ingresado">🆕 Ingresado</option>
+            <option value="Contactado">📞 Contactado</option>
+            <option value="Participando">🌱 Participando</option>
+          </select>
+          <div id="nv-promote-subestado-info" style="font-size:11px;color:#9CA3AF;margin-top:4px"></div>
+        </div>
         <div id="nv-promote-seg-wrap" style="margin-bottom:1rem;padding:10px 12px;background:#F9FAFB;border-radius:8px;font-size:13px">
           👤 Seguimiento: <span id="nv-promote-seg" style="color:#1F4E79;font-weight:600">—</span>
-          <button onclick="nvEditSeguimiento(nvSelectedId)" class="btn btn-sm" style="margin-left:8px;font-size:11px">Cambiar</button>
+          <button onclick="nvEditSeguimiento(nvSelectedId)" class="btn btn-sm" style="margin-left:8px;font-size:11px">Asignar</button>
         </div>
         <div id="nv-promote-nopermiso" style="display:none"></div>
-        <!-- Comentarios pastorales -->
-        <div id="nv-comentarios-wrap" style="margin-bottom:1rem">
+        <div id="nv-promote-acciones" style="flex-direction:column;gap:10px;display:flex">
+        <!-- Re-activar (solo para histórico) -->
+        <button id="nv-btn-reactivar" onclick="nvReactivar()" class="btn" style="display:none;text-align:left;padding:12px 16px;border-radius:10px;border:2px solid #D1FAE5;background:#F0FDF4">
+          <div style="font-weight:600;color:#065F46">♻️ Re-activar como Nuevo</div>
+          <div style="font-size:12px;color:#6B7280;margin-top:2px">Vuelve al seguimiento activo</div>
+        </button>
+        <div id="nv-btns-activo" style="flex-direction:column;gap:8px;display:flex">
+          <label style="font-size:12px;font-weight:600;color:#374151">Cambiar condición</label>
+          <select id="nv-promote-select" style="width:100%">
+            <option value="Nuevo">🌱 Mantener como Nuevo</option>
+            <option value="Asistente Bautizado">✅ Promover a Asistente Bautizado</option>
+            <option value="Asistente NO Bautizado">✅ Promover a Asistente NO Bautizado</option>
+            <option value="Miembro">⭐ Promover a Miembro</option>
+            <option value="Historico">📁 Pasar a Histórico</option>
+          </select>
+        </div>
+        </div>
+        <!-- Comentarios pastorales — al final -->
+        <div id="nv-comentarios-wrap" style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid #F3F4F6">
           <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">💬 Comentarios pastorales</div>
           <div id="nv-comentarios-lista" style="max-height:160px;overflow-y:auto;margin-bottom:8px;font-size:12px"></div>
           <div id="nv-comentario-input-wrap">
             <textarea id="nv-comentario-txt" placeholder="Agregar comentario..." style="width:100%;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;min-height:60px;resize:vertical"></textarea>
-            <button onclick="nvGuardarComentario()" class="btn btn-sm" style="margin-top:6px">💾 Guardar comentario</button>
           </div>
         </div>
-        <div id="nv-promote-acciones" style="flex-direction:column;gap:0;display:flex">
-        <!-- Re-activar (solo para histórico) -->
-        <button id="nv-btn-reactivar" onclick="nvReactivar()" class="btn" style="display:none;text-align:left;padding:12px 16px;border-radius:10px;border:2px solid #D1FAE5;background:#F0FDF4;margin-bottom:10px">
-          <div style="font-weight:600;color:#065F46">♻️ Re-activar como Nuevo</div>
-          <div style="font-size:12px;color:#6B7280;margin-top:2px">Vuelve al seguimiento activo</div>
-        </button>
-        <div id="nv-btns-activo" style="flex-direction:column;gap:10px;display:flex">
-          <button onclick="nvPromover('Nuevo')" class="btn" style="text-align:left;padding:12px 16px;border-radius:10px;border:2px solid #FEF3C7;background:#FFFBEB">
-            <div style="font-weight:600;color:#92400E">🌱 Mantener como Nuevo</div>
-            <div style="font-size:12px;color:#6B7280;margin-top:2px">Primer mes, asistencia recurrente</div>
-          </button>
-          <button onclick="nvPromover('Asistente Bautizado')" class="btn" style="text-align:left;padding:12px 16px;border-radius:10px;border:2px solid #BFDBFE;background:#EFF6FF">
-            <div style="font-weight:600;color:#1E40AF">✅ Promover a Asistente Bautizado</div>
-            <div style="font-size:12px;color:#6B7280;margin-top:2px">Participa activamente, ya bautizado</div>
-          </button>
-          <button onclick="nvPromover('Asistente NO Bautizado')" class="btn" style="text-align:left;padding:12px 16px;border-radius:10px;border:2px solid #D1FAE5;background:#F0FDF4">
-            <div style="font-weight:600;color:#065F46">✅ Promover a Asistente NO Bautizado</div>
-            <div style="font-size:12px;color:#6B7280;margin-top:2px">Participa activamente, aún no bautizado</div>
-          </button>
-          <button onclick="nvPromover('Miembro')" class="btn" style="text-align:left;padding:12px 16px;border-radius:10px;border:2px solid #DBEAFE;background:#EFF6FF">
-            <div style="font-weight:600;color:#1E40AF">⭐ Promover a Miembro</div>
-            <div style="font-size:12px;color:#6B7280;margin-top:2px">Bautizado, miembro pleno de la iglesia</div>
-          </button>
-          <button onclick="nvDarDeBaja()" class="btn" style="text-align:left;padding:12px 16px;border-radius:10px;border:2px solid #FEE2E2;background:#FFF5F5">
-            <div style="font-weight:600;color:#6B7280">📁 Pasar a Histórico</div>
-            <div style="font-size:12px;color:#6B7280;margin-top:2px">Ya no asiste — queda registrado con fecha de baja</div>
-          </button>
-        </div>
-        <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
           <button class="btn" onclick="nvClosePromote()">Cancelar</button>
+          <button class="btn btn-primary" onclick="nvConfirmarGestion()">Confirmar</button>
         </div>
       </div>
+    </div>
+
+    <!-- Modal liviano: Contactar (solo Comentarios) -->
+    <div id="nv-contactar-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:310;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <div style="font-size:15px;font-weight:600;color:#1F4E79" id="nv-contactar-name">—</div>
+          <button onclick="nvCloseContactar()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1" title="Cerrar">✕</button>
+        </div>
+        <div style="font-size:13px;color:#6B7280;margin-bottom:.75rem">📞 Registrá el contacto — con el primer comentario pasa a Contactado automáticamente</div>
+        <div id="nv-contactar-comentarios-lista" style="max-height:220px;overflow-y:auto;margin-bottom:8px;font-size:12px"></div>
+        <textarea id="nv-contactar-comentario-txt" placeholder="¿Cómo fue el contacto? ¿Qué se conversó?..." style="width:100%;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;min-height:80px;resize:vertical"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+          <button class="btn" onclick="nvCloseContactar()">Cancelar</button>
+          <button class="btn btn-primary" onclick="nvGuardarComentarioContactar()">💾 Guardar comentario</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup de acciones — se abre al clickear el Nombre, como en Rebaños -->
+    <div id="nv-actions-backdrop" onclick="nvCloseActions()" style="display:none;position:fixed;inset:0;z-index:398"></div>
+    <div id="nv-actions-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:399;background:#fff;border:1px solid #E5E7EB;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:1rem;width:260px;max-width:90vw">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div id="nv-actions-name" style="font-size:14px;font-weight:700;color:#1F4E79">—</div>
+        <button onclick="nvCloseActions()" style="background:none;border:none;font-size:18px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1" title="Cerrar">✕</button>
+      </div>
+      <div id="nv-actions-buttons" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>
   </div>`;
 }
 
 let nvSelectedId=null;
 let nvFiltro='ultimos30'; // 'ultimos30' | 'mas30' | 'historico'
+let nvDraftSeguimientoId=null, nvDraftSeguimientoNombre=null, nvDraftSeguimientoSet=false;
+const NV_SUBESTADO_ORDEN={Ingresado:0,Contactado:1,Participando:2};
+
+// ── Sub-estado de seguimiento (solo aplica mientras condicion==='Nuevo') ──
+function nvDiasAlerta(){
+  const v=parseInt(localStorage.getItem('gdv_nv_dias_alerta'));
+  return (v&&v>0)?v:3; // default 3 días
+}
+async function nvSetDiasAlerta(val){
+  const v=parseInt(val)||3;
+  await saveK('gdv_nv_dias_alerta', v);
+  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){}
+  renderNuevos();
+}
+function nvFechaRegDate(m){
+  const partes=(m.fechaRegistro||'').split('/');
+  if(partes.length<3) return null;
+  let yy=parseInt(partes[2]);
+  if(yy<100) yy+=2000;
+  const d=new Date(yy,+partes[1]-1,+partes[0]);
+  return isNaN(d.getTime())?null:d;
+}
+function nvDiasDesdeIngreso(m){
+  const d=nvFechaRegDate(m);
+  if(!d) return 0;
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  return Math.floor((hoy-d)/(1000*60*60*24));
+}
+function nvEsAtrasado(m){
+  return (m.subEstado||'Ingresado')==='Ingresado' && nvDiasDesdeIngreso(m)>=nvDiasAlerta();
+}
+function nvSubEstadoBadge(m){
+  const est=m.subEstado||'Ingresado';
+  const map={
+    Ingresado:  {bg:'#FEF3C7',color:'#92400E',icon:'🆕'},
+    Contactado: {bg:'#DBEAFE',color:'#1E40AF',icon:'📞'},
+    Participando:{bg:'#D1FAE5',color:'#065F46',icon:'🌱'},
+  };
+  const s=map[est]||map.Ingresado;
+  return `<span style="background:${s.bg};color:${s.color};font-size:11px;padding:3px 10px;border-radius:99px;font-weight:600">${s.icon} ${est}</span>`;
+}
+// Transición automática Ingresado/Contactado → Participando en cuanto tiene Grupo asignado
+async function nvAplicarParticipando(m){
+  if(!m || m.condicion!=='Nuevo') return false;
+  if(!m.grupoId) return false;
+  if(m.subEstado==='Participando') return false;
+  const de=m.subEstado||'Ingresado';
+  m.subEstado='Participando';
+  if(!m.subEstadoHistorial) m.subEstadoHistorial=[];
+  m.subEstadoHistorial.push({de,a:'Participando',autor:'Sistema (grupo asignado)',fecha:new Date().toISOString()});
+  return true;
+}
 
 function renderNuevos(){
   const search=(document.getElementById('nv-search')?.value||'').toLowerCase();
   const fGrupo=parseInt(document.getElementById('nv-fil-grupo')?.value)||null;
   const fGen=document.getElementById('nv-fil-gen')?.value||'';
   const fTipoGrupo=document.getElementById('nv-fil-tipo-grupo')?.value||'';
+  const fSubEstado=document.getElementById('nv-fil-subestado')?.value||'';
+  const fResponsable=document.getElementById('nv-fil-responsable')?.value||'';
 
   const gsel=document.getElementById('nv-fil-grupo');
-  if(gsel&&gsel.options.length<=1)
+  if(gsel&&gsel.options.length<=1){
     S.groups.forEach(g=>{const o=document.createElement('option');o.value=g.id;o.textContent=g.name;gsel.appendChild(o);});
+    (S.ngComunidades||[]).forEach(ng=>{const o=document.createElement('option');o.value=ng.id;o.textContent='🌱 '+ng.name;gsel.appendChild(o);});
+  }
+
+  // Responsable filter: rebuild options from current Nuevos, preserving the selection
+  const rsel=document.getElementById('nv-fil-responsable');
+  if(rsel){
+    const prevVal=rsel.value;
+    const responsables=new Map();
+    S.members.filter(m=>m.condicion==='Nuevo'&&m.estado!=='Baja'&&m.seguimientoId).forEach(m=>{
+      responsables.set(m.seguimientoId, m.seguimientoNombre||'');
+    });
+    rsel.innerHTML='<option value="">Todos los responsables</option><option value="sin-asignar">⏳ Sin asignar</option>'+
+      [...responsables.entries()].map(([id,nombre])=>`<option value="${id}">${(nombre||'').split(' — ')[0]}</option>`).join('');
+    rsel.value=prevVal;
+  }
 
   const hoy=new Date(); hoy.setHours(0,0,0,0);
   const hace30=new Date(hoy); hace30.setDate(hace30.getDate()-30);
@@ -7245,6 +7394,9 @@ function renderNuevos(){
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
   if(fGen)   members=members.filter(m=>m.genero===fGen);
+  if(fSubEstado) members=members.filter(m=>(m.subEstado||'Ingresado')===fSubEstado);
+  if(fResponsable==='sin-asignar') members=members.filter(m=>!m.seguimientoId);
+  else if(fResponsable) members=members.filter(m=>String(m.seguimientoId)===String(fResponsable));
   if(fTipoGrupo==='gdv'){
     var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
     members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});
@@ -7253,12 +7405,21 @@ function renderNuevos(){
     members=members.filter(function(m){return m.grupoId&&ngIds.has(Number(m.grupoId));});
   }
 
-  // Sort: unassigned seguimiento first, then by registration date
-  members.sort(function(a,b){
-    var aHas=a.seguimientoId?1:0;
-    var bHas=b.seguimientoId?1:0;
-    return aHas-bHas; // 0 (sin asignar) primero
-  });
+  // Orden: 1° Ingresados, 2° Contactados, 3° Participando — dentro de cada grupo,
+  // primero los que no tienen responsable asignado, y luego por antigüedad (más viejos arriba)
+  if(nvFiltro!=='historico'){
+    members.sort(function(a,b){
+      const oa=NV_SUBESTADO_ORDEN[a.subEstado||'Ingresado']??9;
+      const ob=NV_SUBESTADO_ORDEN[b.subEstado||'Ingresado']??9;
+      if(oa!==ob) return oa-ob;
+      const aHas=a.seguimientoId?1:0;
+      const bHas=b.seguimientoId?1:0;
+      if(aHas!==bHas) return aHas-bHas; // 0 (sin asignar) primero
+      const da=nvFechaRegDate(a)?.getTime()??0;
+      const db=nvFechaRegDate(b)?.getTime()??0;
+      return da-db; // más antiguos primero
+    });
+  }
 
   const countEl=document.getElementById('nv-count');
   if(countEl) countEl.textContent=S.members.filter(m=>m.condicion==='Nuevo'&&m.estado!=='Baja').length;
@@ -7282,6 +7443,8 @@ function renderNuevos(){
     const genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
     const genColor=m.genero==='H'?'#1E40AF':'#9D174D';
     const edad=saCalcEdad(m.fnac);
+    const esNuevo=nvFiltro!=='historico'&&m.condicion==='Nuevo';
+    const atrasado=esNuevo&&nvEsAtrasado(m);
     // Seguimiento display
     const segNombre=m.seguimientoNombre||'';
     const segLabel=segNombre
@@ -7293,34 +7456,63 @@ function renderNuevos(){
       ?'<span style="background:#E0F2FE;color:#0369A1;font-size:10px;padding:1px 7px;border-radius:99px">✏️ Manual</span>'
       :'';
 
-    return `<div class="card" style="margin-bottom:.75rem;border-left:4px solid #16A34A;padding:12px 14px">
-      <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
-        <div style="width:40px;height:40px;border-radius:50%;background:#F0FDF4;border:2px solid #86EFAC;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#16A34A;flex-shrink:0">
+    return `<div class="card" style="margin-bottom:.6rem;border-left:4px solid ${atrasado?'#DC2626':'#16A34A'};padding:10px 14px${atrasado?';background:#FFF0F5':''}">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div style="width:36px;height:36px;border-radius:50%;background:#F0FDF4;border:2px solid #86EFAC;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#16A34A;flex-shrink:0;margin-top:2px">
           ${initials(fullName(m))}
         </div>
-        <div style="flex:1;min-width:160px">
-          <div style="font-weight:700;font-size:14px;color:#1F2937">${fullName(m)} ${origenBadge}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">
+            <div style="font-weight:700;font-size:14px">
+              <span style="cursor:pointer;text-decoration:underline dotted;color:#1F2937" onclick="nvOpenActions(${m.id})">${fullName(m)}</span>
+              ${origenBadge}${atrasado?' <span style="background:#FEE2E2;color:#991B1B;font-size:10px;padding:1px 7px;border-radius:99px;font-weight:700">⏰ Atrasado</span>':''}
+            </div>
+            ${esNuevo?nvSubEstadoBadge(m):'<span style="background:#F3F4F6;color:#6B7280;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;flex-shrink:0">📁 Histórico</span>'}
+          </div>
           <div style="font-size:12px;color:#6B7280;margin-top:3px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
             ${memberGroups.length?memberGroups.map(gr=>`<span style="color:#374151">${gr.name}</span>`).join(' · '):'<span style="color:#F59E0B">Sin grupo</span>'}
             ${m.tel?`<span>· 📱 ${m.tel}</span>`:''}
             ${nvCalcEdad(m.fnac)!==null?`<span>· ${nvCalcEdad(m.fnac)} años</span>`:''}
-            <span style="margin-left:auto;color:#9CA3AF;font-size:11px">📅 ${m.fechaRegistro||'Sin fecha'}</span>
+            <span style="margin-left:auto;color:#9CA3AF;font-size:11px">📅 ${m.fechaRegistro||'Sin fecha'}${esNuevo?` · ${nvDiasDesdeIngreso(m)}d`:''}</span>
           </div>
-          <div style="font-size:12px;margin-top:5px;display:flex;flex-wrap:wrap;gap:10px">
+          <div style="font-size:12px;margin-top:3px;display:flex;flex-wrap:wrap;gap:10px">
             ${m.comoNosConocio?`<span style="color:#6B7280">🔗 ${m.comoNosConocio}</span>`:''}
             <span>👤 Seguimiento: ${segLabel}</span>
           </div>
-          ${m.motivoContacto?`<div style="font-size:12px;color:#374151;margin-top:4px;font-style:italic">💬 ${m.motivoContacto}</div>`:''}
-        </div>
-        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-          <span style="background:#FEF3C7;color:#92400E;font-size:11px;padding:3px 10px;border-radius:99px;font-weight:600">🌱 Nuevo</span>
-          <button class="btn btn-sm" onclick="nvAbrirEditar(${m.id})">✏️ Editar</button>
-          ${canGestionarNuevos()||isContactar()?`<button class="btn btn-sm btn-primary" onclick="nvOpenPromote(${m.id})">Gestionar →</button>`:''}
-          ${isSuperAdmin()?`<button onclick="nvEliminarContacto(${m.id})" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:18px;padding:2px 6px" title="Eliminar registro">🗑️</button>`:''}
+          ${m.motivoContacto?`<div style="font-size:12px;color:#374151;margin-top:3px;font-style:italic">💬 ${m.motivoContacto}</div>`:''}
         </div>
       </div>
     </div>`;
   }).join('');
+}
+
+// Popup de acciones (Editar/Contactar/Gestionar/Eliminar) — se abre al clickear el Nombre
+function nvOpenActions(id){
+  const m=S.members.find(x=>x.id===id);
+  if(!m) return;
+  const nameEl=document.getElementById('nv-actions-name');
+  if(nameEl) nameEl.textContent=fullName(m);
+  const esNuevo=nvFiltro!=='historico'&&m.condicion==='Nuevo';
+  let btns='';
+  btns+=`<button class="btn btn-sm" style="width:100%;text-align:left" onclick="nvCloseActions();nvAbrirEditar(${m.id})">✏️ Editar</button>`;
+  if(esNuevo&&(m.subEstado||'Ingresado')==='Ingresado'&&(canGestionarNuevos()||isContactar())){
+    btns+=`<button class="btn btn-sm" style="width:100%;text-align:left;background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvCloseActions();nvOpenContactar(${m.id})">📞 Contactar</button>`;
+  }
+  if(canGestionarNuevos()||isContactar()){
+    btns+=`<button class="btn btn-sm btn-primary" style="width:100%;text-align:left" onclick="nvCloseActions();nvOpenPromote(${m.id})">Gestionar →</button>`;
+  }
+  if(isSuperAdmin()){
+    btns+=`<button class="btn btn-sm" style="width:100%;text-align:left;color:#DC2626;border-color:#FECACA" onclick="nvCloseActions();nvEliminarContacto(${m.id})">🗑️ Eliminar</button>`;
+  }
+  const btnsEl=document.getElementById('nv-actions-buttons');
+  if(btnsEl) btnsEl.innerHTML=btns;
+  document.getElementById('nv-actions-panel').style.display='block';
+  document.getElementById('nv-actions-backdrop').style.display='block';
+}
+
+function nvCloseActions(){
+  document.getElementById('nv-actions-panel').style.display='none';
+  document.getElementById('nv-actions-backdrop').style.display='none';
 }
 
 function nvOpenPromote(id){
@@ -7328,6 +7520,10 @@ function nvOpenPromote(id){
   const m=S.members.find(x=>x.id===id);
   if(!m) return;
   document.getElementById('nv-promote-name').textContent=fullName(m);
+  // Borrador de seguimiento: arranca igual al valor guardado, no se persiste hasta Confirmar
+  nvDraftSeguimientoId=m.seguimientoId||null;
+  nvDraftSeguimientoNombre=m.seguimientoNombre||'';
+  nvDraftSeguimientoSet=false;
   const segEl=document.getElementById('nv-promote-seg');
   if(segEl) segEl.textContent=m.seguimientoNombre||'Pendiente de asignar';
   nvRenderComentarios(m);
@@ -7337,6 +7533,18 @@ function nvOpenPromote(id){
   const btnsMantener=document.getElementById('nv-btns-activo');
   if(btnReactivar) btnReactivar.style.display=isHistorico?'block':'none';
   if(btnsMantener) btnsMantener.style.display=isHistorico?'none':'flex';
+  // Sub-estado (Ingresado/Contactado/Participando) — solo aplica mientras es Nuevo
+  const subWrap=document.getElementById('nv-promote-subestado-wrap');
+  const subSelect=document.getElementById('nv-promote-subestado-select');
+  const subInfo=document.getElementById('nv-promote-subestado-info');
+  const esNuevoActivo=!isHistorico&&m.condicion==='Nuevo';
+  if(subWrap) subWrap.style.display=esNuevoActivo?'block':'none';
+  if(esNuevoActivo){
+    if(subSelect) subSelect.value=m.subEstado||'Ingresado';
+    if(subInfo) subInfo.textContent=m.contactadoPor?`Contactado por ${m.contactadoPor}`:'';
+  }
+  const selCond=document.getElementById('nv-promote-select');
+  if(selCond) selCond.value=(m.condicion==='Nuevo')?'Nuevo':(m.condicion||'Nuevo');
   // Restrict condition buttons and seguimiento to Pastores/SuperAdmin
   const canGest=canGestionarNuevos();
   const accionesWrap=document.getElementById('nv-promote-acciones');
@@ -7348,9 +7556,42 @@ function nvOpenPromote(id){
   document.getElementById('nv-promote-overlay').style.display='flex';
 }
 
+// Único botón "Confirmar" al pie del modal: aplica lo que haya cambiado
+// (condición, sub-estado, o solo el comentario) en una sola acción.
+function nvConfirmarGestion(){
+  if(!nvSelectedId) return;
+  const m=S.members.find(x=>x.id===nvSelectedId);
+  if(!m) return;
+  // Aplicar el borrador de Seguimiento (si se seleccionó algo) junto con lo demás que se confirme
+  if(nvDraftSeguimientoSet){
+    m.seguimientoId=nvDraftSeguimientoId;
+    m.seguimientoNombre=nvDraftSeguimientoNombre;
+  }
+  const isHistorico=m.condicion==='Historico'||m.estado==='Baja';
+  if(isHistorico) return nvGuardarComentario(); // Re-activar tiene su propio botón
+
+  const nuevaCondicion=document.getElementById('nv-promote-select')?.value;
+  const nuevoSubEstado=document.getElementById('nv-promote-subestado-select')?.value;
+  const condicionActual=(m.condicion==='Nuevo')?'Nuevo':(m.condicion||'Nuevo');
+  const subEstadoActual=m.subEstado||'Ingresado';
+  const condicionCambio=nuevaCondicion&&nuevaCondicion!==condicionActual;
+  const subEstadoCambio=!condicionCambio&&nuevoSubEstado&&nuevoSubEstado!==subEstadoActual;
+
+  if(condicionCambio){
+    if(nuevaCondicion==='Historico') return nvDarDeBaja();
+    return nvPromover(nuevaCondicion);
+  }
+  if(subEstadoCambio) return nvCambiarSubEstadoManual(nuevoSubEstado);
+  return nvGuardarComentario();
+}
+
 function nvClosePromote(){
   document.getElementById('nv-promote-overlay').style.display='none';
   nvSelectedId=null;
+  // Descartar cualquier selección de Seguimiento no confirmada
+  nvDraftSeguimientoId=null;
+  nvDraftSeguimientoNombre=null;
+  nvDraftSeguimientoSet=false;
 }
 
 function nvEditSeguimiento(memberId){
@@ -7370,14 +7611,15 @@ function nvSelectSeguimiento(id, nombre, grupo){
     document.getElementById('nv-mf-seguimiento-id').value=id;
     document.getElementById('nv-mf-seguimiento-label').textContent=nombre+(grupo?' — '+grupo:'');
   } else if(nvSelectedId){
-    // Editing from list card
+    // Gestionar: se guarda como borrador, recién se persiste al hacer Confirmar
     const m=S.members.find(x=>x.id===nvSelectedId);
     if(m){
-      m.seguimientoId=id;
-      m.seguimientoNombre=nombre+(grupo?' — '+grupo:'');
-      saveK(SK.members,S.members);
-      renderNuevos();
-      showToast('✅ Seguimiento asignado a '+nombre,'#16A34A');
+      nvDraftSeguimientoId=id;
+      nvDraftSeguimientoNombre=nombre+(grupo?' — '+grupo:'');
+      nvDraftSeguimientoSet=true;
+      const segEl=document.getElementById('nv-promote-seg');
+      if(segEl) segEl.textContent=nvDraftSeguimientoNombre;
+      showToast('Seleccionado — hacé clic en Confirmar para guardar','#1D4ED8');
     }
   }
   document.getElementById('nv-seg-modal').style.display='none';
@@ -7415,14 +7657,17 @@ function nvRenderComentarios(m){
 async function nvGuardarComentario(){
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m||!nvCanComentario(m)) return;
-  const txt=document.getElementById('nv-comentario-txt')?.value.trim();
-  if(!txt){showToast('Escribí un comentario primero','#D97706');return;}
-  if(!m.comentarios) m.comentarios=[];
-  m.comentarios.push({
-    texto:txt,
-    autor:currentUser.name,
-    ts:Date.now()
-  });
+  const txt=(document.getElementById('nv-comentario-txt')?.value||'').trim();
+  const huboSeguimiento=nvDraftSeguimientoSet;
+  if(!txt&&!huboSeguimiento){showToast('No hay cambios para confirmar','#6B7280');return;}
+  if(txt){
+    if(!m.comentarios) m.comentarios=[];
+    m.comentarios.push({
+      texto:txt,
+      autor:currentUser.name,
+      ts:Date.now()
+    });
+  }
   document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
   try{
@@ -7431,8 +7676,104 @@ async function nvGuardarComentario(){
     console.error('nvGuardarComentario Firebase error:',e);
     showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
   }
-  nvRenderComentarios(m);
-  showToast('💬 Comentario guardado','#16A34A');
+  nvClosePromote();
+  renderNuevos();
+  showToast(txt?'💬 Comentario guardado':'✅ Seguimiento asignado','#16A34A');
+}
+
+async function nvCambiarSubEstadoManual(nuevoSubEstado){
+  const m=S.members.find(x=>x.id===nvSelectedId);
+  if(!m) return;
+  const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
+  const anterior=m.subEstado||'Ingresado';
+  m.subEstado=nuevoSubEstado;
+  if(nuevoSubEstado==='Contactado'&&anterior!=='Contactado'){
+    m.contactadoPor=currentUser?.name||'Sistema';
+    m.contactadoFecha=new Date().toISOString();
+  }
+  if(!m.subEstadoHistorial) m.subEstadoHistorial=[];
+  m.subEstadoHistorial.push({de:anterior,a:nuevoSubEstado,autor:currentUser?.name||'Sistema',fecha:new Date().toISOString(),comentario:txtComentario||''});
+  if(!m.comentarios) m.comentarios=[];
+  m.comentarios.push({texto:`Sub-estado cambiado de "${anterior}" a "${nuevoSubEstado}".`+(txtComentario?` ${txtComentario}`:''),autor:currentUser?.name||'Sistema',ts:Date.now()});
+  document.getElementById('nv-comentario-txt').value='';
+  await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
+  nvClosePromote();
+  renderNuevos();
+  showToast('✅ Sub-estado actualizado a '+nuevoSubEstado,'#16A34A');
+}
+
+function nvOpenContactar(id){
+  nvSelectedId=id;
+  const m=S.members.find(x=>x.id===id);
+  if(!m) return;
+  const nameEl=document.getElementById('nv-contactar-name');
+  if(nameEl) nameEl.textContent=fullName(m);
+  nvRenderComentariosContactar(m);
+  const txtEl=document.getElementById('nv-contactar-comentario-txt');
+  if(txtEl) txtEl.value='';
+  document.getElementById('nv-contactar-overlay').style.display='flex';
+}
+
+function nvCloseContactar(){
+  document.getElementById('nv-contactar-overlay').style.display='none';
+  nvSelectedId=null;
+}
+
+function nvRenderComentariosContactar(m){
+  const lista=document.getElementById('nv-contactar-comentarios-lista');
+  if(!lista) return;
+  const coms=(m.comentarios||[]).slice().sort((a,b)=>b.ts-a.ts);
+  if(!coms.length){
+    lista.innerHTML='<div style="color:#9CA3AF;padding:4px 0">Sin comentarios aún — el primero marca el contacto como realizado.</div>';
+  } else {
+    lista.innerHTML=coms.map(c=>`
+      <div style="padding:6px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #1D4ED8">
+        <div style="color:#1F2937;margin-bottom:2px">${c.texto}</div>
+        <div style="font-size:11px;color:#9CA3AF">${c.autor} · ${new Date(c.ts).toLocaleString('es-AR')}</div>
+      </div>`).join('');
+  }
+}
+
+async function nvGuardarComentarioContactar(){
+  if(!nvSelectedId) return;
+  const m=S.members.find(x=>x.id===nvSelectedId);
+  if(!m) return;
+  const txt=(document.getElementById('nv-contactar-comentario-txt')?.value||'').trim();
+  const esPrimerContacto=(m.subEstado||'Ingresado')==='Ingresado';
+  if(!txt){showToast('Escribí un comentario primero','#D97706');return;}
+  if(esPrimerContacto&&txt.length<10){
+    alert('Para registrar el primer contacto escribí un comentario de al menos 10 caracteres (cómo fue, qué se conversó).');
+    return;
+  }
+  if(!m.comentarios) m.comentarios=[];
+  m.comentarios.push({texto:txt,autor:currentUser?.name||'Sistema',ts:Date.now()});
+  if(esPrimerContacto){
+    m.subEstado='Contactado';
+    m.contactadoPor=currentUser?.name||'Sistema';
+    m.contactadoFecha=new Date().toISOString();
+    if(!m.subEstadoHistorial) m.subEstadoHistorial=[];
+    m.subEstadoHistorial.push({de:'Ingresado',a:'Contactado',autor:m.contactadoPor,fecha:m.contactadoFecha,comentario:txt});
+  }
+  document.getElementById('nv-contactar-comentario-txt').value='';
+  await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    showToast('⚠️ Guardado local OK pero no se pudo sincronizar con la nube. Verificá tu red.','#D97706');
+  }
+  if(esPrimerContacto){
+    nvCloseContactar();
+    renderNuevos();
+    showToast('📞 '+fullName(m)+' — contacto registrado','#1D4ED8');
+  } else {
+    nvRenderComentariosContactar(m);
+    showToast('💬 Comentario guardado','#16A34A');
+  }
 }
 
 async function nvPromover(condicion){
@@ -7447,6 +7788,10 @@ async function nvPromover(condicion){
   }
   const condAnterior=m.condicion||'Nuevo';
   m.condicion=condicion;
+  if(condicion!=='Nuevo'){
+    // Sale del pipeline de Nuevos — el historial de sub-estado queda guardado para auditoría
+    m.subEstado=null;
+  }
   if(!m.comentarios) m.comentarios=[];
   const textoAccion=condicion==='Nuevo'
     ?`Mantenido como Nuevo (estaba: ${condAnterior})`
@@ -7484,6 +7829,7 @@ async function nvDarDeBaja(){
   }
   if(!confirm('¿Pasar a Histórico a '+fullName(m)+'?')) return;
   m.condicion='Historico';
+  m.subEstado=null;
   m.estado='Baja';
   m.fechaBaja=todayAA();
   m.motivoBaja=txtComentario;
@@ -7568,6 +7914,7 @@ async function nvGuardarEditar(){
   var grupoVals=nvGetGrupoIdFromVal(document.getElementById('nv-edit-grupo')?.value||'');
   m.grupoId=grupoVals.grupoId;
   m.ngComunidadId=grupoVals.ngComunidadId;
+  await nvAplicarParticipando(m);
   if(isSuperAdmin()){
     const fechaVal=document.getElementById('nv-edit-fecha')?.value.trim();
     if(fechaVal) m.fechaRegistro=fechaVal;
@@ -7588,11 +7935,16 @@ async function nvGuardarEditar(){
 async function nvReactivar(){
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
+  const subEstadoAnterior=m.subEstado||'Ingresado';
   m.condicion='Nuevo';
+  m.subEstado='Ingresado';
+  m.fechaRegistro=todayAA(); // reinicia el conteo de días para la alerta de atraso
   m.estado='Activo';
   m.fechaHistorico=null;
   m.fechaBaja=null;
   m.motivoBaja=null;
+  if(!m.subEstadoHistorial) m.subEstadoHistorial=[];
+  m.subEstadoHistorial.push({de:subEstadoAnterior,a:'Ingresado',autor:currentUser?.name||'Sistema',fecha:new Date().toISOString(),comentario:'Re-activación desde Histórico'});
   if(!m.comentarios) m.comentarios=[];
   const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
   m.comentarios.push({
@@ -7664,10 +8016,139 @@ function nvCumplesBanner(){
 }
 
 function nvSetFiltro(filtro, btn){
-  nvFiltro=filtro;
   document.querySelectorAll('.nav-btn[id^="nv-btn-"]').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
+  const listSection=document.getElementById('nv-list-section');
+  const dashSection=document.getElementById('nv-dashboard-section');
+  if(filtro==='dashboard'){
+    if(listSection) listSection.style.display='none';
+    if(dashSection) dashSection.style.display='block';
+    nvRenderDashboard();
+    return;
+  }
+  if(listSection) listSection.style.display='block';
+  if(dashSection) dashSection.style.display='none';
+  nvFiltro=filtro;
   renderNuevos();
+}
+
+// ── Dashboard de análisis por fecha de Alta/Ingreso ──
+function nvGetDashboardCohort(){
+  const desde=document.getElementById('nv-dash-desde')?.value||'';
+  const hasta=document.getElementById('nv-dash-hasta')?.value||'';
+  const sexo=document.getElementById('nv-dash-sexo')?.value||'';
+  return S.members.filter(m=>{
+    const d=nvFechaRegDate(m);
+    if(!d) return false; // solo quienes pasaron por el flujo de Nuevos (tienen fecha de ingreso)
+    if(desde&&d<new Date(desde)) return false;
+    if(hasta){ const h=new Date(hasta); h.setHours(23,59,59,999); if(d>h) return false; }
+    if(sexo&&m.genero!==sexo) return false;
+    return true;
+  });
+}
+
+function nvResetDashboardFiltros(){
+  const d=new Date(); d.setMonth(d.getMonth()-1);
+  const desdeEl=document.getElementById('nv-dash-desde');
+  const hastaEl=document.getElementById('nv-dash-hasta');
+  const sexoEl=document.getElementById('nv-dash-sexo');
+  if(desdeEl) desdeEl.value=d.toISOString().slice(0,10);
+  if(hastaEl) hastaEl.value=new Date().toISOString().slice(0,10);
+  if(sexoEl) sexoEl.value='';
+  nvRenderDashboard();
+}
+
+function nvRenderDashboard(){
+  const desdeEl=document.getElementById('nv-dash-desde');
+  const hastaEl=document.getElementById('nv-dash-hasta');
+  if(desdeEl&&!desdeEl.value){
+    const d=new Date(); d.setMonth(d.getMonth()-1);
+    desdeEl.value=d.toISOString().slice(0,10);
+  }
+  if(hastaEl&&!hastaEl.value) hastaEl.value=new Date().toISOString().slice(0,10);
+
+  const cohort=nvGetDashboardCohort();
+  const total=cohort.length;
+  const promovidoCondiciones=['Asistente Bautizado','Asistente NO Bautizado','Miembro'];
+  const ingresadoSolo=cohort.filter(m=>m.condicion==='Nuevo'&&(m.subEstado||'Ingresado')==='Ingresado').length;
+  const contactadoSolo=cohort.filter(m=>m.condicion==='Nuevo'&&m.subEstado==='Contactado').length;
+  const participando=cohort.filter(m=>m.condicion==='Nuevo'&&m.subEstado==='Participando').length;
+  const promovidos=cohort.filter(m=>promovidoCondiciones.includes(m.condicion)).length;
+  const historico=cohort.filter(m=>m.condicion==='Historico').length;
+  const contactadosTotal=cohort.filter(m=>m.contactadoFecha).length;
+
+  const statsEl=document.getElementById('nv-dash-stats');
+  if(statsEl){
+    statsEl.innerHTML=[
+      {label:'Ingresaron',val:total,icon:'🆕'},
+      {label:'Contactados',val:contactadosTotal,icon:'📞'},
+      {label:'Participando',val:participando,icon:'🌱'},
+      {label:'Asistente/Miembro',val:promovidos,icon:'⭐'},
+      {label:'Histórico',val:historico,icon:'📁'},
+    ].map(s=>`<div class="stat"><span class="stat-val">${s.val}</span><span class="stat-lbl">${s.icon} ${s.label}</span></div>`).join('');
+  }
+
+  // Tiempo hasta el primer contacto
+  const tiemposWrap=document.getElementById('nv-dash-tiempos');
+  if(tiemposWrap){
+    const conContacto=cohort.filter(m=>m.contactadoFecha);
+    if(!conContacto.length){
+      tiemposWrap.innerHTML='<div class="empty">Sin contactos registrados en el período</div>';
+    } else {
+      const dias=conContacto.map(m=>{
+        const fReg=nvFechaRegDate(m);
+        if(!fReg) return null;
+        const fCon=new Date(m.contactadoFecha);
+        return Math.max(0,Math.round((fCon-fReg)/(1000*60*60*24)));
+      }).filter(d=>d!==null);
+      const prom=dias.length?(dias.reduce((a,b)=>a+b,0)/dias.length):0;
+      const buckets=[
+        {label:'Mismo día / 1 día',min:0,max:1,count:0,color:'#16A34A'},
+        {label:'2-3 días',min:2,max:3,count:0,color:'#1F4E79'},
+        {label:'4-7 días',min:4,max:7,count:0,color:'#D97706'},
+        {label:'Más de 7 días',min:8,max:Infinity,count:0,color:'#DC2626'},
+      ];
+      dias.forEach(d=>{ const b=buckets.find(b=>d>=b.min&&d<=b.max); if(b) b.count++; });
+      let html=`<div style="font-size:13px;color:#374151;margin-bottom:12px">Promedio: <strong style="color:#1F4E79">${prom.toFixed(1)} días</strong> desde el ingreso hasta el primer contacto (${dias.length} caso${dias.length!==1?'s':''})</div>`;
+      buckets.forEach(b=>{
+        const pct=dias.length?Math.round(b.count/dias.length*100):0;
+        html+=`<div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">
+            <span>${b.label}</span><span style="color:#6B7280">${b.count} — ${pct}%</span>
+          </div>
+          <div class="pbar-bg"><div style="height:8px;border-radius:999px;background:${b.color};width:${pct}%"></div></div>
+        </div>`;
+      });
+      tiemposWrap.innerHTML=html;
+    }
+  }
+
+  // Conversión desde el ingreso
+  const convWrap=document.getElementById('nv-dash-conversion');
+  if(convWrap){
+    if(!total){
+      convWrap.innerHTML='<div class="empty">Sin datos en el período seleccionado</div>';
+    } else {
+      const rows=[
+        {label:'🆕 Aún Ingresado (sin contactar)',count:ingresadoSolo,color:'#D97706'},
+        {label:'📞 Contactado (sin grupo aún)',count:contactadoSolo,color:'#1D4ED8'},
+        {label:'🌱 Participando en un grupo',count:participando,color:'#16A34A'},
+        {label:'⭐ Promovido a Asistente/Miembro',count:promovidos,color:'#7C3AED'},
+        {label:'📁 Pasó a Histórico',count:historico,color:'#6B7280'},
+      ];
+      convWrap.innerHTML=rows.map(r=>{
+        const pct=Math.round(r.count/total*100);
+        return `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">
+            <span>${r.label}</span><span style="color:#6B7280"><strong style="color:${r.color}">${r.count}</strong> — ${pct}%</span>
+          </div>
+          <div class="pbar-bg"><div style="height:8px;border-radius:999px;background:${r.color};width:${pct}%"></div></div>
+        </div>`;
+      }).join('');
+      const sumaVerif=ingresadoSolo+contactadoSolo+participando+promovidos+historico;
+      convWrap.innerHTML+=`<div style="font-size:11px;color:#9CA3AF;margin-top:6px">Total del período: ${sumaVerif} de ${total}</div>`;
+    }
+  }
 }
 
 function nvAgregarNuevo(){
@@ -7764,19 +8245,26 @@ function nvOpenSeguimientoSelector(){
     const self=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
     activos=self?[self]:[];
   } else {
-    activos=S.members.filter(m=>m.estado!=='Baja');
+    // Solo Miembros plenos de Rebaños pueden quedar como responsables de seguimiento
+    activos=S.members.filter(m=>m.estado!=='Baja'&&m.condicion==='Miembro');
   }
   const filtered=search?activos.filter(m=>fullName(m).toLowerCase().includes(search)):activos;
+  if(!filtered.length){
+    wrap.innerHTML='<div style="padding:16px 12px;text-align:center;color:#9CA3AF;font-size:13px">No hay Miembros disponibles para asignar.</div>';
+    document.getElementById('nv-seg-modal').style.display='flex';
+    return;
+  }
   wrap.innerHTML=filtered.slice(0,30).map(m=>{
     const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
     const allAvailableGroups=[...(S.groups||[]),...(S.ngComunidades||[]).map(function(ng){return {id:ng.id,name:'🌱 '+ng.name};})];
     const memberGroups=allGids.map(gid=>allAvailableGroups.find(x=>Number(x.id)===gid)).filter(Boolean);
-    return `<div onclick="nvSelectSeguimiento(${m.id},'${fullName(m).replace(/'/g,"\'")}','${g?g.name:''}')"
+    const grupoLabel=memberGroups.length?memberGroups.map(gr=>gr.name).join(', '):'Sin grupo';
+    return `<div onclick="nvSelectSeguimiento(${m.id},'${fullName(m).replace(/'/g,"\\'")}','${grupoLabel.replace(/'/g,"\\'")}')"
       style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px;display:flex;align-items:center;gap:8px"
       onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background=''">
       <div>
         <div style="font-weight:600">${fullName(m)}</div>
-        <div style="font-size:11px;color:#6B7280">${g?g.name:'Sin grupo'}</div>
+        <div style="font-size:11px;color:#6B7280">${grupoLabel}</div>
       </div>
     </div>`;
   }).join('');
@@ -7808,6 +8296,7 @@ async function nvSaveInlineForm(){
       id:Date.now(),nombre,apellido,
       tel:cel,genero,grupoId:null,
       condicion:'Nuevo',estado:'Activo',
+      subEstado:'Ingresado',subEstadoHistorial:[],
       dir:barrio,fnac,roles:[],
       comoNosConocio:como,
       motivoContacto:motivo,
@@ -8417,6 +8906,7 @@ function enviarForm(){
     var nuevo={
       id:Date.now(),nombre:n,apellido:a,tel:cel,genero:genero,
       grupoId:null,condicion:'Nuevo',estado:'Activo',
+      subEstado:'Ingresado',subEstadoHistorial:[],
       dir:barrio,fnac:fnac,roles:[],
       comoNosConocio:como,motivoContacto:motivo,
       fechaRegistro:todayAA(),
@@ -9253,6 +9743,7 @@ function pnvEnviar(){
     members.push({
       id:Date.now(),nombre:n,apellido:a,tel:cel,genero:genero,
       grupoId:null,condicion:'Nuevo',estado:'Activo',
+      subEstado:'Ingresado',subEstadoHistorial:[],
       dir:barrio,fnac:fnac,roles:[],
       comoNosConocio:como,motivoContacto:motivo,
       fechaRegistro:todayAA(),
@@ -9446,6 +9937,9 @@ function exportNuevosExcel(){
   const search=(document.getElementById('nv-search')?.value||'').toLowerCase();
   const fGrupo=parseInt(document.getElementById('nv-fil-grupo')?.value)||null;
   const fGen=document.getElementById('nv-fil-gen')?.value||'';
+  const fTipoGrupo=document.getElementById('nv-fil-tipo-grupo')?.value||'';
+  const fSubEstado=document.getElementById('nv-fil-subestado')?.value||'';
+  const fResponsable=document.getElementById('nv-fil-responsable')?.value||'';
   const hoy=new Date(); hoy.setHours(0,0,0,0);
   const hace30=new Date(hoy); hace30.setDate(hace30.getDate()-30);
 
@@ -9468,6 +9962,9 @@ function exportNuevosExcel(){
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
   if(fGen)   members=members.filter(m=>m.genero===fGen);
+  if(fSubEstado) members=members.filter(m=>(m.subEstado||'Ingresado')===fSubEstado);
+  if(fResponsable==='sin-asignar') members=members.filter(m=>!m.seguimientoId);
+  else if(fResponsable) members=members.filter(m=>String(m.seguimientoId)===String(fResponsable));
   if(fTipoGrupo==='gdv'){
     var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
     members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});
@@ -9489,6 +9986,8 @@ function exportNuevosExcel(){
       celular:m.tel||'',
       barrio:m.dir||'',
       comoNosConocio:m.comoNosConocio||'',
+      subEstado:nvFiltro!=='historico'?(m.subEstado||'Ingresado'):'-',
+      contactadoPor:m.contactadoPor||'',
       seguimiento:m.seguimientoNombre||'Pendiente',
       origen:m.origen||'',
       fechaRegistro:m.fechaRegistro||'',
@@ -9505,6 +10004,8 @@ function exportNuevosExcel(){
     {key:'celular',     label:'Celular',           width:16},
     {key:'barrio',      label:'Barrio / Ciudad',   width:20},
     {key:'comoNosConocio',label:'Cómo nos conociste',width:24},
+    {key:'subEstado',   label:'Sub-Estado',        width:14},
+    {key:'contactadoPor',label:'Contactado por',   width:18},
     {key:'seguimiento', label:'Seguimiento',       width:24},
     {key:'origen',      label:'Origen',            width:16},
     {key:'fechaRegistro',label:'Fecha registro',   width:16},

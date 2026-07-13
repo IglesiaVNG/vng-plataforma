@@ -390,6 +390,7 @@ const KEY_GROUPS = {
   'disc':    ['gdv_disc_pasos','gdv_disc_records','gdv_disc_cursadas'],
   'ng':      ['gdv_ng5','gdv_ng_records'],
   'modules': ['gdv_modules5'],
+  'agenda':  ['gdv_ministerios','gdv_eventos'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
                'of5_part','of5_obspart','of5_obspago','of5_materias'],
 };
@@ -574,6 +575,8 @@ window.fbDownload().then(function(hasData) {
         S.ngComunidades  = _ld('gdv_ng5',           S.ngComunidades  ||[]);
         S.ngRecords      = _ld('gdv_ng_records',    S.ngRecords      ||[]);
         S.modulesConfig  = _ld('gdv_modules5',      S.modulesConfig  ||[]);
+        S.ministerios    = _ld('gdv_ministerios',   S.ministerios    ||[]);
+        S.eventos        = _ld('gdv_eventos',       S.eventos        ||[]);
       }
       // Load permisos from Firebase if this device has none configured
       // Reload permisos from localStorage (now updated from Firebase if it was empty)
@@ -624,6 +627,10 @@ const MODULES_PERM=[
   {key:'config', label:'Configuración', icon:'⚙️', screens:[
     {key:'config', label:'Acceso completo al sistema'},
   ]},
+  {key:'agenda', label:'Agenda Ministerial', icon:'📅', screens:[
+    {key:'agenda_ver',   label:'Ver agenda y eventos'},
+    {key:'agenda_crear', label:'Crear y editar eventos'},
+  ]},
 ];
 
 // Flat SCREENS list for backward compatibility
@@ -631,16 +638,16 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno'},
-  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta'},
-  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta'},
-  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno'},
-  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
-  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
-  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
-  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
-  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'},
-  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno'}
+  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno'},
+  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno'},
+  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno'},
+  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno'},
+  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno'},
+  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno'},
+  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno'},
+  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno'},
+  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno'},
+  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno'}
 };
 
 let PERMISOS={};
@@ -751,6 +758,17 @@ async function migratePermisos(){
       SCREENS.forEach(function(s){ emptyPerms[s.key||s]='ninguno'; });
       PERMISOS[role.id]=emptyPerms;
       needsSave=true;
+    } else {
+      // Rol existente: completar SOLO las pantallas nuevas que todavía no tiene
+      // (ej: agenda_ver/agenda_crear al agregar el módulo). Nunca pisa lo que ya está configurado.
+      SCREENS.forEach(function(s){
+        var key=s.key||s;
+        if(!(key in PERMISOS[role.id])){
+          var def=DEFAULT_PERMISOS[role.id];
+          PERMISOS[role.id][key]=(def&&def[key])?def[key]:'ninguno';
+          needsSave=true;
+        }
+      });
     }
   });
   if(needsSave) await saveK('gdv_permisos', PERMISOS);
@@ -821,7 +839,8 @@ function recordInWeek(fechaStr, offsetWeeks=0){
 const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles:'gdv_roles5',
   discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records',discCursadas:'gdv_disc_cursadas',
   ngComunidades:'gdv_ng5',ngRecords:'gdv_ng_records',
-  modulesConfig:'gdv_modules5'};
+  modulesConfig:'gdv_modules5',
+  ministerios:'gdv_ministerios',eventos:'gdv_eventos'};
 
 const DEFAULT_DISC_PASOS=[
   {id:1,nombre:'Discipulado N1',nivel:'Inicial',roleId:'disc_n1',estado:'Activo',discipuladorId:null,miembros:[],completados:{},
@@ -1054,7 +1073,7 @@ const DEFAULT_USERS=[
 // ════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════
-let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],ngComunidades:[],ngRecords:[],modulesConfig:[]};
+let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[]};
 let currentUser=null;
 let gdvCharts={};
 
@@ -1073,6 +1092,8 @@ async function initStorage(){
   S.roles      =load(SK.roles,      DEFAULT_ROLES);
   S.discPasos  =load(SK.discPasos,  DEFAULT_DISC_PASOS);
   S.discRecords=load(SK.discRecords,[]);S.discCursadas=load('gdv_disc_cursadas',[]);
+  S.ministerios=load(SK.ministerios,[]);
+  S.eventos    =load(SK.eventos,    []);
   await cleanMembers();
   loadPermisos();
   // ── Migrar roles nuevos si no existen ──
@@ -2112,6 +2133,13 @@ function canAccessOF(){
   return isSuperAdmin() || canScreen('of');
 }
 
+function canAccessAgenda(){
+  return isSuperAdmin() || canScreen('agenda_ver');
+}
+function canCrearEventos(){
+  return isSuperAdmin() || canEjecutar('agenda_crear');
+}
+
 function normName(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
 function getFacilitadorGroupIds(){
   // Returns ALL group ids this user is responsible for (can be more than one)
@@ -2204,13 +2232,14 @@ function showHome(){
 // MODULES CONFIG
 // ══════════════════════════════════════════════════════════════════
 const DEFAULT_MODULES = [
-  {key:'miembros',   icon:'🐑',  name:'Rebaños',               desc:'Base centralizada de todos los miembros de la iglesia con sus roles, grupos y datos de contacto.', tag:'Módulo activo', tagClass:'tag-blue',   action:'openMiembros'},
-  {key:'nuevos',     icon:'🌱',  name:'Nuevos Contactos',      desc:'Seguimiento de personas nuevas en la iglesia. Primer contacto, integración y acompañamiento.', tag:'Módulo activo', tagClass:'tag-green',  action:'openNuevos'},
-  {key:'gdv',        icon:'🏘',  name:'Grupos de Vida',        desc:'Control de asistencia semanal, facilitadores y dashboards de los grupos.',           tag:'Módulo activo', tagClass:'tag-blue',   action:'openGdV'},
-  {key:'ng',         icon:'🌿',  name:'Nuevas Generaciones',   desc:'Gestión de comunidades juveniles, adolescentes, niños y preadolescentes.',            tag:'Módulo activo', tagClass:'tag-green',  action:'openNG'},
-  {key:'disc',       icon:'📖',  name:'Discipulado',           desc:'Seguimiento de niveles de discipulado. Pasos N1, N2 y N3 con asistencia y capítulos.', tag:'Módulo activo', tagClass:'tag-green',  action:'openDiscipulado'},
-  {key:'of',         icon:'👨‍👩‍👧',  name:'Orientación Familiar', desc:'Gestión de alumnos, asistencia, pagos y participación del curso.',                 tag:'Módulo activo', tagClass:'tag-purple', action:'openOF'},
-  {key:'config',     icon:'⚙️',  name:'Configuración',         desc:'Gestión de grupos, usuarios del sistema y roles. Solo accesible para Super Admin.',   tag:'Solo Super Admin', tagClass:'tag-green', action:'openConfig'},
+  {key:'miembros',   icon:'🐑',  name:'Rebaños',               desc:'Base centralizada de todos los miembros de la iglesia con sus roles, grupos y datos de contacto.', tag:'Módulo activo', tagClass:'tag-blue',   action:'openMiembros', activo:true},
+  {key:'nuevos',     icon:'🌱',  name:'Nuevos Contactos',      desc:'Seguimiento de personas nuevas en la iglesia. Primer contacto, integración y acompañamiento.', tag:'Módulo activo', tagClass:'tag-green',  action:'openNuevos', activo:true},
+  {key:'gdv',        icon:'🏘',  name:'Grupos de Vida',        desc:'Control de asistencia semanal, facilitadores y dashboards de los grupos.',           tag:'Módulo activo', tagClass:'tag-blue',   action:'openGdV', activo:true},
+  {key:'ng',         icon:'🌿',  name:'Nuevas Generaciones',   desc:'Gestión de comunidades juveniles, adolescentes, niños y preadolescentes.',            tag:'Módulo activo', tagClass:'tag-green',  action:'openNG', activo:true},
+  {key:'disc',       icon:'📖',  name:'Discipulado',           desc:'Seguimiento de niveles de discipulado. Pasos N1, N2 y N3 con asistencia y capítulos.', tag:'Módulo activo', tagClass:'tag-green',  action:'openDiscipulado', activo:true},
+  {key:'of',         icon:'👨‍👩‍👧',  name:'Orientación Familiar', desc:'Gestión de alumnos, asistencia, pagos y participación del curso.',                 tag:'Módulo activo', tagClass:'tag-purple', action:'openOF', activo:true},
+  {key:'agenda',     icon:'📅',  name:'Agenda Ministerial',   desc:'Calendario de eventos y actividades por Servicio/Ministerio, con recurrencia semanal o mensual.', tag:'Módulo activo', tagClass:'tag-blue', action:'openAgenda', activo:false},
+  {key:'config',     icon:'⚙️',  name:'Configuración',         desc:'Gestión de grupos, usuarios del sistema y roles. Solo accesible para Super Admin.',   tag:'Solo Super Admin', tagClass:'tag-green', action:'openConfig', activo:true},
 ];
 
 function getModulesConfig(){
@@ -2218,13 +2247,13 @@ function getModulesConfig(){
   var saved=S.modulesConfig&&S.modulesConfig.length?S.modulesConfig:[];
   return DEFAULT_MODULES.map(function(def){
     var override=saved.find(function(s){return s.key===def.key;});
-    return Object.assign({},def,override?{name:override.name,desc:override.desc}:{});
+    return Object.assign({},def,override?{name:override.name,desc:override.desc,activo:(override.activo!==undefined?override.activo:def.activo)}:{});
   });
 }
 
 async function saveModulesConfig(modules){
-  // Only save name+desc overrides (not icon/action which are hardcoded)
-  var toSave=modules.map(function(m){return {key:m.key,name:m.name,desc:m.desc};});
+  // Only save name+desc+activo overrides (not icon/action which son hardcoded)
+  var toSave=modules.map(function(m){return {key:m.key,name:m.name,desc:m.desc,activo:m.activo};});
   S.modulesConfig=toSave;
   await saveK(SK.modulesConfig, S.modulesConfig);
   try{
@@ -2244,19 +2273,25 @@ function renderModulesGrid(){
   var accessMap={
     miembros:canAccessMiembros(), nuevos:canAccessNuevos(),
     gdv:canAccessGdV(), ng:canAccessNG(),
-    disc:canAccessDisc(), of:canAccessOF(), config:canAccessConfig()
+    disc:canAccessDisc(), of:canAccessOF(), config:canAccessConfig(),
+    agenda:canAccessAgenda()
   };
   allMods.forEach(function(mod){
-    if(accessMap[mod.key]) modules.push(mod);
+    var tienePermiso=accessMap[mod.key];
+    var visibleParaMi=(mod.activo!==false)||isSuperAdmin();
+    if(tienePermiso&&visibleParaMi) modules.push(mod);
   });
 
-  document.getElementById('modules-grid').innerHTML=modules.map(m=>`
+  document.getElementById('modules-grid').innerHTML=modules.map(m=>{
+    var enConstruccion=m.activo===false; // solo Super Admin llega a ver esto
+    return `
     <div class="module-card${m.comingSoon?' coming-soon':''}" ${m.action?`onclick="${m.action}()"`:''}>
       <div class="module-icon">${m.icon}</div>
       <div class="module-name">${m.name}</div>
       <div class="module-desc">${m.desc}</div>
-      <span class="module-tag ${m.tagClass}">${m.tag}</span>
-    </div>`).join('');
+      <span class="module-tag ${enConstruccion?'tag-purple':m.tagClass}">${enConstruccion?'🚧 En construcción — solo vos lo ves':m.tag}</span>
+    </div>`;
+  }).join('');
   // Render upcoming birthdays
   setTimeout(renderHomeCumples, 50);
   // Render Export/Import only for Super Admin
@@ -3310,6 +3345,7 @@ function buildConfigHTML(){
     <div style="display:flex;gap:8px;margin-bottom:1.5rem;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" id="cfg-tab-grupos" onclick="configTab('grupos',this)">🏘 Grupos</button>
       <button class="btn btn-sm" id="cfg-tab-ng" onclick="configTab('ng',this)">🌱 Nuevas Generaciones</button>
+      <button class="btn btn-sm" id="cfg-tab-ministerios" onclick="configTab('ministerios',this)">🤝 Servicios/Ministerios</button>
       <button class="btn btn-sm" id="cfg-tab-modulos" onclick="configTab('modulos',this)">📱 Módulos</button>
       <button class="btn btn-sm" id="cfg-tab-usuarios" onclick="configTab('usuarios',this)">👤 Usuarios</button>
       <button class="btn btn-sm" id="cfg-tab-roles" onclick="configTab('roles',this)">🎭 Funciones</button>
@@ -3348,6 +3384,17 @@ function configTab(sub, btn){
       </div>
       <div id="ng-comunidades-list"></div>`;
     ngRenderList();
+  } else if(sub==='ministerios'){
+    wrap.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <span style="font-size:14px;font-weight:600;color:#1F4E79">🤝 Servicios/Ministerios</span>
+        <button class="btn btn-primary btn-sm" onclick="ministerioOpenForm()">+ Servicio/Ministerio</button>
+      </div>
+      <div style="font-size:12px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#F9FAFB;border-radius:8px">
+        Un mismo Ministerio puede tener varias Áreas — creá una fila por cada combinación (ej: "Alabanza" / "Coro", "Alabanza" / "Sonido"), o dejá el Área en blanco si no aplica.
+      </div>
+      <div id="ministerios-list"></div>`;
+    ministerioRenderList();
   } else if(sub==='modulos'){
     cfgRenderModulos(wrap);
   } else if(sub==='usuarios'){
@@ -3497,23 +3544,42 @@ function cfgRenderModulos(wrap){
   if(!wrap) return;
   var mods=getModulesConfig();
   var rows=mods.map(function(mod){
-    return '<div class="card" style="margin-bottom:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">'+
+    var activo=mod.activo!==false;
+    return '<div class="card" style="margin-bottom:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap'+(activo?'':';opacity:.7;border-left:4px solid #F59E0B')+'">'+
       '<div style="display:flex;align-items:center;gap:12px">'+
         '<span style="font-size:24px">'+mod.icon+'</span>'+
         '<div>'+
-          '<div style="font-weight:700;color:#1F4E79;font-size:14px">'+mod.name+'</div>'+
+          '<div style="font-weight:700;color:#1F4E79;font-size:14px">'+mod.name+(activo?'':' <span style="font-size:11px;color:#D97706;font-weight:600">🚧 Inactivo — oculto salvo para Super Admin</span>')+'</div>'+
           '<div style="font-size:12px;color:#6B7280;max-width:320px">'+mod.desc+'</div>'+
         '</div>'+
       '</div>'+
-      '<button class="btn btn-sm" onclick="cfgEditModulo(&quot;'+mod.key+'&quot;)">✏️ Editar</button>'+
+      '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">'+
+        '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:'+(activo?'#166534':'#92400E')+';font-weight:600">'+
+          '<input type="checkbox" '+(activo?'checked':'')+' onchange="cfgToggleModuloActivo(&quot;'+mod.key+'&quot;,this.checked)" style="width:18px;height:18px;cursor:pointer">'+
+          (activo?'Activo':'Inactivo')+
+        '</label>'+
+        '<button class="btn btn-sm" onclick="cfgEditModulo(&quot;'+mod.key+'&quot;)">✏️ Editar</button>'+
+      '</div>'+
     '</div>';
   }).join('');
   wrap.innerHTML=
     '<div style="margin-bottom:1rem;padding:10px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:13px;color:#1E40AF">'+
-      'ℹ️ Podés editar el <strong>Nombre</strong> y la <strong>Descripción</strong> de cada módulo tal como aparece en el inicio. El ícono se actualiza en futuras versiones.'+
+      'ℹ️ Podés editar el <strong>Nombre</strong> y la <strong>Descripción</strong> de cada módulo tal como aparece en el inicio. '+
+      'Con el interruptor <strong>Activo/Inactivo</strong> controlás si el módulo se ve en el Home de todos, o queda oculto (solo vos como Super Admin lo seguís viendo, para poder probarlo).'+
     '</div>'+
     rows+
     '<div id="cfg-modulo-form-wrap"></div>';
+}
+
+async function cfgToggleModuloActivo(key, activo){
+  var mods=getModulesConfig();
+  var mod=mods.find(function(m){return m.key===key;});
+  if(mod) mod.activo=activo;
+  var ok=await saveModulesConfig(mods);
+  if(!ok){ cfgRenderModulos(); return; } // revertir visualmente si no se pudo guardar
+  cfgRenderModulos();
+  renderModulesGrid();
+  showToast(activo?'✅ Módulo activado — ya lo ven todos los que tienen permiso':'🚧 Módulo desactivado — solo vos lo ves','#16A34A');
 }
 
 function cfgEditModulo(key){
@@ -3796,6 +3862,656 @@ async function ngDeleteComunidad(id){
     S.ngComunidades.push(ng);
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SERVICIOS/MINISTERIOS (base de Agenda Ministerial)
+// ══════════════════════════════════════════════════════════════════
+function ministerioRenderList(){
+  const c=document.getElementById('ministerios-list');
+  if(!c) return;
+  if(!S.ministerios.length){
+    c.innerHTML='<p style="color:#9CA3AF;font-size:13px;text-align:center;padding:24px">Sin Servicios/Ministerios cargados</p>';
+    return;
+  }
+  // Agrupar filas por Nombre para que las distintas Áreas queden juntas
+  const porNombre={};
+  S.ministerios.forEach(function(m){
+    if(!porNombre[m.nombre]) porNombre[m.nombre]=[];
+    porNombre[m.nombre].push(m);
+  });
+  c.innerHTML=Object.keys(porNombre).sort().map(function(nombre){
+    const filas=porNombre[nombre];
+    return '<div class="card" style="margin-bottom:.75rem">'+
+      '<div style="font-weight:700;color:#1F4E79;font-size:14px;margin-bottom:6px">'+nombre+'</div>'+
+      filas.map(function(m){
+        const lideres=(m.liderIds||[]).map(function(id){
+          var mm=S.members.find(function(x){return Number(x.id)===Number(id);});
+          return mm?fullName(mm):null;
+        }).filter(Boolean).join(', ')||'—';
+        const colabs=(m.colaboradorIds||[]).map(function(id){
+          var mm=S.members.find(function(x){return Number(x.id)===Number(id);});
+          return mm?fullName(mm):null;
+        }).filter(Boolean).join(', ');
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #F3F4F6">'+
+          '<div>'+
+            (m.area?'<div style="font-size:13px;font-weight:600;color:#374151">'+m.area+'</div>':'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Sin área específica</div>')+
+            '<div style="font-size:12px;color:#6B7280">Líder: '+lideres+(colabs?' · Colaborador: '+colabs:'')+'</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:6px;flex-shrink:0">'+
+            '<button class="btn btn-sm" onclick="ministerioOpenForm('+m.id+')">✏️</button>'+
+            '<button onclick="ministerioDeleteMinisterio('+m.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:13px">🗑️</button>'+
+          '</div>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }).join('');
+}
+
+let ministerioEditingId=null;
+
+function ministerioOpenForm(id){
+  ministerioEditingId=id||null;
+  const min=id?S.ministerios.find(function(x){return Number(x.id)===Number(id);}):null;
+  const lider1Id = min&&min.liderIds&&min.liderIds[0] ? min.liderIds[0] : '';
+  const lider2Id = min&&min.liderIds&&min.liderIds[1] ? min.liderIds[1] : '';
+  const colab1Id = min&&min.colaboradorIds&&min.colaboradorIds[0] ? min.colaboradorIds[0] : '';
+  const colab2Id = min&&min.colaboradorIds&&min.colaboradorIds[1] ? min.colaboradorIds[1] : '';
+  const noAsig='<option value="">Sin asignar</option>';
+  const noApl='<option value="">No aplica</option>';
+  const membOpts=S.members.filter(function(m){return m.estado!=='Baja'&&m.condicion!=='Historico';})
+    .sort(function(a,b){return listName(a).localeCompare(listName(b));})
+    .map(function(m){return '<option value="'+m.id+'">'+listName(m)+'</option>';}).join('');
+
+  document.getElementById('cfg-ministerio-overlay').innerHTML=
+    '<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">'+
+      '<div style="font-size:15px;font-weight:700;color:#1F4E79">'+(id?'Editar':'Nuevo')+' Servicio/Ministerio</div>'+
+      '<button class="btn btn-sm" onclick="ministerioCloseForm()">✕</button>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
+      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre *</label>'+
+        '<input id="min-f-nombre" type="text" maxlength="60" value="'+(min?min.nombre:'')+'" placeholder="Ej: Alabanza" style="width:100%"></div>'+
+      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Área <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'+
+        '<input id="min-f-area" type="text" maxlength="60" value="'+(min&&min.area?min.area:'')+'" placeholder="Ej: Coro" style="width:100%"></div>'+
+    '</div>'+
+    '<div style="margin-bottom:12px">'+
+      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Líder</label>'+
+      '<select id="min-f-lider1" onchange="ministerioCheckLider2()" style="width:100%">'+noAsig+membOpts+'</select>'+
+    '</div>'+
+    '<div id="min-lider2-row" style="display:none;margin-bottom:12px">'+
+      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Líder adicional <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'+
+      '<select id="min-f-lider2" style="width:100%">'+noApl+membOpts+'</select>'+
+    '</div>'+
+    '<div style="margin-bottom:12px">'+
+      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Colaborador</label>'+
+      '<select id="min-f-colab1" onchange="ministerioCheckColab2()" style="width:100%">'+noAsig+membOpts+'</select>'+
+    '</div>'+
+    '<div id="min-colab2-row" style="display:none;margin-bottom:16px">'+
+      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Colaborador adicional <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'+
+      '<select id="min-f-colab2" style="width:100%">'+noApl+membOpts+'</select>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px">'+
+      '<button class="btn" onclick="ministerioCloseForm()">Cancelar</button>'+
+      '<button class="btn btn-primary" onclick="ministerioSaveMinisterio()">Confirmar</button>'+
+    '</div>'+
+  '</div>';
+
+  document.getElementById('cfg-ministerio-overlay').style.display='flex';
+  const l1=document.getElementById('min-f-lider1'); if(l1) l1.value=lider1Id;
+  const l2=document.getElementById('min-f-lider2'); if(l2) l2.value=lider2Id;
+  const c1=document.getElementById('min-f-colab1'); if(c1) c1.value=colab1Id;
+  const c2=document.getElementById('min-f-colab2'); if(c2) c2.value=colab2Id;
+  ministerioCheckLider2();
+  ministerioCheckColab2();
+}
+
+function ministerioCheckLider2(){
+  var l1=document.getElementById('min-f-lider1');
+  var row=document.getElementById('min-lider2-row');
+  if(row) row.style.display=(l1&&l1.value)?'':'none';
+}
+function ministerioCheckColab2(){
+  var c1=document.getElementById('min-f-colab1');
+  var row=document.getElementById('min-colab2-row');
+  if(row) row.style.display=(c1&&c1.value)?'':'none';
+}
+
+function ministerioCloseForm(){
+  document.getElementById('cfg-ministerio-overlay').style.display='none';
+  ministerioEditingId=null;
+}
+
+async function ministerioSaveMinisterio(){
+  const nombre=(document.getElementById('min-f-nombre')?.value||'').trim();
+  if(!nombre){ alert('Ingresá el Nombre del Servicio/Ministerio'); return; }
+  const area=(document.getElementById('min-f-area')?.value||'').trim();
+  var l1=document.getElementById('min-f-lider1')?.value||'';
+  var l2=document.getElementById('min-f-lider2')?.value||'';
+  var c1=document.getElementById('min-f-colab1')?.value||'';
+  var c2=document.getElementById('min-f-colab2')?.value||'';
+  var liderIds=[l1,l2].filter(function(x){return x&&x!=='';}).map(Number);
+  var colaboradorIds=[c1,c2].filter(function(x){return x&&x!=='';}).map(Number);
+  if(ministerioEditingId){
+    var min=S.ministerios.find(function(x){return Number(x.id)===Number(ministerioEditingId);});
+    if(min){ Object.assign(min,{nombre,area,liderIds,colaboradorIds}); }
+  } else {
+    S.ministerios.push({id:Date.now(),nombre,area,liderIds,colaboradorIds,estado:'Activo'});
+  }
+  await saveK(SK.ministerios,S.ministerios);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    alert('No se pudo guardar en la nube. Verificá tu conexión.');
+    return;
+  }
+  ministerioCloseForm();
+  ministerioRenderList();
+  showToast('✅ Servicio/Ministerio guardado','#16A34A');
+}
+
+async function ministerioDeleteMinisterio(id){
+  var min=S.ministerios.find(function(x){return Number(x.id)===Number(id);});
+  if(!min) return;
+  var enUso=S.eventos.filter(function(e){return Number(e.ministerioId)===Number(id);});
+  if(enUso.length>0){
+    alert('Este Servicio/Ministerio tiene '+enUso.length+' evento'+(enUso.length>1?'s':'')+' asociado'+(enUso.length>1?'s':'')+'. Reasigná o eliminá esos eventos antes de borrarlo.');
+    return;
+  }
+  if(!confirm('¿Eliminar "'+min.nombre+(min.area?' / '+min.area:'')+'"? Esta acción no se puede deshacer.')) return;
+  S.ministerios=S.ministerios.filter(function(x){return Number(x.id)!==Number(id);});
+  try{
+    await saveK(SK.ministerios,S.ministerios);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    ministerioRenderList();
+    showToast('✅ Eliminado','#16A34A');
+  }catch(e){
+    S.ministerios.push(min);
+    alert('No se pudo eliminar. Verificá tu conexión.');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// AGENDA MINISTERIAL
+// ══════════════════════════════════════════════════════════════════
+let agendaCalMonth=new Date().getMonth(), agendaCalYear=new Date().getFullYear();
+let agendaEditingId=null;
+let agendaSelectedPersonas=[];
+let agendaDiaActual=null;
+
+function openAgenda(){
+  document.getElementById('screen-home').classList.add('hidden');
+  document.getElementById('screen-app').classList.add('show');
+  document.getElementById('app-topbar-title').textContent='📅 Agenda Ministerial';
+  document.getElementById('app-topbar-user').textContent=currentUser.name;
+  document.getElementById('app-content').innerHTML=buildAgendaHTML();
+  agendaTab('calendario', document.getElementById('agenda-tab-btn-cal'));
+  agendaRenderBanner();
+}
+
+function buildAgendaHTML(){
+  return `<div class="gdv-app">
+    <div id="agenda-banner-wrap" style="display:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 16px;margin-bottom:1rem"></div>
+    <div class="nav" style="margin-bottom:1rem">
+      <button class="nav-btn active" id="agenda-tab-btn-cal" onclick="agendaTab('calendario',this)">📅 Calendario</button>
+      <button class="nav-btn" id="agenda-tab-btn-prox" onclick="agendaTab('proximos',this)">📋 Próximos eventos</button>
+    </div>
+
+    <div id="agenda-tab-calendario">
+      <div class="card">
+        <div id="agenda-cal-wrap"></div>
+      </div>
+      <div style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:.5rem">🟣 Día con eventos — tocá un día para ver el detalle${canCrearEventos()?' o cargar uno nuevo':''}</div>
+    </div>
+
+    <div id="agenda-tab-proximos" style="display:none">
+      <div class="card" style="margin-bottom:1rem">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde</label>
+            <input type="date" id="agenda-prox-desde" onchange="agendaRenderProximos()"></div>
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Hasta</label>
+            <input type="date" id="agenda-prox-hasta" onchange="agendaRenderProximos()"></div>
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Ministerio</label>
+            <select id="agenda-prox-ministerio" onchange="agendaRenderProximos()">
+              <option value="">Todos</option>
+            </select></div>
+          <button class="btn btn-sm" onclick="agendaResetProximosFiltro()">↺ Reset (30 días)</button>
+          ${canCrearEventos()?'<button class="btn btn-primary btn-sm" onclick="agendaAbrirForm()">+ Nuevo evento</button>':''}
+        </div>
+      </div>
+      <div id="agenda-proximos-list"></div>
+    </div>
+
+    <!-- Modal: detalle del día -->
+    <div id="agenda-dia-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:440px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:15px;font-weight:700;color:#1F4E79" id="agenda-dia-titulo">—</div>
+          <button onclick="agendaCloseDia()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1" title="Cerrar">✕</button>
+        </div>
+        <div id="agenda-dia-lista" style="margin-bottom:1rem"></div>
+        ${canCrearEventos()?'<button class="btn btn-primary" style="width:100%" onclick="agendaAbrirFormDesdeDia()">+ Nuevo evento este día</button>':''}
+      </div>
+    </div>
+
+    <!-- Modal: crear/editar evento -->
+    <div id="agenda-form-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:320;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:15px;font-weight:700;color:#1F4E79" id="agenda-form-titulo">Nuevo evento</div>
+          <button onclick="agendaCloseForm()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1" title="Cerrar">✕</button>
+        </div>
+        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Título *</label>
+        <input type="text" id="agenda-f-titulo" placeholder="Ej: Ensayo de Alabanza" style="margin-bottom:10px">
+        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Descripción</label>
+        <textarea id="agenda-f-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;margin-bottom:10px;font-family:inherit"></textarea>
+        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Servicio/Ministerio</label>
+        <select id="agenda-f-ministerio" style="margin-bottom:10px"><option value="">— Sin asignar —</option></select>
+        <div class="form-row">
+          <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha *</label>
+            <input type="date" id="agenda-f-fecha"></div>
+          <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hora</label>
+            <input type="time" id="agenda-f-hora"></div>
+        </div>
+        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Lugar</label>
+        <input type="text" id="agenda-f-lugar" placeholder="Ej: Salón principal" style="margin-bottom:10px">
+
+        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Personas asignadas <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+        <input type="text" placeholder="Buscar..." oninput="agendaFilterMiembros(this.value)" style="margin-bottom:6px">
+        <div id="agenda-f-personas-list" style="max-height:140px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:10px"></div>
+
+        <div style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:10px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151;margin-bottom:6px">
+            <input type="checkbox" id="agenda-f-recordatorio" onchange="agendaToggleRecordatorio()" style="width:16px;height:16px"> 🔔 Recordatorio visual
+          </label>
+          <div id="agenda-f-record-dias-wrap" style="display:none">
+            <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Avisar con cuántos días de anticipación</label>
+            <input type="number" id="agenda-f-record-dias" min="1" max="30" value="3" style="width:70px">
+          </div>
+        </div>
+
+        <div style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:14px">
+          <label style="font-size:13px;font-weight:500;color:#374151;display:block;margin-bottom:6px">🔁 Recurrencia</label>
+          <select id="agenda-f-recur-tipo" onchange="agendaToggleRecurrencia()" style="margin-bottom:8px">
+            <option value="ninguna">No se repite</option>
+            <option value="semanal">Semanal</option>
+            <option value="mensual">Mensual</option>
+          </select>
+          <div id="agenda-f-recur-hasta-wrap" style="display:none">
+            <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Repetir hasta</label>
+            <input type="date" id="agenda-f-recur-hasta">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn" onclick="agendaCloseForm()">Cancelar</button>
+          <button class="btn btn-primary" onclick="agendaGuardarEvento()">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function agendaTab(tab,btn){
+  document.querySelectorAll('.nav-btn[onclick*="agendaTab"]').forEach(function(b){b.classList.remove('active');});
+  if(btn) btn.classList.add('active');
+  var cal=document.getElementById('agenda-tab-calendario');
+  var prox=document.getElementById('agenda-tab-proximos');
+  if(tab==='calendario'){
+    if(cal) cal.style.display='block';
+    if(prox) prox.style.display='none';
+    agendaRenderCalendario();
+  } else {
+    if(cal) cal.style.display='none';
+    if(prox) prox.style.display='block';
+    agendaRenderProximos();
+  }
+}
+
+// ── Ocurrencias: expande eventos recurrentes dentro de un rango de fechas ──
+function agendaGetOcurrencias(desde,hasta){
+  var ocs=[];
+  (S.eventos||[]).filter(function(e){return e.estado!=='Cancelado';}).forEach(function(e){
+    var fechaBase=new Date(e.fecha+'T00:00:00');
+    var rec=e.recurrencia||{tipo:'ninguna'};
+    if(!rec.tipo||rec.tipo==='ninguna'){
+      if(fechaBase>=desde&&fechaBase<=hasta) ocs.push(Object.assign({},e,{fechaOcurrencia:e.fecha}));
+      return;
+    }
+    var limite=rec.hasta?new Date(rec.hasta+'T23:59:59'):hasta;
+    var tope=limite<hasta?limite:hasta;
+    var cur=new Date(fechaBase);
+    var pasos=0;
+    while(cur<=tope&&pasos<520){ // tope de seguridad
+      if(cur>=desde&&cur>=fechaBase) ocs.push(Object.assign({},e,{fechaOcurrencia:cur.toISOString().slice(0,10)}));
+      if(rec.tipo==='semanal') cur.setDate(cur.getDate()+7);
+      else if(rec.tipo==='mensual') cur.setMonth(cur.getMonth()+1);
+      else break;
+      pasos++;
+    }
+  });
+  return ocs.sort(function(a,b){return a.fechaOcurrencia.localeCompare(b.fechaOcurrencia)||(a.hora||'').localeCompare(b.hora||'');});
+}
+
+function agendaMinisterioLabel(id){
+  if(!id) return '';
+  var m=S.ministerios.find(function(x){return Number(x.id)===Number(id);});
+  return m?(m.nombre+(m.area?' / '+m.area:'')):'';
+}
+
+// ── Calendario mensual ──
+function agendaRenderCalendario(){
+  const wrap=document.getElementById('agenda-cal-wrap');
+  if(!wrap) return;
+  const first=new Date(agendaCalYear,agendaCalMonth,1);
+  const last=new Date(agendaCalYear,agendaCalMonth+1,0);
+  const startWeekday=first.getDay();
+  const totalDias=last.getDate();
+  const totalCells=Math.ceil((startWeekday+totalDias)/7)*7;
+  const rangeStart=new Date(agendaCalYear,agendaCalMonth,1-startWeekday);
+  const rangeEnd=new Date(rangeStart); rangeEnd.setDate(rangeEnd.getDate()+totalCells-1);
+  const ocs=agendaGetOcurrencias(rangeStart,rangeEnd);
+  const ocsPorDia={};
+  ocs.forEach(function(o){ if(!ocsPorDia[o.fechaOcurrencia]) ocsPorDia[o.fechaOcurrencia]=[]; ocsPorDia[o.fechaOcurrencia].push(o); });
+  const hoyStr=today();
+
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+    '<button class="btn btn-sm" onclick="agendaCambiarMes(-1)">←</button>'+
+    '<div style="font-size:15px;font-weight:700;color:#1F4E79">'+MESES[agendaCalMonth]+' '+agendaCalYear+'</div>'+
+    '<button class="btn btn-sm" onclick="agendaCambiarMes(1)">→</button>'+
+  '</div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;font-size:10px;color:#6B7280;text-align:center;margin-bottom:4px;font-weight:600">'+
+    ['D','L','M','M','J','V','S'].map(function(d){return '<div>'+d+'</div>';}).join('')+
+  '</div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">';
+  for(var i=0;i<totalCells;i++){
+    var cellDate=new Date(rangeStart); cellDate.setDate(cellDate.getDate()+i);
+    var key=cellDate.toISOString().slice(0,10);
+    var enMes=cellDate.getMonth()===agendaCalMonth;
+    var esHoy=key===hoyStr;
+    var evs=ocsPorDia[key]||[];
+    html+='<div onclick="agendaOpenDia(\''+key+'\')" style="min-height:50px;border-radius:8px;padding:3px 4px;cursor:pointer;background:'+(esHoy?'#DBEAFE':'#fff')+';border:1px solid '+(esHoy?'#93C5FD':'#F3F4F6')+';opacity:'+(enMes?'1':'0.35')+'">'+
+      '<div style="font-size:11px;font-weight:'+(esHoy?'700':'500')+';color:'+(esHoy?'#1E40AF':'#374151')+'">'+cellDate.getDate()+'</div>'+
+      (evs.length?'<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:3px">'+evs.slice(0,4).map(function(){return '<span style="width:5px;height:5px;border-radius:50%;background:#7C3AED;display:inline-block"></span>';}).join('')+(evs.length>4?'<span style="font-size:8px;color:#9CA3AF">+'+(evs.length-4)+'</span>':'')+'</div>':'')+
+    '</div>';
+  }
+  html+='</div>';
+  wrap.innerHTML=html;
+}
+
+function agendaCambiarMes(delta){
+  agendaCalMonth+=delta;
+  if(agendaCalMonth<0){agendaCalMonth=11;agendaCalYear--;}
+  if(agendaCalMonth>11){agendaCalMonth=0;agendaCalYear++;}
+  agendaRenderCalendario();
+}
+
+// ── Detalle del día ──
+function agendaOpenDia(fechaStr){
+  agendaDiaActual=fechaStr;
+  var d=new Date(fechaStr+'T00:00:00');
+  var ocs=agendaGetOcurrencias(d,d);
+  document.getElementById('agenda-dia-titulo').textContent=fmt(fechaStr);
+  var lista=document.getElementById('agenda-dia-lista');
+  if(!ocs.length){
+    lista.innerHTML='<div class="empty" style="padding:1.5rem 0">Sin eventos este día</div>';
+  } else {
+    lista.innerHTML=ocs.map(function(o){
+      var minLabel=agendaMinisterioLabel(o.ministerioId);
+      return '<div class="card" style="margin-bottom:8px;padding:10px 12px;border-left:4px solid #7C3AED">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+          '<div>'+
+            '<div style="font-weight:700;font-size:14px;color:#1F2937">'+o.titulo+'</div>'+
+            '<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(o.hora?'🕐 '+o.hora+' · ':'')+(o.lugar?'📍 '+o.lugar:'')+'</div>'+
+            (minLabel?'<div style="font-size:11px;color:#7C3AED;margin-top:2px">🤝 '+minLabel+'</div>':'')+
+            (o.recurrencia&&o.recurrencia.tipo!=='ninguna'?'<div style="font-size:10px;color:#9CA3AF;margin-top:2px">🔁 Se repite '+(o.recurrencia.tipo==='semanal'?'cada semana':'cada mes')+'</div>':'')+
+          '</div>'+
+          (canCrearEventos()?'<div style="display:flex;gap:4px;flex-shrink:0">'+
+            '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+')">✏️</button>'+
+            '<button onclick="agendaEliminarEvento('+o.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
+          '</div>':'')+
+        '</div>'+
+        (o.descripcion?'<div style="font-size:12px;color:#374151;margin-top:6px">'+o.descripcion+'</div>':'')+
+      '</div>';
+    }).join('');
+  }
+  document.getElementById('agenda-dia-overlay').style.display='flex';
+}
+function agendaCloseDia(){
+  document.getElementById('agenda-dia-overlay').style.display='none';
+}
+function agendaAbrirFormDesdeDia(){
+  var fecha=agendaDiaActual;
+  agendaCloseDia();
+  agendaAbrirForm(null,fecha);
+}
+
+// ── Formulario crear/editar evento ──
+function agendaFilterMiembros(q){
+  q=(q||'').toLowerCase();
+  document.querySelectorAll('#agenda-f-personas-list label').forEach(function(lbl){
+    lbl.style.display=lbl.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
+function agendaToggleRecurrencia(){
+  var tipo=document.getElementById('agenda-f-recur-tipo')?.value;
+  var wrap=document.getElementById('agenda-f-recur-hasta-wrap');
+  if(wrap) wrap.style.display=(tipo&&tipo!=='ninguna')?'block':'none';
+}
+function agendaToggleRecordatorio(){
+  var chk=document.getElementById('agenda-f-recordatorio');
+  var wrap=document.getElementById('agenda-f-record-dias-wrap');
+  if(wrap) wrap.style.display=chk&&chk.checked?'block':'none';
+}
+
+function agendaAbrirForm(eventoId, fechaPrefill){
+  if(!canCrearEventos()){ alert('No tenés permiso para crear o editar eventos.'); return; }
+  agendaEditingId=eventoId||null;
+  var ev=eventoId?S.eventos.find(function(x){return Number(x.id)===Number(eventoId);}):null;
+  document.getElementById('agenda-form-titulo').textContent=eventoId?'Editar evento':'Nuevo evento';
+  document.getElementById('agenda-f-titulo').value=ev?ev.titulo:'';
+  document.getElementById('agenda-f-desc').value=ev?(ev.descripcion||''):'';
+  document.getElementById('agenda-f-fecha').value=ev?ev.fecha:(fechaPrefill||today());
+  document.getElementById('agenda-f-hora').value=ev?(ev.hora||''):'';
+  document.getElementById('agenda-f-lugar').value=ev?(ev.lugar||''):'';
+
+  // Ministerio: cada opción es Nombre + Área
+  var minSel=document.getElementById('agenda-f-ministerio');
+  if(minSel){
+    minSel.innerHTML='<option value="">— Sin asignar —</option>'+
+      S.ministerios.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).map(function(m){
+        return '<option value="'+m.id+'">'+m.nombre+(m.area?' / '+m.area:'')+'</option>';
+      }).join('');
+    minSel.value=ev&&ev.ministerioId?ev.ministerioId:'';
+  }
+
+  // Personas asignadas
+  agendaSelectedPersonas=ev&&ev.personasAsignadas?ev.personasAsignadas.slice():[];
+  var personasList=document.getElementById('agenda-f-personas-list');
+  if(personasList){
+    personasList.innerHTML=S.members.filter(function(m){return m.estado!=='Baja';})
+      .sort(function(a,b){return listName(a).localeCompare(listName(b));})
+      .map(function(m){
+        var checked=agendaSelectedPersonas.map(Number).includes(Number(m.id));
+        return '<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB">'+
+          '<input type="checkbox" class="agenda-persona-cb" value="'+m.id+'"'+(checked?' checked':'')+' style="width:15px;height:15px;flex-shrink:0;cursor:pointer">'+
+          '<span style="font-size:13px">'+listName(m)+'</span>'+
+        '</label>';
+      }).join('');
+  }
+
+  // Recordatorio
+  var recChk=document.getElementById('agenda-f-recordatorio');
+  var recDias=document.getElementById('agenda-f-record-dias');
+  if(recChk) recChk.checked=!!(ev&&ev.recordatorio&&ev.recordatorio.activo);
+  if(recDias) recDias.value=(ev&&ev.recordatorio&&ev.recordatorio.diasAntes)?ev.recordatorio.diasAntes:3;
+  agendaToggleRecordatorio();
+
+  // Recurrencia
+  var recurSel=document.getElementById('agenda-f-recur-tipo');
+  var recurHasta=document.getElementById('agenda-f-recur-hasta');
+  if(recurSel) recurSel.value=(ev&&ev.recurrencia&&ev.recurrencia.tipo)?ev.recurrencia.tipo:'ninguna';
+  if(recurHasta) recurHasta.value=(ev&&ev.recurrencia&&ev.recurrencia.hasta)?ev.recurrencia.hasta:'';
+  agendaToggleRecurrencia();
+
+  document.getElementById('agenda-form-overlay').style.display='flex';
+}
+
+function agendaCloseForm(){
+  document.getElementById('agenda-form-overlay').style.display='none';
+  agendaEditingId=null;
+}
+
+async function agendaGuardarEvento(){
+  var titulo=(document.getElementById('agenda-f-titulo')?.value||'').trim();
+  var fecha=document.getElementById('agenda-f-fecha')?.value||'';
+  if(!titulo||!fecha){ alert('Completá al menos Título y Fecha'); return; }
+  var descripcion=(document.getElementById('agenda-f-desc')?.value||'').trim();
+  var ministerioId=parseInt(document.getElementById('agenda-f-ministerio')?.value)||null;
+  var hora=document.getElementById('agenda-f-hora')?.value||'';
+  var lugar=(document.getElementById('agenda-f-lugar')?.value||'').trim();
+  var personasAsignadas=[...document.querySelectorAll('.agenda-persona-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  var recordatorio={
+    activo: !!document.getElementById('agenda-f-recordatorio')?.checked,
+    diasAntes: parseInt(document.getElementById('agenda-f-record-dias')?.value)||3
+  };
+  var recurTipo=document.getElementById('agenda-f-recur-tipo')?.value||'ninguna';
+  var recurrencia={
+    tipo:recurTipo,
+    hasta: recurTipo!=='ninguna' ? (document.getElementById('agenda-f-recur-hasta')?.value||'') : ''
+  };
+
+  var data={titulo,descripcion,ministerioId,fecha,hora,lugar,personasAsignadas,recordatorio,recurrencia};
+
+  if(agendaEditingId){
+    var ev=S.eventos.find(function(x){return Number(x.id)===Number(agendaEditingId);});
+    if(ev) Object.assign(ev,data);
+  } else {
+    S.eventos.push(Object.assign({id:Date.now(),estado:'Activo',creadoPor:currentUser?.name||'Sistema',ts:Date.now()},data));
+  }
+
+  await saveK(SK.eventos,S.eventos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    alert('No se pudo guardar en la nube. Verificá tu conexión.');
+    return;
+  }
+  agendaCloseForm();
+  agendaRenderCalendario();
+  agendaRenderBanner();
+  var proxTab=document.getElementById('agenda-tab-proximos');
+  if(proxTab&&proxTab.style.display!=='none') agendaRenderProximos();
+  showToast('✅ Evento guardado','#16A34A');
+}
+
+async function agendaEliminarEvento(id){
+  var ev=S.eventos.find(function(x){return Number(x.id)===Number(id);});
+  if(!ev) return;
+  var esRecurrente=ev.recurrencia&&ev.recurrencia.tipo&&ev.recurrencia.tipo!=='ninguna';
+  var msg=esRecurrente
+    ?'¿Eliminar "'+ev.titulo+'"? Esto borra TODA la serie recurrente, no solo esta fecha.'
+    :'¿Eliminar "'+ev.titulo+'"?';
+  if(!confirm(msg)) return;
+  S.eventos=S.eventos.filter(function(x){return Number(x.id)!==Number(id);});
+  try{
+    await saveK(SK.eventos,S.eventos);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    agendaCloseDia();
+    agendaRenderCalendario();
+    agendaRenderBanner();
+    var proxTab=document.getElementById('agenda-tab-proximos');
+    if(proxTab&&proxTab.style.display!=='none') agendaRenderProximos();
+    showToast('🗑️ Evento eliminado','#DC2626');
+  }catch(e){
+    S.eventos.push(ev);
+    alert('No se pudo eliminar. Verificá tu conexión.');
+  }
+}
+
+// ── Próximos eventos: lista con período ampliable ──
+function agendaRenderProximos(){
+  var desdeEl=document.getElementById('agenda-prox-desde');
+  var hastaEl=document.getElementById('agenda-prox-hasta');
+  if(desdeEl&&!desdeEl.value) desdeEl.value=today();
+  if(hastaEl&&!hastaEl.value){ var d=new Date(); d.setDate(d.getDate()+30); hastaEl.value=d.toISOString().slice(0,10); }
+
+  var minSel=document.getElementById('agenda-prox-ministerio');
+  if(minSel&&minSel.options.length<=1){
+    S.ministerios.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).forEach(function(m){
+      var o=document.createElement('option'); o.value=m.id; o.textContent=m.nombre+(m.area?' / '+m.area:''); minSel.appendChild(o);
+    });
+  }
+
+  var desde=new Date((desdeEl&&desdeEl.value?desdeEl.value:today())+'T00:00:00');
+  var hasta=new Date((hastaEl&&hastaEl.value?hastaEl.value:today())+'T23:59:59');
+  var fMinisterio=minSel?minSel.value:'';
+
+  var ocs=agendaGetOcurrencias(desde,hasta);
+  if(fMinisterio) ocs=ocs.filter(function(o){return String(o.ministerioId)===String(fMinisterio);});
+
+  var wrap=document.getElementById('agenda-proximos-list');
+  if(!wrap) return;
+  if(!ocs.length){
+    wrap.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">Sin eventos en el período seleccionado</div>';
+    return;
+  }
+  var porFecha={};
+  ocs.forEach(function(o){ if(!porFecha[o.fechaOcurrencia]) porFecha[o.fechaOcurrencia]=[]; porFecha[o.fechaOcurrencia].push(o); });
+  wrap.innerHTML=Object.keys(porFecha).sort().map(function(fecha){
+    var evs=porFecha[fecha];
+    return '<div style="margin-bottom:1rem">'+
+      '<div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">'+fmt(fecha)+'</div>'+
+      evs.map(function(o){
+        var minLabel=agendaMinisterioLabel(o.ministerioId);
+        return '<div class="card" style="margin-bottom:6px;padding:10px 12px;border-left:4px solid #7C3AED">'+
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+            '<div>'+
+              '<div style="font-weight:700;font-size:14px;color:#1F2937">'+o.titulo+'</div>'+
+              '<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(o.hora?'🕐 '+o.hora+' · ':'')+(o.lugar?'📍 '+o.lugar:'')+'</div>'+
+              (minLabel?'<div style="font-size:11px;color:#7C3AED;margin-top:2px">🤝 '+minLabel+'</div>':'')+
+              ((o.personasAsignadas||[]).length?'<div style="font-size:11px;color:#6B7280;margin-top:2px">👥 '+o.personasAsignadas.length+' asignado'+(o.personasAsignadas.length>1?'s':'')+'</div>':'')+
+            '</div>'+
+            (canCrearEventos()?'<div style="display:flex;gap:4px;flex-shrink:0">'+
+              '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+')">✏️</button>'+
+              '<button onclick="agendaEliminarEvento('+o.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
+            '</div>':'')+
+          '</div>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }).join('');
+}
+
+function agendaResetProximosFiltro(){
+  var desdeEl=document.getElementById('agenda-prox-desde');
+  var hastaEl=document.getElementById('agenda-prox-hasta');
+  var minSel=document.getElementById('agenda-prox-ministerio');
+  if(desdeEl) desdeEl.value=today();
+  if(hastaEl){ var d=new Date(); d.setDate(d.getDate()+30); hastaEl.value=d.toISOString().slice(0,10); }
+  if(minSel) minSel.value='';
+  agendaRenderProximos();
+}
+
+// ── Banner de recordatorio (estilo cumpleaños) ──
+function agendaRenderBanner(){
+  var wrap=document.getElementById('agenda-banner-wrap');
+  if(!wrap) return;
+  var hoy=new Date(); hoy.setHours(0,0,0,0);
+  var en7=new Date(hoy); en7.setDate(en7.getDate()+7);
+  var ocs=agendaGetOcurrencias(hoy,en7).filter(function(o){return o.recordatorio&&o.recordatorio.activo;});
+  if(!ocs.length){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  wrap.innerHTML='<div style="font-size:13px;font-weight:700;color:#1E40AF;margin-bottom:6px">🔔 Próximos eventos con recordatorio</div>'+
+    ocs.slice(0,5).map(function(o){
+      var d=new Date(o.fechaOcurrencia+'T00:00:00');
+      var dias=Math.round((d-hoy)/(1000*60*60*24));
+      var label=dias===0?'HOY':dias===1?'Mañana':'en '+dias+' días';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #DBEAFE;font-size:13px">'+
+        '<span style="color:#1E3A8A;font-weight:600">📅 '+o.titulo+'</span>'+
+        '<span style="color:#1D4ED8;font-weight:700;font-size:12px">'+label+'</span>'+
+      '</div>';
+    }).join('');
 }
 
 let cfgEditingGroupId=null;
@@ -8355,7 +9071,24 @@ function cfgRenderPermisosTabla(){
     html+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">'
       +'2. Configurá los permisos para <span style="color:'+role.color+'">'+role.name+'</span>:</div>';
 
-    MODULES_PERM.forEach(function(mod){
+    var modsActivos=getModulesConfig();
+    var modulosVisibles=MODULES_PERM.filter(function(mod){
+      var cfg=modsActivos.find(function(m){return m.key===mod.key;});
+      return !cfg || cfg.activo!==false; // si no está registrado en Módulos, se muestra igual (ej: pantallas internas)
+    });
+    var modulosOcultos=MODULES_PERM.filter(function(mod){
+      var cfg=modsActivos.find(function(m){return m.key===mod.key;});
+      return cfg && cfg.activo===false;
+    });
+
+    if(modulosOcultos.length){
+      html+='<div style="font-size:12px;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:8px 12px;margin-bottom:10px">'
+        +'🚧 '+modulosOcultos.map(function(m){return m.label;}).join(', ')+' '+(modulosOcultos.length>1?'están':'está')
+        +' Inactivo'+(modulosOcultos.length>1?'s':'')+' en Configuración → Módulos, por eso no '+(modulosOcultos.length>1?'aparecen':'aparece')+' acá. Activalo primero para poder asignarle permisos.'
+        +'</div>';
+    }
+
+    modulosVisibles.forEach(function(mod){
       html+='<div style="border:1px solid #E5E7EB;border-radius:12px;margin-bottom:10px;overflow:hidden">';
       // Module header
       html+='<div style="background:#F9FAFB;padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #E5E7EB">';
@@ -10376,5 +11109,6 @@ boot();
       </div>
     </div>
 <div id="cfg-ng-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem"></div>
+<div id="cfg-ministerio-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem"></div>
 </body>
 </html>

@@ -569,6 +569,8 @@ window.fbDownload().then(function(hasData) {
         S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
         S.discPasos      = _ld('gdv_disc_pasos',    S.discPasos      ||[]);
         S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);S.discCursadas=_ld('gdv_disc_cursadas',S.discCursadas||[]);
+        (S.discPasos||[]).forEach(function(p){ if(!p.discipuladorIds) p.discipuladorIds=p.discipuladorId?[p.discipuladorId]:[]; });
+        (S.discCursadas||[]).forEach(function(cu){ if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[]; });
   S.ngComunidades  = _ld('gdv_ng5',           S.ngComunidades  ||[]);
   S.ngRecords      = _ld('gdv_ng_records',    S.ngRecords      ||[]);
   S.modulesConfig  = _ld('gdv_modules5',      S.modulesConfig  ||[]);
@@ -1092,6 +1094,13 @@ async function initStorage(){
   S.roles      =load(SK.roles,      DEFAULT_ROLES);
   S.discPasos  =load(SK.discPasos,  DEFAULT_DISC_PASOS);
   S.discRecords=load(SK.discRecords,[]);S.discCursadas=load('gdv_disc_cursadas',[]);
+  // Migración: discipuladorId (único) → discipuladorIds (varios), sin perder lo ya asignado
+  S.discPasos.forEach(function(p){
+    if(!p.discipuladorIds) p.discipuladorIds=p.discipuladorId?[p.discipuladorId]:[];
+  });
+  S.discCursadas.forEach(function(cu){
+    if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[];
+  });
   S.ministerios=load(SK.ministerios,[]);
   S.eventos    =load(SK.eventos,    []);
   await cleanMembers();
@@ -9876,6 +9885,17 @@ function buildDiscipuladoHTML(){
 let discEditingPasoId=null;
 let discAsignandoPasoId=null;
 
+// Devuelve el/los nombres de Discipulador(es) de un Paso o Cursada, separados por coma
+function discDiscipuladoresLabel(obj){
+  var ids=obj&&obj.discipuladorIds?obj.discipuladorIds:[];
+  if(!ids.length) return 'Sin asignar';
+  var nombres=ids.map(function(id){
+    var m=S.members.find(function(x){return x.id===id;});
+    return m?fullName(m):null;
+  }).filter(Boolean);
+  return nombres.length?nombres.join(', '):'Sin asignar';
+}
+
 function discTab(tab, btn){
   document.querySelectorAll('[id^="disc-tab-"]').forEach(function(b){b.className='btn btn-sm';});
   if(btn) btn.className='btn btn-primary btn-sm';
@@ -9898,7 +9918,7 @@ function discRenderDashboard(c){
     // Discipulador solo ve su paso
     var linkedDisc=getLinkedMember();
     pasosToShow=S.discPasos.filter(function(p){
-      return linkedDisc&&Number(p.discipuladorId)===Number(linkedDisc.id);
+      return linkedDisc&&(p.discipuladorIds||[]).map(Number).includes(Number(linkedDisc.id));
     });
   }
 
@@ -9909,7 +9929,6 @@ function discRenderDashboard(c){
 
   var html='';
   pasosToShow.forEach(function(paso){
-    var disc=paso.discipuladorId?S.members.find(function(m){return m.id===paso.discipuladorId;}):null;
     var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
     var recs=S.discRecords.filter(function(r){return r.pasoId===paso.id;});
 
@@ -9939,7 +9958,7 @@ function discRenderDashboard(c){
     html+='<span style="background:'+nc+'22;color:'+nc+';font-size:11px;padding:2px 10px;border-radius:99px;font-weight:600">'+(paso.nivel||'')+'</span>';
     html+='</div>';
     html+='<div style="font-size:12px;color:#6B7280;margin-top:3px">';
-    html+='Discipulador: <strong>'+(disc?fullName(disc):'Sin asignar')+'</strong>';
+    html+='Discipulador: <strong>'+discDiscipuladoresLabel(paso)+'</strong>';
     html+='</div></div>';
     html+='<span class="badge '+(isActivo?'b-ok':'b-muted')+'">'+(isActivo?'Activo':'Inactivo')+'</span>';
     html+='</div>';
@@ -10047,7 +10066,7 @@ async function discToggleCompletado(pasoId, memberId){
 
 function fgPopup(e,fecha,fuente){e.stopPropagation();document.querySelectorAll('.fg-popup').forEach(function(x){x.remove();});var div=document.createElement('div');div.className='fg-popup';div.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px 18px;box-shadow:0 4px 20px rgba(0,0,0,0.18);font-size:13px;min-width:160px';div.innerHTML='<div style="font-weight:700;color:#1F4E79;margin-bottom:8px">✅ Completado</div><div style="color:#6B7280;font-size:11px;margin-bottom:4px">Fecha</div><div style="font-weight:600;margin-bottom:10px">'+fecha+'</div><div style="color:#6B7280;font-size:11px;margin-bottom:4px">Origen</div><div style="font-weight:600">'+fuente+'</div>';var r=e.target.getBoundingClientRect();div.style.top=(r.bottom+6)+'px';div.style.left=Math.max(8,r.left-40)+'px';document.body.appendChild(div);setTimeout(function(){document.addEventListener('click',function h(){div.remove();document.removeEventListener('click',h);});},50);}
 function discGenLabel(pasoId,anio){var ant=(S.discCursadas||[]).filter(function(c){return c.pasoId===pasoId&&c.anio===anio;}).length;var p=S.discPasos.find(function(x){return x.id===pasoId;});return (p?p.nombre:'Paso')+' — '+(ant+1)+'/'+anio;}
-async function discAbrirCursada(pasoId){var paso=S.discPasos.find(function(p){return p.id===pasoId;});if(!paso)return;var activa=(S.discCursadas||[]).find(function(c){return c.pasoId===pasoId&&c.estado==='Activo';});if(activa){showToast('Ya hay una cursada activa para '+paso.nombre,'#D97706');return;}var anio=new Date().getFullYear();if(!S.discCursadas)S.discCursadas=[];var recsPrev=S.discRecords.filter(function(r){return r.pasoId===pasoId&&!r.cursadaId&&r.asistencia;});var memPrev=[...new Set(recsPrev.flatMap(function(r){return Object.keys(r.asistencia).filter(function(id){return r.asistencia[id]&&r.asistencia[id].state==='presente';})}))].map(Number).filter(Boolean);var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorId:paso.discipuladorId||null,miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:''};S.discCursadas.push(nc);S.discRecords.forEach(function(r){if(r.pasoId===pasoId&&!r.cursadaId)r.cursadaId=nc.id;});await saveK('gdv_disc_cursadas',S.discCursadas);await saveK('gdv_disc_records',S.discRecords);try{if(typeof window.fbUpload==='function')await window.fbUpload(true);}catch(e){}showToast('✅ Cursada '+nc.label+' iniciada'+(memPrev.length?' con '+memPrev.length+' integrantes':''),'#16A34A');var c=document.getElementById('disc-content');if(c)discRenderCursada(c);}
+async function discAbrirCursada(pasoId){var paso=S.discPasos.find(function(p){return p.id===pasoId;});if(!paso)return;var activa=(S.discCursadas||[]).find(function(c){return c.pasoId===pasoId&&c.estado==='Activo';});if(activa){showToast('Ya hay una cursada activa para '+paso.nombre,'#D97706');return;}var anio=new Date().getFullYear();if(!S.discCursadas)S.discCursadas=[];var recsPrev=S.discRecords.filter(function(r){return r.pasoId===pasoId&&!r.cursadaId&&r.asistencia;});var memPrev=[...new Set(recsPrev.flatMap(function(r){return Object.keys(r.asistencia).filter(function(id){return r.asistencia[id]&&r.asistencia[id].state==='presente';})}))].map(Number).filter(Boolean);var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorIds:paso.discipuladorIds||[],miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:''};S.discCursadas.push(nc);S.discRecords.forEach(function(r){if(r.pasoId===pasoId&&!r.cursadaId)r.cursadaId=nc.id;});await saveK('gdv_disc_cursadas',S.discCursadas);await saveK('gdv_disc_records',S.discRecords);try{if(typeof window.fbUpload==='function')await window.fbUpload(true);}catch(e){}showToast('✅ Cursada '+nc.label+' iniciada'+(memPrev.length?' con '+memPrev.length+' integrantes':''),'#16A34A');var c=document.getElementById('disc-content');if(c)discRenderCursada(c);}
 async function discCerrarCursada(cursadaId){var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});if(!cursada)return;if(!confirm('¿Cerrar la cursada "'+cursada.label+'"?\nLos miembros con ≥75% serán marcados Completado.'))return;var recs=S.discRecords.filter(function(r){return (r.cursadaId===cursadaId||(r.pasoId===cursada.pasoId&&!r.cursadaId))&&r.asistencia;});var total=recs.length;var completados=0;cursada.miembros.forEach(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;if(!m.formacion)m.formacion=[];m.formacion=m.formacion.filter(function(f){return !(String(f.pasoId)===String(cursada.pasoId)&&f.fuente==='cursado'&&f.cursadaId===cursadaId);});if(pct>=75){m.formacion.push({pasoId:cursada.pasoId,cursadaId:cursadaId,cursadaLabel:cursada.label,pasoNombre:cursada.pasoNombre,fechaCompletado:todayAA(),fuente:'cursado'});completados++;}});cursada.estado='Completado';cursada.fechaCierre=todayAA();if(!cursada.num){var _a=new Date().getFullYear();var _ant=(S.discCursadas||[]).filter(function(c){return c.pasoId===cursada.pasoId&&c.anio===_a&&c.id!==cursada.id;}).length;cursada.num=_ant+1;cursada.anio=_a;cursada.label=cursada.pasoNombre+' — '+cursada.num+'/'+_a;}await saveK('gdv_disc_cursadas',S.discCursadas);await saveK('gdv_m5',S.members);try{if(typeof window.fbUpload==='function')await window.fbUpload(true);}catch(e){}showToast('✅ Cursada cerrada — '+completados+' completados','#16A34A');var c=document.getElementById('disc-content');if(c)discRenderCursada(c);}
 
 // Super Admin: deshacer el Cierre de una Cursada — vuelve a Activo y saca las Formaciones auto-marcadas por ese cierre
@@ -10088,7 +10107,7 @@ async function discRevertirInicio(cursadaId){
   if(c) discRenderCursada(c);
 }
 
-function discRenderHistorico(c){var fP=document.getElementById('hist-fil-paso')?document.getElementById('hist-fil-paso').value:'';var fA=document.getElementById('hist-fil-anio')?document.getElementById('hist-fil-anio').value:'';var fI=document.getElementById('hist-fil-id')?document.getElementById('hist-fil-id').value.trim().toLowerCase():'';var done=(S.discCursadas||[]).filter(function(cu){if(cu.estado!=='Completado')return false;if(fP&&String(cu.pasoId)!==fP)return false;if(fA&&String(cu.anio)!==fA)return false;if(fI&&!(cu.label||'').toLowerCase().includes(fI))return false;return true;}).sort(function(a,b){return b.id-a.id;});var pOpts=S.discPasos.map(function(p){return '<option value="'+p.id+'"'+(fP===String(p.id)?' selected':'')+'>'+p.nombre+'</option>';}).join('');var anios=[...new Set((S.discCursadas||[]).filter(function(c){return c.estado==='Completado';}).map(function(c){return c.anio;}))].sort(function(a,b){return b-a;});var aOpts=anios.map(function(a){return '<option value="'+a+'"'+(fA===String(a)?' selected':'')+'>'+a+'</option>';}).join('');c.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center"><select id="hist-fil-paso" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los pasos</option>'+pOpts+'</select><select id="hist-fil-anio" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los años</option>'+aOpts+'</select><input id="hist-fil-id" oninput="discRenderHistorico(document.getElementById(\'disc-content\'))" placeholder="Buscar ID (ej: 1/2026)" value="'+fI+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;width:160px"><span style="font-size:12px;color:#6B7280">'+done.length+' resultado'+(done.length!==1?'s':'')+'</span></div><div id="hist-results"></div>';if(!done.length){document.getElementById('hist-results').innerHTML='<div class="empty" style="padding:2rem">No hay cursadas que coincidan.</div>';return;}var html='';done.forEach(function(cursada){var disc=cursada.discipuladorId?S.members.find(function(m){return m.id===cursada.discipuladorId;}):null;var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&r.asistencia;});var total=recs.length;var stats=cursada.miembros.map(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return null;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;return {m:m,asist:asist,pct:pct,ok:pct>=75};}).filter(Boolean);var nOk=stats.filter(function(x){return x.ok;}).length;html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #9CA3AF"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+cursada.label+'</div><div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+(disc?fullName(disc):'Sin asignar')+'</strong> · Inicio: '+(cursada.fechaInicio||'—')+' · Cierre: '+(cursada.fechaCierre||'—')+'</div></div><span class="badge b-muted">Completada</span>'+(hasRole('super_admin')?'<button class="btn btn-sm" onclick="discRevertirCierre('+cursada.id+')" style="color:#D97706;margin-left:6px" title="Vuelve la cursada a Activo">↩️ Revertir</button>':'')+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+cursada.miembros.length+'</span><span class="stat-lbl">Alumnos</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+total+'</span><span class="stat-lbl">Encuentros</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem;color:#16A34A">'+nOk+'/'+cursada.miembros.length+'</span><span class="stat-lbl">Completados</span></div></div>';stats.forEach(function(s){var bc=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;flex:1">'+fullName(s.m)+'</span><div style="flex:2;min-width:120px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#6B7280">'+s.asist+'/'+total+' enc.</span><strong style="color:'+bc+'">'+s.pct+'%</strong></div><div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+bc+';width:'+s.pct+'%"></div></div></div><span style="font-size:11px;padding:3px 10px;border-radius:6px;'+(s.ok?'background:#D1FAE5;color:#065F46':'background:#FEE2E2;color:#991B1B')+'">'+( s.ok?'✅ Completado':'❌ No completó')+'</span></div>';});if(recs.length){html+='<details style="margin-top:1rem"><summary style="font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;padding:6px 0">Ver encuentros ('+recs.length+')</summary><div style="margin-top:8px">';recs.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(r){var pres=Object.values(r.asistencia||{}).filter(function(a){return a&&a.state==='presente';}).length;var editBtn=hasRole('super_admin')?'<button class="btn btn-sm" onclick="discEditRecord('+r.id+')" style="font-size:10px;padding:2px 8px">✏️</button>':'';html+='<div style="padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:12px;display:flex;justify-content:space-between;align-items:center"><span>'+(fmtAA(r.fecha)||r.fecha)+' — '+r.capitulo+'</span><div style="display:flex;align-items:center;gap:8px"><span style="color:#6B7280">'+pres+' presentes</span>'+editBtn+'</div></div>';});html+='</div></details>';}html+='</div>';});document.getElementById('hist-results').innerHTML=html;}
+function discRenderHistorico(c){var fP=document.getElementById('hist-fil-paso')?document.getElementById('hist-fil-paso').value:'';var fA=document.getElementById('hist-fil-anio')?document.getElementById('hist-fil-anio').value:'';var fI=document.getElementById('hist-fil-id')?document.getElementById('hist-fil-id').value.trim().toLowerCase():'';var done=(S.discCursadas||[]).filter(function(cu){if(cu.estado!=='Completado')return false;if(fP&&String(cu.pasoId)!==fP)return false;if(fA&&String(cu.anio)!==fA)return false;if(fI&&!(cu.label||'').toLowerCase().includes(fI))return false;return true;}).sort(function(a,b){return b.id-a.id;});var pOpts=S.discPasos.map(function(p){return '<option value="'+p.id+'"'+(fP===String(p.id)?' selected':'')+'>'+p.nombre+'</option>';}).join('');var anios=[...new Set((S.discCursadas||[]).filter(function(c){return c.estado==='Completado';}).map(function(c){return c.anio;}))].sort(function(a,b){return b-a;});var aOpts=anios.map(function(a){return '<option value="'+a+'"'+(fA===String(a)?' selected':'')+'>'+a+'</option>';}).join('');c.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center"><select id="hist-fil-paso" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los pasos</option>'+pOpts+'</select><select id="hist-fil-anio" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los años</option>'+aOpts+'</select><input id="hist-fil-id" oninput="discRenderHistorico(document.getElementById(\'disc-content\'))" placeholder="Buscar ID (ej: 1/2026)" value="'+fI+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;width:160px"><span style="font-size:12px;color:#6B7280">'+done.length+' resultado'+(done.length!==1?'s':'')+'</span></div><div id="hist-results"></div>';if(!done.length){document.getElementById('hist-results').innerHTML='<div class="empty" style="padding:2rem">No hay cursadas que coincidan.</div>';return;}var html='';done.forEach(function(cursada){var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&r.asistencia;});var total=recs.length;var stats=cursada.miembros.map(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return null;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;return {m:m,asist:asist,pct:pct,ok:pct>=75};}).filter(Boolean);var nOk=stats.filter(function(x){return x.ok;}).length;html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #9CA3AF"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+cursada.label+'</div><div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+discDiscipuladoresLabel(cursada)+'</strong> · Inicio: '+(cursada.fechaInicio||'—')+' · Cierre: '+(cursada.fechaCierre||'—')+'</div></div><span class="badge b-muted">Completada</span>'+(hasRole('super_admin')?'<button class="btn btn-sm" onclick="discRevertirCierre('+cursada.id+')" style="color:#D97706;margin-left:6px" title="Vuelve la cursada a Activo">↩️ Revertir</button>':'')+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+cursada.miembros.length+'</span><span class="stat-lbl">Alumnos</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+total+'</span><span class="stat-lbl">Encuentros</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem;color:#16A34A">'+nOk+'/'+cursada.miembros.length+'</span><span class="stat-lbl">Completados</span></div></div>';stats.forEach(function(s){var bc=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;flex:1">'+fullName(s.m)+'</span><div style="flex:2;min-width:120px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#6B7280">'+s.asist+'/'+total+' enc.</span><strong style="color:'+bc+'">'+s.pct+'%</strong></div><div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+bc+';width:'+s.pct+'%"></div></div></div><span style="font-size:11px;padding:3px 10px;border-radius:6px;'+(s.ok?'background:#D1FAE5;color:#065F46':'background:#FEE2E2;color:#991B1B')+'">'+( s.ok?'✅ Completado':'❌ No completó')+'</span></div>';});if(recs.length){html+='<details style="margin-top:1rem"><summary style="font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;padding:6px 0">Ver encuentros ('+recs.length+')</summary><div style="margin-top:8px">';recs.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(r){var pres=Object.values(r.asistencia||{}).filter(function(a){return a&&a.state==='presente';}).length;var editBtn=hasRole('super_admin')?'<button class="btn btn-sm" onclick="discEditRecord('+r.id+')" style="font-size:10px;padding:2px 8px">✏️</button>':'';html+='<div style="padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:12px;display:flex;justify-content:space-between;align-items:center"><span>'+(fmtAA(r.fecha)||r.fecha)+' — '+r.capitulo+'</span><div style="display:flex;align-items:center;gap:8px"><span style="color:#6B7280">'+pres+' presentes</span>'+editBtn+'</div></div>';});html+='</div></details>';}html+='</div>';});document.getElementById('hist-results').innerHTML=html;}
 function discRenderCursos(c){
   var esSuper=hasRole('super_admin');
   var html='<div style="font-size:12px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#F9FAFB;border-radius:8px">'
@@ -10120,7 +10139,6 @@ function discRenderCursada(c){
   var esSuper=hasRole('super_admin');
   var html='';
   S.discPasos.forEach(function(paso){
-    var disc=paso.discipuladorId?S.members.find(function(m){return m.id===paso.discipuladorId;}):null;
     var isActivo=paso.estado==='Activo';
     var cursadaActiva=(S.discCursadas||[]).find(function(cu){return cu.pasoId===paso.id&&cu.estado==='Activo';});
     html+='<div class="card" style="margin-bottom:1rem;border-left:4px solid '+(isActivo?'#16A34A':'#9CA3AF')+'">';
@@ -10129,7 +10147,7 @@ function discRenderCursada(c){
     html+='<div style="font-size:15px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>';
     html+='<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+paso.nivel+' · '+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'')+'</div>';
     html+='<div style="font-size:12px;color:#6B7280;margin-top:4px">';
-    html+='Discipulador: <strong>'+(disc?fullName(disc):'Sin asignar')+'</strong>';
+    html+='Discipulador: <strong>'+discDiscipuladoresLabel(paso)+'</strong>';
     html+=' · '+paso.miembros.length+' miembro'+(paso.miembros.length!==1?'s':'');
     html+='</div></div>';
     html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
@@ -10169,8 +10187,16 @@ function discOpenAsignacion(pasoId){
     '<strong>'+paso.nombre+'</strong> · '+paso.nivel+' · '+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'')
     +'<div style="margin-top:2px;color:#9CA3AF">El Nombre, Nivel y Capítulos se editan desde 🎓 Cursos</div>';
 
-  var discOptions=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
-    return '<option value="'+m.id+'"'+(paso.discipuladorId===m.id?' selected':'')+'>'+fullName(m)+'</option>';
+  var discIds=paso.discipuladorIds||[];
+  var discChecks=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
+    var checked=discIds.includes(m.id);
+    var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+    var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB;min-width:0">'
+      +'<input type="checkbox" class="disc-disc-cb" value="'+m.id+'"'+(checked?' checked':'')+' style="width:16px;height:16px;flex-shrink:0;cursor:pointer">'
+      +'<span style="background:'+genBg+';color:'+genColor+';font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;flex-shrink:0">'+m.genero+'</span>'
+      +'<span style="font-size:13px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fullName(m)+'</span>'
+      +'</label>';
   }).join('');
 
   var memberChecks=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
@@ -10187,10 +10213,11 @@ function discOpenAsignacion(pasoId){
   }).join('');
 
   document.getElementById('disc-asig-body').innerHTML=
-    '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Discipulador</label>'
-    +'<select id="disc-asig-disc" style="width:100%"><option value="">Sin asignar</option>'+discOptions+'</select>'
+    '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Discipulador(es)</label>'
+    +'<input type="text" placeholder="Buscar..." oninput="discFilterList(this.value,\'disc-disc-list\')" style="width:100%;margin-bottom:8px">'
+    +'<div id="disc-disc-list" style="max-height:160px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+discChecks+'</div>'
     +'<div style="margin-top:1rem"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Integrantes</label>'
-    +'<input type="text" placeholder="Buscar..." oninput="discFilterMembers(this.value)" style="width:100%;margin-bottom:8px">'
+    +'<input type="text" placeholder="Buscar..." oninput="discFilterList(this.value,\'disc-mem-list\')" style="width:100%;margin-bottom:8px">'
     +'<div id="disc-mem-list" style="max-height:220px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+memberChecks+'</div></div>';
 
   document.getElementById('disc-asig-modal').style.display='flex';
@@ -10204,7 +10231,7 @@ function discCloseAsignacion(){
 async function discGuardarAsignacion(){
   var paso=S.discPasos.find(function(p){return p.id===discAsignandoPasoId;});
   if(!paso) return;
-  paso.discipuladorId=parseInt(document.getElementById('disc-asig-disc').value)||null;
+  paso.discipuladorIds=[...document.querySelectorAll('.disc-disc-cb:checked')].map(function(cb){return parseInt(cb.value);});
   paso.miembros=[...document.querySelectorAll('.disc-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
   await saveK(SK.discPasos,S.discPasos);
   try{
@@ -10252,9 +10279,9 @@ function discOpenModal(pasoId){
   document.getElementById('disc-paso-modal').style.display='flex';
 }
 
-function discFilterMembers(query){
+function discFilterList(query, listId){
   var q=query.toLowerCase();
-  document.querySelectorAll('#disc-mem-list label').forEach(function(lbl){
+  document.querySelectorAll('#'+listId+' label').forEach(function(lbl){
     lbl.style.display=lbl.textContent.toLowerCase().includes(q)?'':'none';
   });
 }
@@ -10285,7 +10312,7 @@ async function discGuardarCurso(){
   var esNuevo=!discEditingPasoId;
   var paso;
   if(esNuevo){
-    paso={id:Date.now(),nombre,nivel,capitulos,discipuladorId:null,miembros:[],estado:'Activo',completados:{}};
+    paso={id:Date.now(),nombre,nivel,capitulos,discipuladorIds:[],miembros:[],estado:'Activo',completados:{}};
     S.discPasos.push(paso);
   } else {
     paso=S.discPasos.find(function(p){return p.id===discEditingPasoId;});

@@ -581,7 +581,7 @@ window.fbDownload().then(function(hasData) {
       // Load permisos from Firebase if this device has none configured
       // Reload permisos from localStorage (now updated from Firebase if it was empty)
       if(!window._permisosEditing && typeof loadPermisos==='function') loadPermisos();
-      if(typeof renderModulesGrid==='function') renderModulesGrid();
+      if(currentUser && typeof renderModulesGrid==='function') renderModulesGrid();
     }catch(e){ console.error('Firebase post-sync error:',e); }
   }
   }).catch(function(e){ console.error('Firebase auto-download error:', e); });
@@ -1123,12 +1123,55 @@ function listName(m){return [m.apellido,m.nombre].filter(Boolean).join(' ');}
 function groupMembers(gid){
   return S.members.filter(m=>m.estado==='Activo' && (Number(m.grupoId)===Number(gid) || (m.grupoIds||[]).map(Number).includes(Number(gid))));
 }
-function roleChips(roles){
+// Dado un memberId y un roleId, busca en qué Grupo/Comunidad/Ministerio aplica esa Función.
+// Los roles de acceso al sistema (Pastor, Admin GdV, etc.) no tienen un área específica.
+function getRoleContexto(memberId, roleId){
+  var id=Number(memberId);
+  if(roleId==='facilitador'){
+    var grupos=S.groups.filter(function(g){return Number(g.facId)===id||Number(g.facId2)===id;}).map(function(g){return g.name;});
+    if(grupos.length) return grupos.join(', ');
+  }
+  if(roleId==='lider'){
+    var ngsLider=S.ngComunidades.filter(function(ng){return (ng.liderIds||[]).map(Number).includes(id);}).map(function(ng){return ng.name;});
+    if(ngsLider.length) return ngsLider.join(', ');
+  }
+  // Rol de Colaborador de Nuevas Generaciones (id histórico)
+  if(roleId==='colaborador1783645248659'){
+    var ngsColab=S.ngComunidades.filter(function(ng){return (ng.colaboradorIds||[]).map(Number).includes(id);}).map(function(ng){return ng.name;});
+    if(ngsColab.length) return ngsColab.join(', ');
+  }
+  return null;
+}
+
+function roleChips(roles, memberId){
   if(!roles||!roles.length) return '';
   return roles.map(rid=>{
     const r=S.roles.find(x=>x.id===rid);
-    return r?`<span class="role-chip" style="background:${r.color};color:#fff">${r.name}</span>`:'';
+    if(!r) return '';
+    const contexto=memberId?getRoleContexto(memberId,rid):null;
+    const mensaje=contexto||'Función de acceso general — no vinculada a un Grupo/Área específica';
+    const safeMsg=mensaje.replace(/'/g,"\\'");
+    const safeName=r.name.replace(/'/g,"\\'");
+    return `<span class="role-chip" style="background:${r.color};color:#fff;cursor:pointer" onclick="event.stopPropagation();roleChipShowContexto(this,'${safeMsg}','${safeName}')">${r.name}</span>`;
   }).join('');
+}
+
+// Popup liviano que muestra dónde aplica la Función clickeada (Grupo/Comunidad/Ministerio)
+function roleChipShowContexto(el, contexto, roleName){
+  document.querySelectorAll('.role-chip-popup').forEach(function(p){p.remove();});
+  var rect=el.getBoundingClientRect();
+  var popup=document.createElement('div');
+  popup.className='role-chip-popup';
+  var left=Math.max(8,Math.min(rect.left,window.innerWidth-232));
+  popup.style.cssText='position:fixed;z-index:500;background:#1F2937;color:#fff;font-size:12px;line-height:1.4;padding:7px 11px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.28);max-width:220px;top:'+(rect.bottom+6)+'px;left:'+left+'px';
+  popup.innerHTML='<strong>'+roleName+':</strong> '+contexto;
+  document.body.appendChild(popup);
+  setTimeout(function(){
+    document.addEventListener('click', function closePopup(){
+      popup.remove();
+      document.removeEventListener('click', closePopup);
+    }, {once:true});
+  }, 0);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1194,7 +1237,7 @@ function ngTab(tab,btn){
 
 function ngIsLiderOColab(){
   if(!currentUser) return false;
-  var linked=S.members.find(function(m){return fullName(m).toLowerCase()===currentUser.name.toLowerCase();});
+  var linked=getLinkedMember();
   if(!linked) return false;
   return (S.ngComunidades||[]).some(function(ng){
     return (ng.liderIds||[]).includes(linked.id)||(ng.colaboradorIds||[]).includes(linked.id);
@@ -1203,7 +1246,7 @@ function ngIsLiderOColab(){
 
 function ngGetMisComunidades(){
   if(isSuperAdmin()) return S.ngComunidades||[];
-  var linked=S.members.find(function(m){return fullName(m).toLowerCase()===currentUser.name.toLowerCase();});
+  var linked=getLinkedMember();
   if(!linked) return [];
   return (S.ngComunidades||[]).filter(function(ng){
     return (ng.liderIds||[]).some(function(id){return Number(id)===Number(linked.id);})||
@@ -1762,8 +1805,8 @@ function ngRenderCargar(c){
         '<span>📝 Nuevo encuentro</span>'+
         '<button onclick="nvOpenInlineForm()" style="background:#1D4ED8;color:#fff;font-weight:700;font-size:13px;padding:6px 16px;border:none;border-radius:8px;cursor:pointer">+ Alta Nueva Persona</button>'+
       '</div>'+
-      (misComs.length>1?'<div id="ng-admin-sel" style="margin-bottom:12px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Comunidad</label><select id="ng-com-sel" onchange="ngCargarComChanged()" style="margin-bottom:0"><option value="">— Elegir comunidad —</option>'+comOpts+'</select></div>':'<input type="hidden" id="ng-com-sel" value="">'+
-        '<div id="ng-com-info" style="font-size:13px;color:#1E40AF;padding:8px;background:#EFF6FF;border-radius:6px;margin-bottom:8px">'+misComs[0].name+' — '+misComs[0].tipo+'</div>')+
+      (misComs.length>1?'<div id="ng-admin-sel" style="margin-bottom:12px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Comunidad</label><select id="ng-com-sel" onchange="ngCargarComChanged()" style="margin-bottom:0"><option value="">— Elegir comunidad —</option>'+comOpts+'</select></div>':'<input type="hidden" id="ng-com-sel" value="'+misComs[0].id+'">'+
+        '<div id="ng-com-info" style="font-size:13px;color:#1E40AF;padding:8px;background:#EFF6FF;border-radius:6px;margin-bottom:8px;font-weight:600">'+misComs[0].name+' — '+misComs[0].tipo+'</div>')+
       '<div id="ng-pending-alert" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px;font-size:13px;color:#92400E;margin-bottom:12px"></div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
         '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha del encuentro</label>'+
@@ -2102,7 +2145,7 @@ function canCargarAsistencia(){
 // ── Role helper ────────────────────────────────────────────
 function userRoles(){
   if(!currentUser||!currentUser.name) return currentUser&&currentUser.role?[currentUser.role]:[];
-  const linked=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
+  const linked=getLinkedMember();
   return linked?linked.roles:(currentUser.role?[currentUser.role]:[]);
 }
 function hasRole(...rols){ const r=userRoles(); return rols.some(x=>r.includes(x)||(currentUser&&currentUser.role&&currentUser.role===x)); }
@@ -2140,16 +2183,27 @@ function canCrearEventos(){
   return isSuperAdmin() || canEjecutar('agenda_crear');
 }
 
-function normName(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function normName(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); }
+
+// Enlaza el usuario logueado con su registro de Miembro de forma confiable:
+// 1° por memberId (si el usuario fue vinculado explícitamente en Configuración → Usuarios)
+// 2° por nombre normalizado (sin acentos, sin espacios extra) — evita fallos por tildes o mayúsculas
+function getLinkedMember(){
+  if(!currentUser) return null;
+  if(currentUser.memberId){
+    var byId=S.members.find(function(x){return Number(x.id)===Number(currentUser.memberId);});
+    if(byId) return byId;
+  }
+  if(!currentUser.name) return null;
+  return S.members.find(function(m){return normName(fullName(m))===normName(currentUser.name);})||null;
+}
+
 function getFacilitadorGroupIds(){
   // Returns ALL group ids this user is responsible for (can be more than one)
   const ids=new Set();
   if(currentUser.groupId) ids.add(Number(currentUser.groupId));
 
-  // Find linked member: by memberId, or by accent-normalized name
-  let linked=null;
-  if(currentUser.memberId) linked=S.members.filter(Boolean).find(m=>Number(m.id)===Number(currentUser.memberId));
-  if(!linked) linked=S.members.filter(Boolean).find(m=>normName(fullName(m))===normName(currentUser.name));
+  const linked=getLinkedMember();
 
   if(linked){
     // Member's primary + extra groups
@@ -2192,7 +2246,7 @@ function isGdVFacilitador(){
   const al=document.getElementById('login-alert');
   if(!found){al.textContent='Usuario o contraseña incorrectos';return;}
   al.textContent='';
-  currentUser={id:found.id,name:found.name,role:found.role,groupId:found.groupId||null};
+  currentUser={id:found.id,name:found.name,role:found.role,groupId:found.groupId||null,memberId:found.memberId||null};
   var sess=JSON.stringify(currentUser);
   try{localStorage.setItem('vng_cu',sess);}catch(e){}
   try{sessionStorage.setItem('vng_cu',sess);}catch(e){}
@@ -2204,6 +2258,7 @@ function isGdVFacilitador(){
 function doLogout(){
   currentUser=null;
   localStorage.removeItem('vng_cu');
+  sessionStorage.removeItem('vng_cu');
   document.getElementById('screen-login').style.display='';
   document.getElementById('screen-home').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('show');
@@ -2217,11 +2272,11 @@ function doLogout(){
 function showHome(){
   document.getElementById('screen-home').classList.remove('hidden');
   document.getElementById('screen-app').classList.remove('show');
-  const linked=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
+  const linked=getLinkedMember();
   document.getElementById('home-avatar').textContent=initials(currentUser.name);
   document.getElementById('home-name').textContent=`Bienvenido, ${currentUser.name.split(' ')[0]}!`;
   document.getElementById('home-roles').innerHTML=linked&&linked.roles.length
-    ?roleChips(linked.roles)
+    ?roleChips(linked.roles,linked.id)
     :`<span style="font-size:12px;color:#6B7280">${currentUser.role}</span>`;
 
   renderModulesGrid();
@@ -2522,8 +2577,9 @@ function buildMiembrosHTML(){
       </div>
       <div style="margin-top:10px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Barrio / Ciudad</label>
         <input type="text" id="sa-mf-dir" placeholder="Barrio y número"></div>
-      <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Funciones asignadas</label>
+      <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Funciones asignadas <span style="font-weight:400;color:#9CA3AF">(solo lectura)</span></label>
       <div class="role-selector" id="sa-mf-roles"></div>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:4px">Se asignan desde Configuración → Usuarios, Grupos, Nuevas Generaciones o Servicios/Ministerios según corresponda.</div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
         <button class="btn" onclick="saCloseMemberForm()">Cancelar</button>
         <button class="btn btn-primary" onclick="saSaveMember()">Guardar</button>
@@ -2844,7 +2900,7 @@ function renderMiembrosStandalone(){
       </td>
       <td><span style="background:${genBg};color:${genColor};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${m.genero}</span></td>
       <td style="color:#6B7280;font-size:12px">${memberGroups.length?memberGroups.map(gr=>`<div>${gr.name}</div>`).join(''):'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
-      <td style="max-width:180px"><div style="display:flex;flex-wrap:wrap;gap:3px;max-height:52px;overflow:hidden">${roleChips(m.roles||[])}</div></td>
+      <td style="max-width:180px"><div style="display:flex;flex-wrap:wrap;gap:3px;max-height:52px;overflow:hidden">${roleChips(m.roles||[],m.id)}</div></td>
       <td>${saCondicionBadge(m.condicion)}</td>
       <td><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></td>
       <td style="font-size:12px;color:#6B7280">${saFmtDate(m.fechaIngreso)||'—'}</td>
@@ -2867,7 +2923,7 @@ function renderMiembrosStandalone(){
       return '<tr style="'+rs+'">'
         +'<td style="max-width:160px"><span style="color:#1F4E79;font-weight:600">'+fullName(m)+'</span></td>'
         +'<td style="font-size:12px;color:#6B7280">'+(mGroups.length?mGroups.map(gr=>'<div>'+gr.name+'</div>').join(''):'—')+'</td>'
-        +'<td>'+roleChips(m.roles||[])+'</td>'
+        +'<td>'+roleChips(m.roles||[],m.id)+'</td>'
         +'<td>'+saCondicionBadge(m.condicion)+'</td>'
         +'<td><span class="badge '+(m.estado==='Activo'?'b-ok':'b-danger')+'">'+m.estado+'</span></td>'
         +'</tr>';
@@ -2934,6 +2990,30 @@ function saDetailTab(tab,btn){
   });
 }
 
+// Ministerios donde participa un Miembro — se calcula solo desde Servicios/Ministerios,
+// igual que los Grupos: se asigna una sola vez ahí y se ve automáticamente acá.
+function getMinisteriosDeMiembro(memberId){
+  var id=Number(memberId);
+  var resultado=[];
+  (S.ministerios||[]).forEach(function(min){
+    var nivel=null;
+    if((min.liderIds||[]).map(Number).includes(id)) nivel='Líder';
+    else if((min.coordinadorIds||[]).map(Number).includes(id)) nivel='Coordinador';
+    else if((min.colaboradorIds||[]).map(Number).includes(id)) nivel='Colaborador';
+    if(nivel) resultado.push({ministerio:min.nombre,area:min.area||'',nivel:nivel});
+  });
+  return resultado;
+}
+function ministerioNivelBadge(nivel){
+  var map={
+    'Líder':{bg:'#EDE9FE',color:'#5B21B6'},
+    'Coordinador':{bg:'#DBEAFE',color:'#1E40AF'},
+    'Colaborador':{bg:'#D1FAE5',color:'#065F46'},
+  };
+  var s=map[nivel]||{bg:'#F3F4F6',color:'#6B7280'};
+  return '<span style="background:'+s.bg+';color:'+s.color+';font-size:11px;padding:2px 9px;border-radius:99px;font-weight:600">'+nivel+'</span>';
+}
+
 function saShowDetail(id,event){
   if(saDetailMemberId===id){saCloseDetail();return;}
   saDetailMemberId=id;
@@ -2949,7 +3029,7 @@ function saShowDetail(id,event){
     + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Condición</div>${saCondicionBadge(m.condicion)}</div>`
     + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Estado</div><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></div>`
     + saDetailLabel('Fecha de ingreso', saFmtDate(m.fechaIngreso)||'—')
-    + ((m.roles||[]).length?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Función</div>${roleChips(m.roles)}</div>`:'')
+    + ((m.roles||[]).length?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Función</div>${roleChips(m.roles,m.id)}</div>`:'')
     + (m.estado==='Baja'?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#DC2626;margin-bottom:4px">Fecha de baja</div><div style="font-size:13px;font-weight:500;color:#DC2626">${saFmtDate(m.fechaBaja||'')}</div></div>`:'')
     + (m.estadoMotivo?`<div style="grid-column:1/-1">
         <div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Motivo (último cambio de estado — ${saFmtDate(m.estadoMotivoFecha||'')})</div>
@@ -2998,7 +3078,16 @@ function saShowDetail(id,event){
       </div>`:''}
     </div>`;
 
-  document.getElementById('sa-detail-servicio').innerHTML='<div class="empty" style="padding:1.5rem 0">🤝 Servicio — 🚧 Próximamente</div>';
+  const misMinisterios=getMinisteriosDeMiembro(m.id);
+  document.getElementById('sa-detail-servicio').innerHTML=misMinisterios.length
+    ? misMinisterios.map(function(ms){
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F3F4F6">'+
+          '<div><div style="font-size:13px;font-weight:600;color:#374151">'+ms.ministerio+'</div>'+
+          (ms.area?'<div style="font-size:11px;color:#9CA3AF">'+ms.area+'</div>':'')+'</div>'+
+          ministerioNivelBadge(ms.nivel)+
+        '</div>';
+      }).join('')
+    : '<div class="empty" style="padding:1.5rem 0">Sin Servicios/Ministerios asignados</div>';
   document.getElementById('sa-detail-historial').innerHTML='<div class="empty" style="padding:1.5rem 0">📜 Historial — 🚧 Próximamente</div>';
 
   // Reset to first tab
@@ -3031,16 +3120,15 @@ function saBuildRoleSelector(selected){
   saSelectedRoles=[...(selected||[])];
   const wrap=document.getElementById('sa-mf-roles');
   if(!wrap) return;
-  wrap.innerHTML=S.roles.map(r=>`
-    <div class="role-option ${saSelectedRoles.includes(r.id)?'selected':''}" onclick="saToggleRole('${r.id}',this)">
-      <span style="width:10px;height:10px;border-radius:50%;background:${r.color};display:inline-block;flex-shrink:0"></span>${r.name}
-    </div>`).join('');
-}
-
-function saToggleRole(rid,el){
-  const idx=saSelectedRoles.indexOf(rid);
-  if(idx>=0){saSelectedRoles.splice(idx,1);el.classList.remove('selected');}
-  else{saSelectedRoles.push(rid);el.classList.add('selected');}
+  if(!saSelectedRoles.length){
+    wrap.innerHTML='<div style="font-size:12px;color:#9CA3AF;font-style:italic">Sin Funciones asignadas todavía</div>';
+    return;
+  }
+  wrap.innerHTML=S.roles.filter(function(r){return saSelectedRoles.includes(r.id);}).map(function(r){
+    return '<div class="role-option selected" style="cursor:default">'+
+      '<span style="width:10px;height:10px;border-radius:50%;background:'+r.color+';display:inline-block;flex-shrink:0"></span>'+r.name+
+    '</div>';
+  }).join('');
 }
 
 let saSelectedGruposExtra=[];
@@ -3889,6 +3977,10 @@ function ministerioRenderList(){
           var mm=S.members.find(function(x){return Number(x.id)===Number(id);});
           return mm?fullName(mm):null;
         }).filter(Boolean).join(', ')||'—';
+        const coords=(m.coordinadorIds||[]).map(function(id){
+          var mm=S.members.find(function(x){return Number(x.id)===Number(id);});
+          return mm?fullName(mm):null;
+        }).filter(Boolean).join(', ');
         const colabs=(m.colaboradorIds||[]).map(function(id){
           var mm=S.members.find(function(x){return Number(x.id)===Number(id);});
           return mm?fullName(mm):null;
@@ -3896,7 +3988,7 @@ function ministerioRenderList(){
         return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #F3F4F6">'+
           '<div>'+
             (m.area?'<div style="font-size:13px;font-weight:600;color:#374151">'+m.area+'</div>':'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Sin área específica</div>')+
-            '<div style="font-size:12px;color:#6B7280">Líder: '+lideres+(colabs?' · Colaborador: '+colabs:'')+'</div>'+
+            '<div style="font-size:12px;color:#6B7280">Líder: '+lideres+(coords?' · Coordinador: '+coords:'')+(colabs?' · Colaborador: '+colabs:'')+'</div>'+
           '</div>'+
           '<div style="display:flex;gap:6px;flex-shrink:0">'+
             '<button class="btn btn-sm" onclick="ministerioOpenForm('+m.id+')">✏️</button>'+
@@ -3913,15 +4005,18 @@ let ministerioEditingId=null;
 function ministerioOpenForm(id){
   ministerioEditingId=id||null;
   const min=id?S.ministerios.find(function(x){return Number(x.id)===Number(id);}):null;
-  const lider1Id = min&&min.liderIds&&min.liderIds[0] ? min.liderIds[0] : '';
-  const lider2Id = min&&min.liderIds&&min.liderIds[1] ? min.liderIds[1] : '';
-  const colab1Id = min&&min.colaboradorIds&&min.colaboradorIds[0] ? min.colaboradorIds[0] : '';
-  const colab2Id = min&&min.colaboradorIds&&min.colaboradorIds[1] ? min.colaboradorIds[1] : '';
-  const noAsig='<option value="">Sin asignar</option>';
-  const noApl='<option value="">No aplica</option>';
-  const membOpts=S.members.filter(function(m){return m.estado!=='Baja'&&m.condicion!=='Historico';})
-    .sort(function(a,b){return listName(a).localeCompare(listName(b));})
-    .map(function(m){return '<option value="'+m.id+'">'+listName(m)+'</option>';}).join('');
+  const membros=S.members.filter(function(m){return m.estado!=='Baja'&&m.condicion!=='Historico';})
+    .sort(function(a,b){return listName(a).localeCompare(listName(b));});
+
+  function buildChecklist(idPref, selectedIds){
+    return membros.map(function(m){
+      var checked=(selectedIds||[]).map(Number).includes(Number(m.id));
+      return '<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB">'+
+        '<input type="checkbox" class="'+idPref+'-cb" value="'+m.id+'"'+(checked?' checked':'')+' style="width:15px;height:15px;flex-shrink:0;cursor:pointer">'+
+        '<span style="font-size:13px">'+listName(m)+'</span>'+
+      '</label>';
+    }).join('');
+  }
 
   document.getElementById('cfg-ministerio-overlay').innerHTML=
     '<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'+
@@ -3929,28 +4024,31 @@ function ministerioOpenForm(id){
       '<div style="font-size:15px;font-weight:700;color:#1F4E79">'+(id?'Editar':'Nuevo')+' Servicio/Ministerio</div>'+
       '<button class="btn btn-sm" onclick="ministerioCloseForm()">✕</button>'+
     '</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+
       '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre *</label>'+
-        '<input id="min-f-nombre" type="text" maxlength="60" value="'+(min?min.nombre:'')+'" placeholder="Ej: Alabanza" style="width:100%"></div>'+
+        '<input id="min-f-nombre" type="text" maxlength="60" value="'+(min?min.nombre:'')+'" placeholder="Ej: Evangelismo" style="width:100%"></div>'+
       '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Área <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'+
-        '<input id="min-f-area" type="text" maxlength="60" value="'+(min&&min.area?min.area:'')+'" placeholder="Ej: Coro" style="width:100%"></div>'+
+        '<input id="min-f-area" type="text" maxlength="60" value="'+(min&&min.area?min.area:'')+'" placeholder="Ej: Calles" style="width:100%"></div>'+
     '</div>'+
-    '<div style="margin-bottom:12px">'+
-      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Líder</label>'+
-      '<select id="min-f-lider1" onchange="ministerioCheckLider2()" style="width:100%">'+noAsig+membOpts+'</select>'+
+
+    '<div style="margin-bottom:14px">'+
+      '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Líder(es) <span style="font-weight:400;color:#9CA3AF">— pueden ser varios</span></label>'+
+      '<input type="text" placeholder="Buscar..." oninput="ministerioFilterLista(\'min-lider\',this.value)" style="margin-bottom:4px">'+
+      '<div id="min-lider-list" style="max-height:130px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+buildChecklist('min-lider',min?min.liderIds:[])+'</div>'+
     '</div>'+
-    '<div id="min-lider2-row" style="display:none;margin-bottom:12px">'+
-      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Líder adicional <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'+
-      '<select id="min-f-lider2" style="width:100%">'+noApl+membOpts+'</select>'+
+
+    '<div style="margin-bottom:14px">'+
+      '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Coordinador(es) <span style="font-weight:400;color:#9CA3AF">— entre Líder y Colaborador, pueden ser varios</span></label>'+
+      '<input type="text" placeholder="Buscar..." oninput="ministerioFilterLista(\'min-coord\',this.value)" style="margin-bottom:4px">'+
+      '<div id="min-coord-list" style="max-height:130px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+buildChecklist('min-coord',min?min.coordinadorIds:[])+'</div>'+
     '</div>'+
-    '<div style="margin-bottom:12px">'+
-      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Colaborador</label>'+
-      '<select id="min-f-colab1" onchange="ministerioCheckColab2()" style="width:100%">'+noAsig+membOpts+'</select>'+
+
+    '<div style="margin-bottom:16px">'+
+      '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Colaborador(es) <span style="font-weight:400;color:#9CA3AF">— pueden ser varios</span></label>'+
+      '<input type="text" placeholder="Buscar..." oninput="ministerioFilterLista(\'min-colab\',this.value)" style="margin-bottom:4px">'+
+      '<div id="min-colab-list" style="max-height:130px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+buildChecklist('min-colab',min?min.colaboradorIds:[])+'</div>'+
     '</div>'+
-    '<div id="min-colab2-row" style="display:none;margin-bottom:16px">'+
-      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Colaborador adicional <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'+
-      '<select id="min-f-colab2" style="width:100%">'+noApl+membOpts+'</select>'+
-    '</div>'+
+
     '<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px">'+
       '<button class="btn" onclick="ministerioCloseForm()">Cancelar</button>'+
       '<button class="btn btn-primary" onclick="ministerioSaveMinisterio()">Confirmar</button>'+
@@ -3958,23 +4056,13 @@ function ministerioOpenForm(id){
   '</div>';
 
   document.getElementById('cfg-ministerio-overlay').style.display='flex';
-  const l1=document.getElementById('min-f-lider1'); if(l1) l1.value=lider1Id;
-  const l2=document.getElementById('min-f-lider2'); if(l2) l2.value=lider2Id;
-  const c1=document.getElementById('min-f-colab1'); if(c1) c1.value=colab1Id;
-  const c2=document.getElementById('min-f-colab2'); if(c2) c2.value=colab2Id;
-  ministerioCheckLider2();
-  ministerioCheckColab2();
 }
 
-function ministerioCheckLider2(){
-  var l1=document.getElementById('min-f-lider1');
-  var row=document.getElementById('min-lider2-row');
-  if(row) row.style.display=(l1&&l1.value)?'':'none';
-}
-function ministerioCheckColab2(){
-  var c1=document.getElementById('min-f-colab1');
-  var row=document.getElementById('min-colab2-row');
-  if(row) row.style.display=(c1&&c1.value)?'':'none';
+function ministerioFilterLista(prefix,q){
+  q=(q||'').toLowerCase();
+  document.querySelectorAll('#'+prefix+'-list label').forEach(function(lbl){
+    lbl.style.display=lbl.textContent.toLowerCase().includes(q)?'':'none';
+  });
 }
 
 function ministerioCloseForm(){
@@ -3986,17 +4074,14 @@ async function ministerioSaveMinisterio(){
   const nombre=(document.getElementById('min-f-nombre')?.value||'').trim();
   if(!nombre){ alert('Ingresá el Nombre del Servicio/Ministerio'); return; }
   const area=(document.getElementById('min-f-area')?.value||'').trim();
-  var l1=document.getElementById('min-f-lider1')?.value||'';
-  var l2=document.getElementById('min-f-lider2')?.value||'';
-  var c1=document.getElementById('min-f-colab1')?.value||'';
-  var c2=document.getElementById('min-f-colab2')?.value||'';
-  var liderIds=[l1,l2].filter(function(x){return x&&x!=='';}).map(Number);
-  var colaboradorIds=[c1,c2].filter(function(x){return x&&x!=='';}).map(Number);
+  var liderIds=[...document.querySelectorAll('.min-lider-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  var coordinadorIds=[...document.querySelectorAll('.min-coord-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  var colaboradorIds=[...document.querySelectorAll('.min-colab-cb:checked')].map(function(cb){return parseInt(cb.value);});
   if(ministerioEditingId){
     var min=S.ministerios.find(function(x){return Number(x.id)===Number(ministerioEditingId);});
-    if(min){ Object.assign(min,{nombre,area,liderIds,colaboradorIds}); }
+    if(min){ Object.assign(min,{nombre,area,liderIds,coordinadorIds,colaboradorIds}); }
   } else {
-    S.ministerios.push({id:Date.now(),nombre,area,liderIds,colaboradorIds,estado:'Activo'});
+    S.ministerios.push({id:Date.now(),nombre,area,liderIds,coordinadorIds,colaboradorIds,estado:'Activo'});
   }
   await saveK(SK.ministerios,S.ministerios);
   try{
@@ -5149,7 +5234,7 @@ function buildGdVHTML(){
         <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-mf-nombre"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Apellido</label><input type="text" id="gdv-mf-apellido"></div></div>
         <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Género</label><select id="gdv-mf-genero"><option value="H">Hombre</option><option value="M">Mujer</option></select></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label><select id="gdv-mf-grupo"></select></div></div>
         <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label><input type="tel" id="gdv-mf-tel"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Estado</label><select id="gdv-mf-estado"><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option></select></div></div>
-        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función</label><div class="role-selector" id="gdv-mf-roles"></div>
+        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función <span style="font-weight:400;color:#9CA3AF">(solo lectura)</span></label><div class="role-selector" id="gdv-mf-roles"></div><div style="font-size:11px;color:#9CA3AF;margin-top:4px">Se asigna desde Configuración → Usuarios, Grupos, Nuevas Generaciones o Servicios/Ministerios según corresponda.</div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" onclick="gdvCloseMemberForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveMember()">Guardar</button></div>
       </div>
     </div>
@@ -5242,7 +5327,7 @@ function gdvMiembrosHTML(){return `
     <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-mf-nombre"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Apellido</label><input type="text" id="gdv-mf-apellido"></div></div>
     <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Género</label><select id="gdv-mf-genero"><option value="H">Hombre</option><option value="M">Mujer</option></select></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label><select id="gdv-mf-grupo"></select></div></div>
     <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label><input type="tel" id="gdv-mf-tel"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Estado</label><select id="gdv-mf-estado"><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option></select></div></div>
-    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función</label><div class="role-selector" id="gdv-mf-roles"></div>
+    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función <span style="font-weight:400;color:#9CA3AF">(solo lectura)</span></label><div class="role-selector" id="gdv-mf-roles"></div><div style="font-size:11px;color:#9CA3AF;margin-top:4px">Se asigna desde Configuración → Usuarios, Grupos, Nuevas Generaciones o Servicios/Ministerios según corresponda.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" onclick="gdvCloseMemberForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveMember()">Guardar</button></div>
   </div>`;}
 
@@ -6516,7 +6601,7 @@ function gdvRenderMiembros(){
       <td><strong>${fullName(m)}</strong></td>
       <td><span style="background:${m.genero==='H'?'#DBEAFE':'#FCE7F3'};color:${m.genero==='H'?'#1E40AF':'#9D174D'};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${m.genero}</span></td>
       <td style="color:#6B7280;font-size:12px">${memberGroups.length?memberGroups.map(gr=>`<div>${gr.name}</div>`).join(''):'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
-      <td>${roleChips(m.roles||[])}</td>
+      <td>${roleChips(m.roles||[],m.id)}</td>
       <td><span class="badge ${m.estado==='Activo'?'b-ok':'b-muted'}">${m.estado}</span></td>
       <td style="white-space:nowrap"><button class="btn btn-sm" onclick="gdvEditMember(${m.id})" style="margin-right:4px">✏️</button><button class="btn btn-sm btn-danger" onclick="gdvDeleteMember(${m.id})">🗑</button></td>
     </tr>`;
@@ -6525,15 +6610,17 @@ function gdvRenderMiembros(){
 
 function gdvBuildRoleSelector(selected){
   gdvSelectedRoles=[...(selected||[])];
-  document.getElementById('gdv-mf-roles').innerHTML=S.roles.map(r=>`
-    <div class="role-option ${gdvSelectedRoles.includes(r.id)?'selected':''}" onclick="gdvToggleRole('${r.id}',this)">
-      <span style="width:10px;height:10px;border-radius:50%;background:${r.color};display:inline-block;flex-shrink:0"></span>${r.name}
-    </div>`).join('');
-}
-function gdvToggleRole(rid,el){
-  const idx=gdvSelectedRoles.indexOf(rid);
-  if(idx>=0){gdvSelectedRoles.splice(idx,1);el.classList.remove('selected');}
-  else{gdvSelectedRoles.push(rid);el.classList.add('selected');}
+  const wrap=document.getElementById('gdv-mf-roles');
+  if(!wrap) return;
+  if(!gdvSelectedRoles.length){
+    wrap.innerHTML='<div style="font-size:12px;color:#9CA3AF;font-style:italic">Sin Funciones asignadas todavía</div>';
+    return;
+  }
+  wrap.innerHTML=S.roles.filter(function(r){return gdvSelectedRoles.includes(r.id);}).map(function(r){
+    return '<div class="role-option selected" style="cursor:default">'+
+      '<span style="width:10px;height:10px;border-radius:50%;background:'+r.color+';display:inline-block;flex-shrink:0"></span>'+r.name+
+    '</div>';
+  }).join('');
 }
 function gdvOpenNewMember(){
   gdvEditingMemberId=null;
@@ -8958,7 +9045,7 @@ function nvOpenSeguimientoSelector(){
   // Rol 'contactar': solo puede autoasignarse
   let activos;
   if(isContactar()){
-    const self=S.members.find(m=>fullName(m).toLowerCase()===currentUser.name.toLowerCase());
+    const self=getLinkedMember();
     activos=self?[self]:[];
   } else {
     // Solo Miembros plenos de Rebaños pueden quedar como responsables de seguimiento
@@ -9053,7 +9140,7 @@ function cfgRenderPermisosTabla(){
   var rolesToShow=S.roles.filter(function(r){return r.id!=='super_admin';});
 
   // Step 1: Role selector chips
-  var html='<div style="margin-bottom:1.25rem">';
+  var html='<div style="margin-bottom:1.25rem;background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.08)">';
   html+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">1. Seleccioná una función para configurar sus permisos:</div>';
   html+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
   rolesToShow.forEach(function(r){
@@ -9068,7 +9155,7 @@ function cfgRenderPermisosTabla(){
   // Step 2+3+4: Show modules and screens for selected role
   if(cfgPermRolSeleccionado){
     var role=S.roles.find(function(r){return r.id===cfgPermRolSeleccionado;});
-    html+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">'
+    html+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px;background:#fff;border-radius:10px;padding:10px 14px;box-shadow:0 2px 10px rgba(0,0,0,0.08)">'
       +'2. Configurá los permisos para <span style="color:'+role.color+'">'+role.name+'</span>:</div>';
 
     var modsActivos=getModulesConfig();
@@ -9089,7 +9176,7 @@ function cfgRenderPermisosTabla(){
     }
 
     modulosVisibles.forEach(function(mod){
-      html+='<div style="border:1px solid #E5E7EB;border-radius:12px;margin-bottom:10px;overflow:hidden">';
+      html+='<div style="border:1px solid #E5E7EB;border-radius:12px;margin-bottom:10px;overflow:hidden;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,0.08)">';
       // Module header
       html+='<div style="background:#F9FAFB;padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #E5E7EB">';
       html+='<span style="font-size:1.2rem">'+mod.icon+'</span>';
@@ -9099,7 +9186,7 @@ function cfgRenderPermisosTabla(){
       mod.screens.forEach(function(screen,si){
         var cur=(PERMISOS[cfgPermRolSeleccionado]||{})[screen.key]||'ninguno';
         var isLast=si===mod.screens.length-1;
-        html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;'+(isLast?'':'border-bottom:1px solid #F3F4F6')+';flex-wrap:wrap;gap:8px">';
+        html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fff;'+(isLast?'':'border-bottom:1px solid #F3F4F6')+';flex-wrap:wrap;gap:8px">';
         html+='<span style="font-size:13px;color:#374151">'+screen.label+'</span>';
         html+='<div style="display:flex;gap:6px">';
         [{val:'ninguno',label:'— Sin acceso',bg:'#F3F4F6',active:'#6B7280'},
@@ -9746,23 +9833,40 @@ function buildDiscipuladoHTML(){
   return `<div class="gdv-app">
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
       <button id="disc-tab-dashboard" class="btn btn-primary btn-sm" onclick="discTab('dashboard',this)">📊 Dashboard</button>
-      ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-pasos" class="btn btn-sm" onclick="discTab('pasos',this)">📋 Pasos</button>`:''}
+      ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-cursos" class="btn btn-sm" onclick="discTab('cursos',this)">🎓 Cursos</button>`:''}
+      ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-pasos" class="btn btn-sm" onclick="discTab('cursada',this)">📋 Cursada</button>`:''}
       <button id="disc-tab-cargar" class="btn btn-sm" onclick="discTab('cargar',this)">✏️ Cargar</button>
       <button id="disc-tab-registros" class="btn btn-sm" onclick="discTab('registros',this)">📄 Registros</button><button id="disc-tab-historico" class="btn btn-sm" onclick="discTab('historico',this)">📁 Histórico</button>
     </div>
     <div id="disc-content"></div>
 
-    <!-- MODAL: Editar Paso -->
+    <!-- MODAL: Editar Curso (Nombre / Nivel / Capítulos — Solo Super Admin) -->
     <div id="disc-paso-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:1rem">
       <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-          <div style="font-size:15px;font-weight:700;color:#1F4E79" id="disc-modal-title">Editar Paso</div>
+          <div style="font-size:15px;font-weight:700;color:#1F4E79" id="disc-modal-title">Editar Curso</div>
           <button class="btn btn-sm" onclick="discCloseModal()">✕</button>
         </div>
         <div id="disc-modal-body"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
           <button class="btn" onclick="discCloseModal()">Cancelar</button>
-          <button class="btn btn-primary" onclick="discSavePaso()">Guardar</button>
+          <button class="btn btn-primary" onclick="discGuardarCurso()">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: Asignar Cursada (Discipulador + Integrantes — Admin Discipulado y Super Admin) -->
+    <div id="disc-asig-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:15px;font-weight:700;color:#1F4E79" id="disc-asig-title">Asignar — Cursada</div>
+          <button class="btn btn-sm" onclick="discCloseAsignacion()">✕</button>
+        </div>
+        <div id="disc-asig-curso-info" style="background:#F9FAFB;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:12px;color:#6B7280"></div>
+        <div id="disc-asig-body"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
+          <button class="btn" onclick="discCloseAsignacion()">Cancelar</button>
+          <button class="btn btn-primary" onclick="discGuardarAsignacion()">Guardar</button>
         </div>
       </div>
     </div>
@@ -9770,6 +9874,7 @@ function buildDiscipuladoHTML(){
 }
 
 let discEditingPasoId=null;
+let discAsignandoPasoId=null;
 
 function discTab(tab, btn){
   document.querySelectorAll('[id^="disc-tab-"]').forEach(function(b){b.className='btn btn-sm';});
@@ -9777,7 +9882,8 @@ function discTab(tab, btn){
   var c=document.getElementById('disc-content');
   if(!c) return;
   if(tab==='dashboard') discRenderDashboard(c);
-  else if(tab==='pasos') discRenderPasos(c);
+  else if(tab==='cursos') discRenderCursos(c);
+  else if(tab==='cursada'||tab==='pasos') discRenderCursada(c);
   else if(tab==='cargar') discRenderCargar(c);
   else if(tab==='registros') discRenderRegistros(c);else if(tab==='historico') discRenderHistorico(c);
 }
@@ -9790,10 +9896,9 @@ function discRenderDashboard(c){
     pasosToShow=S.discPasos;
   } else {
     // Discipulador solo ve su paso
+    var linkedDisc=getLinkedMember();
     pasosToShow=S.discPasos.filter(function(p){
-      return p.discipuladorId&&S.members.find(function(m){
-        return m.id===p.discipuladorId&&fullName(m).toLowerCase()===currentUser.name.toLowerCase();
-      });
+      return linkedDisc&&Number(p.discipuladorId)===Number(linkedDisc.id);
     });
   }
 
@@ -9942,28 +10047,100 @@ async function discToggleCompletado(pasoId, memberId){
 
 function fgPopup(e,fecha,fuente){e.stopPropagation();document.querySelectorAll('.fg-popup').forEach(function(x){x.remove();});var div=document.createElement('div');div.className='fg-popup';div.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px 18px;box-shadow:0 4px 20px rgba(0,0,0,0.18);font-size:13px;min-width:160px';div.innerHTML='<div style="font-weight:700;color:#1F4E79;margin-bottom:8px">✅ Completado</div><div style="color:#6B7280;font-size:11px;margin-bottom:4px">Fecha</div><div style="font-weight:600;margin-bottom:10px">'+fecha+'</div><div style="color:#6B7280;font-size:11px;margin-bottom:4px">Origen</div><div style="font-weight:600">'+fuente+'</div>';var r=e.target.getBoundingClientRect();div.style.top=(r.bottom+6)+'px';div.style.left=Math.max(8,r.left-40)+'px';document.body.appendChild(div);setTimeout(function(){document.addEventListener('click',function h(){div.remove();document.removeEventListener('click',h);});},50);}
 function discGenLabel(pasoId,anio){var ant=(S.discCursadas||[]).filter(function(c){return c.pasoId===pasoId&&c.anio===anio;}).length;var p=S.discPasos.find(function(x){return x.id===pasoId;});return (p?p.nombre:'Paso')+' — '+(ant+1)+'/'+anio;}
-async function discAbrirCursada(pasoId){var paso=S.discPasos.find(function(p){return p.id===pasoId;});if(!paso)return;var activa=(S.discCursadas||[]).find(function(c){return c.pasoId===pasoId&&c.estado==='Activo';});if(activa){showToast('Ya hay una cursada activa para '+paso.nombre,'#D97706');return;}var anio=new Date().getFullYear();if(!S.discCursadas)S.discCursadas=[];var recsPrev=S.discRecords.filter(function(r){return r.pasoId===pasoId&&!r.cursadaId&&r.asistencia;});var memPrev=[...new Set(recsPrev.flatMap(function(r){return Object.keys(r.asistencia).filter(function(id){return r.asistencia[id]&&r.asistencia[id].state==='presente';})}))].map(Number).filter(Boolean);var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorId:paso.discipuladorId||null,miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:''};S.discCursadas.push(nc);S.discRecords.forEach(function(r){if(r.pasoId===pasoId&&!r.cursadaId)r.cursadaId=nc.id;});await saveK('gdv_disc_cursadas',S.discCursadas);await saveK('gdv_disc_records',S.discRecords);try{if(typeof window.fbUpload==='function')await window.fbUpload(true);}catch(e){}showToast('✅ Cursada '+nc.label+' iniciada'+(memPrev.length?' con '+memPrev.length+' integrantes':''),'#16A34A');var c=document.getElementById('disc-content');if(c)discRenderPasos(c);}
-async function discCerrarCursada(cursadaId){var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});if(!cursada)return;if(!confirm('¿Cerrar la cursada "'+cursada.label+'"?\nLos miembros con ≥75% serán marcados Completado.'))return;var recs=S.discRecords.filter(function(r){return (r.cursadaId===cursadaId||(r.pasoId===cursada.pasoId&&!r.cursadaId))&&r.asistencia;});var total=recs.length;var completados=0;cursada.miembros.forEach(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;if(!m.formacion)m.formacion=[];m.formacion=m.formacion.filter(function(f){return !(String(f.pasoId)===String(cursada.pasoId)&&f.fuente==='auto');});if(pct>=75){m.formacion.push({pasoId:cursada.pasoId,cursadaId:cursadaId,cursadaLabel:cursada.label,pasoNombre:cursada.pasoNombre,fechaCompletado:todayAA(),fuente:'cursado'});completados++;}});cursada.estado='Completado';cursada.fechaCierre=todayAA();if(!cursada.num){var _a=new Date().getFullYear();var _ant=(S.discCursadas||[]).filter(function(c){return c.pasoId===cursada.pasoId&&c.anio===_a&&c.id!==cursada.id;}).length;cursada.num=_ant+1;cursada.anio=_a;cursada.label=cursada.pasoNombre+' — '+cursada.num+'/'+_a;}await saveK('gdv_disc_cursadas',S.discCursadas);await saveK('gdv_m5',S.members);try{if(typeof window.fbUpload==='function')await window.fbUpload(true);}catch(e){}showToast('✅ Cursada cerrada — '+completados+' completados','#16A34A');var c=document.getElementById('disc-content');if(c)discRenderPasos(c);}
-function discRenderHistorico(c){var fP=document.getElementById('hist-fil-paso')?document.getElementById('hist-fil-paso').value:'';var fA=document.getElementById('hist-fil-anio')?document.getElementById('hist-fil-anio').value:'';var fI=document.getElementById('hist-fil-id')?document.getElementById('hist-fil-id').value.trim().toLowerCase():'';var done=(S.discCursadas||[]).filter(function(cu){if(cu.estado!=='Completado')return false;if(fP&&String(cu.pasoId)!==fP)return false;if(fA&&String(cu.anio)!==fA)return false;if(fI&&!(cu.label||'').toLowerCase().includes(fI))return false;return true;}).sort(function(a,b){return b.id-a.id;});var pOpts=S.discPasos.map(function(p){return '<option value="'+p.id+'"'+(fP===String(p.id)?' selected':'')+'>'+p.nombre+'</option>';}).join('');var anios=[...new Set((S.discCursadas||[]).filter(function(c){return c.estado==='Completado';}).map(function(c){return c.anio;}))].sort(function(a,b){return b-a;});var aOpts=anios.map(function(a){return '<option value="'+a+'"'+(fA===String(a)?' selected':'')+'>'+a+'</option>';}).join('');c.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center"><select id="hist-fil-paso" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los pasos</option>'+pOpts+'</select><select id="hist-fil-anio" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los años</option>'+aOpts+'</select><input id="hist-fil-id" oninput="discRenderHistorico(document.getElementById(\'disc-content\'))" placeholder="Buscar ID (ej: 1/2026)" value="'+fI+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;width:160px"><span style="font-size:12px;color:#6B7280">'+done.length+' resultado'+(done.length!==1?'s':'')+'</span></div><div id="hist-results"></div>';if(!done.length){document.getElementById('hist-results').innerHTML='<div class="empty" style="padding:2rem">No hay cursadas que coincidan.</div>';return;}var html='';done.forEach(function(cursada){var disc=cursada.discipuladorId?S.members.find(function(m){return m.id===cursada.discipuladorId;}):null;var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&r.asistencia;});var total=recs.length;var stats=cursada.miembros.map(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return null;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;return {m:m,asist:asist,pct:pct,ok:pct>=75};}).filter(Boolean);var nOk=stats.filter(function(x){return x.ok;}).length;html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #9CA3AF"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+cursada.label+'</div><div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+(disc?fullName(disc):'Sin asignar')+'</strong> · Inicio: '+(cursada.fechaInicio||'—')+' · Cierre: '+(cursada.fechaCierre||'—')+'</div></div><span class="badge b-muted">Completada</span></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+cursada.miembros.length+'</span><span class="stat-lbl">Alumnos</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+total+'</span><span class="stat-lbl">Encuentros</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem;color:#16A34A">'+nOk+'/'+cursada.miembros.length+'</span><span class="stat-lbl">Completados</span></div></div>';stats.forEach(function(s){var bc=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;flex:1">'+fullName(s.m)+'</span><div style="flex:2;min-width:120px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#6B7280">'+s.asist+'/'+total+' enc.</span><strong style="color:'+bc+'">'+s.pct+'%</strong></div><div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+bc+';width:'+s.pct+'%"></div></div></div><span style="font-size:11px;padding:3px 10px;border-radius:6px;'+(s.ok?'background:#D1FAE5;color:#065F46':'background:#FEE2E2;color:#991B1B')+'">'+( s.ok?'✅ Completado':'❌ No completó')+'</span></div>';});if(recs.length){html+='<details style="margin-top:1rem"><summary style="font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;padding:6px 0">Ver encuentros ('+recs.length+')</summary><div style="margin-top:8px">';recs.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(r){var pres=Object.values(r.asistencia||{}).filter(function(a){return a&&a.state==='presente';}).length;var editBtn=hasRole('super_admin')?'<button class="btn btn-sm" onclick="discEditRecord('+r.id+')" style="font-size:10px;padding:2px 8px">✏️</button>':'';html+='<div style="padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:12px;display:flex;justify-content:space-between;align-items:center"><span>'+(fmtAA(r.fecha)||r.fecha)+' — '+r.capitulo+'</span><div style="display:flex;align-items:center;gap:8px"><span style="color:#6B7280">'+pres+' presentes</span>'+editBtn+'</div></div>';});html+='</div></details>';}html+='</div>';});document.getElementById('hist-results').innerHTML=html;}
-function discRenderPasos(c){
+async function discAbrirCursada(pasoId){var paso=S.discPasos.find(function(p){return p.id===pasoId;});if(!paso)return;var activa=(S.discCursadas||[]).find(function(c){return c.pasoId===pasoId&&c.estado==='Activo';});if(activa){showToast('Ya hay una cursada activa para '+paso.nombre,'#D97706');return;}var anio=new Date().getFullYear();if(!S.discCursadas)S.discCursadas=[];var recsPrev=S.discRecords.filter(function(r){return r.pasoId===pasoId&&!r.cursadaId&&r.asistencia;});var memPrev=[...new Set(recsPrev.flatMap(function(r){return Object.keys(r.asistencia).filter(function(id){return r.asistencia[id]&&r.asistencia[id].state==='presente';})}))].map(Number).filter(Boolean);var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorId:paso.discipuladorId||null,miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:''};S.discCursadas.push(nc);S.discRecords.forEach(function(r){if(r.pasoId===pasoId&&!r.cursadaId)r.cursadaId=nc.id;});await saveK('gdv_disc_cursadas',S.discCursadas);await saveK('gdv_disc_records',S.discRecords);try{if(typeof window.fbUpload==='function')await window.fbUpload(true);}catch(e){}showToast('✅ Cursada '+nc.label+' iniciada'+(memPrev.length?' con '+memPrev.length+' integrantes':''),'#16A34A');var c=document.getElementById('disc-content');if(c)discRenderCursada(c);}
+async function discCerrarCursada(cursadaId){var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});if(!cursada)return;if(!confirm('¿Cerrar la cursada "'+cursada.label+'"?\nLos miembros con ≥75% serán marcados Completado.'))return;var recs=S.discRecords.filter(function(r){return (r.cursadaId===cursadaId||(r.pasoId===cursada.pasoId&&!r.cursadaId))&&r.asistencia;});var total=recs.length;var completados=0;cursada.miembros.forEach(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;if(!m.formacion)m.formacion=[];m.formacion=m.formacion.filter(function(f){return !(String(f.pasoId)===String(cursada.pasoId)&&f.fuente==='cursado'&&f.cursadaId===cursadaId);});if(pct>=75){m.formacion.push({pasoId:cursada.pasoId,cursadaId:cursadaId,cursadaLabel:cursada.label,pasoNombre:cursada.pasoNombre,fechaCompletado:todayAA(),fuente:'cursado'});completados++;}});cursada.estado='Completado';cursada.fechaCierre=todayAA();if(!cursada.num){var _a=new Date().getFullYear();var _ant=(S.discCursadas||[]).filter(function(c){return c.pasoId===cursada.pasoId&&c.anio===_a&&c.id!==cursada.id;}).length;cursada.num=_ant+1;cursada.anio=_a;cursada.label=cursada.pasoNombre+' — '+cursada.num+'/'+_a;}await saveK('gdv_disc_cursadas',S.discCursadas);await saveK('gdv_m5',S.members);try{if(typeof window.fbUpload==='function')await window.fbUpload(true);}catch(e){}showToast('✅ Cursada cerrada — '+completados+' completados','#16A34A');var c=document.getElementById('disc-content');if(c)discRenderCursada(c);}
+
+// Super Admin: deshacer el Cierre de una Cursada — vuelve a Activo y saca las Formaciones auto-marcadas por ese cierre
+async function discRevertirCierre(cursadaId){
+  if(!hasRole('super_admin')) return;
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
+  if(!cursada) return;
+  if(cursada.estado!=='Completado'){ showToast('Esta cursada no está cerrada','#D97706'); return; }
+  if(!confirm('¿Revertir el cierre de "'+cursada.label+'"?\nVuelve a quedar Activa y se sacan las Formaciones que se marcaron automáticamente al cerrarla.')) return;
+  S.members.forEach(function(m){
+    if(!m.formacion) return;
+    m.formacion=m.formacion.filter(function(f){return !(f.cursadaId===cursadaId&&f.fuente==='cursado');});
+  });
+  cursada.estado='Activo';
+  cursada.fechaCierre='';
+  await saveK('gdv_disc_cursadas',S.discCursadas);
+  await saveK(SK.members,S.members);
+  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){}
+  showToast('↩️ Cierre revertido — la cursada volvió a Activo','#D97706');
+  var c=document.getElementById('disc-content');
+  if(c){ if(document.getElementById('disc-tab-historico')&&document.getElementById('disc-tab-historico').className.includes('btn-primary')) discRenderHistorico(c); else discRenderCursada(c); }
+}
+
+// Super Admin: deshacer el Inicio de una Cursada (por error) — la elimina y desvincula los encuentros ya cargados
+async function discRevertirInicio(cursadaId){
+  if(!hasRole('super_admin')) return;
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
+  if(!cursada) return;
+  if(cursada.estado!=='Activo'){ showToast('Esta cursada ya no está en curso','#D97706'); return; }
+  if(!confirm('¿Revertir el inicio de "'+cursada.label+'"?\nSe elimina esta cursada. Los encuentros ya cargados quedan sin cursada asociada y se podrán re-agrupar al iniciar una nueva.')) return;
+  S.discRecords.forEach(function(r){ if(r.cursadaId===cursadaId) r.cursadaId=null; });
+  S.discCursadas=(S.discCursadas||[]).filter(function(c){return c.id!==cursadaId;});
+  await saveK('gdv_disc_cursadas',S.discCursadas);
+  await saveK('gdv_disc_records',S.discRecords);
+  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){}
+  showToast('↩️ Inicio revertido','#D97706');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+}
+
+function discRenderHistorico(c){var fP=document.getElementById('hist-fil-paso')?document.getElementById('hist-fil-paso').value:'';var fA=document.getElementById('hist-fil-anio')?document.getElementById('hist-fil-anio').value:'';var fI=document.getElementById('hist-fil-id')?document.getElementById('hist-fil-id').value.trim().toLowerCase():'';var done=(S.discCursadas||[]).filter(function(cu){if(cu.estado!=='Completado')return false;if(fP&&String(cu.pasoId)!==fP)return false;if(fA&&String(cu.anio)!==fA)return false;if(fI&&!(cu.label||'').toLowerCase().includes(fI))return false;return true;}).sort(function(a,b){return b.id-a.id;});var pOpts=S.discPasos.map(function(p){return '<option value="'+p.id+'"'+(fP===String(p.id)?' selected':'')+'>'+p.nombre+'</option>';}).join('');var anios=[...new Set((S.discCursadas||[]).filter(function(c){return c.estado==='Completado';}).map(function(c){return c.anio;}))].sort(function(a,b){return b-a;});var aOpts=anios.map(function(a){return '<option value="'+a+'"'+(fA===String(a)?' selected':'')+'>'+a+'</option>';}).join('');c.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center"><select id="hist-fil-paso" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los pasos</option>'+pOpts+'</select><select id="hist-fil-anio" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los años</option>'+aOpts+'</select><input id="hist-fil-id" oninput="discRenderHistorico(document.getElementById(\'disc-content\'))" placeholder="Buscar ID (ej: 1/2026)" value="'+fI+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;width:160px"><span style="font-size:12px;color:#6B7280">'+done.length+' resultado'+(done.length!==1?'s':'')+'</span></div><div id="hist-results"></div>';if(!done.length){document.getElementById('hist-results').innerHTML='<div class="empty" style="padding:2rem">No hay cursadas que coincidan.</div>';return;}var html='';done.forEach(function(cursada){var disc=cursada.discipuladorId?S.members.find(function(m){return m.id===cursada.discipuladorId;}):null;var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&r.asistencia;});var total=recs.length;var stats=cursada.miembros.map(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return null;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;return {m:m,asist:asist,pct:pct,ok:pct>=75};}).filter(Boolean);var nOk=stats.filter(function(x){return x.ok;}).length;html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #9CA3AF"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+cursada.label+'</div><div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+(disc?fullName(disc):'Sin asignar')+'</strong> · Inicio: '+(cursada.fechaInicio||'—')+' · Cierre: '+(cursada.fechaCierre||'—')+'</div></div><span class="badge b-muted">Completada</span>'+(hasRole('super_admin')?'<button class="btn btn-sm" onclick="discRevertirCierre('+cursada.id+')" style="color:#D97706;margin-left:6px" title="Vuelve la cursada a Activo">↩️ Revertir</button>':'')+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+cursada.miembros.length+'</span><span class="stat-lbl">Alumnos</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+total+'</span><span class="stat-lbl">Encuentros</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem;color:#16A34A">'+nOk+'/'+cursada.miembros.length+'</span><span class="stat-lbl">Completados</span></div></div>';stats.forEach(function(s){var bc=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;flex:1">'+fullName(s.m)+'</span><div style="flex:2;min-width:120px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#6B7280">'+s.asist+'/'+total+' enc.</span><strong style="color:'+bc+'">'+s.pct+'%</strong></div><div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+bc+';width:'+s.pct+'%"></div></div></div><span style="font-size:11px;padding:3px 10px;border-radius:6px;'+(s.ok?'background:#D1FAE5;color:#065F46':'background:#FEE2E2;color:#991B1B')+'">'+( s.ok?'✅ Completado':'❌ No completó')+'</span></div>';});if(recs.length){html+='<details style="margin-top:1rem"><summary style="font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;padding:6px 0">Ver encuentros ('+recs.length+')</summary><div style="margin-top:8px">';recs.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(r){var pres=Object.values(r.asistencia||{}).filter(function(a){return a&&a.state==='presente';}).length;var editBtn=hasRole('super_admin')?'<button class="btn btn-sm" onclick="discEditRecord('+r.id+')" style="font-size:10px;padding:2px 8px">✏️</button>':'';html+='<div style="padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:12px;display:flex;justify-content:space-between;align-items:center"><span>'+(fmtAA(r.fecha)||r.fecha)+' — '+r.capitulo+'</span><div style="display:flex;align-items:center;gap:8px"><span style="color:#6B7280">'+pres+' presentes</span>'+editBtn+'</div></div>';});html+='</div></details>';}html+='</div>';});document.getElementById('hist-results').innerHTML=html;}
+function discRenderCursos(c){
+  var esSuper=hasRole('super_admin');
+  var html='<div style="font-size:12px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#F9FAFB;border-radius:8px">'
+    +'🎓 Acá se define el contenido de cada Curso: Nombre, Nivel y Capítulos. La asignación de Discipulador e Integrantes, e Iniciar/Cerrar, se hace desde la pestaña <strong>📋 Cursada</strong>.'
+    +'</div>';
+  if(esSuper){
+    html+='<div style="display:flex;justify-content:flex-end;margin-bottom:1rem"><button class="btn btn-primary btn-sm" onclick="discOpenModal(null)">+ Nuevo Curso</button></div>';
+  }
+  var nivelMap={Inicial:{icon:'🔵',color:'#0369A1'},Intermedio:{icon:'🟣',color:'#7C3AED'},Avanzado:{icon:'🩷',color:'#BE185D'}};
+  S.discPasos.forEach(function(paso){
+    var nv=nivelMap[paso.nivel]||{icon:'⚪',color:'#6B7280'};
+    html+='<div class="card" style="margin-bottom:1rem">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
+      +'<div>'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>'
+      +'<div style="font-size:12px;color:'+nv.color+';margin-top:4px;font-weight:600">'+nv.icon+' '+paso.nivel+'</div>'
+      +'</div>'
+      +(esSuper?'<button class="btn btn-sm" onclick="discOpenModal('+paso.id+')">✏️ Editar</button>':'')
+      +'</div>'
+      +'<div style="margin-top:10px;font-size:12px;color:#6B7280">'+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'')+'</div>'
+      +(paso.capitulos.length?'<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px">'+paso.capitulos.map(function(cap,i){return '<div style="font-size:12px;color:#374151">Semana '+(i+1)+' — '+cap+'</div>';}).join('')+'</div>':'')
+      +'</div>';
+  });
+  if(!S.discPasos.length) html+='<div class="empty" style="padding:2rem">Sin Cursos cargados todavía</div>';
+  c.innerHTML=html;
+}
+
+function discRenderCursada(c){
+  var esSuper=hasRole('super_admin');
   var html='';
   S.discPasos.forEach(function(paso){
     var disc=paso.discipuladorId?S.members.find(function(m){return m.id===paso.discipuladorId;}):null;
     var isActivo=paso.estado==='Activo';
+    var cursadaActiva=(S.discCursadas||[]).find(function(cu){return cu.pasoId===paso.id&&cu.estado==='Activo';});
     html+='<div class="card" style="margin-bottom:1rem;border-left:4px solid '+(isActivo?'#16A34A':'#9CA3AF')+'">';
     html+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
     html+='<div>';
     html+='<div style="font-size:15px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>';
+    html+='<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+paso.nivel+' · '+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'')+'</div>';
     html+='<div style="font-size:12px;color:#6B7280;margin-top:4px">';
     html+='Discipulador: <strong>'+(disc?fullName(disc):'Sin asignar')+'</strong>';
     html+=' · '+paso.miembros.length+' miembro'+(paso.miembros.length!==1?'s':'');
-    html+=' · '+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'');
     html+='</div></div>';
-    html+='<div style="display:flex;gap:8px;align-items:center">';
-    html+='<span class="badge '+(isActivo?'b-ok':'b-muted')+'">'+(isActivo?'Activo':'Inactivo')+'</span>';
-    if(canAdminDisc()){var _ca=(S.discCursadas||[]).find(function(cu){return cu.pasoId===paso.id&&cu.estado==='Activo';});
-      html+='<button class="btn btn-sm btn-primary" onclick="discOpenModal('+paso.id+')">✏️ Editar</button>';
-      if(!_ca){html+='<button class="btn btn-sm" onclick="discAbrirCursada('+paso.id+')" style="background:#7C3AED;color:#fff;border:none">▶ Iniciar Cursada</button>';}else{html+='<button class="btn btn-sm" onclick="discCerrarCursada('+_ca.id+')" style="color:#DC2626">⏹ Cerrar Cursada</button>';}
+    html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+    html+='<span class="badge '+(cursadaActiva?'b-ok':'b-muted')+'">'+(cursadaActiva?'Cursada Activa':'Sin cursada activa')+'</span>';
+    if(canAdminDisc()){
+      html+='<button class="btn btn-sm btn-primary" onclick="discOpenAsignacion('+paso.id+')">👤 Asignar</button>';
+      if(!cursadaActiva){html+='<button class="btn btn-sm" onclick="discAbrirCursada('+paso.id+')" style="background:#7C3AED;color:#fff;border:none">▶ Iniciar Cursada</button>';}
+      else{
+        html+='<button class="btn btn-sm" onclick="discCerrarCursada('+cursadaActiva.id+')" style="color:#DC2626">⏹ Cerrar Cursada</button>';
+        if(esSuper) html+='<button class="btn btn-sm" onclick="discRevertirInicio('+cursadaActiva.id+')" style="color:#D97706" title="Deshace el inicio de esta cursada">↩️ Revertir inicio</button>';
+      }
     }
     html+='</div></div>';
     // Members list
@@ -9979,21 +10156,23 @@ function discRenderPasos(c){
     }
     html+='</div>';
   });
+  if(!S.discPasos.length) html='<div class="empty" style="padding:2rem">Sin Cursos cargados — creá uno primero desde 🎓 Cursos</div>';
   c.innerHTML=html;
 }
 
-function discOpenModal(pasoId){
-  discEditingPasoId=pasoId;
+function discOpenAsignacion(pasoId){
+  discAsignandoPasoId=pasoId;
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   if(!paso) return;
-  document.getElementById('disc-modal-title').textContent='Editar — '+paso.nombre;
+  document.getElementById('disc-asig-title').textContent='Asignar — '+paso.nombre;
+  document.getElementById('disc-asig-curso-info').innerHTML=
+    '<strong>'+paso.nombre+'</strong> · '+paso.nivel+' · '+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'')
+    +'<div style="margin-top:2px;color:#9CA3AF">El Nombre, Nivel y Capítulos se editan desde 🎓 Cursos</div>';
 
-  // Discipulador selector
   var discOptions=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
     return '<option value="'+m.id+'"'+(paso.discipuladorId===m.id?' selected':'')+'>'+fullName(m)+'</option>';
   }).join('');
 
-  // Members checkboxes
   var memberChecks=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
     var checked=paso.miembros.includes(m.id);
     var g=S.groups.find(function(x){return x.id===m.grupoId;});
@@ -10007,6 +10186,46 @@ function discOpenModal(pasoId){
       +'</label>';
   }).join('');
 
+  document.getElementById('disc-asig-body').innerHTML=
+    '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Discipulador</label>'
+    +'<select id="disc-asig-disc" style="width:100%"><option value="">Sin asignar</option>'+discOptions+'</select>'
+    +'<div style="margin-top:1rem"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Integrantes</label>'
+    +'<input type="text" placeholder="Buscar..." oninput="discFilterMembers(this.value)" style="width:100%;margin-bottom:8px">'
+    +'<div id="disc-mem-list" style="max-height:220px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+memberChecks+'</div></div>';
+
+  document.getElementById('disc-asig-modal').style.display='flex';
+}
+
+function discCloseAsignacion(){
+  document.getElementById('disc-asig-modal').style.display='none';
+  discAsignandoPasoId=null;
+}
+
+async function discGuardarAsignacion(){
+  var paso=S.discPasos.find(function(p){return p.id===discAsignandoPasoId;});
+  if(!paso) return;
+  paso.discipuladorId=parseInt(document.getElementById('disc-asig-disc').value)||null;
+  paso.miembros=[...document.querySelectorAll('.disc-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  await saveK(SK.discPasos,S.discPasos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+  }
+  discCloseAsignacion();
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+  showToast('✅ Asignación guardada','#16A34A');
+}
+
+function discOpenModal(pasoId){
+  if(!hasRole('super_admin')){ alert('Solo Super Admin puede crear o editar Cursos.'); return; }
+  discEditingPasoId=pasoId;
+  var esNuevo=!pasoId;
+  var paso=esNuevo?{nombre:'',nivel:'Inicial',capitulos:[]}:S.discPasos.find(function(p){return p.id===pasoId;});
+  if(!paso) return;
+  document.getElementById('disc-modal-title').textContent=esNuevo?'Nuevo Curso':'Editar — '+paso.nombre;
+
   // Chapters
   var chapHtml=paso.capitulos.map(function(cap,i){
     return '<div style="display:flex;gap:6px;margin-bottom:6px">'
@@ -10015,33 +10234,20 @@ function discOpenModal(pasoId){
       +'</div>';
   }).join('');
 
-  // Super Admin can edit name, nivel and chapters
-  // Admin Disc can only edit discipulador and members
-  var superFields='';
-  if(hasRole('super_admin')){
-    superFields=
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem">'
-      +'<div><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Nombre del Paso</label>'
-      +'<input type="text" id="disc-modal-nombre" value="'+paso.nombre+'" style="width:100%"></div>'
-      +'<div><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Nivel</label>'
-      +'<select id="disc-modal-nivel" style="width:100%">'
-      +'<option value="Inicial"'+(paso.nivel==='Inicial'?' selected':'')+'>🔵 Inicial</option>'
-      +'<option value="Intermedio"'+(paso.nivel==='Intermedio'?' selected':'')+'>🟣 Intermedio</option>'
-      +'<option value="Avanzado"'+(paso.nivel==='Avanzado'?' selected':'')+'>🩷 Avanzado</option>'
-      +'</select></div></div>'
-      +'<div style="margin-top:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
-      +'<label style="font-size:13px;font-weight:600;color:#374151">Capítulos</label>'
-      +'<button class="btn btn-sm" onclick="discAddCap()">+ Agregar</button></div>'
-      +'<div id="disc-caps-list">'+chapHtml+'</div></div>';
-  }
-
   document.getElementById('disc-modal-body').innerHTML=
-    superFields
-    +'<div style="margin-top:'+(superFields?'1rem':'0')+'"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Discipulador</label>'
-    +'<select id="disc-modal-disc" style="width:100%"><option value="">Sin asignar</option>'+discOptions+'</select></div>'
-    +'<div style="margin-top:1rem"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Miembros asignados</label>'
-    +'<input type="text" placeholder="Buscar..." oninput="discFilterMembers(this.value)" style="width:100%;margin-bottom:8px">'
-    +'<div id="disc-mem-list" style="max-height:180px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+memberChecks+'</div></div>';
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem">'
+    +'<div><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Nombre del Curso *</label>'
+    +'<input type="text" id="disc-modal-nombre" value="'+paso.nombre+'" placeholder="Ej: Paso 1 NACER" style="width:100%"></div>'
+    +'<div><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Nivel *</label>'
+    +'<select id="disc-modal-nivel" style="width:100%">'
+    +'<option value="Inicial"'+(paso.nivel==='Inicial'?' selected':'')+'>🔵 Inicial</option>'
+    +'<option value="Intermedio"'+(paso.nivel==='Intermedio'?' selected':'')+'>🟣 Intermedio</option>'
+    +'<option value="Avanzado"'+(paso.nivel==='Avanzado'?' selected':'')+'>🩷 Avanzado</option>'
+    +'</select></div></div>'
+    +'<div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    +'<label style="font-size:13px;font-weight:600;color:#374151">Capítulos que contiene *</label>'
+    +'<button class="btn btn-sm" onclick="discAddCap()">+ Agregar</button></div>'
+    +'<div id="disc-caps-list">'+chapHtml+'</div></div>';
 
   document.getElementById('disc-paso-modal').style.display='flex';
 }
@@ -10067,31 +10273,36 @@ function discCloseModal(){
   discEditingPasoId=null;
 }
 
-async function discSavePaso(){
-  var paso=S.discPasos.find(function(p){return p.id===discEditingPasoId;});
-  if(!paso) return;
-  // Super Admin can rename and change nivel/chapters
-  if(hasRole('super_admin')){
-    var nombre=document.getElementById('disc-modal-nombre')?.value.trim();
-    if(nombre) paso.nombre=nombre;
-    var nivel=document.getElementById('disc-modal-nivel')?.value;
-    if(nivel) paso.nivel=nivel;
-    paso.capitulos=[...document.querySelectorAll('.disc-cap-inp')].map(function(inp){return inp.value.trim();}).filter(Boolean);
+async function discGuardarCurso(){
+  if(!hasRole('super_admin')) return;
+  var nombre=(document.getElementById('disc-modal-nombre')?.value||'').trim();
+  var nivel=document.getElementById('disc-modal-nivel')?.value;
+  var capitulos=[...document.querySelectorAll('.disc-cap-inp')].map(function(inp){return inp.value.trim();}).filter(Boolean);
+  if(!nombre||!nivel||!capitulos.length){
+    alert('Completá Nombre del Curso, Nivel y al menos un Capítulo.');
+    return;
   }
-  // Admin Disc and Super Admin can assign discipulador and members
-  paso.discipuladorId=parseInt(document.getElementById('disc-modal-disc').value)||null;
-  paso.miembros=[...document.querySelectorAll('.disc-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
-  if(!paso.completados) paso.completados={};
+  var esNuevo=!discEditingPasoId;
+  var paso;
+  if(esNuevo){
+    paso={id:Date.now(),nombre,nivel,capitulos,discipuladorId:null,miembros:[],estado:'Activo',completados:{}};
+    S.discPasos.push(paso);
+  } else {
+    paso=S.discPasos.find(function(p){return p.id===discEditingPasoId;});
+    if(!paso) return;
+    paso.nombre=nombre; paso.nivel=nivel; paso.capitulos=capitulos;
+  }
   await saveK(SK.discPasos,S.discPasos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('discSavePaso Firebase error:',e);
+    console.error('discGuardarCurso Firebase error:',e);
     showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
   }
   discCloseModal();
-  discTab('pasos', document.getElementById('disc-tab-pasos'));
-  showToast('✅ Paso guardado correctamente','#16A34A');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursos(c);
+  showToast(esNuevo?'✅ Curso creado':'✅ Curso actualizado','#16A34A');
 }
 
 async function discToggleEstado(pasoId){
@@ -10105,7 +10316,7 @@ async function discToggleEstado(pasoId){
     console.error('discToggleEstado Firebase error:',e);
     showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
   }
-  discTab('pasos', document.getElementById('disc-tab-pasos'));
+  discTab('cursos', document.getElementById('disc-tab-cursos'));
 }
 
 // ── Cargar asistencia ──

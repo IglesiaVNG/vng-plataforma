@@ -1860,6 +1860,17 @@ function ngRenderCargar(c){
   ngCargarComChanged();
 }
 
+function ngFechaSugerida(cid){
+  var comRecs=S.ngRecords.filter(function(r){return Number(r.comunidadId)===Number(cid);});
+  if(!comRecs.length) return today();
+  var lastRec=comRecs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
+  var siguiente=new Date(lastRec.fecha);
+  siguiente.setDate(siguiente.getDate()+7);
+  var sugerida=dateToStr(siguiente);
+  var hoyStr=today();
+  return sugerida>hoyStr?hoyStr:sugerida;
+}
+
 function ngCargarComChanged(){
   var sel=document.getElementById('ng-com-sel');
   var cid=sel&&sel.value?parseInt(sel.value):null;
@@ -1874,6 +1885,8 @@ function ngCargarComChanged(){
   ngCurrentComunidadId=cid;
   var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(cid);});
   if(info&&ng) info.textContent=ng.name+' — Comunidad '+ng.tipo;
+  var fechaInput=document.getElementById('ng-fecha');
+  if(fechaInput) fechaInput.value=ngFechaSugerida(cid);
   ngCheckExistingRecord();
   ngBuildAsistList(cid);
 }
@@ -4996,6 +5009,7 @@ function cfgOpenNewUser(){
   ['cfg-uf-name','cfg-uf-user','cfg-uf-pass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('cfg-uf-role').value='facilitador';
   document.getElementById('cfg-user-form').style.display='block';
+  document.getElementById('cfg-user-form').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function cfgEditUser(id){
   const u=S.users.find(x=>x.id===id);
@@ -5037,6 +5051,7 @@ function cfgEditUser(id){
     }
   }
   document.getElementById('cfg-user-form').style.display='block';
+  document.getElementById('cfg-user-form').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function cfgToggleGroupSel(){
   // Group row removed - members have their group assigned already
@@ -5693,6 +5708,18 @@ function gdvInitFacForm(){
   }
 }
 
+function gdvFechaSugerida(gid){
+  var groupRecs=S.records.filter(function(r){return r.grupoId===gid;});
+  if(!groupRecs.length) return today();
+  var lastRec=groupRecs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
+  var siguiente=new Date(lastRec.fecha);
+  siguiente.setDate(siguiente.getDate()+7);
+  var sugerida=dateToStr(siguiente);
+  var hoyStr=today();
+  // Nunca sugerir una fecha futura — si ya están al día, proponer hoy
+  return sugerida>hoyStr?hoyStr:sugerida;
+}
+
 function gdvAdminGroupChanged(){
   const gid=parseInt(document.getElementById('gdv-grupo-sel').value)||null;
   if(!gid){document.getElementById('gdv-group-info').textContent='Seleccioná un grupo.';document.getElementById('gdv-members').innerHTML='';gdvFacAtt={};return;}
@@ -5702,6 +5729,10 @@ function gdvAdminGroupChanged(){
   gdvFacAtt={};
   members.forEach(m=>{gdvFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
   gdvRenderFacMembers(members);
+  const fechaInput=document.getElementById('gdv-fecha');
+  if(fechaInput) fechaInput.value=gdvFechaSugerida(gid);
+  gdvCheckPendingWeeks(gid);
+  gdvCheckDuplicateWeek(gid);
 }
 
 function gdvRenderFacMembers(members){
@@ -10873,8 +10904,9 @@ function discRenderCargar(c){
     '<div class="card"><div class="card-title">✏️ Cargar asistencia</div>'
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Paso</label>'
     +'<select id="disc-sel-paso" onchange="discLoadPasoForm()" style="margin-bottom:12px"><option value="">— Seleccioná un paso —</option>'+pasoOpts+'</select>'
+    +'<div id="disc-pending-alert" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:10px;font-size:13px;color:#991B1B;margin-bottom:12px"></div>'
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha</label>'
-    +'<input type="date" id="disc-fecha" value="'+hoy+'" max="'+hoy+'" style="margin-bottom:12px">'
+    +'<input type="date" id="disc-fecha" value="'+hoy+'" max="'+hoy+'" style="margin-bottom:12px" onchange="discCheckDuplicateWeek()">'
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Capítulo</label>'
     +'<select id="disc-sel-cap" style="margin-bottom:12px"><option value="">— Primero seleccioná un paso —</option></select>'
     +'<div id="disc-asistencia-wrap"></div>'
@@ -10883,10 +10915,44 @@ function discRenderCargar(c){
     +'</div>';
 }
 
+function discFechaSugerida(cursadaId){
+  var recs=S.discRecords.filter(function(r){return (r.cursadaId||r.pasoId)===cursadaId;});
+  if(!recs.length) return today();
+  var lastRec=recs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
+  var siguiente=new Date(lastRec.fecha);
+  siguiente.setDate(siguiente.getDate()+7);
+  var sugerida=dateToStr(siguiente);
+  var hoyStr=today();
+  return sugerida>hoyStr?hoyStr:sugerida;
+}
+
+function discCheckDuplicateWeek(){
+  var alertEl=document.getElementById('disc-pending-alert');
+  if(!alertEl) return;
+  var cursadaId=discSelectedPasoId;
+  var fecha=document.getElementById('disc-fecha')?.value;
+  if(!cursadaId||!fecha){alertEl.style.display='none';return;}
+  var semana=getISOWeek(fecha);
+  var anio=new Date(fecha).getFullYear();
+  var existe=S.discRecords.find(function(r){
+    if((r.cursadaId||r.pasoId)!==cursadaId) return false;
+    return getISOWeek(r.fecha)===semana && new Date(r.fecha).getFullYear()===anio;
+  });
+  if(existe){
+    alertEl.style.display='block';
+    alertEl.innerHTML='🚫 Ya existe un registro para la <strong>Semana '+semana+'</strong> en este Paso (fecha '+fmtAA(existe.fecha)+').';
+  } else {
+    alertEl.style.display='none';
+  }
+}
+
 function discLoadPasoForm(){
   var cursadaId=parseInt(document.getElementById('disc-sel-paso').value)||null;
   discSelectedPasoId=cursadaId;
   var cursada=cursadaId?(S.discCursadas||[]).find(function(cu){return cu.id===cursadaId;}):null;var paso=cursada?S.discPasos.find(function(p){return p.id===cursada.pasoId;}):null;
+  var fechaInput=document.getElementById('disc-fecha');
+  if(fechaInput) fechaInput.value=cursadaId?discFechaSugerida(cursadaId):today();
+  discCheckDuplicateWeek();
 
   // Load chapters
   var capSel=document.getElementById('disc-sel-cap');

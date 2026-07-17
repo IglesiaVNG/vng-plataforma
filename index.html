@@ -873,6 +873,18 @@ function getISOWeek(d){
   const week1=new Date(dt.getFullYear(),0,4);
   return 1+Math.round(((dt-week1)/86400000-3+(week1.getDay()+6)%7)/7);
 }
+// Ventana permitida para cargar Encuentros (GdV, NG y Discipulado): la semana ISO en curso
+// y la anterior como máximo, nunca una fecha futura. Aplica a todas las Funciones, incluso Super Admin.
+function limiteFechaCarga(){
+  const hoy=new Date();
+  const dow=hoy.getDay(); // 0=Dom..6=Sáb
+  const diffALunes=(dow===0?-6:1-dow);
+  const lunesEstaSemana=new Date(hoy);
+  lunesEstaSemana.setDate(hoy.getDate()+diffALunes);
+  const lunesSemanaAnterior=new Date(lunesEstaSemana);
+  lunesSemanaAnterior.setDate(lunesEstaSemana.getDate()-7);
+  return { min: dateToStr(lunesSemanaAnterior), max: today() };
+}
 function recordInWeek(fechaStr, offsetWeeks=0){
   const {start,end}=getWeekDates(offsetWeeks);
   const d=new Date(fechaStr);
@@ -1863,14 +1875,10 @@ function ngRenderCargar(c){
       (misComs.length>1?'<div id="ng-admin-sel" style="margin-bottom:12px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Comunidad</label><select id="ng-com-sel" onchange="ngCargarComChanged()" style="margin-bottom:0"><option value="">— Elegir comunidad —</option>'+comOpts+'</select></div>':'<input type="hidden" id="ng-com-sel" value="'+misComs[0].id+'">'+
         '<div id="ng-com-info" style="font-size:13px;color:#1E40AF;padding:8px;background:#EFF6FF;border-radius:6px;margin-bottom:8px;font-weight:600">'+misComs[0].name+' — '+misComs[0].tipo+'</div>')+
       '<div id="ng-pending-alert" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px;font-size:13px;color:#92400E;margin-bottom:12px"></div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
-        '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha del encuentro</label>'+
-          '<input type="date" id="ng-fecha" value="'+hoy+'" max="'+hoy+'" onchange="ngCheckExistingRecord()"></div>'+
-        '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">N° Encuentro</label>'+
-          '<select id="ng-encuentro-num">'+
-            '<option value="1">Primer encuentro de la semana</option>'+
-            '<option value="2">Segundo encuentro de la semana</option>'+
-          '</select></div>'+
+      '<div style="margin-bottom:12px">'+
+        '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha del encuentro</label>'+
+          '<input type="date" id="ng-fecha" value="'+hoy+'" max="'+hoy+'" onchange="ngCheckExistingRecord()">'+
+          '<input type="hidden" id="ng-encuentro-num" value="1">'+
       '</div>'+
       '<div id="ng-sin-enc-row" style="margin-bottom:12px">'+
         '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#4B5563">'+
@@ -1899,13 +1907,15 @@ function ngRenderCargar(c){
 
 function ngFechaSugerida(cid){
   var comRecs=S.ngRecords.filter(function(r){return Number(r.comunidadId)===Number(cid);});
-  if(!comRecs.length) return today();
+  var lim=limiteFechaCarga();
+  if(!comRecs.length) return lim.max;
   var lastRec=comRecs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
   var siguiente=new Date(lastRec.fecha);
   siguiente.setDate(siguiente.getDate()+7);
   var sugerida=dateToStr(siguiente);
-  var hoyStr=today();
-  return sugerida>hoyStr?hoyStr:sugerida;
+  if(sugerida>lim.max) return lim.max;
+  if(sugerida<lim.min) return lim.min;
+  return sugerida;
 }
 
 function ngCargarComChanged(){
@@ -1923,7 +1933,12 @@ function ngCargarComChanged(){
   var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(cid);});
   if(info&&ng) info.textContent=ng.name+' — Comunidad '+ng.tipo;
   var fechaInput=document.getElementById('ng-fecha');
-  if(fechaInput) fechaInput.value=ngFechaSugerida(cid);
+  if(fechaInput){
+    var lim=limiteFechaCarga();
+    fechaInput.min=lim.min;
+    fechaInput.max=lim.max;
+    fechaInput.value=ngFechaSugerida(cid);
+  }
   ngCheckExistingRecord();
   ngBuildAsistList(cid);
 }
@@ -1937,17 +1952,13 @@ function ngCheckExistingRecord(){
     return Number(r.comunidadId)===Number(cid)&&getWeekKey(r.fecha)===semana&&!r.sinEncuentro;
   });
   var alert2=document.getElementById('ng-pending-alert');
-  var numSel=document.getElementById('ng-encuentro-num');
   if(existing.length>=1){
     if(alert2){
       alert2.style.display='block';
-      alert2.textContent='⚠️ Ya hay '+existing.length+' encuentro'+( existing.length>1?'s':'')+' registrado'+( existing.length>1?'s':'')+' esta semana ('+existing.map(function(r){return r.fecha;}).join(', ')+').'+( existing.length<2?' Podés cargar el segundo encuentro.':' Ya se cargaron 2 encuentros esta semana.');
+      alert2.textContent='🚫 Ya hay un encuentro registrado esta semana para esta comunidad ('+fmtAA(existing[0].fecha)+').';
     }
-    if(numSel) numSel.value=String(Math.min(existing.length+1,2));
-    if(existing.length>=2&&numSel) numSel.disabled=true;
   } else {
     if(alert2) alert2.style.display='none';
-    if(numSel){numSel.value='1';numSel.disabled=false;}
   }
 }
 
@@ -2043,15 +2054,34 @@ async function ngSaveRecord(){
   var sinEnc=document.getElementById('ng-sin-enc')?.checked;
   var encNum=parseInt(document.getElementById('ng-encuentro-num')?.value)||1;
   if(!fecha||!cid){alert('Seleccioná la comunidad y la fecha');return;}
-  // Check for duplicate
+  // Ventana permitida — semana ISO en curso y la anterior como máximo, para TODAS las Funciones (incluye Super Admin)
+  var lim=limiteFechaCarga();
+  if(fecha>lim.max){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+fmtAA(lim.max)+').');return;}
+  if(fecha<lim.min){alert('Solo se puede cargar la semana en curso o la anterior. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
+
+  // ── No se puede cargar la semana en curso si la anterior está pendiente ──
+  // (sin excepciones — al menos hay que marcarla como "Sin Encuentro")
+  {
+    var semanaActualKey=getWeekKey(lim.max);
+    var esSemanaActual=getWeekKey(fecha)===semanaActualKey;
+    if(esSemanaActual){
+      var semanaAntKey=lim.min; // ya es el lunes de la semana anterior
+      var existeAnterior=S.ngRecords.some(function(r){
+        return Number(r.comunidadId)===Number(cid) && getWeekKey(r.fecha)===semanaAntKey;
+      });
+      if(!existeAnterior){
+        alert('⚠️ Todavía no cargaste la semana anterior para esta comunidad. Cargala primero — como mínimo marcá "Sin Encuentro" — antes de cargar la semana actual.');
+        return;
+      }
+    }
+  }
+
+  // Check for duplicate — en esta primera etapa, un solo encuentro por semana (igual que GdV)
   var semana=getWeekKey(fecha);
   var existing=S.ngRecords.filter(function(r){return Number(r.comunidadId)===Number(cid)&&getWeekKey(r.fecha)===semana&&!r.sinEncuentro;});
-  if(existing.length>=2&&!sinEnc){
-    alert('Ya hay 2 encuentros registrados esta semana para esta comunidad.');
-    return;
-  }
   if(existing.length>=1&&!sinEnc){
-    if(!confirm('Ya hay un encuentro registrado esta semana. ¿Confirmás agregar el segundo encuentro del '+fecha+'?')) return;
+    alert('Ya hay un encuentro registrado esta semana para esta comunidad ('+fmtAA(existing[0].fecha)+').');
+    return;
   }
   // State already updated via ngToggleBtn - no need to re-read from DOM
   // Tag each entry with esLider flag for dashboard filtering
@@ -5668,12 +5698,20 @@ function gdvCheckPendingWeeks(grupoId){
   if(hoy.getFullYear()>lastFecha.getFullYear()) weeksDiff+=52;
 
   if(weeksDiff>1){
-    // Has pending weeks
     var pendingWeek=lastWeek+1;
     // Calculate the date for that pending week (Monday)
     var pendingDate=new Date(lastFecha);
     pendingDate.setDate(pendingDate.getDate()+7);
     var pendingStr=dateToStr(pendingDate);
+    var lim=limiteFechaCarga();
+
+    // Si esa semana pendiente ya quedó fuera de la ventana permitida (más de 1 semana de atraso),
+    // no tiene sentido sugerir "ir" ahí — ya no se puede cargar retroactivamente.
+    if(pendingStr<lim.min){
+      alert.style.display='block';
+      alert.innerHTML='⚠️ Hay semanas sin registrar que ya no se pueden cargar retroactivamente (solo se admite la semana en curso y la anterior).';
+      return;
+    }
 
     alert.style.display='block';
     alert.innerHTML='⚠️ <strong>Tenés '+( weeksDiff-1)+' semana'+(weeksDiff-1>1?'s':'')+' sin registrar.</strong> '+
@@ -5742,13 +5780,10 @@ function gdvInitFacForm(){
   try {
   const fechaInput=document.getElementById('gdv-fecha');
   const hoy=today();
-  // Max = today, Min = 14 days ago
-  const minDate=new Date();
-  minDate.setDate(minDate.getDate()-14);
-  const minStr=minDate.toISOString().split('T')[0];
+  const lim=limiteFechaCarga();
   if(fechaInput){
-    fechaInput.max=hoy;
-    fechaInput.min=minStr;
+    fechaInput.max=lim.max;
+    fechaInput.min=lim.min;
     fechaInput.value=hoy;
   }
   gdvFacAtt={};gdvVisitsOther=[];gdvVisitsNew=[];
@@ -5804,14 +5839,16 @@ function gdvInitFacForm(){
 
 function gdvFechaSugerida(gid){
   var groupRecs=S.records.filter(function(r){return r.grupoId===gid;});
-  if(!groupRecs.length) return today();
+  var lim=limiteFechaCarga();
+  if(!groupRecs.length) return lim.max;
   var lastRec=groupRecs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
   var siguiente=new Date(lastRec.fecha);
   siguiente.setDate(siguiente.getDate()+7);
   var sugerida=dateToStr(siguiente);
-  var hoyStr=today();
-  // Nunca sugerir una fecha futura — si ya están al día, proponer hoy
-  return sugerida>hoyStr?hoyStr:sugerida;
+  // Nunca sugerir fuera de la ventana permitida (ni futura, ni más atrás que la semana anterior)
+  if(sugerida>lim.max) return lim.max;
+  if(sugerida<lim.min) return lim.min;
+  return sugerida;
 }
 
 function gdvAdminGroupChanged(){
@@ -5824,7 +5861,12 @@ function gdvAdminGroupChanged(){
   members.forEach(m=>{gdvFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
   gdvRenderFacMembers(members);
   const fechaInput=document.getElementById('gdv-fecha');
-  if(fechaInput) fechaInput.value=gdvFechaSugerida(gid);
+  if(fechaInput){
+    var lim=limiteFechaCarga();
+    fechaInput.min=lim.min;
+    fechaInput.max=lim.max;
+    fechaInput.value=gdvFechaSugerida(gid);
+  }
   gdvCheckPendingWeeks(gid);
   gdvCheckDuplicateWeek(gid);
 }
@@ -5953,27 +5995,26 @@ async function gdvSaveRecord(){
   if(!g||!fecha){alert('Seleccioná grupo y fecha');return;}
   const sinEncuentro=document.getElementById('gdv-sin-encuentro')?.checked||false;
   const motivo=document.getElementById('gdv-motivo')?.value.trim()||'';
-  // Validate date range
-  const hoyStr=today();
-  const minDate=new Date(); minDate.setDate(minDate.getDate()-14);
-  const minStr=minDate.toISOString().split('T')[0];
-  if(fecha>hoyStr){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+hoyStr+').');return;}
-  if(fecha<minStr){alert('No podés cargar fechas de más de 14 días atrás. La fecha mínima es '+minStr+'.');return;}
+  // Validate date range — semana ISO en curso y la anterior como máximo, para TODAS las Funciones (incluye Super Admin)
+  const lim=limiteFechaCarga();
+  if(fecha>lim.max){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+fmtAA(lim.max)+').');return;}
+  if(fecha<lim.min){alert('Solo se puede cargar la semana en curso o la anterior. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
 
-  // ── Control de semanas pendientes — no se puede saltear ──
-  if(!isSuperAdmin()){
-    var groupRecs=S.records.filter(function(r){return r.grupoId===gid;});
-    if(groupRecs.length>0){
-      var lastRec=groupRecs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
-      var lastWeekNum=getISOWeek(lastRec.fecha);
-      var lastYear=new Date(lastRec.fecha).getFullYear();
-      var fechaWeekNum=getISOWeek(fecha);
-      var fechaYear=new Date(fecha).getFullYear();
-      // Calcular diferencia de semanas
-      var weeksDiff=(fechaYear-lastYear)*52+(fechaWeekNum-lastWeekNum);
-      if(weeksDiff>1){
-        var pendingWeek=lastWeekNum+1;
-        alert('⚠️ Tenés semanas sin registrar. Debés cargar primero la Semana '+pendingWeek+' antes de poder cargar esta fecha. Usá el botón "→ Ir a Semana '+pendingWeek+'" del aviso naranja.');
+  // ── No se puede cargar la semana en curso si la anterior está pendiente ──
+  // (sin excepciones — al menos hay que marcarla como "Sin Encuentro")
+  {
+    const semanaActualNum=getISOWeek(lim.max);
+    const anioActualNum=new Date(lim.max).getFullYear();
+    const esSemanaActual=getISOWeek(fecha)===semanaActualNum && new Date(fecha).getFullYear()===anioActualNum;
+    if(esSemanaActual){
+      const semanaAntNum=getISOWeek(lim.min);
+      const anioAntNum=new Date(lim.min).getFullYear();
+      const existeAnterior=S.records.some(function(r){
+        if(r.grupoId!==gid) return false;
+        return getISOWeek(r.fecha)===semanaAntNum && new Date(r.fecha).getFullYear()===anioAntNum;
+      });
+      if(!existeAnterior){
+        alert('⚠️ Todavía no cargaste la semana anterior para este grupo. Cargala primero — como mínimo marcá "Sin Encuentro" — antes de cargar la semana actual.');
         return;
       }
     }
@@ -11015,13 +11056,15 @@ function discRenderCargar(c){
 
 function discFechaSugerida(cursadaId){
   var recs=S.discRecords.filter(function(r){return (r.cursadaId||r.pasoId)===cursadaId;});
-  if(!recs.length) return today();
+  var lim=limiteFechaCarga();
+  if(!recs.length) return lim.max;
   var lastRec=recs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
   var siguiente=new Date(lastRec.fecha);
   siguiente.setDate(siguiente.getDate()+7);
   var sugerida=dateToStr(siguiente);
-  var hoyStr=today();
-  return sugerida>hoyStr?hoyStr:sugerida;
+  if(sugerida>lim.max) return lim.max;
+  if(sugerida<lim.min) return lim.min;
+  return sugerida;
 }
 
 function discCheckDuplicateWeek(){
@@ -11049,7 +11092,12 @@ function discLoadPasoForm(){
   discSelectedPasoId=cursadaId;
   var cursada=cursadaId?(S.discCursadas||[]).find(function(cu){return cu.id===cursadaId;}):null;var paso=cursada?S.discPasos.find(function(p){return p.id===cursada.pasoId;}):null;
   var fechaInput=document.getElementById('disc-fecha');
-  if(fechaInput) fechaInput.value=cursadaId?discFechaSugerida(cursadaId):today();
+  if(fechaInput){
+    var lim=limiteFechaCarga();
+    fechaInput.min=lim.min;
+    fechaInput.max=lim.max;
+    fechaInput.value=cursadaId?discFechaSugerida(cursadaId):lim.max;
+  }
   discCheckDuplicateWeek();
 
   // Load chapters
@@ -11111,6 +11159,11 @@ async function discGuardarAsistencia(){
     alert('Completá Paso, Fecha y Capítulo');return;
   }
   if(!Object.keys(discFacAtt).length){alert('No hay miembros en este paso');return;}
+
+  // Ventana permitida — semana ISO en curso y la anterior como máximo, para TODAS las Funciones (incluye Super Admin)
+  var lim=limiteFechaCarga();
+  if(fecha>lim.max){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+fmtAA(lim.max)+').');return;}
+  if(fecha<lim.min){alert('Solo se puede cargar la semana en curso o la anterior. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
 
   // Check for duplicate week (same paso + same ISO week)
   var semana=getISOWeek(fecha);

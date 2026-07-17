@@ -2731,12 +2731,13 @@ function renderFormacionGrid(){
     var rowBg=m.estado==='Baja'?'background:#FEF2F2':'background:#fff';
     var cols=pasos.map(function(p){
       var entry=(m.formacion||[]).find(function(f){return String(f.pasoId)===String(p.id);});
-      var recs=S.discRecords.filter(function(r){return String(r.pasoId)===String(p.id)&&r.asistencia;});
-      var total=recs.length;var asist=recs.filter(function(r){return r.asistencia[m.id];}).length;
-      var pct=total>0?Math.round(asist/total*100):0;
-      if(p.estado==='Activo'&&total>0&&asist>0)return '<td style="text-align:center;font-size:12px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso</td>';
-      if(entry&&entry.fuente==='manual'){var fn='fgPopup(event,\'+'+(entry.fechaCompletado||'—')+'\',\'Manual\')';return '<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="'+fn+'">✅ Completado</td>';}
-      if(p.estado!=='Activo'&&total>0&&pct>=75)return '<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="fgPopup(event,\'—\',\'Cursado\')">✅ Completado</td>';
+      if(entry){
+        var origen=entry.fuente==='manual'?'Manual':('Cursado'+(entry.cursadaLabel?' — '+entry.cursadaLabel:''));
+        var fn='fgPopup(event,\''+(entry.fechaCompletado||'—')+'\',\''+origen+'\')';
+        return '<td style="text-align:center;font-size:12px;color:#065F46;font-weight:700;padding:7px 4px;background:#F0FDF4;border-left:1px solid #E5E7EB;cursor:pointer" onclick="'+fn+'">✅ Completado</td>';
+      }
+      var cursadaActiva=(S.discCursadas||[]).find(function(c){return String(c.pasoId)===String(p.id)&&c.estado==='Activo'&&(c.miembros||[]).includes(m.id);});
+      if(cursadaActiva) return '<td style="text-align:center;font-size:12px;color:#92400E;font-weight:600;padding:7px 4px;background:#FFFBEB;border-left:1px solid #E5E7EB">🟡 En curso</td>';
       return '<td style="text-align:center;font-size:12px;color:#9CA3AF;padding:7px 4px;background:#fff;border-left:1px solid #F3F4F6">Pendiente</td>';
     }).join('');
     return '<tr style="'+rowBg+'"><td style="min-width:150px;max-width:180px;padding:7px 8px;background:#fff;border-bottom:1px solid #F3F4F6"><span style="cursor:pointer;color:#1F4E79;font-weight:600;font-size:13px" onclick="saShowDetail('+m.id+',event)">'+listName(m)+'</span></td>'+cols+'</tr>';
@@ -3080,7 +3081,7 @@ function saShowDetail(id,event){
             <div style="font-size:13px;font-weight:600;color:#1F4E79">${f.pasoNombre}</div>
             <div style="font-size:11px;color:#6B7280">${fmtAA(f.fechaCompletado)||'—'}</div>
           </div>
-          <span style="font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600;background:${f.fuente==='auto'?'#D1FAE5':'#E0F2FE'};color:${f.fuente==='auto'?'#065F46':'#0369A1'}">${f.fuente==='auto'?'Auto':'Manual'}</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600;background:${f.fuente==='auto'?'#D1FAE5':f.fuente==='cursado'?'#DBEAFE':'#E0F2FE'};color:${f.fuente==='auto'?'#065F46':f.fuente==='cursado'?'#1D4ED8':'#0369A1'}">${f.fuente==='auto'?'Auto':f.fuente==='cursado'?'Cursado':'Manual'}</span>
           ${canAddForm&&f.fuente==='manual'?`<button onclick="saDeleteFormacion(${m.id},'${f.pasoId}_${f.fechaCompletado}')" style="background:none;border:none;color:#DC2626;cursor:pointer;font-size:14px">🗑</button>`:''}
         </div>`).join('')}
       ${canAddForm?`
@@ -8536,6 +8537,24 @@ function nvCloseActions(){
   document.getElementById('nv-actions-backdrop').style.display='none';
 }
 
+function nvCampAbrirAcciones(id){
+  const m=S.members.find(x=>x.id===id);
+  if(!m) return;
+  const nameEl=document.getElementById('nv-actions-name');
+  if(nameEl) nameEl.textContent=fullName(m);
+  let btns='';
+  btns+=`<button class="btn btn-sm" style="width:100%;text-align:left" onclick="nvCloseActions();nvAbrirEditar(${m.id})">✏️ Editar</button>`;
+  btns+=`<button class="btn btn-sm" style="width:100%;text-align:left" onclick="nvCloseActions();nvCampAbrirComentario(${m.id})">💬 Comentarios</button>`;
+  btns+=`<button class="btn btn-sm" style="width:100%;text-align:left;background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvCloseActions();nvAbrirGraduar(${m.id})">🎓 Graduar</button>`;
+  if(isSuperAdmin()){
+    btns+=`<button class="btn btn-sm" style="width:100%;text-align:left;color:#DC2626;border-color:#FECACA" onclick="nvCloseActions();nvEliminarContacto(${m.id})">🗑️ Eliminar</button>`;
+  }
+  const btnsEl=document.getElementById('nv-actions-buttons');
+  if(btnsEl) btnsEl.innerHTML=btns;
+  document.getElementById('nv-actions-panel').style.display='block';
+  document.getElementById('nv-actions-backdrop').style.display='block';
+}
+
 function nvOpenPromote(id){
   nvSelectedId=id;
   const m=S.members.find(x=>x.id===id);
@@ -9261,6 +9280,7 @@ function nvRenderCampana(){
     listEl.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">Sin contactos todavía en esta Campaña</div>';
     return;
   }
+  var puedeSeleccionar=hasRole('super_admin','pastor');
   listEl.innerHTML=contactos.map(function(m){
     var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
     var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
@@ -9268,9 +9288,9 @@ function nvRenderCampana(){
     var checked=nvCampSeleccionados.includes(m.id);
     return '<div class="card" style="margin-bottom:.6rem;padding:10px 14px">'
       +'<div style="display:flex;align-items:flex-start;gap:10px">'
-      +'<input type="checkbox" onchange="nvCampanaToggleSeleccion('+m.id+',this.checked)" '+(checked?'checked':'')+' style="width:18px;height:18px;margin-top:4px;flex-shrink:0;cursor:pointer">'
+      +(puedeSeleccionar?'<input type="checkbox" onchange="nvCampanaToggleSeleccion('+m.id+',this.checked)" '+(checked?'checked':'')+' style="width:18px;height:18px;margin-top:4px;flex-shrink:0;cursor:pointer">':'')
       +'<div style="width:36px;height:36px;border-radius:50%;background:'+genBg+';color:'+genColor+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">'+initials(fullName(m))+'</div>'
-      +'<div style="flex:1;min-width:0">'
+      +'<div style="flex:1;min-width:0;cursor:pointer" onclick="nvCampAbrirAcciones('+m.id+')">'
       +'<div style="font-weight:700;font-size:14px;color:#1F2937">'+fullName(m)+'</div>'
       +'<div style="font-size:12px;color:#6B7280;margin-top:2px">'
       +(m.tel?'📱 '+m.tel:'<span style="color:#F59E0B">Sin celular</span>')
@@ -9278,12 +9298,7 @@ function nvRenderCampana(){
       +(m.dir?' · '+m.dir:'')
       +'</div>'
       +'</div>'
-      +'<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0">'
-      +'<button class="btn btn-sm" onclick="nvAbrirEditar('+m.id+')">✏️ Editar</button>'
-      +'<button class="btn btn-sm" onclick="nvCampAbrirComentario('+m.id+')">💬 Comentarios</button>'
-      +'<button class="btn btn-sm" style="background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvAbrirGraduar('+m.id+')">🎓 Graduar</button>'
-      +(isSuperAdmin()?'<button onclick="nvEliminarContacto('+m.id+')" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:17px;padding:2px 6px" title="Eliminar">🗑️</button>':'')
-      +'</div></div></div>';
+      +'</div></div>';
   }).join('');
 }
 
@@ -11160,11 +11175,11 @@ function buildPublicNuevoForm(campanaId){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
       <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
         <input type="tel" id="pnv-cel" placeholder="11 1234-5678" inputmode="numeric" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
-      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Edad *</label>
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Edad <span style="font-weight:400;color:#9CA3AF">(o Fecha nac.)</span></label>
         <input type="text" id="pnv-edad" placeholder="Ej: 28" maxlength="2" inputmode="numeric" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
-      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha de nacimiento <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha de nacimiento <span style="font-weight:400;color:#9CA3AF">(o Edad)</span></label>
         <input type="text" id="pnv-fnac" placeholder="DD/MM/AA" maxlength="8" inputmode="numeric" oninput="pnvFmtFnac(this)" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
       <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Género *</label>
         <select id="pnv-genero" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px">
@@ -11236,9 +11251,10 @@ async function pnvEnviar(){
   var err=document.getElementById('pnv-error');
   var err2=document.getElementById('pnv-error2');
   var edadNum=parseInt(edad);
-  var edadValida=edad&&edadNum>0&&edadNum<120;
-  if(!n||!a||!cel||!edadValida||!genero||!barrio||(!campanaId&&!como)){
-    if(err){err.textContent='Por favor completá todos los campos obligatorios (*)';err.style.display='block';}
+  var edadOk=edad&&edadNum>0&&edadNum<120;
+  var fnacDado=!!fnac;
+  if(!n||!a||!cel||!(edadOk||fnacDado)||!genero||!barrio||(!campanaId&&!como)){
+    if(err){err.textContent='Por favor completá todos los campos obligatorios (*). Alcanza con Edad o Fecha de nacimiento, no hace falta cargar las dos.';err.style.display='block';}
     return;
   }
   if(fnac&&typeof validarFnac==='function'&&!validarFnac(fnac)){
@@ -11263,7 +11279,7 @@ async function pnvEnviar(){
     members.push(Object.assign({
       id:nuevoId,nombre:n,apellido:a,tel:cel,genero:genero,
       grupoId:null,estado:'Activo',
-      dir:barrio,fnac:fnac,edadDeclarada:edadNum,roles:[],
+      dir:barrio,fnac:fnac,edadDeclarada:edadOk?edadNum:null,roles:[],
       motivoContacto:motivo,
       fechaRegistro:todayAA(),
     }, campanaId?{

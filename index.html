@@ -388,10 +388,10 @@ try {
 // ── Keys grouped by document (max ~900KB each) ──
 const KEY_GROUPS = {
   'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_qr_actualizar'], // gdv_permisos se maneja via fbSavePermisos con su propio timestamp
-  'members': ['gdv_m5'],
-  'records': ['gdv_r5'],
-  'disc':    ['gdv_disc_pasos','gdv_disc_records','gdv_disc_cursadas'],
-  'ng':      ['gdv_ng5','gdv_ng_records'],
+  'members': ['_tomb_gdv_m5','gdv_m5'],
+  'records': ['_tomb_gdv_r5','gdv_r5'],
+  'disc':    ['gdv_disc_pasos','_tomb_gdv_disc_records','gdv_disc_records','_tomb_gdv_disc_cursadas','gdv_disc_cursadas'],
+  'ng':      ['gdv_ng5','_tomb_gdv_ng_records','gdv_ng_records'],
   'modules': ['gdv_modules5'],
   'agenda':  ['gdv_ministerios','gdv_eventos'],
   'campanas':['gdv_campanas'],
@@ -443,10 +443,16 @@ window.fbUpload = async function(force) {
 // ── Download: read all docs and merge to localStorage ──
 // Merge genérico por id+_ts: gana el registro más reciente de cada id
 // Funciona para members, records, discRecords, ngRecords, etc.
-function mergeByTs(localStr, cloudStr){
+function mergeByTs(localStr, cloudStr, tombKey){
   try{
     const local=JSON.parse(localStr||'[]');
     const cloud=JSON.parse(cloudStr||'[]');
+    const tombIds=new Set();
+    if(tombKey){
+      try{
+        JSON.parse(localStorage.getItem(tombKey)||'[]').forEach(function(t){ tombIds.add(String(t.id)); });
+      }catch(e){}
+    }
     const localMap={};
     local.forEach(function(m){ localMap[m.id]=m; });
     const cloudMap={};
@@ -457,6 +463,7 @@ function mergeByTs(localStr, cloudStr){
     ]);
     const merged=[];
     allIds.forEach(function(id){
+      if(tombIds.has(String(id))) return; // fue eliminado a propósito — no resucitar
       const l=localMap[id];
       const c=cloudMap[id];
       if(!l){ merged.push(c); return; }
@@ -470,8 +477,32 @@ function mergeByTs(localStr, cloudStr){
   }catch(e){ return cloudStr; }
 }
 
+// Mezcla dos listas de tombstones (ids eliminados), quedándose con el más reciente por id
+function mergeTombstones(localStr, cloudStr){
+  try{
+    const local=JSON.parse(localStr||'[]');
+    const cloud=JSON.parse(cloudStr||'[]');
+    const map={};
+    local.concat(cloud).forEach(function(t){
+      const key=String(t.id);
+      if(!map[key]||t.ts>map[key].ts) map[key]=t;
+    });
+    return JSON.stringify(Object.values(map));
+  }catch(e){ return cloudStr||'[]'; }
+}
+
+// Registra un id como eliminado a propósito, para que el merge con otros dispositivos no lo resucite.
+// key debe ser la clave real de storage (ej: SK.members = 'gdv_m5').
+function addTombstone(key, id){
+  var tkey='_tomb_'+key;
+  var list=[];
+  try{ list=JSON.parse(localStorage.getItem(tkey)||'[]'); }catch(e){}
+  list.push({id:id, ts:Date.now()});
+  localStorage.setItem(tkey, JSON.stringify(list));
+}
+
 // Alias para compatibilidad con código existente
-function mergeMembers(localStr, cloudStr){ return mergeByTs(localStr, cloudStr); }
+function mergeMembers(localStr, cloudStr){ return mergeByTs(localStr, cloudStr, '_tomb_gdv_m5'); }
 window.fbDownload = async function() {
   try {
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
@@ -489,9 +520,15 @@ window.fbDownload = async function() {
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
               const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_ng_records'];
-              if(MERGE_KEYS.includes(k)){
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_ng_records':'_tomb_gdv_ng_records'};
+              const TOMB_KEYS=Object.values(TOMB_MAP);
+              if(TOMB_KEYS.includes(k)){
+                // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
+                // quedar actualizados ANTES de mergear su clave de datos correspondiente
+                localStorage.setItem(k, mergeTombstones(localStorage.getItem(k), data[k]));
+              } else if(MERGE_KEYS.includes(k)){
                 // Siempre mergear por id+ts, independientemente del timestamp del documento
-                localStorage.setItem(k, mergeByTs(localStorage.getItem(k), data[k]));
+                localStorage.setItem(k, mergeByTs(localStorage.getItem(k), data[k], TOMB_MAP[k]));
               } else if(fbTs>=localTs){
                 localStorage.setItem(k, data[k]);
               }
@@ -2142,6 +2179,7 @@ async function ngDeleteRecord(id){
   var idx=S.ngRecords.findIndex(function(r){return Number(r.id)===Number(id);});
   if(idx<0) return;
   var removed=S.ngRecords.splice(idx,1)[0];
+  addTombstone(SK.ngRecords,id);
   await saveK(SK.ngRecords,S.ngRecords);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -2532,6 +2570,7 @@ function buildMiembrosHTML(){
         <div style="font-size:14px;font-weight:600;color:#1F4E79" id="sa-detail-name">—</div>
         <div style="display:flex;gap:6px">
           ${canEditMiembros()?`<button class="btn btn-primary btn-sm" onclick="saEditFromDetail()">✏️ Editar</button>`:''}
+          ${canEditMiembros()?`<button id="sa-btn-toggle-estado" class="btn btn-sm" onclick="saQuickToggleEstado(saDetailMemberId)" style="display:none"></button>`:''}
           ${isSuperAdmin()?`<button class="btn btn-sm btn-danger" onclick="saDeleteMember(saDetailMemberId)">🗑 Eliminar</button>`:''}
           <button class="btn btn-sm" onclick="saCloseDetail()">✕</button>
         </div>
@@ -3056,6 +3095,13 @@ function saShowDetail(id,event){
   if(!m) return;
   const g=S.groups.find(x=>Number(x.id)===Number(m.grupoId));
   document.getElementById('sa-detail-name').textContent=fullName(m);
+  const btnToggle=document.getElementById('sa-btn-toggle-estado');
+  if(btnToggle){
+    const esBaja=m.estado==='Baja';
+    btnToggle.style.display='inline-block';
+    btnToggle.textContent=esBaja?'▶️ Reactivar':'⏸ Dar de baja';
+    btnToggle.style.cssText+=esBaja?'background:#F0FDF4;border-color:#BBF7D0;color:#166534':'background:#FFFBEB;border-color:#FDE68A;color:#92400E';
+  }
 
   // ── Tab 1: Datos Generales (institucional) ──
   document.getElementById('sa-detail-generales').innerHTML=
@@ -3402,6 +3448,7 @@ async function saDeleteMember(id){
   if(!m) return;
   if(!confirm('¿Eliminar definitivamente a '+fullName(m)+'? Esta acción no se puede deshacer.')) return;
   S.members=S.members.filter(x=>Number(x.id)!==Number(id));
+  addTombstone(SK.members,id);
   await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -3441,9 +3488,54 @@ async function saReactivar(id){
   renderMiembrosStandalone();
 }
 
-function saCloseMemberForm(){
+async function saCloseMemberForm(){
   document.getElementById('sa-member-modal-overlay').style.display='none';
   saEditingMemberId=null;
+}
+
+async function saQuickToggleEstado(id){
+  const m=S.members.find(x=>Number(x.id)===Number(id));
+  if(!m) return;
+  const estadoActual=m.estado==='Baja'?'Baja':'Activo';
+  const nuevoEstado=estadoActual==='Baja'?'Activo':'Baja';
+  const accion=nuevoEstado==='Baja'?'dar de baja':'reactivar';
+  var motivo=prompt('Motivo para '+accion+' a '+fullName(m)+' (mínimo 10 caracteres):','');
+  if(motivo===null) return; // cancelado
+  if(!motivo||motivo.trim().length<10){
+    alert('El motivo es obligatorio y debe tener al menos 10 caracteres.');
+    return;
+  }
+  motivo=motivo.trim();
+  const prevEstado=m.estado;
+  const prevFechaBaja=m.fechaBaja;
+  m.estado=nuevoEstado;
+  m.estadoHistorial=m.estadoHistorial||[];
+  m.estadoHistorial.push({
+    fecha:new Date().toISOString().slice(0,10),
+    de:estadoActual,
+    a:nuevoEstado,
+    motivo
+  });
+  m.estadoMotivo=motivo;
+  m.estadoMotivoFecha=new Date().toISOString().slice(0,10);
+  if(nuevoEstado==='Baja') m.fechaBaja=new Date().toISOString().slice(0,10);
+  else m.fechaBaja='';
+  await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    // Revertir si no se pudo confirmar en la nube
+    m.estado=prevEstado;
+    m.fechaBaja=prevFechaBaja;
+    m.estadoHistorial.pop();
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast(nuevoEstado==='Baja'?'⏸ Dado de baja':'▶️ Reactivado','#16A34A');
+  saDetailMemberId=null; // para que saShowDetail refresque en vez de cerrar (alterna abrir/cerrar sobre el mismo id)
+  saShowDetail(id);
+  renderMiembrosStandalone();
 }
 
 
@@ -6688,6 +6780,7 @@ function gdvRenderRegistros(){
 async function gdvDeleteRecord(id){
   if(!confirm('¿Eliminar este registro? El dashboard se actualizará.'))return;
   S.records=S.records.filter(r=>r.id!==id);
+  addTombstone(SK.records,id);
   await saveK(SK.records,S.records);gdvRenderRegistros();gdvRenderDashboard();
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -6851,6 +6944,7 @@ async function gdvSaveMember(){
 async function gdvDeleteMember(id){
   if(!confirm('¿Eliminar?'))return;
   S.members=S.members.filter(m=>m.id!==id);
+  addTombstone(SK.members,id);
   await saveK(SK.members,S.members);gdvRenderMiembros();
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -8931,6 +9025,7 @@ async function nvEliminarContacto(id){
   }
   if(!confirm('¿Eliminar a '+fullName(m)+' definitivamente? Esta acción no se puede deshacer.')) return;
   S.members=S.members.filter(function(x){return Number(x.id)!==Number(id);});
+  addTombstone(SK.members,id);
   await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -10644,6 +10739,7 @@ async function discRevertirInicio(cursadaId){
   if(!confirm('¿Revertir el inicio de "'+cursada.label+'"?\nSe elimina esta cursada. Los encuentros ya cargados quedan sin cursada asociada y se podrán re-agrupar al iniciar una nueva.')) return;
   S.discRecords.forEach(function(r){ if(r.cursadaId===cursadaId) r.cursadaId=null; });
   S.discCursadas=(S.discCursadas||[]).filter(function(c){return c.id!==cursadaId;});
+  addTombstone('gdv_disc_cursadas',cursadaId);
   await saveK('gdv_disc_cursadas',S.discCursadas);
   await saveK('gdv_disc_records',S.discRecords);
   try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){}
@@ -11054,6 +11150,7 @@ async function discGuardarAsistencia(){
 async function discDeleteRecord(id){
   if(!confirm('¿Eliminar este registro? Los dashboards se actualizarán.')) return;
   S.discRecords=S.discRecords.filter(function(r){return r.id!==id;});
+  addTombstone(SK.discRecords,id);
   await saveK(SK.discRecords,S.discRecords);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);

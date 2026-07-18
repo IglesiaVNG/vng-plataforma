@@ -3942,19 +3942,27 @@ function ngRenderList(){
 function ngOpenForm(id){
   ngEditingId = id||null;
   const ng = id ? S.ngComunidades.find(function(x){return Number(x.id)===Number(id);}) : null;
-  const lider1Id = ng&&ng.liderIds&&ng.liderIds[0] ? ng.liderIds[0] : '';
-  const lider2Id = ng&&ng.liderIds&&ng.liderIds[1] ? ng.liderIds[1] : '';
-  const colab1Id = ng&&ng.colaboradorIds&&ng.colaboradorIds[0] ? ng.colaboradorIds[0] : '';
-  const colab2Id = ng&&ng.colaboradorIds&&ng.colaboradorIds[1] ? ng.colaboradorIds[1] : '';
+  const liderIdsActuales=(ng&&ng.liderIds)||[];
+  const colabIdsActuales=(ng&&ng.colaboradorIds)||[];
 
   const tipoOpts=NG_TIPOS.map(function(t){return '<option value="'+t+'"'+(ng&&ng.tipo===t?' selected':'')+'>'+t+'</option>';}).join('');
   const diaOpts=NG_DIAS.map(function(d){return '<option value="'+d+'"'+(ng&&ng.dia===d?' selected':'')+'>'+d+'</option>';}).join('');
   const horOpts=NG_HORARIOS.map(function(h){return '<option value="'+h+'"'+(ng&&ng.horario===h?' selected':'')+'>'+h+'</option>';}).join('');
-  const noAsig='<option value="">Sin asignar</option>';
-  const noApl='<option value="">No aplica</option>';
-  const membOpts=S.members.filter(function(m){return m.estado!=='Baja'&&m.condicion!=='Historico';})
-    .sort(function(a,b){return listName(a).localeCompare(listName(b));})
-    .map(function(m){return '<option value="'+m.id+'">'+listName(m)+'</option>';}).join('');
+  const membrosDisponibles=S.members.filter(function(m){return m.estado!=='Baja'&&m.condicion!=='Historico';})
+    .sort(function(a,b){return listName(a).localeCompare(listName(b));});
+
+  function checklistHtml(idPrefix, seleccionados){
+    return membrosDisponibles.map(function(m){
+      var checked=seleccionados.map(Number).includes(Number(m.id));
+      var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+      var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+      return '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB;min-width:0">'
+        +'<input type="checkbox" class="'+idPrefix+'-cb" value="'+m.id+'"'+(checked?' checked':'')+' style="width:16px;height:16px;flex-shrink:0;cursor:pointer">'
+        +'<span style="background:'+genBg+';color:'+genColor+';font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;flex-shrink:0">'+m.genero+'</span>'
+        +'<span style="font-size:13px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+listName(m)+'</span>'
+        +'</label>';
+    }).join('');
+  }
 
   document.getElementById('cfg-ng-overlay').innerHTML=
     '<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'+
@@ -3976,23 +3984,17 @@ function ngOpenForm(id){
       '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Horario</label>'+
         '<select id="ng-f-horario" style="width:100%"><option value="">— Horario —</option>'+horOpts+'</select></div>'+
     '</div>'+
-    // Líder
+    // Líderes
     '<div style="margin-bottom:12px">'+
-      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Líder</label>'+
-      '<select id="ng-f-lider1" onchange="ngCheckLider2()" style="width:100%">'+noAsig+membOpts+'</select>'+
+      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Líderes</label>'+
+      '<input type="text" placeholder="Buscar..." oninput="discFilterList(this.value,\'ng-lider-list\')" style="width:100%;margin-bottom:6px">'+
+      '<div id="ng-lider-list" style="max-height:150px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+checklistHtml('ng-lider',liderIdsActuales)+'</div>'+
     '</div>'+
-    '<div id="ng-lider2-row" style="display:none;margin-bottom:12px">'+
-      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Líder adicional <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'+
-      '<select id="ng-f-lider2" style="width:100%">'+noApl+membOpts+'</select>'+
-    '</div>'+
-    // Colaborador
-    '<div style="margin-bottom:12px">'+
-      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Colaborador</label>'+
-      '<select id="ng-f-colab1" onchange="ngCheckColab2()" style="width:100%">'+noAsig+membOpts+'</select>'+
-    '</div>'+
-    '<div id="ng-colab2-row" style="display:none;margin-bottom:16px">'+
-      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Colaborador adicional <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'+
-      '<select id="ng-f-colab2" style="width:100%">'+noApl+membOpts+'</select>'+
+    // Colaboradores
+    '<div style="margin-bottom:16px">'+
+      '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Colaboradores</label>'+
+      '<input type="text" placeholder="Buscar..." oninput="discFilterList(this.value,\'ng-colab-list\')" style="width:100%;margin-bottom:6px">'+
+      '<div id="ng-colab-list" style="max-height:150px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+checklistHtml('ng-colab',colabIdsActuales)+'</div>'+
     '</div>'+
     // Botones
     '<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px">'+
@@ -4002,24 +4004,6 @@ function ngOpenForm(id){
   '</div>';
 
   document.getElementById('cfg-ng-overlay').style.display='flex';
-  // Set values after render
-  const l1=document.getElementById('ng-f-lider1'); if(l1) l1.value=lider1Id;
-  const l2=document.getElementById('ng-f-lider2'); if(l2) l2.value=lider2Id;
-  const c1=document.getElementById('ng-f-colab1'); if(c1) c1.value=colab1Id;
-  const c2=document.getElementById('ng-f-colab2'); if(c2) c2.value=colab2Id;
-  ngCheckLider2();
-  ngCheckColab2();
-}
-
-function ngCheckLider2(){
-  var l1=document.getElementById('ng-f-lider1');
-  var row=document.getElementById('ng-lider2-row');
-  if(row) row.style.display=(l1&&l1.value)?'':'none';
-}
-function ngCheckColab2(){
-  var c1=document.getElementById('ng-f-colab1');
-  var row=document.getElementById('ng-colab2-row');
-  if(row) row.style.display=(c1&&c1.value)?'':'none';
 }
 
 function ngCloseForm(){
@@ -4039,12 +4023,8 @@ async function ngSaveComunidad(){
   const dia=document.getElementById('ng-f-dia')?.value||'';
   const horario=document.getElementById('ng-f-horario')?.value||'';
   if(!nombre||!tipo){ alert('Completá Nombre y Tipo'); return; }
-  var l1=document.getElementById('ng-f-lider1')?.value||'';
-  var l2=document.getElementById('ng-f-lider2')?.value||'';
-  var c1=document.getElementById('ng-f-colab1')?.value||'';
-  var c2=document.getElementById('ng-f-colab2')?.value||'';
-  var liderIds=[l1,l2].filter(function(x){return x&&x!=='';}).map(Number);
-  var colaboradorIds=[c1,c2].filter(function(x){return x&&x!=='';}).map(Number);
+  var liderIds=[...document.querySelectorAll('.ng-lider-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  var colaboradorIds=[...document.querySelectorAll('.ng-colab-cb:checked')].map(function(cb){return parseInt(cb.value);});
   if(ngEditingId){
     var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(ngEditingId);});
     if(ng){ Object.assign(ng,{name:nombre,tipo,dia,horario,liderIds,colaboradorIds}); }

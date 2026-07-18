@@ -1856,6 +1856,7 @@ function ngRenderAsistenciaMiembros(recs){
 // ── CARGAR ASISTENCIA ──────────────────────────────────────────────
 var ngFacAtt={};
 var ngVisitsNew=[];
+var ngVisitsNewIds=[];
 
 function ngRenderCargar(c){
   if(!c) c=document.getElementById('ng-tab-content');
@@ -1888,12 +1889,16 @@ function ngRenderCargar(c){
       '<div id="ng-form-asist">'+
         '<div id="ng-asist-list"></div>'+
         '<div id="ng-nuevos-section" style="margin-top:12px">'+
-          '<div style="font-size:13px;font-weight:600;color:#4B5563;margin-bottom:6px">Personas Nuevas</div>'+
-          '<div id="ng-nuevos-list"></div>'+
-          '<div style="display:flex;gap:8px;margin-top:6px">'+
-            '<input type="text" id="ng-nuevo-nombre" placeholder="Nombre y Apellido" style="flex:1">'+
-            '<button class="btn btn-sm" onclick="ngAddNuevo()">+ Agregar</button>'+
+          '<div style="font-size:13px;font-weight:600;color:#4B5563;margin-bottom:2px">🆕 Personas nuevas</div>'+
+          '<div style="font-size:11px;color:#6B7280;margin-bottom:6px">Buscá en la base o registrá como nuevo contacto</div>'+
+          '<div id="ng-nuevos-list" style="margin-bottom:8px"></div>'+
+          '<div style="position:relative">'+
+            '<input type="text" id="ng-nuevo-nombre" placeholder="Escribí el nombre..." style="width:100%" oninput="ngAutoComplete(this.value)" autocomplete="off">'+
+            '<div id="ng-ac-new" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:100;max-height:180px;overflow-y:auto"></div>'+
           '</div>'+
+          '<button class="btn btn-sm" onclick="nvOpenInlineForm()" style="margin-top:10px;width:100%;background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">'+
+            '➕ No está en la lista — Registrar como Nuevo Contacto'+
+          '</button>'+
         '</div>'+
       '</div>'+
       '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">'+
@@ -1902,6 +1907,7 @@ function ngRenderCargar(c){
     '</div>';
   ngFacAtt={};
   ngVisitsNew=[];
+  ngVisitsNewIds=[];
   ngCargarComChanged();
 }
 
@@ -2015,13 +2021,55 @@ function ngBuildAsistList(cid){
 function ngToggleAtt(mid,checked){
   if(ngFacAtt[mid]) ngFacAtt[mid].state=checked?'presente':'ausente';
 }
-function ngAddNuevo(){
+function ngAutoComplete(query){
+  const dropdown=document.getElementById('ng-ac-new');
+  if(!dropdown) return;
+  if(query.length<2){dropdown.style.display='none';return;}
+  let pool=S.members.filter(function(m){ return m.estado!=='Baja'; });
+  // Personas Nuevas: solo condición Nuevo O sin grupo/comunidad asignada
+  pool=pool.filter(function(m){
+    const sinGrupo=!m.grupoId&&!(m.grupoIds||[]).length;
+    return m.condicion==='Nuevo'||sinGrupo;
+  });
+  const q=query.toLowerCase();
+  const results=pool.filter(function(m){
+    return fullName(m).toLowerCase().includes(q) && !ngVisitsNew.includes(fullName(m));
+  }).slice(0,8);
+  if(!results.length){
+    var msg=q.length>1
+      ?'No encontrado sin grupo asignado. Si es nuevo, registralo con el botón de abajo.'
+      :'Escribí el nombre para buscar...';
+    dropdown.innerHTML='<div style="padding:10px 12px;font-size:13px;color:#9CA3AF">'+msg+'</div>';
+    dropdown.style.display='block';
+    return;
+  }
+  dropdown.innerHTML=results.map(function(m){
+    var safeName=fullName(m).replace(/'/g,"&#39;");
+    return '<div data-id="'+m.id+'" data-name="'+safeName.replace(/"/g,'&quot;')+'" onpointerdown="event.preventDefault();ngPickAC(this)" ontouchstart="event.preventDefault();ngPickAC(this)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px">'+
+      '<span style="font-weight:600">'+fullName(m)+'</span><br>'+
+      '<span style="font-size:11px;color:#6B7280">'+(m.condicion||'')+'</span>'+
+      '</div>';
+  }).join('');
+  dropdown.style.display='block';
+}
+
+function ngPickAC(el){
+  var nombre=el.getAttribute('data-name');
+  var id=parseInt(el.getAttribute('data-id'))||null;
+  ngSelectFromAC(nombre, id);
+}
+
+function ngSelectFromAC(nombre, id){
+  window._ngACSelecting=true;
+  var decoded=nombre.replace(/&#39;/g,"'").replace(/&quot;/g,'"');
+  ngVisitsNew.push(decoded);
+  ngVisitsNewIds.push(id);
   var inp=document.getElementById('ng-nuevo-nombre');
-  var nombre=(inp?.value||'').trim();
-  if(!nombre) return;
-  ngVisitsNew.push(nombre);
-  inp.value='';
+  if(inp){inp.value='';inp.blur();}
+  var dd=document.getElementById('ng-ac-new');
+  if(dd) dd.style.display='none';
   ngRenderNuevosList();
+  setTimeout(function(){window._ngACSelecting=false;},200);
 }
 
 function ngRenderNuevosList(){
@@ -2037,6 +2085,7 @@ function ngRenderNuevosList(){
 
 function ngRemoveNuevo(i){
   ngVisitsNew.splice(i,1);
+  ngVisitsNewIds.splice(i,1);
   ngRenderNuevosList();
 }
 
@@ -2114,7 +2163,26 @@ async function ngSaveRecord(){
     al.classList.remove('hidden');
     setTimeout(function(){al.classList.add('hidden');al.style='';},4000);
   }
+
+  // ── Vincular Personas Nuevas a esta Comunidad (usando el id real capturado en la búsqueda) ──
+  var membersUpdated=false;
+  for(let i=0;i<ngVisitsNew.length;i++){
+    var mid=ngVisitsNewIds[i];
+    var m=mid?S.members.find(function(x){return x.id===mid;}):null;
+    if(!m){
+      var nombreBuscado=ngVisitsNew[i];
+      m=S.members.find(function(x){return fullName(x).toLowerCase()===nombreBuscado.toLowerCase();});
+    }
+    if(m&&!m.grupoId){
+      m.grupoId=cid;
+      await nvAplicarParticipando(m);
+      membersUpdated=true;
+    }
+  }
+  if(membersUpdated) await saveK(SK.members,S.members);
+
   ngVisitsNew=[];
+  ngVisitsNewIds=[];
   ngFacAtt={};
   ngRenderCargar(document.getElementById('ng-tab-content'));
 }
@@ -5293,7 +5361,7 @@ function cfgCloseRoleForm(){document.getElementById('cfg-role-form').classList.a
 // ════════════════════════════════════════════════════════════
 // GDV MODULE
 // ════════════════════════════════════════════════════════════
-let gdvFacAtt={},gdvVisitsOther=[],gdvVisitsNew=[],gdvSelectedRoles=[];
+let gdvFacAtt={},gdvVisitsOther=[],gdvVisitsNew=[],gdvVisitsNewIds=[],gdvSelectedRoles=[];
 let gdvEditingGroupId=null,gdvEditingUserId=null,gdvEditingMemberId=null,gdvEditingRoleId=null;
 var _d2w=(function(){var d=new Date();d.setDate(d.getDate()-14);return d.toISOString().slice(0,10);})();
 let gdvFilDesde=_d2w,gdvFilHasta='',gdvFilGrupos=null,gdvFilSexo='';
@@ -5766,7 +5834,7 @@ function gdvInitFacForm(){
     fechaInput.min=lim.min;
     fechaInput.value=hoy;
   }
-  gdvFacAtt={};gdvVisitsOther=[];gdvVisitsNew=[];
+  gdvFacAtt={};gdvVisitsOther=[];gdvVisitsNew=[];gdvVisitsNewIds=[];
   // Reset sin encuentro
   const chk=document.getElementById('gdv-sin-encuentro');
   if(chk){chk.checked=false;}
@@ -5918,7 +5986,7 @@ function gdvAutoComplete(type, query){
   dropdown.innerHTML=results.map(function(m){
     const g=S.groups.find(function(x){return x.id===m.grupoId;});
     var safeName=fullName(m).replace(/'/g,"&#39;");
-    return '<div class="gdv-ac-item" data-type="'+type+'" data-name="'+safeName.replace(/"/g,'&quot;')+'" onpointerdown="event.preventDefault();gdvPickAC(this)" ontouchstart="event.preventDefault();gdvPickAC(this)">' +
+    return '<div class="gdv-ac-item" data-type="'+type+'" data-id="'+m.id+'" data-name="'+safeName.replace(/"/g,'&quot;')+'" onpointerdown="event.preventDefault();gdvPickAC(this)" ontouchstart="event.preventDefault();gdvPickAC(this)">' +
       '<span style="font-weight:600">'+fullName(m)+'</span><br>' +
       '<span style="font-size:11px;color:#6B7280">'+(g?g.name:'Sin grupo')+'</span>' +
       '</div>';
@@ -5929,14 +5997,19 @@ function gdvAutoComplete(type, query){
 function gdvPickAC(el){
   var type=el.getAttribute('data-type');
   var nombre=el.getAttribute('data-name');
-  gdvSelectFromAC(type, nombre);
+  var id=parseInt(el.getAttribute('data-id'))||null;
+  gdvSelectFromAC(type, nombre, id);
 }
 
-function gdvSelectFromAC(type, nombre){
+function gdvSelectFromAC(type, nombre, id){
   window._gdvACSelecting=true;
   var decoded=nombre.replace(/&#39;/g,"'").replace(/&quot;/g,'"');
-  if(type==='other') gdvVisitsOther.push(decoded);
-  else gdvVisitsNew.push(decoded);
+  if(type==='other'){
+    gdvVisitsOther.push(decoded);
+  } else {
+    gdvVisitsNew.push(decoded);
+    gdvVisitsNewIds.push(id);
+  }
   var inp=document.getElementById('gdv-vinp-'+type);
   if(inp){inp.value='';inp.blur();}
   var dd=document.getElementById('gdv-ac-'+type);
@@ -5956,7 +6029,7 @@ function gdvAbrirFormNuevoContacto(){
 }
 
 
-function gdvRemoveVisit(type,i){if(type==='other')gdvVisitsOther.splice(i,1);else gdvVisitsNew.splice(i,1);gdvRenderVisitTags();}
+function gdvRemoveVisit(type,i){if(type==='other')gdvVisitsOther.splice(i,1);else{gdvVisitsNew.splice(i,1);gdvVisitsNewIds.splice(i,1);}gdvRenderVisitTags();}
 function gdvRenderVisitTags(){
   ['other','new'].forEach(type=>{
     const el=document.getElementById(`gdv-vtags-${type}`);
@@ -6036,10 +6109,14 @@ async function gdvSaveRecord(){
 
   // ── Auto-assign group to "Nuevos" so they appear in next encounter ──
   var membersUpdated=false;
-  for(const nombre of gdvVisitsNew){
-    var m=S.members.find(function(x){
-      return fullName(x).toLowerCase()===nombre.toLowerCase();
-    });
+  for(let i=0;i<gdvVisitsNew.length;i++){
+    var mid=gdvVisitsNewIds[i];
+    var m=mid?S.members.find(function(x){return x.id===mid;}):null;
+    // Respaldo por si algún registro viejo no tiene el id capturado (no debería pasar con la búsqueda actual)
+    if(!m){
+      var nombreBuscado=gdvVisitsNew[i];
+      m=S.members.find(function(x){return fullName(x).toLowerCase()===nombreBuscado.toLowerCase();});
+    }
     if(m&&!m.grupoId){
       m.grupoId=gid; // Assign to this group
       await nvAplicarParticipando(m);
@@ -6185,6 +6262,13 @@ document.addEventListener('click', function(e){
         dd.style.display='none';
       }
     });
+  }
+  if(!window._ngACSelecting){
+    const ngInp=document.getElementById('ng-nuevo-nombre');
+    const ngDd=document.getElementById('ng-ac-new');
+    if(ngDd&&ngInp&&!ngInp.contains(e.target)&&!ngDd.contains(e.target)){
+      ngDd.style.display='none';
+    }
   }
 });
 

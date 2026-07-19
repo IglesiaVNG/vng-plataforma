@@ -393,7 +393,7 @@ const KEY_GROUPS = {
   'disc':    ['gdv_disc_pasos','_tomb_gdv_disc_records','gdv_disc_records','_tomb_gdv_disc_cursadas','gdv_disc_cursadas'],
   'ng':      ['gdv_ng5','_tomb_gdv_ng_records','gdv_ng_records'],
   'modules': ['gdv_modules5'],
-  'agenda':  ['gdv_ministerios','gdv_eventos'],
+  'agenda':  ['gdv_ministerios','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas'],
   'campanas':['gdv_campanas'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
                'of5_part','of5_obspart','of5_obspago','of5_materias'],
@@ -519,8 +519,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_ng_records'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_ng_records':'_tomb_gdv_ng_records'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_ng_records','gdv_checklists','gdv_checklist_tareas'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -623,6 +623,8 @@ window.fbDownload().then(function(hasData) {
         S.ministerios    = _ld('gdv_ministerios',   S.ministerios    ||[]);
         S.eventos        = _ld('gdv_eventos',       S.eventos        ||[]);
         S.campanas       = _ld('gdv_campanas',      S.campanas       ||[]);
+        S.checklists     = _ld('gdv_checklists',      S.checklists     ||[]);
+        S.checklistTareas= _ld('gdv_checklist_tareas',S.checklistTareas||[]);
       }
       // Load permisos from Firebase if this device has none configured
       // Reload permisos from localStorage (now updated from Firebase if it was empty)
@@ -899,7 +901,8 @@ const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles
   ngComunidades:'gdv_ng5',ngRecords:'gdv_ng_records',
   modulesConfig:'gdv_modules5',
   ministerios:'gdv_ministerios',eventos:'gdv_eventos',
-  campanas:'gdv_campanas'};
+  campanas:'gdv_campanas',
+  checklists:'gdv_checklists',checklistTareas:'gdv_checklist_tareas'};
 
 const DEFAULT_DISC_PASOS=[
   {id:1,nombre:'Discipulado N1',nivel:'Inicial',roleId:'disc_n1',estado:'Activo',discipuladorId:null,miembros:[],completados:{},
@@ -1132,7 +1135,7 @@ const DEFAULT_USERS=[
 // ════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════
-let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[]};
+let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[]};
 let currentUser=null;
 let gdvCharts={};
 
@@ -1161,6 +1164,8 @@ async function initStorage(){
   S.ministerios=load(SK.ministerios,[]);
   S.eventos    =load(SK.eventos,    []);
   S.campanas   =load(SK.campanas,   []);
+  S.checklists     =load(SK.checklists,     []);
+  S.checklistTareas=load(SK.checklistTareas,[]);
   await cleanMembers();
   loadPermisos();
   // ── Migrar roles nuevos si no existen ──
@@ -2166,6 +2171,7 @@ async function ngSaveRecord(){
 
   // ── Vincular Personas Nuevas a esta Comunidad (usando el id real capturado en la búsqueda) ──
   var membersUpdated=false;
+  var vinculosPrevios=[];
   for(let i=0;i<ngVisitsNew.length;i++){
     var mid=ngVisitsNewIds[i];
     var m=mid?S.members.find(function(x){return x.id===mid;}):null;
@@ -2174,12 +2180,22 @@ async function ngSaveRecord(){
       m=S.members.find(function(x){return fullName(x).toLowerCase()===nombreBuscado.toLowerCase();});
     }
     if(m&&!m.grupoId){
+      vinculosPrevios.push(m);
       m.grupoId=cid;
       await nvAplicarParticipando(m);
       membersUpdated=true;
     }
   }
-  if(membersUpdated) await saveK(SK.members,S.members);
+  if(membersUpdated){
+    await saveK(SK.members,S.members);
+    try{
+      if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    }catch(e){
+      vinculosPrevios.forEach(function(m){ m.grupoId=null; });
+      await saveK(SK.members,S.members);
+      alert('El encuentro se guardó, pero no se pudo vincular a las Personas Nuevas con la Comunidad. Verificá tu conexión y volvé a intentarlo desde Rebaños.');
+    }
+  }
 
   ngVisitsNew=[];
   ngVisitsNewIds=[];
@@ -2348,6 +2364,46 @@ function canAccessAgenda(){
 }
 function canCrearEventos(){
   return isSuperAdmin() || canEjecutar('agenda_crear');
+}
+
+// ── Permisos de Checklist (roles definidos por checklist, no globales) ──
+function agendaGetChecklist(eventoId){
+  return (S.checklists||[]).find(function(c){return Number(c.eventoId)===Number(eventoId);});
+}
+function agendaEsCoordinadorDe(checklist){
+  if(!checklist) return false;
+  if(isSuperAdmin()) return true;
+  var linked=getLinkedMember();
+  return !!(linked&&(checklist.coordinadorIds||[]).map(Number).includes(Number(linked.id)));
+}
+function agendaEsColaboradorDe(checklist){
+  if(!checklist) return false;
+  var linked=getLinkedMember();
+  return !!(linked&&(checklist.colaboradorIds||[]).map(Number).includes(Number(linked.id)));
+}
+function agendaEsResponsableDe(checklist){
+  if(!checklist) return false;
+  if(isSuperAdmin()) return true;
+  var ev=S.eventos.find(function(e){return Number(e.id)===Number(checklist.eventoId);});
+  var linked=getLinkedMember();
+  return !!(ev&&linked&&Number(ev.responsableId)===Number(linked.id));
+}
+// Crear/editar/eliminar tareas, y mover Completada <-> Finalizada/Pendiente
+function agendaPuedeAdminTareas(checklist){
+  return agendaEsCoordinadorDe(checklist)||agendaEsResponsableDe(checklist);
+}
+// Está asignado a alguna tarea de este checklist (aunque no sea Coordinador/Colaborador formal)
+function agendaEsAsignadoEnChecklist(checklist){
+  if(!checklist) return false;
+  var linked=getLinkedMember();
+  if(!linked) return false;
+  return (S.checklistTareas||[]).some(function(t){
+    return Number(t.checklistId)===Number(checklist.id)&&(t.asignadosIds||[]).map(Number).includes(Number(linked.id));
+  });
+}
+// Ver y participar del checklist (comentar, marcar Completada)
+function agendaPuedeVerChecklist(checklist){
+  return isSuperAdmin()||canCrearEventos()||agendaEsCoordinadorDe(checklist)||agendaEsColaboradorDe(checklist)||agendaEsResponsableDe(checklist)||agendaEsAsignadoEnChecklist(checklist);
 }
 
 function normName(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); }
@@ -3121,8 +3177,17 @@ async function saAddFormacion(memberId){
   if(!m.formacion) m.formacion=[];
   var yaExiste=m.formacion.find(f=>String(f.pasoId)===String(pasoId)&&f.fuente==='manual');
   if(yaExiste){showToast('Ya existe ese Paso en Formación','#D97706');return;}
-  m.formacion.push({pasoId,pasoNombre:paso?paso.nombre:'Paso desconocido',fechaCompletado:fmtAA(fecha),fuente:'manual'});
+  var nuevaFormacion={pasoId,pasoNombre:paso?paso.nombre:'Paso desconocido',fechaCompletado:fmtAA(fecha),fuente:'manual'};
+  m.formacion.push(nuevaFormacion);
   await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    m.formacion=m.formacion.filter(function(f){return f!==nuevaFormacion;});
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   // Re-render formacion tab
   saShowDetail(memberId,null);
   saDetailTab('formacion',document.querySelectorAll('#sa-detail-panel .nav-btn')[2]);
@@ -3133,13 +3198,16 @@ async function saDeleteFormacion(memberId, key){
   var m=S.members.find(x=>Number(x.id)===Number(memberId));
   if(!m||!m.formacion) return;
   if(!confirm('¿Eliminar este paso de Formación?')) return;
+  var formacionPrevia=m.formacion.slice();
   m.formacion=m.formacion.filter(f=>!(f.fuente==='manual'&&(f.pasoId+'_'+f.fechaCompletado)===key));
   await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('saDeleteFormacion Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    m.formacion=formacionPrevia;
+    await saveK(SK.members,S.members);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   saShowDetail(memberId,null);
   saDetailTab('formacion',document.querySelectorAll('#sa-detail-panel .nav-btn')[2]);
@@ -3846,12 +3914,16 @@ function configTab(sub, btn){
 async function cfgToggleQrActualizar(enabled){
   // JSON.stringify(true)/(false) produce 'true'/'false' (no quotes), matching the
   // plain string check used in buildPublicActualizarForm.
+  var valorPrevio=localStorage.getItem('gdv_qr_actualizar');
   await saveK('gdv_qr_actualizar', !!enabled);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('cfgToggleQrActualizar Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    localStorage.setItem('gdv_qr_actualizar', valorPrevio);
+    var chk=document.getElementById('cfg-qr-actualizar-toggle');
+    if(chk) chk.checked=!enabled;
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   const label=document.getElementById('cfg-qr-actualizar-label');
   if(label) label.textContent=enabled?'Habilitado':'Inhabilitado';
@@ -4421,12 +4493,17 @@ async function campanaSaveCampana(){
 async function campanaToggleActiva(id, activo){
   var camp=S.campanas.find(function(x){return Number(x.id)===Number(id);});
   if(!camp) return;
+  var prev=camp.activo;
   camp.activo=activo;
   await saveK(SK.campanas,S.campanas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    alert('No se pudo guardar en la nube. Verificá tu conexión.');
+    camp.activo=prev;
+    await saveK(SK.campanas,S.campanas);
+    campanaRenderList();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   campanaRenderList();
   showToast(activo?'✅ Campaña activada — su QR ya funciona':'🚧 Campaña desactivada — su QR deja de aceptar cargas','#16A34A');
@@ -4459,7 +4536,9 @@ async function campanaDeleteCampana(id){
 let agendaCalMonth=new Date().getMonth(), agendaCalYear=new Date().getFullYear();
 let agendaEditingId=null;
 let agendaSelectedPersonas=[];
+let agendaSelectedResponsableId=null;
 let agendaDiaActual=null;
+let agendaChecklistEstadoActual='activos';
 
 function openAgenda(){
   document.getElementById('screen-home').classList.add('hidden');
@@ -4467,7 +4546,7 @@ function openAgenda(){
   document.getElementById('app-topbar-title').textContent='📅 Agenda Ministerial';
   document.getElementById('app-topbar-user').textContent=currentUser.name;
   document.getElementById('app-content').innerHTML=buildAgendaHTML();
-  agendaTab('calendario', document.getElementById('agenda-tab-btn-cal'));
+  agendaChecklistTab('activos', document.getElementById('agenda-cl-btn-activos'));
   agendaRenderBanner();
 }
 
@@ -4475,33 +4554,63 @@ function buildAgendaHTML(){
   return `<div class="gdv-app">
     <div id="agenda-banner-wrap" style="display:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 16px;margin-bottom:1rem"></div>
     <div class="nav" style="margin-bottom:1rem">
-      <button class="nav-btn active" id="agenda-tab-btn-cal" onclick="agendaTab('calendario',this)">📅 Calendario</button>
-      <button class="nav-btn" id="agenda-tab-btn-prox" onclick="agendaTab('proximos',this)">📋 Próximos eventos</button>
+      <button class="nav-btn active" id="agenda-top-btn-checklist" onclick="agendaTopTab('checklist',this)">📋 Checklist</button>
+      <button class="nav-btn" id="agenda-top-btn-eventos" onclick="agendaTopTab('eventos',this)">📅 Eventos</button>
     </div>
 
-    <div id="agenda-tab-calendario">
-      <div class="card">
-        <div id="agenda-cal-wrap"></div>
+    <!-- ═══════════════ CHECKLIST ═══════════════ -->
+    <div id="agenda-top-checklist">
+      <div class="nav" style="margin-bottom:1rem">
+        <button class="nav-btn active" id="agenda-cl-btn-activos" onclick="agendaChecklistTab('activos',this)">🟢 Activos</button>
+        <button class="nav-btn" id="agenda-cl-btn-historico" onclick="agendaChecklistTab('historico',this)">📁 Histórico</button>
       </div>
-      <div style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:.5rem">🟣 Día con eventos — tocá un día para ver el detalle${canCrearEventos()?' o cargar uno nuevo':''}</div>
+      <div id="agenda-checklist-list"></div>
     </div>
 
-    <div id="agenda-tab-proximos" style="display:none">
-      <div class="card" style="margin-bottom:1rem">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde</label>
-            <input type="date" id="agenda-prox-desde" onchange="agendaRenderProximos()"></div>
-          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Hasta</label>
-            <input type="date" id="agenda-prox-hasta" onchange="agendaRenderProximos()"></div>
-          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Ministerio</label>
-            <select id="agenda-prox-ministerio" onchange="agendaRenderProximos()">
-              <option value="">Todos</option>
-            </select></div>
-          <button class="btn btn-sm" onclick="agendaResetProximosFiltro()">↺ Reset (30 días)</button>
-          ${canCrearEventos()?'<button class="btn btn-primary btn-sm" onclick="agendaAbrirForm()">+ Nuevo evento</button>':''}
+    <!-- ═══════════════ EVENTOS ═══════════════ -->
+    <div id="agenda-top-eventos" style="display:none">
+      <div class="nav" style="margin-bottom:1rem">
+        <button class="nav-btn active" id="agenda-tab-btn-activos" onclick="agendaTab('activos',this)">🟢 Activos</button>
+        <button class="nav-btn" id="agenda-tab-btn-historico" onclick="agendaTab('historico',this)">📁 Histórico</button>
+        <button class="nav-btn" id="agenda-tab-btn-cal" onclick="agendaTab('calendario',this)">📅 Calendario</button>
+      </div>
+
+      <div id="agenda-tab-calendario" style="display:none">
+        <div class="card">
+          <div id="agenda-cal-wrap"></div>
         </div>
+        <div style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:.5rem">🟣 Día con eventos — tocá un día para ver el detalle${canCrearEventos()?' o cargar uno nuevo':''}</div>
       </div>
-      <div id="agenda-proximos-list"></div>
+
+      <div id="agenda-tab-activos">
+        <div class="card" style="margin-bottom:1rem">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Hasta</label>
+              <input type="date" id="agenda-prox-hasta" onchange="agendaRenderProximos()"></div>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Ministerio</label>
+              <select id="agenda-prox-ministerio" onchange="agendaRenderProximos()">
+                <option value="">Todos</option>
+              </select></div>
+            <button class="btn btn-sm" onclick="agendaResetProximosFiltro()">↺ Reset (15 días)</button>
+            ${canCrearEventos()?'<button class="btn btn-primary btn-sm" onclick="agendaAbrirForm()">+ Nuevo evento</button>':''}
+          </div>
+        </div>
+        <div id="agenda-proximos-list"></div>
+      </div>
+
+      <div id="agenda-tab-historico" style="display:none">
+        <div class="card" style="margin-bottom:1rem">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+              <input type="date" id="agenda-hist-desde" onchange="agendaRenderHistoricoEventos()"></div>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Ministerio</label>
+              <select id="agenda-hist-ministerio" onchange="agendaRenderHistoricoEventos()">
+                <option value="">Todos</option>
+              </select></div>
+          </div>
+        </div>
+        <div id="agenda-historico-list"></div>
+      </div>
     </div>
 
     <!-- Modal: detalle del día -->
@@ -4529,14 +4638,41 @@ function buildAgendaHTML(){
         <textarea id="agenda-f-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;margin-bottom:10px;font-family:inherit"></textarea>
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Servicio/Ministerio</label>
         <select id="agenda-f-ministerio" style="margin-bottom:10px"><option value="">— Sin asignar —</option></select>
-        <div class="form-row">
-          <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha *</label>
-            <input type="date" id="agenda-f-fecha"></div>
-          <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hora</label>
-            <input type="time" id="agenda-f-hora"></div>
+        <div style="background:#F5F3FF;border-radius:10px;padding:10px 12px;margin-bottom:10px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#4C1D95">
+            <input type="checkbox" id="agenda-f-es-periodo" onchange="agendaTogglePeriodo()" style="width:16px;height:16px"> 📆 Es un período de varios días <span style="font-weight:400;color:#6B21A8">(no una fecha única)</span>
+          </label>
         </div>
+
+        <div id="agenda-f-fecha-unica-wrap">
+          <div class="form-row">
+            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha *</label>
+              <input type="date" id="agenda-f-fecha"></div>
+            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hora</label>
+              <input type="time" id="agenda-f-hora"></div>
+          </div>
+        </div>
+
+        <div id="agenda-f-fecha-periodo-wrap" style="display:none">
+          <div class="form-row">
+            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Desde *</label>
+              <input type="date" id="agenda-f-fecha-desde"></div>
+            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hasta *</label>
+              <input type="date" id="agenda-f-fecha-hasta"></div>
+          </div>
+          <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Hora <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+          <input type="time" id="agenda-f-hora-periodo" style="margin-bottom:10px">
+        </div>
+
         <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Lugar</label>
         <input type="text" id="agenda-f-lugar" placeholder="Ej: Salón principal" style="margin-bottom:10px">
+
+        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Responsable <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+        <div id="agenda-f-resp-chip" style="display:none;margin-bottom:6px"></div>
+        <div style="position:relative;margin-bottom:10px">
+          <input type="text" id="agenda-f-resp-search" placeholder="Buscar..." oninput="agendaSearchResponsable(this.value)" autocomplete="off">
+          <div id="agenda-f-resp-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
+        </div>
 
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Personas asignadas <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
         <input type="text" placeholder="Buscar..." oninput="agendaFilterMiembros(this.value)" style="margin-bottom:6px">
@@ -4552,7 +4688,7 @@ function buildAgendaHTML(){
           </div>
         </div>
 
-        <div style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:14px">
+        <div id="agenda-f-recur-wrap" style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:14px">
           <label style="font-size:13px;font-weight:500;color:#374151;display:block;margin-bottom:6px">🔁 Recurrencia</label>
           <select id="agenda-f-recur-tipo" onchange="agendaToggleRecurrencia()" style="margin-bottom:8px">
             <option value="ninguna">No se repite</option>
@@ -4571,29 +4707,129 @@ function buildAgendaHTML(){
         </div>
       </div>
     </div>
+
+    <!-- Modal: crear Checklist -->
+    <div id="agenda-cl-crear-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:340;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:15px;font-weight:700;color:#1F4E79">Nuevo Checklist — <span id="agenda-cl-crear-titulo"></span></div>
+          <button onclick="agendaCerrarModalCrearChecklist()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1">✕</button>
+        </div>
+        <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Coordinadores <span style="font-weight:400;color:#9CA3AF">(1 a 4 — el Responsable de la Actividad entra por defecto)</span></label>
+        <input type="text" placeholder="Buscar..." oninput="discFilterList(this.value,'agenda-cl-coord-list')" style="width:100%;margin-bottom:6px">
+        <div id="agenda-cl-coord-list" style="max-height:150px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:14px"></div>
+
+        <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Colaboradores <span style="font-weight:400;color:#9CA3AF">(sin límite)</span></label>
+        <input type="text" placeholder="Buscar..." oninput="discFilterList(this.value,'agenda-cl-colab-list')" style="width:100%;margin-bottom:6px">
+        <div id="agenda-cl-colab-list" style="max-height:150px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:14px"></div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn" onclick="agendaCerrarModalCrearChecklist()">Cancelar</button>
+          <button class="btn btn-primary" onclick="agendaGuardarChecklistNuevo()">Crear Checklist</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: detalle del Checklist -->
+    <div id="agenda-cl-detalle-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:340;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#1F4E79" id="agenda-cl-det-titulo">—</div>
+            <div id="agenda-cl-det-estado" style="font-size:11px;margin-top:2px"></div>
+          </div>
+          <button onclick="agendaCerrarModalDetalleChecklist()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1">✕</button>
+        </div>
+        <div id="agenda-cl-det-equipo" style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:1rem;font-size:12.5px"></div>
+        <div id="agenda-cl-det-cerrar-wrap" style="margin-bottom:1rem"></div>
+        <div id="agenda-cl-det-add-wrap" style="display:none;margin-bottom:1rem;background:#F9FAFB;border-radius:10px;padding:10px 12px">
+          <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Nueva tarea</label>
+          <input type="text" id="agenda-cl-nueva-tarea" placeholder="Título de la tarea..." style="width:100%;margin-bottom:8px">
+          <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Asignar a <span style="font-weight:400;color:#9CA3AF">(1 a 3 personas — obligatorio)</span></label>
+          <div id="agenda-cl-tarea-asig-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+          <div style="position:relative;margin-bottom:8px">
+            <input type="text" id="agenda-cl-tarea-asig-search" placeholder="Buscar..." oninput="agendaSearchAsignado(this.value)" autocomplete="off">
+            <div id="agenda-cl-tarea-asig-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:160px;overflow-y:auto"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" style="width:100%" onclick="agendaCrearTarea()">+ Agregar tarea</button>
+        </div>
+        <div id="agenda-cl-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem"></div>
+        <div id="agenda-cl-det-tareas"></div>
+      </div>
+    </div>
   </div>`;
 }
 
-function agendaTab(tab,btn){
-  document.querySelectorAll('.nav-btn[onclick*="agendaTab"]').forEach(function(b){b.classList.remove('active');});
+function agendaTopTab(tab,btn){
+  document.querySelectorAll('.nav-btn[onclick*="agendaTopTab"]').forEach(function(b){b.classList.remove('active');});
   if(btn) btn.classList.add('active');
+  var cl=document.getElementById('agenda-top-checklist');
+  var ev=document.getElementById('agenda-top-eventos');
+  if(tab==='eventos'){
+    if(cl) cl.style.display='none';
+    if(ev) ev.style.display='block';
+    agendaTab('activos');
+  } else {
+    if(cl) cl.style.display='block';
+    if(ev) ev.style.display='none';
+    agendaChecklistTab('activos');
+  }
+}
+
+function agendaTab(tab,btn){
+  document.querySelectorAll('.nav-btn[onclick*="agendaTab(\'"]').forEach(function(b){b.classList.remove('active');});
+  if(btn) btn.classList.add('active');
+  else {
+    var defaultBtn=document.getElementById('agenda-tab-btn-'+tab);
+    if(defaultBtn) defaultBtn.classList.add('active');
+  }
   var cal=document.getElementById('agenda-tab-calendario');
-  var prox=document.getElementById('agenda-tab-proximos');
+  var activos=document.getElementById('agenda-tab-activos');
+  var historico=document.getElementById('agenda-tab-historico');
+  [cal,activos,historico].forEach(function(el){ if(el) el.style.display='none'; });
   if(tab==='calendario'){
     if(cal) cal.style.display='block';
-    if(prox) prox.style.display='none';
     agendaRenderCalendario();
+  } else if(tab==='historico'){
+    if(historico) historico.style.display='block';
+    agendaRenderHistoricoEventos();
   } else {
-    if(cal) cal.style.display='none';
-    if(prox) prox.style.display='block';
+    if(activos) activos.style.display='block';
     agendaRenderProximos();
   }
 }
 
-// ── Ocurrencias: expande eventos recurrentes dentro de un rango de fechas ──
+function agendaChecklistTab(tab,btn){
+  document.querySelectorAll('.nav-btn[onclick*="agendaChecklistTab"]').forEach(function(b){b.classList.remove('active');});
+  if(btn) btn.classList.add('active');
+  else {
+    var defaultBtn=document.getElementById('agenda-cl-btn-'+tab);
+    if(defaultBtn) defaultBtn.classList.add('active');
+  }
+  agendaChecklistEstadoActual=tab;
+  agendaRenderChecklistList();
+}
+
+// ── Ocurrencias: expande eventos recurrentes y de Período dentro de un rango de fechas ──
 function agendaGetOcurrencias(desde,hasta){
   var ocs=[];
   (S.eventos||[]).filter(function(e){return e.estado!=='Cancelado';}).forEach(function(e){
+    if(e.tipoFecha==='periodo'&&e.fechaDesde&&e.fechaHasta){
+      var pDesde=new Date(e.fechaDesde+'T00:00:00');
+      var pHasta=new Date(e.fechaHasta+'T00:00:00');
+      var totalDias=Math.round((pHasta-pDesde)/86400000)+1;
+      var cur=new Date(pDesde<desde?desde:pDesde);
+      var tope=pHasta<hasta?pHasta:hasta;
+      var pasos=0;
+      while(cur<=tope&&pasos<520){
+        var fechaOc=cur.toISOString().slice(0,10);
+        var diaN=Math.round((cur-pDesde)/86400000)+1;
+        ocs.push(Object.assign({},e,{fechaOcurrencia:fechaOc,esPeriodo:true,diaDelPeriodo:diaN,totalDiasPeriodo:totalDias}));
+        cur.setDate(cur.getDate()+1);
+        pasos++;
+      }
+      return;
+    }
     var fechaBase=new Date(e.fecha+'T00:00:00');
     var rec=e.recurrencia||{tipo:'ninguna'};
     if(!rec.tipo||rec.tipo==='ninguna'){
@@ -4652,12 +4888,17 @@ function agendaRenderCalendario(){
     var enMes=cellDate.getMonth()===agendaCalMonth;
     var esHoy=key===hoyStr;
     var evs=ocsPorDia[key]||[];
-    html+='<div onclick="agendaOpenDia(\''+key+'\')" style="min-height:50px;border-radius:8px;padding:3px 4px;cursor:pointer;background:'+(esHoy?'#DBEAFE':'#fff')+';border:1px solid '+(esHoy?'#93C5FD':'#F3F4F6')+';opacity:'+(enMes?'1':'0.35')+'">'+
+    var evsUnicos=evs.filter(function(o){return !o.esPeriodo;});
+    var evsPeriodo=evs.filter(function(o){return o.esPeriodo;});
+    html+='<div onclick="agendaOpenDia(\''+key+'\')" style="min-height:50px;border-radius:8px;padding:3px 4px;cursor:pointer;background:'+(esHoy?'#DBEAFE':'#fff')+';border:1px solid '+(esHoy?'#93C5FD':'#F3F4F6')+';'+(evsPeriodo.length?'border-bottom:3px solid #C7A233;':'')+'opacity:'+(enMes?'1':'0.35')+'">'+
       '<div style="font-size:11px;font-weight:'+(esHoy?'700':'500')+';color:'+(esHoy?'#1E40AF':'#374151')+'">'+cellDate.getDate()+'</div>'+
-      (evs.length?'<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:3px">'+evs.slice(0,4).map(function(){return '<span style="width:5px;height:5px;border-radius:50%;background:#7C3AED;display:inline-block"></span>';}).join('')+(evs.length>4?'<span style="font-size:8px;color:#9CA3AF">+'+(evs.length-4)+'</span>':'')+'</div>':'')+
+      (evsUnicos.length?'<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:3px">'+evsUnicos.slice(0,4).map(function(){return '<span style="width:5px;height:5px;border-radius:50%;background:#7C3AED;display:inline-block"></span>';}).join('')+(evsUnicos.length>4?'<span style="font-size:8px;color:#9CA3AF">+'+(evsUnicos.length-4)+'</span>':'')+'</div>':'')+
     '</div>';
   }
   html+='</div>';
+  html+='<div style="display:flex;gap:14px;justify-content:center;margin-top:10px;font-size:10.5px;color:#6B7280">'+
+    '<span>🟣 Evento de un día</span><span>🟡 Período de varios días</span>'+
+  '</div>';
   wrap.innerHTML=html;
 }
 
@@ -4680,11 +4921,12 @@ function agendaOpenDia(fechaStr){
   } else {
     lista.innerHTML=ocs.map(function(o){
       var minLabel=agendaMinisterioLabel(o.ministerioId);
-      return '<div class="card" style="margin-bottom:8px;padding:10px 12px;border-left:4px solid #7C3AED">'+
+      return '<div class="card" style="margin-bottom:8px;padding:10px 12px;border-left:4px solid '+(o.esPeriodo?'#C7A233':'#7C3AED')+'">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
           '<div>'+
             '<div style="font-weight:700;font-size:14px;color:#1F2937">'+o.titulo+'</div>'+
             '<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(o.hora?'🕐 '+o.hora+' · ':'')+(o.lugar?'📍 '+o.lugar:'')+'</div>'+
+            (o.esPeriodo?'<div style="font-size:10px;color:#92400E;margin-top:2px">📆 Período: '+fmtAA(o.fechaDesde)+' al '+fmtAA(o.fechaHasta)+' — día '+o.diaDelPeriodo+' de '+o.totalDiasPeriodo+'</div>':'')+
             (minLabel?'<div style="font-size:11px;color:#7C3AED;margin-top:2px">🤝 '+minLabel+'</div>':'')+
             (o.recurrencia&&o.recurrencia.tipo!=='ninguna'?'<div style="font-size:10px;color:#9CA3AF;margin-top:2px">🔁 Se repite '+(o.recurrencia.tipo==='semanal'?'cada semana':'cada mes')+'</div>':'')+
           '</div>'+
@@ -4715,10 +4957,64 @@ function agendaFilterMiembros(q){
     lbl.style.display=lbl.textContent.toLowerCase().includes(q)?'':'none';
   });
 }
+
+// ── Responsable de la Actividad: selección única con buscador ──
+function agendaSearchResponsable(query){
+  var box=document.getElementById('agenda-f-resp-results');
+  if(!box) return;
+  var q=(query||'').trim().toLowerCase();
+  if(q.length<2){ box.style.display='none'; return; }
+  var results=S.members.filter(function(m){
+    return m.estado!=='Baja' && listName(m).toLowerCase().includes(q);
+  }).slice(0,8);
+  if(!results.length){
+    box.innerHTML='<div style="padding:9px 12px;font-size:13px;color:#9CA3AF">Sin resultados</div>';
+    box.style.display='block';
+    return;
+  }
+  box.innerHTML=results.map(function(m){
+    return '<div data-id="'+m.id+'" onpointerdown="event.preventDefault();agendaPickResponsableEl(this)" ontouchstart="event.preventDefault();agendaPickResponsableEl(this)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px;font-weight:600">'+listName(m)+'</div>';
+  }).join('');
+  box.style.display='block';
+}
+function agendaPickResponsableEl(el){
+  agendaSelectedResponsableId=parseInt(el.getAttribute('data-id'))||null;
+  agendaRenderResponsableChip();
+  var s=document.getElementById('agenda-f-resp-search'); if(s){s.value='';s.blur();}
+  var box=document.getElementById('agenda-f-resp-results'); if(box) box.style.display='none';
+}
+function agendaClearResponsable(){
+  agendaSelectedResponsableId=null;
+  agendaRenderResponsableChip();
+}
+function agendaRenderResponsableChip(){
+  var chip=document.getElementById('agenda-f-resp-chip');
+  if(!chip) return;
+  if(!agendaSelectedResponsableId){ chip.style.display='none'; chip.innerHTML=''; return; }
+  var m=S.members.find(function(x){return Number(x.id)===Number(agendaSelectedResponsableId);});
+  chip.style.display='block';
+  chip.innerHTML='<span style="display:inline-flex;align-items:center;gap:6px;background:#EFF6FF;border:1px solid #93C5FD;color:#1E40AF;font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px">👤 '+(m?listName(m):'—')+' <span onclick="agendaClearResponsable()" style="cursor:pointer;font-weight:700">×</span></span>';
+}
+
 function agendaToggleRecurrencia(){
   var tipo=document.getElementById('agenda-f-recur-tipo')?.value;
   var wrap=document.getElementById('agenda-f-recur-hasta-wrap');
   if(wrap) wrap.style.display=(tipo&&tipo!=='ninguna')?'block':'none';
+}
+function agendaTogglePeriodo(){
+  var esPeriodo=document.getElementById('agenda-f-es-periodo')?.checked;
+  var wrapUnica=document.getElementById('agenda-f-fecha-unica-wrap');
+  var wrapPeriodo=document.getElementById('agenda-f-fecha-periodo-wrap');
+  var wrapRecur=document.getElementById('agenda-f-recur-wrap');
+  if(wrapUnica) wrapUnica.style.display=esPeriodo?'none':'block';
+  if(wrapPeriodo) wrapPeriodo.style.display=esPeriodo?'block':'none';
+  if(wrapRecur) wrapRecur.style.display=esPeriodo?'none':'block';
+  if(esPeriodo){
+    // Período y Recurrencia son excluyentes — resetear la recurrencia si estaba cargada
+    var recurSel=document.getElementById('agenda-f-recur-tipo');
+    if(recurSel) recurSel.value='ninguna';
+    agendaToggleRecurrencia();
+  }
 }
 function agendaToggleRecordatorio(){
   var chk=document.getElementById('agenda-f-recordatorio');
@@ -4733,9 +5029,23 @@ function agendaAbrirForm(eventoId, fechaPrefill){
   document.getElementById('agenda-form-titulo').textContent=eventoId?'Editar evento':'Nuevo evento';
   document.getElementById('agenda-f-titulo').value=ev?ev.titulo:'';
   document.getElementById('agenda-f-desc').value=ev?(ev.descripcion||''):'';
-  document.getElementById('agenda-f-fecha').value=ev?ev.fecha:(fechaPrefill||today());
-  document.getElementById('agenda-f-hora').value=ev?(ev.hora||''):'';
+  var esPeriodo=!!(ev&&ev.tipoFecha==='periodo');
+  document.getElementById('agenda-f-es-periodo').checked=esPeriodo;
+  document.getElementById('agenda-f-fecha').value=(ev&&!esPeriodo)?ev.fecha:(fechaPrefill||today());
+  document.getElementById('agenda-f-hora').value=(ev&&!esPeriodo)?(ev.hora||''):'';
+  document.getElementById('agenda-f-fecha-desde').value=(ev&&esPeriodo)?(ev.fechaDesde||''):(fechaPrefill||today());
+  document.getElementById('agenda-f-fecha-hasta').value=(ev&&esPeriodo)?(ev.fechaHasta||''):'';
+  document.getElementById('agenda-f-hora-periodo').value=(ev&&esPeriodo)?(ev.hora||''):'';
+  agendaTogglePeriodo();
   document.getElementById('agenda-f-lugar').value=ev?(ev.lugar||''):'';
+
+  // Responsable
+  agendaSelectedResponsableId=ev&&ev.responsableId?ev.responsableId:null;
+  agendaRenderResponsableChip();
+  var respSearch=document.getElementById('agenda-f-resp-search');
+  if(respSearch) respSearch.value='';
+  var respResults=document.getElementById('agenda-f-resp-results');
+  if(respResults) respResults.style.display='none';
 
   // Ministerio: cada opción es Nombre + Área
   var minSel=document.getElementById('agenda-f-ministerio');
@@ -4786,24 +5096,38 @@ function agendaCloseForm(){
 
 async function agendaGuardarEvento(){
   var titulo=(document.getElementById('agenda-f-titulo')?.value||'').trim();
-  var fecha=document.getElementById('agenda-f-fecha')?.value||'';
-  if(!titulo||!fecha){ alert('Completá al menos Título y Fecha'); return; }
+  var esPeriodo=!!document.getElementById('agenda-f-es-periodo')?.checked;
+  var fecha, hora, fechaDesde='', fechaHasta='';
+  if(esPeriodo){
+    fechaDesde=document.getElementById('agenda-f-fecha-desde')?.value||'';
+    fechaHasta=document.getElementById('agenda-f-fecha-hasta')?.value||'';
+    hora=document.getElementById('agenda-f-hora-periodo')?.value||'';
+    if(!titulo||!fechaDesde||!fechaHasta){ alert('Completá al menos Título, Desde y Hasta'); return; }
+    if(fechaHasta<fechaDesde){ alert('La fecha "Hasta" no puede ser anterior a "Desde"'); return; }
+    fecha=fechaDesde; // compatibilidad: fecha = primer día del período
+  } else {
+    fecha=document.getElementById('agenda-f-fecha')?.value||'';
+    hora=document.getElementById('agenda-f-hora')?.value||'';
+    if(!titulo||!fecha){ alert('Completá al menos Título y Fecha'); return; }
+  }
   var descripcion=(document.getElementById('agenda-f-desc')?.value||'').trim();
   var ministerioId=parseInt(document.getElementById('agenda-f-ministerio')?.value)||null;
-  var hora=document.getElementById('agenda-f-hora')?.value||'';
   var lugar=(document.getElementById('agenda-f-lugar')?.value||'').trim();
   var personasAsignadas=[...document.querySelectorAll('.agenda-persona-cb:checked')].map(function(cb){return parseInt(cb.value);});
   var recordatorio={
     activo: !!document.getElementById('agenda-f-recordatorio')?.checked,
     diasAntes: parseInt(document.getElementById('agenda-f-record-dias')?.value)||3
   };
-  var recurTipo=document.getElementById('agenda-f-recur-tipo')?.value||'ninguna';
+  // Período y Recurrencia son excluyentes — si es período, la recurrencia queda vacía
+  var recurTipo=esPeriodo?'ninguna':(document.getElementById('agenda-f-recur-tipo')?.value||'ninguna');
   var recurrencia={
     tipo:recurTipo,
     hasta: recurTipo!=='ninguna' ? (document.getElementById('agenda-f-recur-hasta')?.value||'') : ''
   };
 
-  var data={titulo,descripcion,ministerioId,fecha,hora,lugar,personasAsignadas,recordatorio,recurrencia};
+  var data={titulo,descripcion,ministerioId,fecha,hora,lugar,
+    tipoFecha:esPeriodo?'periodo':'unica',fechaDesde:esPeriodo?fechaDesde:'',fechaHasta:esPeriodo?fechaHasta:'',
+    responsableId:agendaSelectedResponsableId,personasAsignadas,recordatorio,recurrencia};
 
   if(agendaEditingId){
     var ev=S.eventos.find(function(x){return Number(x.id)===Number(agendaEditingId);});
@@ -4852,30 +5176,47 @@ async function agendaEliminarEvento(id){
 }
 
 // ── Próximos eventos: lista con período ampliable ──
-function agendaRenderProximos(){
-  var desdeEl=document.getElementById('agenda-prox-desde');
-  var hastaEl=document.getElementById('agenda-prox-hasta');
-  if(desdeEl&&!desdeEl.value) desdeEl.value=today();
-  if(hastaEl&&!hastaEl.value){ var d=new Date(); d.setDate(d.getDate()+30); hastaEl.value=d.toISOString().slice(0,10); }
-
-  var minSel=document.getElementById('agenda-prox-ministerio');
-  if(minSel&&minSel.options.length<=1){
-    S.ministerios.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).forEach(function(m){
-      var o=document.createElement('option'); o.value=m.id; o.textContent=m.nombre+(m.area?' / '+m.area:''); minSel.appendChild(o);
-    });
+function agendaRenderOcurrenciasCard(o){
+  var minLabel=agendaMinisterioLabel(o.ministerioId);
+  var resp=o.responsableId?S.members.find(function(m){return Number(m.id)===Number(o.responsableId);}):null;
+  var checklist=agendaGetChecklist(o.id);
+  var mostrarBtnChecklist=checklist?agendaPuedeVerChecklist(checklist):canCrearEventos();
+  var btnChecklist='';
+  if(mostrarBtnChecklist){
+    if(checklist){
+      var tareas=(S.checklistTareas||[]).filter(function(t){return Number(t.checklistId)===Number(checklist.id);});
+      var fin=tareas.filter(function(t){return t.estado==='Finalizada';}).length;
+      btnChecklist='<button class="btn btn-sm" onclick="agendaAbrirChecklist('+o.id+')" style="background:#F5F3FF;border-color:#DDD6FE;color:#6D28D9;font-weight:600">📋 '+fin+'/'+tareas.length+'</button>';
+    } else {
+      btnChecklist='<button class="btn btn-sm" onclick="agendaAbrirChecklist('+o.id+')" style="background:#F5F3FF;border-color:#DDD6FE;color:#6D28D9;font-weight:600">📋 + Checklist</button>';
+    }
   }
+  return '<div class="card" style="margin-bottom:6px;padding:10px 12px;border-left:4px solid '+(o.esPeriodo?'#C7A233':'#7C3AED')+'">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+      '<div>'+
+        '<div style="font-weight:700;font-size:14px;color:#1F2937">'+o.titulo+'</div>'+
+        '<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(o.hora?'🕐 '+o.hora+' · ':'')+(o.lugar?'📍 '+o.lugar:'')+'</div>'+
+        (o.esPeriodo?'<div style="font-size:10px;color:#92400E;margin-top:2px">📆 Período: '+fmtAA(o.fechaDesde)+' al '+fmtAA(o.fechaHasta)+' — día '+o.diaDelPeriodo+' de '+o.totalDiasPeriodo+'</div>':'')+
+        (minLabel?'<div style="font-size:11px;color:#7C3AED;margin-top:2px">🤝 '+minLabel+'</div>':'')+
+        (resp?'<div style="font-size:11px;color:#1E40AF;margin-top:2px">👤 '+listName(resp)+'</div>':'')+
+        ((o.personasAsignadas||[]).length?'<div style="font-size:11px;color:#6B7280;margin-top:2px">👥 '+o.personasAsignadas.length+' asignado'+(o.personasAsignadas.length>1?'s':'')+'</div>':'')+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:flex-end">'+
+        (canCrearEventos()?'<div style="display:flex;gap:4px">'+
+          '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+')">✏️</button>'+
+          '<button onclick="agendaEliminarEvento('+o.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
+        '</div>':'')+
+        btnChecklist+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
 
-  var desde=new Date((desdeEl&&desdeEl.value?desdeEl.value:today())+'T00:00:00');
-  var hasta=new Date((hastaEl&&hastaEl.value?hastaEl.value:today())+'T23:59:59');
-  var fMinisterio=minSel?minSel.value:'';
-
-  var ocs=agendaGetOcurrencias(desde,hasta);
-  if(fMinisterio) ocs=ocs.filter(function(o){return String(o.ministerioId)===String(fMinisterio);});
-
-  var wrap=document.getElementById('agenda-proximos-list');
+function agendaRenderOcurrenciasList(ocs, wrapId, emptyMsg){
+  var wrap=document.getElementById(wrapId);
   if(!wrap) return;
   if(!ocs.length){
-    wrap.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">Sin eventos en el período seleccionado</div>';
+    wrap.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">'+emptyMsg+'</div>';
     return;
   }
   var porFecha={};
@@ -4884,35 +5225,681 @@ function agendaRenderProximos(){
     var evs=porFecha[fecha];
     return '<div style="margin-bottom:1rem">'+
       '<div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">'+fmt(fecha)+'</div>'+
-      evs.map(function(o){
-        var minLabel=agendaMinisterioLabel(o.ministerioId);
-        return '<div class="card" style="margin-bottom:6px;padding:10px 12px;border-left:4px solid #7C3AED">'+
-          '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
-            '<div>'+
-              '<div style="font-weight:700;font-size:14px;color:#1F2937">'+o.titulo+'</div>'+
-              '<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(o.hora?'🕐 '+o.hora+' · ':'')+(o.lugar?'📍 '+o.lugar:'')+'</div>'+
-              (minLabel?'<div style="font-size:11px;color:#7C3AED;margin-top:2px">🤝 '+minLabel+'</div>':'')+
-              ((o.personasAsignadas||[]).length?'<div style="font-size:11px;color:#6B7280;margin-top:2px">👥 '+o.personasAsignadas.length+' asignado'+(o.personasAsignadas.length>1?'s':'')+'</div>':'')+
-            '</div>'+
-            (canCrearEventos()?'<div style="display:flex;gap:4px;flex-shrink:0">'+
-              '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+')">✏️</button>'+
-              '<button onclick="agendaEliminarEvento('+o.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
-            '</div>':'')+
-          '</div>'+
-        '</div>';
-      }).join('')+
+      evs.map(agendaRenderOcurrenciasCard).join('')+
     '</div>';
   }).join('');
 }
 
+function agendaRenderProximos(){
+  var hastaEl=document.getElementById('agenda-prox-hasta');
+  if(hastaEl&&!hastaEl.value){ var d=new Date(); d.setDate(d.getDate()+15); hastaEl.value=d.toISOString().slice(0,10); }
+
+  var minSel=document.getElementById('agenda-prox-ministerio');
+  if(minSel&&minSel.options.length<=1){
+    S.ministerios.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).forEach(function(m){
+      var o=document.createElement('option'); o.value=m.id; o.textContent=m.nombre+(m.area?' / '+m.area:''); minSel.appendChild(o);
+    });
+  }
+
+  // Activos: siempre arranca hoy (incluido) — no editable
+  var desde=new Date(today()+'T00:00:00');
+  var hasta=new Date((hastaEl&&hastaEl.value?hastaEl.value:today())+'T23:59:59');
+  var fMinisterio=minSel?minSel.value:'';
+
+  var ocs=agendaGetOcurrencias(desde,hasta);
+  if(fMinisterio) ocs=ocs.filter(function(o){return String(o.ministerioId)===String(fMinisterio);});
+
+  agendaRenderOcurrenciasList(ocs,'agenda-proximos-list','Sin eventos en el período seleccionado');
+}
+
+function agendaRenderHistoricoEventos(){
+  var desdeEl=document.getElementById('agenda-hist-desde');
+  var minSel=document.getElementById('agenda-hist-ministerio');
+  if(minSel&&minSel.options.length<=1){
+    S.ministerios.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).forEach(function(m){
+      var o=document.createElement('option'); o.value=m.id; o.textContent=m.nombre+(m.area?' / '+m.area:''); minSel.appendChild(o);
+    });
+  }
+
+  // Histórico: siempre termina ayer (hoy no incluido) — arranca donde el usuario elija, o sin límite
+  var ayer=new Date(today()+'T00:00:00'); ayer.setDate(ayer.getDate()-1); ayer.setHours(23,59,59,999);
+  var desde=desdeEl&&desdeEl.value?new Date(desdeEl.value+'T00:00:00'):new Date(2000,0,1);
+  var fMinisterio=minSel?minSel.value:'';
+
+  var ocs=agendaGetOcurrencias(desde,ayer);
+  if(fMinisterio) ocs=ocs.filter(function(o){return String(o.ministerioId)===String(fMinisterio);});
+  ocs.sort(function(a,b){return b.fechaOcurrencia.localeCompare(a.fechaOcurrencia);});
+
+  agendaRenderOcurrenciasList(ocs,'agenda-historico-list','Sin eventos anteriores a hoy en el período seleccionado');
+}
+
 function agendaResetProximosFiltro(){
-  var desdeEl=document.getElementById('agenda-prox-desde');
   var hastaEl=document.getElementById('agenda-prox-hasta');
   var minSel=document.getElementById('agenda-prox-ministerio');
-  if(desdeEl) desdeEl.value=today();
-  if(hastaEl){ var d=new Date(); d.setDate(d.getDate()+30); hastaEl.value=d.toISOString().slice(0,10); }
+  if(hastaEl){ var d=new Date(); d.setDate(d.getDate()+15); hastaEl.value=d.toISOString().slice(0,10); }
   if(minSel) minSel.value='';
   agendaRenderProximos();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CHECKLIST DE ACTIVIDAD — opcional, por Evento
+// ══════════════════════════════════════════════════════════════════
+let agendaChecklistCrearEventoId=null;
+let agendaChecklistCrearEditando=null;
+let agendaChecklistDetalleId=null;
+let agendaTareasComentariosAbiertos={};
+let agendaNuevaTareaAsignados=[]; // ids de las 1-3 personas asignadas mientras se arma una tarea nueva
+let agendaFiltroEstado='todas'; // todas | pendiente | en_curso | completada | finalizada
+let agendaFiltroAsignado=''; // '' = todos, o un memberId
+
+function agendaFmtFechaHora(ts){
+  if(!ts) return '';
+  var d=(typeof ts==='number')?new Date(ts):new Date(ts);
+  return d.toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+function agendaMembersChecklistPoolHtml(idPrefix, seleccionados){
+  return S.members.filter(function(m){return m.estado!=='Baja';})
+    .sort(function(a,b){return listName(a).localeCompare(listName(b));})
+    .map(function(m){
+      var checked=(seleccionados||[]).map(Number).includes(Number(m.id));
+      var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+      var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+      return '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB;min-width:0">'
+        +'<input type="checkbox" class="'+idPrefix+'-cb" value="'+m.id+'"'+(checked?' checked':'')+' style="width:16px;height:16px;flex-shrink:0;cursor:pointer">'
+        +'<span style="background:'+genBg+';color:'+genColor+';font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;flex-shrink:0">'+m.genero+'</span>'
+        +'<span style="font-size:13px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+listName(m)+'</span>'
+        +'</label>';
+    }).join('');
+}
+
+function agendaAbrirChecklist(eventoId){
+  var checklist=agendaGetChecklist(eventoId);
+  if(checklist){
+    if(!agendaPuedeVerChecklist(checklist)){ alert('No tenés acceso a este Checklist.'); return; }
+    agendaAbrirChecklistDetalle(checklist.id);
+  } else {
+    if(!canCrearEventos()){ alert('No tenés permiso para crear un Checklist.'); return; }
+    agendaAbrirModalCrearChecklist(eventoId);
+  }
+}
+
+function agendaAbrirModalCrearChecklist(eventoId){
+  agendaChecklistCrearEventoId=eventoId;
+  agendaChecklistCrearEditando=null;
+  var ev=S.eventos.find(function(e){return Number(e.id)===Number(eventoId);});
+  if(!ev) return;
+  document.getElementById('agenda-cl-crear-titulo').textContent=ev.titulo;
+  var coordDefault=ev.responsableId?[ev.responsableId]:[];
+  document.getElementById('agenda-cl-coord-list').innerHTML=agendaMembersChecklistPoolHtml('agenda-cl-coord',coordDefault);
+  document.getElementById('agenda-cl-colab-list').innerHTML=agendaMembersChecklistPoolHtml('agenda-cl-colab',[]);
+  document.getElementById('agenda-cl-crear-overlay').style.display='flex';
+}
+
+function agendaAbrirModalEditarEquipo(checklistId){
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(checklistId);});
+  if(!checklist) return;
+  agendaChecklistCrearEventoId=checklist.eventoId;
+  agendaChecklistCrearEditando=checklist.id;
+  var ev=S.eventos.find(function(e){return Number(e.id)===Number(checklist.eventoId);});
+  document.getElementById('agenda-cl-crear-titulo').textContent=(ev?ev.titulo:'')+' — Editar equipo';
+  document.getElementById('agenda-cl-coord-list').innerHTML=agendaMembersChecklistPoolHtml('agenda-cl-coord',checklist.coordinadorIds);
+  document.getElementById('agenda-cl-colab-list').innerHTML=agendaMembersChecklistPoolHtml('agenda-cl-colab',checklist.colaboradorIds);
+  document.getElementById('agenda-cl-crear-overlay').style.display='flex';
+}
+
+function agendaCerrarModalCrearChecklist(){
+  document.getElementById('agenda-cl-crear-overlay').style.display='none';
+  agendaChecklistCrearEventoId=null;
+  agendaChecklistCrearEditando=null;
+}
+
+async function agendaGuardarChecklistNuevo(){
+  var coordinadorIds=[...document.querySelectorAll('.agenda-cl-coord-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  var colaboradorIds=[...document.querySelectorAll('.agenda-cl-colab-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  if(coordinadorIds.length<1){ alert('Elegí al menos 1 Coordinador.'); return; }
+  if(coordinadorIds.length>4){ alert('Como máximo se pueden elegir 4 Coordinadores.'); return; }
+
+  var esNuevo=!agendaChecklistCrearEditando;
+  var checklistPrevio=null;
+  if(agendaChecklistCrearEditando){
+    var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(agendaChecklistCrearEditando);});
+    if(!checklist) return;
+    checklistPrevio={coordinadorIds:checklist.coordinadorIds.slice(),colaboradorIds:checklist.colaboradorIds.slice()};
+    checklist.coordinadorIds=coordinadorIds;
+    checklist.colaboradorIds=colaboradorIds;
+  } else {
+    var nuevoId=Date.now();
+    S.checklists.push({
+      id:nuevoId, eventoId:agendaChecklistCrearEventoId,
+      coordinadorIds:coordinadorIds, colaboradorIds:colaboradorIds,
+      estado:'Activo', creadoPor:currentUser?.name||'Sistema', ts:Date.now()
+    });
+  }
+  await saveK(SK.checklists,S.checklists);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    if(esNuevo){ S.checklists.pop(); }
+    else { var c2=(S.checklists||[]).find(function(c){return Number(c.id)===Number(agendaChecklistCrearEditando);}); if(c2&&checklistPrevio) Object.assign(c2,checklistPrevio); }
+    await saveK(SK.checklists,S.checklists);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+
+  var abrirId=agendaChecklistCrearEditando||agendaGetChecklist(agendaChecklistCrearEventoId).id;
+  agendaCerrarModalCrearChecklist();
+  agendaAbrirChecklistDetalle(abrirId);
+  agendaRenderChecklistList();
+}
+
+function agendaCerrarModalDetalleChecklist(){
+  document.getElementById('agenda-cl-detalle-overlay').style.display='none';
+  agendaChecklistDetalleId=null;
+  agendaNuevaTareaAsignados=[];
+  agendaFiltroEstado='todas';
+  agendaFiltroAsignado='';
+}
+
+function agendaAbrirChecklistDetalle(checklistId){
+  agendaChecklistDetalleId=checklistId;
+  agendaNuevaTareaAsignados=[];
+  agendaFiltroEstado='todas';
+  agendaFiltroAsignado='';
+  agendaRenderChecklistDetalle();
+  document.getElementById('agenda-cl-detalle-overlay').style.display='flex';
+}
+
+function agendaRenderChecklistDetalle(){
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(agendaChecklistDetalleId);});
+  if(!checklist) return;
+  var ev=S.eventos.find(function(e){return Number(e.id)===Number(checklist.eventoId);});
+  var puedeAdmin=agendaPuedeAdminTareas(checklist);
+  var puedeCerrar=agendaEsResponsableDe(checklist);
+  var esHistorico=checklist.estado==='Historico';
+
+  document.getElementById('agenda-cl-det-titulo').textContent=(ev?ev.titulo:'Actividad')+' — Checklist';
+  document.getElementById('agenda-cl-det-estado').innerHTML=esHistorico
+    ?'<span class="badge b-muted">📁 Histórico — cerrado por '+(checklist.cerradoPor||'—')+' el '+fmtAA(checklist.fechaCierre||'')+'</span>'
+    :'<span class="badge b-ok">🟢 Activo</span>';
+
+  var coordNames=(checklist.coordinadorIds||[]).map(function(id){var m=S.members.find(function(x){return x.id===id;});return m?listName(m):null;}).filter(Boolean).join(', ');
+  var colabNames=(checklist.colaboradorIds||[]).map(function(id){var m=S.members.find(function(x){return x.id===id;});return m?listName(m):null;}).filter(Boolean).join(', ');
+  document.getElementById('agenda-cl-det-equipo').innerHTML=
+    '<div style="margin-bottom:4px"><strong>👔 Coordinadores:</strong> '+(coordNames||'—')+'</div>'
+    +'<div><strong>🙋 Colaboradores:</strong> '+(colabNames||'—')+'</div>'
+    +(puedeAdmin&&!esHistorico?'<button class="btn btn-sm" style="margin-top:8px" onclick="agendaAbrirModalEditarEquipo('+checklist.id+')">✏️ Editar equipo</button>':'');
+
+  var todasLasTareas=(S.checklistTareas||[]).filter(function(t){return Number(t.checklistId)===Number(checklist.id);});
+  var pendientesOCompletadas=todasLasTareas.filter(function(t){return t.estado!=='Finalizada';}).length;
+
+  var cerrarWrap=document.getElementById('agenda-cl-det-cerrar-wrap');
+  if(esHistorico){
+    cerrarWrap.innerHTML='';
+  } else if(puedeCerrar){
+    if(pendientesOCompletadas>0){
+      cerrarWrap.innerHTML='<div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;font-size:12.5px;color:#92400E">🔒 Para cerrar el Checklist, primero todas las tareas deben estar Finalizadas ('+pendientesOCompletadas+' pendiente'+(pendientesOCompletadas>1?'s':'')+').</div>';
+    } else {
+      cerrarWrap.innerHTML='<button class="btn btn-primary" style="width:100%;background:#166534" onclick="agendaCerrarChecklist('+checklist.id+')">🔒 Cerrar Checklist (pasa a Histórico)</button>';
+    }
+  } else {
+    cerrarWrap.innerHTML='';
+  }
+
+  var addWrap=document.getElementById('agenda-cl-det-add-wrap');
+  addWrap.style.display=(puedeAdmin&&!esHistorico)?'block':'none';
+  var nuevaTareaInp=document.getElementById('agenda-cl-nueva-tarea');
+  if(nuevaTareaInp) nuevaTareaInp.value='';
+  agendaRenderAsignadoChips();
+
+  agendaRenderFiltrosChecklist(todasLasTareas);
+
+  var tareas=todasLasTareas.filter(function(t){
+    if(agendaFiltroEstado==='pendiente'&&t.estado!=='Pendiente') return false;
+    if(agendaFiltroEstado==='en_curso'&&t.estado!=='En Curso') return false;
+    if(agendaFiltroEstado==='completada'&&t.estado!=='Completada') return false;
+    if(agendaFiltroEstado==='finalizada'&&t.estado!=='Finalizada') return false;
+    if(agendaFiltroAsignado&&!(t.asignadosIds||[]).map(Number).includes(Number(agendaFiltroAsignado))) return false;
+    return true;
+  });
+
+  var tareasWrap=document.getElementById('agenda-cl-det-tareas');
+  if(!todasLasTareas.length){
+    tareasWrap.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:10px;padding:1.5rem">Sin tareas todavía'+(puedeAdmin&&!esHistorico?' — agregá la primera arriba':'')+'.</div>';
+    return;
+  }
+  if(!tareas.length){
+    tareasWrap.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:10px;padding:1.5rem">Ninguna tarea coincide con el filtro elegido.</div>';
+    return;
+  }
+  tareasWrap.innerHTML=tareas.map(function(t){return agendaRenderTareaRow(t,checklist,puedeAdmin,esHistorico);}).join('');
+}
+
+function agendaRenderFiltrosChecklist(todasLasTareas){
+  var wrap=document.getElementById('agenda-cl-filtros');
+  if(!wrap) return;
+  var estados=[
+    {key:'todas',label:'Todas'},
+    {key:'pendiente',label:'⬜ Pendientes'},
+    {key:'en_curso',label:'🔵 En Curso'},
+    {key:'completada',label:'🟡 Completadas'},
+    {key:'finalizada',label:'🟢 Finalizadas'}
+  ];
+  var chipsHtml=estados.map(function(e){
+    var activo=agendaFiltroEstado===e.key;
+    return '<span onclick="agendaSetFiltroEstado(\''+e.key+'\')" style="cursor:pointer;font-size:12px;font-weight:600;padding:5px 12px;border-radius:99px;border:1px solid '+(activo?'#1F4E79':'#E5E7EB')+';background:'+(activo?'#1F4E79':'#fff')+';color:'+(activo?'#fff':'#4B5563')+'">'+e.label+'</span>';
+  }).join('');
+
+  // Personas distintas asignadas en este checklist, para el filtro "Asignada a"
+  var idsAsignados=[...new Set(todasLasTareas.flatMap(function(t){return t.asignadosIds||[];}))];
+  var nombresOpts=idsAsignados.map(function(id){
+    var m=S.members.find(function(x){return x.id===id;});
+    return m?{id:id,nombre:listName(m)}:null;
+  }).filter(Boolean).sort(function(a,b){return a.nombre.localeCompare(b.nombre);});
+  var selectHtml='<select onchange="agendaSetFiltroAsignado(this.value)" style="font-size:12px;padding:5px 10px;border-radius:99px;border:1px solid #E5E7EB;color:#4B5563">'
+    +'<option value="">👤 Asignada a...</option>'
+    +nombresOpts.map(function(o){return '<option value="'+o.id+'"'+(String(agendaFiltroAsignado)===String(o.id)?' selected':'')+'>'+o.nombre+'</option>';}).join('')
+    +'</select>';
+
+  wrap.innerHTML=chipsHtml+selectHtml;
+}
+function agendaSetFiltroEstado(key){
+  agendaFiltroEstado=key;
+  agendaRenderChecklistDetalle();
+}
+function agendaSetFiltroAsignado(val){
+  agendaFiltroAsignado=val;
+  agendaRenderChecklistDetalle();
+}
+
+function agendaRenderTareaRow(t,checklist,puedeAdmin,esHistorico){
+  var estadoColor={Pendiente:'#9CA3AF','En Curso':'#2563EB',Completada:'#D97706',Finalizada:'#16A34A'}[t.estado]||'#9CA3AF';
+  var estadoBg={Pendiente:'#F9FAFB','En Curso':'#EFF6FF',Completada:'#FFFBEB',Finalizada:'#F0FDF4'}[t.estado]||'#F9FAFB';
+  var comentarios=t.comentarios||[];
+  var abiertos=!!agendaTareasComentariosAbiertos[t.id];
+  var asignadosNombres=(t.asignadosIds||[]).map(function(id){var m=S.members.find(function(x){return x.id===id;});return m?listName(m):null;}).filter(Boolean);
+
+  var acciones='';
+  if(!esHistorico){
+    if(t.estado==='Pendiente'||t.estado==='En Curso'){
+      acciones+='<button class="btn btn-sm" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600" onclick="agendaMarcarCompletada('+t.id+')">✅ Marcar Completada</button>';
+    } else if(t.estado==='Completada'&&puedeAdmin){
+      acciones+='<button class="btn btn-sm" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600" onclick="agendaFinalizarTarea('+t.id+')">🔒 Finalizar</button>'
+        +'<button class="btn btn-sm" onclick="agendaVolverPendiente('+t.id+')">↩️ Volver a Pendiente</button>';
+    } else if(t.estado==='Finalizada'&&isSuperAdmin()){
+      acciones+='<button class="btn btn-sm" style="color:#D97706" onclick="agendaRevertirFinalizada('+t.id+')">↩️ Revertir (Super Admin)</button>';
+    }
+    if(puedeAdmin){
+      acciones+='<button class="btn btn-sm" onclick="agendaEditarTarea('+t.id+')">✏️</button>'
+        +'<button onclick="agendaEliminarTarea('+t.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>';
+    }
+  }
+
+  var html='<div class="card" style="margin-bottom:.6rem;padding:10px 12px;border-left:4px solid '+estadoColor+';background:'+estadoBg+'">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">';
+  html+='<div style="flex:1;min-width:180px">';
+  html+='<div style="font-weight:700;font-size:13.5px;color:#1F2937">'+t.titulo+'</div>';
+  html+='<div style="font-size:11px;color:'+estadoColor+';font-weight:700;margin-top:2px">'+t.estado+'</div>';
+  if(asignadosNombres.length){
+    html+='<div style="font-size:11.5px;color:#4B5563;margin-top:3px">👤 '+asignadosNombres.join(', ')+'</div>';
+  }
+  html+='<div style="font-size:10.5px;color:#9CA3AF;margin-top:3px">Creada por '+(t.creadoPor||'—')+' · '+agendaFmtFechaHora(t.fechaCreacion)+'</div>';
+  if(t.editadoPor){
+    html+='<div style="font-size:10.5px;color:#9CA3AF;margin-top:1px">✏️ Editada por '+t.editadoPor+' · '+agendaFmtFechaHora(t.fechaEdicion)+'</div>';
+  }
+  if(t.estado!=='Pendiente'&&t.comentarioCompletado){
+    html+='<div style="font-size:12px;color:#6B7280;margin-top:4px">✅ '+t.comentarioCompletado+'</div>';
+    html+='<div style="font-size:10.5px;color:#9CA3AF;margin-top:1px">Completada por '+(t.completadoPor||'')+' · '+agendaFmtFechaHora(t.fechaCompletado)+'</div>';
+  }
+  if(t.estado==='Finalizada'){
+    html+='<div style="font-size:10.5px;color:#9CA3AF;margin-top:1px">🔒 Finalizada por '+(t.finalizadoPor||'')+' · '+agendaFmtFechaHora(t.fechaFinalizado)+'</div>';
+  }
+  html+='</div>';
+  html+='<div style="display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0">'+acciones+'</div>';
+  html+='</div>';
+
+  html+='<div style="margin-top:8px">';
+  html+='<span onclick="agendaToggleComentariosTarea('+t.id+')" style="font-size:11.5px;font-weight:600;color:#6B7280;cursor:pointer">💬 '+(abiertos?'Ocultar':'Ver')+' comentarios ('+comentarios.length+')</span>';
+  if(abiertos){
+    html+='<div style="margin-top:6px;display:flex;flex-direction:column;gap:5px">';
+    comentarios.forEach(function(c){
+      html+='<div style="background:#F7F3E9;border-left:3px solid #C7A233;border-radius:6px;padding:6px 9px;font-size:12px;color:#2B2620">'
+        +c.texto+'<div style="color:#9CA3AF;font-size:10.5px;margin-top:2px">'+c.autor+' · '+agendaFmtFechaHora(c.ts)+'</div></div>';
+    });
+    html+='</div>';
+    if(!esHistorico){
+      html+='<div style="display:flex;gap:6px;margin-top:6px">'
+        +'<input type="text" id="agenda-cl-com-'+t.id+'" placeholder="Agregar comentario..." style="flex:1;font-size:12.5px;padding:6px 9px">'
+        +'<button class="btn btn-sm" onclick="agendaAgregarComentarioTarea('+t.id+')">Agregar</button></div>';
+    }
+  }
+  html+='</div>';
+  html+='</div>';
+  return html;
+}
+
+function agendaToggleComentariosTarea(tareaId){
+  agendaTareasComentariosAbiertos[tareaId]=!agendaTareasComentariosAbiertos[tareaId];
+  agendaRenderChecklistDetalle();
+}
+
+// ── Asignar tarea a 1-3 personas (cualquier miembro, mismo buscador general) ──
+function agendaSearchAsignado(query){
+  var box=document.getElementById('agenda-cl-tarea-asig-results');
+  if(!box) return;
+  var q=(query||'').trim().toLowerCase();
+  if(q.length<2){ box.style.display='none'; return; }
+  if(agendaNuevaTareaAsignados.length>=3){
+    box.innerHTML='<div style="padding:9px 12px;font-size:12.5px;color:#9CA3AF">Ya elegiste el máximo de 3 personas</div>';
+    box.style.display='block';
+    return;
+  }
+  var results=S.members.filter(function(m){
+    return m.estado!=='Baja' && !agendaNuevaTareaAsignados.includes(m.id) && listName(m).toLowerCase().includes(q);
+  }).slice(0,8);
+  if(!results.length){
+    box.innerHTML='<div style="padding:9px 12px;font-size:12.5px;color:#9CA3AF">Sin resultados</div>';
+    box.style.display='block';
+    return;
+  }
+  box.innerHTML=results.map(function(m){
+    return '<div data-id="'+m.id+'" onpointerdown="event.preventDefault();agendaPickAsignado(this)" ontouchstart="event.preventDefault();agendaPickAsignado(this)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px;font-weight:600">'+listName(m)+'</div>';
+  }).join('');
+  box.style.display='block';
+}
+function agendaPickAsignado(el){
+  var id=parseInt(el.getAttribute('data-id'))||null;
+  if(!id||agendaNuevaTareaAsignados.includes(id)) return;
+  if(agendaNuevaTareaAsignados.length>=3){ showToast('Como máximo se pueden asignar 3 personas','#D97706'); return; }
+  agendaNuevaTareaAsignados.push(id);
+  var s=document.getElementById('agenda-cl-tarea-asig-search'); if(s){s.value='';s.blur();}
+  var box=document.getElementById('agenda-cl-tarea-asig-results'); if(box) box.style.display='none';
+  agendaRenderAsignadoChips();
+}
+function agendaRemoveAsignadoChip(id){
+  agendaNuevaTareaAsignados=agendaNuevaTareaAsignados.filter(function(x){return x!==id;});
+  agendaRenderAsignadoChips();
+}
+function agendaRenderAsignadoChips(){
+  var wrap=document.getElementById('agenda-cl-tarea-asig-chips');
+  if(!wrap) return;
+  wrap.innerHTML=agendaNuevaTareaAsignados.map(function(id){
+    var m=S.members.find(function(x){return x.id===id;});
+    return '<span style="display:inline-flex;align-items:center;gap:6px;background:#EFF6FF;border:1px solid #93C5FD;color:#1E40AF;font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px">👤 '+(m?listName(m):'—')+' <span onclick="agendaRemoveAsignadoChip('+id+')" style="cursor:pointer;font-weight:700">×</span></span>';
+  }).join('');
+}
+
+async function agendaCrearTarea(){
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(agendaChecklistDetalleId);});
+  if(!checklist) return;
+  if(!agendaPuedeAdminTareas(checklist)){ alert('No tenés permiso para agregar tareas.'); return; }
+  var titulo=(document.getElementById('agenda-cl-nueva-tarea')?.value||'').trim();
+  if(!titulo){ showToast('Escribí un título para la tarea','#D97706'); return; }
+  if(agendaNuevaTareaAsignados.length<1||agendaNuevaTareaAsignados.length>3){
+    alert('Asigná la tarea a 1, 2 o 3 personas antes de guardarla.');
+    return;
+  }
+  var nuevaTarea={
+    id:Date.now(), checklistId:checklist.id, titulo:titulo, estado:'Pendiente',
+    asignadosIds:agendaNuevaTareaAsignados.slice(),
+    creadoPor:currentUser?.name||'Sistema', fechaCreacion:new Date().toISOString(),
+    editadoPor:null, fechaEdicion:null,
+    comentarios:[], completadoPor:null, comentarioCompletado:null, fechaCompletado:null,
+    finalizadoPor:null, fechaFinalizado:null
+  };
+  S.checklistTareas.push(nuevaTarea);
+  await saveK(SK.checklistTareas,S.checklistTareas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.checklistTareas=S.checklistTareas.filter(function(t){return t.id!==nuevaTarea.id;});
+    await saveK(SK.checklistTareas,S.checklistTareas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  agendaNuevaTareaAsignados=[];
+  agendaRenderAsignadoChips();
+  agendaRenderChecklistDetalle();
+  agendaRenderChecklistList();
+}
+
+async function agendaEditarTarea(tareaId){
+  var t=(S.checklistTareas||[]).find(function(x){return x.id===tareaId;});
+  if(!t) return;
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(t.checklistId);});
+  if(!checklist||!agendaPuedeAdminTareas(checklist)){ alert('No tenés permiso para editar esta tarea.'); return; }
+  var nuevoTitulo=prompt('Editar tarea:',t.titulo);
+  if(nuevoTitulo===null) return;
+  nuevoTitulo=nuevoTitulo.trim();
+  if(!nuevoTitulo) return;
+  var tituloPrevio=t.titulo;
+  var editadoPorPrevio=t.editadoPor, fechaEdicionPrevia=t.fechaEdicion;
+  t.titulo=nuevoTitulo;
+  t.editadoPor=currentUser?.name||'Sistema';
+  t.fechaEdicion=new Date().toISOString();
+  await saveK(SK.checklistTareas,S.checklistTareas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    t.titulo=tituloPrevio;
+    t.editadoPor=editadoPorPrevio;
+    t.fechaEdicion=fechaEdicionPrevia;
+    await saveK(SK.checklistTareas,S.checklistTareas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  agendaRenderChecklistDetalle();
+}
+
+async function agendaEliminarTarea(tareaId){
+  var t=(S.checklistTareas||[]).find(function(x){return x.id===tareaId;});
+  if(!t) return;
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(t.checklistId);});
+  if(!checklist||!agendaPuedeAdminTareas(checklist)){ alert('No tenés permiso para eliminar esta tarea.'); return; }
+  if(!confirm('¿Eliminar la tarea "'+t.titulo+'"? Esta acción no se puede deshacer.')) return;
+  S.checklistTareas=S.checklistTareas.filter(function(x){return x.id!==tareaId;});
+  addTombstone(SK.checklistTareas,tareaId);
+  await saveK(SK.checklistTareas,S.checklistTareas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.checklistTareas.push(t);
+    await saveK(SK.checklistTareas,S.checklistTareas);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  agendaRenderChecklistDetalle();
+  agendaRenderChecklistList();
+  showToast('🗑️ Tarea eliminada','#DC2626');
+}
+
+async function agendaMarcarCompletada(tareaId){
+  var t=(S.checklistTareas||[]).find(function(x){return x.id===tareaId;});
+  if(!t) return;
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(t.checklistId);});
+  if(!checklist||!agendaPuedeVerChecklist(checklist)){ alert('No tenés acceso a este Checklist.'); return; }
+  var comentario=prompt('Contanos brevemente qué se hizo (mínimo 10 caracteres):','');
+  if(comentario===null) return;
+  comentario=comentario.trim();
+  if(comentario.length<10){ alert('El comentario es obligatorio y debe tener al menos 10 caracteres.'); return; }
+  var prev={estado:t.estado,completadoPor:t.completadoPor,comentarioCompletado:t.comentarioCompletado,fechaCompletado:t.fechaCompletado,comentarios:(t.comentarios||[]).slice()};
+  t.estado='Completada';
+  t.completadoPor=currentUser?.name||'Sistema';
+  t.comentarioCompletado=comentario;
+  t.fechaCompletado=new Date().toISOString();
+  if(!t.comentarios) t.comentarios=[];
+  t.comentarios.push({texto:'✅ Completada: '+comentario,autor:t.completadoPor,ts:Date.now()});
+  await saveK(SK.checklistTareas,S.checklistTareas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(t,prev);
+    await saveK(SK.checklistTareas,S.checklistTareas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  agendaRenderChecklistDetalle();
+  agendaRenderChecklistList();
+  showToast('✅ Tarea marcada Completada','#16A34A');
+}
+
+async function agendaFinalizarTarea(tareaId){
+  var t=(S.checklistTareas||[]).find(function(x){return x.id===tareaId;});
+  if(!t) return;
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(t.checklistId);});
+  if(!checklist||!agendaPuedeAdminTareas(checklist)){ alert('No tenés permiso para finalizar esta tarea.'); return; }
+  var prev={estado:t.estado,finalizadoPor:t.finalizadoPor,fechaFinalizado:t.fechaFinalizado};
+  t.estado='Finalizada';
+  t.finalizadoPor=currentUser?.name||'Sistema';
+  t.fechaFinalizado=new Date().toISOString();
+  await saveK(SK.checklistTareas,S.checklistTareas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(t,prev);
+    await saveK(SK.checklistTareas,S.checklistTareas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  agendaRenderChecklistDetalle();
+  agendaRenderChecklistList();
+  showToast('🔒 Tarea Finalizada','#16A34A');
+}
+
+async function agendaVolverPendiente(tareaId){
+  var t=(S.checklistTareas||[]).find(function(x){return x.id===tareaId;});
+  if(!t) return;
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(t.checklistId);});
+  if(!checklist||!agendaPuedeAdminTareas(checklist)){ alert('No tenés permiso para esta acción.'); return; }
+  var prev={estado:t.estado,completadoPor:t.completadoPor,comentarioCompletado:t.comentarioCompletado,fechaCompletado:t.fechaCompletado};
+  t.estado='Pendiente';
+  t.completadoPor=null; t.comentarioCompletado=null; t.fechaCompletado=null;
+  await saveK(SK.checklistTareas,S.checklistTareas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(t,prev);
+    await saveK(SK.checklistTareas,S.checklistTareas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  agendaRenderChecklistDetalle();
+  agendaRenderChecklistList();
+}
+
+async function agendaRevertirFinalizada(tareaId){
+  if(!isSuperAdmin()){ alert('Revertir una tarea Finalizada es una acción exclusiva de Super Admin.'); return; }
+  var t=(S.checklistTareas||[]).find(function(x){return x.id===tareaId;});
+  if(!t) return;
+  if(!confirm('¿Revertir esta tarea Finalizada a Pendiente?')) return;
+  var prev={estado:t.estado,finalizadoPor:t.finalizadoPor,fechaFinalizado:t.fechaFinalizado,completadoPor:t.completadoPor,comentarioCompletado:t.comentarioCompletado,fechaCompletado:t.fechaCompletado};
+  t.estado='Pendiente';
+  t.finalizadoPor=null; t.fechaFinalizado=null;
+  t.completadoPor=null; t.comentarioCompletado=null; t.fechaCompletado=null;
+  await saveK(SK.checklistTareas,S.checklistTareas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(t,prev);
+    await saveK(SK.checklistTareas,S.checklistTareas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  agendaRenderChecklistDetalle();
+  agendaRenderChecklistList();
+}
+
+async function agendaAgregarComentarioTarea(tareaId){
+  var t=(S.checklistTareas||[]).find(function(x){return x.id===tareaId;});
+  if(!t) return;
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(t.checklistId);});
+  if(!checklist||!agendaPuedeVerChecklist(checklist)){ alert('No tenés acceso a este Checklist.'); return; }
+  var inp=document.getElementById('agenda-cl-com-'+tareaId);
+  var texto=(inp&&inp.value||'').trim();
+  if(!texto){ showToast('Escribí un comentario primero','#D97706'); return; }
+  if(!t.comentarios) t.comentarios=[];
+  var nuevoComentario={texto:texto,autor:currentUser?.name||'Sistema',ts:Date.now()};
+  var estadoPrevio=t.estado;
+  t.comentarios.push(nuevoComentario);
+  var pasoAEnCurso=false;
+  if(t.estado==='Pendiente'){ t.estado='En Curso'; pasoAEnCurso=true; }
+  await saveK(SK.checklistTareas,S.checklistTareas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    t.comentarios=t.comentarios.filter(function(c){return c!==nuevoComentario;});
+    t.estado=estadoPrevio;
+    await saveK(SK.checklistTareas,S.checklistTareas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  agendaTareasComentariosAbiertos[tareaId]=true;
+  agendaRenderChecklistDetalle();
+  agendaRenderChecklistList();
+  if(pasoAEnCurso) showToast('🔵 La tarea pasó a En Curso','#2563EB');
+}
+
+async function agendaCerrarChecklist(checklistId){
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(checklistId);});
+  if(!checklist) return;
+  if(!agendaEsResponsableDe(checklist)){ alert('Solo el Responsable de la Actividad (o Super Admin) puede cerrar este Checklist.'); return; }
+  var tareas=(S.checklistTareas||[]).filter(function(t){return Number(t.checklistId)===Number(checklist.id);});
+  if(tareas.some(function(t){return t.estado!=='Finalizada';})){
+    alert('Todavía hay tareas sin Finalizar. Cerrá o finalizá todas antes de cerrar el Checklist.');
+    return;
+  }
+  if(!confirm('¿Cerrar este Checklist? Pasará a Histórico.')) return;
+  var prev={estado:checklist.estado,fechaCierre:checklist.fechaCierre,cerradoPor:checklist.cerradoPor};
+  checklist.estado='Historico';
+  checklist.fechaCierre=today();
+  checklist.cerradoPor=currentUser?.name||'Sistema';
+  await saveK(SK.checklists,S.checklists);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(checklist,prev);
+    await saveK(SK.checklists,S.checklists);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  agendaRenderChecklistDetalle();
+  agendaRenderChecklistList();
+  showToast('🔒 Checklist cerrado — pasó a Histórico','#16A34A');
+}
+
+// ── Listado de Checklists (pestaña Checklist → Activos/Histórico) ──
+function agendaRenderChecklistList(){
+  var wrap=document.getElementById('agenda-checklist-list');
+  if(!wrap) return;
+  var estadoBuscado=agendaChecklistEstadoActual==='historico'?'Historico':'Activo';
+  var verTodos=isSuperAdmin()||canCrearEventos();
+  var lista=(S.checklists||[]).filter(function(c){
+    if(c.estado!==estadoBuscado) return false;
+    return verTodos||agendaEsCoordinadorDe(c)||agendaEsColaboradorDe(c)||agendaEsResponsableDe(c)||agendaEsAsignadoEnChecklist(c);
+  });
+  lista.sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+
+  if(!lista.length){
+    wrap.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">'
+      +(agendaChecklistEstadoActual==='historico'?'Sin Checklists cerrados todavía.':'Sin Checklists activos. Se crean desde 📅 Eventos, en la tarjeta de cada Actividad.')
+      +'</div>';
+    return;
+  }
+
+  wrap.innerHTML=lista.map(function(c){
+    var ev=S.eventos.find(function(e){return Number(e.id)===Number(c.eventoId);});
+    var tareas=(S.checklistTareas||[]).filter(function(t){return Number(t.checklistId)===Number(c.id);});
+    var fin=tareas.filter(function(t){return t.estado==='Finalizada';}).length;
+    var resp=ev&&ev.responsableId?S.members.find(function(m){return Number(m.id)===Number(ev.responsableId);}):null;
+    return '<div class="card" style="margin-bottom:.6rem;padding:12px;cursor:pointer" onclick="agendaAbrirChecklistDetalle('+c.id+')">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
+      +'<div>'
+      +'<div style="font-weight:700;font-size:14px;color:#1F2937">'+(ev?ev.titulo:'Actividad')+'</div>'
+      +'<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(ev?fmt(ev.fecha):'')+(resp?' · 👤 '+listName(resp):'')+'</div>'
+      +'</div>'
+      +'<span class="badge '+(fin===tareas.length&&tareas.length>0?'b-ok':'b-muted')+'">'+fin+'/'+tareas.length+' finalizadas</span>'
+      +'</div></div>';
+  }).join('');
 }
 
 // ── Banner de recordatorio (estilo cumpleaños) ──
@@ -5236,9 +6223,12 @@ async function cfgSaveUser(){
   const groupId=parseInt(document.getElementById('cfg-uf-group')?.value)||null;
   const memberIdVal=parseInt(document.getElementById('cfg-uf-member')?.value)||null;
   if(!name||!user||!pass){alert('Completá todos los campos');return;}
+  var esNuevo=!cfgEditingUserId;
+  var snapshotExisting=null, snapshotMemberRoles=null, memberIdTocado=null;
   if(cfgEditingUserId){
     const existing=S.users.find(x=>Number(x.id)===Number(cfgEditingUserId));
     if(!existing){alert('Error: usuario no encontrado');return;}
+    snapshotExisting=Object.assign({},existing);
     // Keep existing memberId when editing (member is read-only)
     // Also try reading selector directly in case memberId was never saved
     var selectorMemberId=parseInt(document.getElementById('cfg-uf-member')?.value)||null;
@@ -5246,30 +6236,28 @@ async function cfgSaveUser(){
     Object.assign(existing,{name,user,pass,role,groupId,memberId:resolvedMemberId});
     // Sincronizar función con S.members para que se vea en Rebaños
     var memberId=resolvedMemberId;
-    console.log('[CFG] memberId resuelto:', memberId, 'role:', role);
     if(memberId){
       var mem=S.members.find(function(m){return Number(m.id)===Number(memberId);});
-      console.log('[CFG] miembro encontrado:', mem?fullName(mem):'NO ENCONTRADO');
       if(mem){
+        memberIdTocado=memberId;
+        snapshotMemberRoles=(mem.roles||[]).slice();
         if(!mem.roles) mem.roles=[];
         if(!mem.roles.includes(role)) mem.roles.push(role);
         mem._ts=Date.now();
-        console.log('[CFG] roles actualizados:', mem.roles);
       }
     }
   } else {
     var newUser={id:Date.now(),name,user,pass,role,groupId,memberId:memberIdVal};
     S.users.push(newUser);
     // Sincronizar función con S.members para que se vea en Rebaños
-    console.log('[CFG] nuevo usuario, memberIdVal:', memberIdVal, 'role:', role);
     if(memberIdVal){
       var mem=S.members.find(function(m){return Number(m.id)===Number(memberIdVal);});
-      console.log('[CFG] miembro encontrado:', mem?fullName(mem):'NO ENCONTRADO');
       if(mem){
+        memberIdTocado=memberIdVal;
+        snapshotMemberRoles=(mem.roles||[]).slice();
         if(!mem.roles) mem.roles=[];
         if(!mem.roles.includes(role)) mem.roles.push(role);
         mem._ts=Date.now();
-        console.log('[CFG] roles actualizados:', mem.roles);
       }
     }
   }
@@ -5278,22 +6266,34 @@ async function cfgSaveUser(){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('cfgSaveUser Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(esNuevo){ S.users=S.users.filter(function(u){return u.id!==newUser.id;}); }
+    else { var ex2=S.users.find(function(u){return Number(u.id)===Number(cfgEditingUserId);}); if(ex2&&snapshotExisting) Object.assign(ex2,snapshotExisting); }
+    if(memberIdTocado!==null&&snapshotMemberRoles){
+      var mem2=S.members.find(function(m){return Number(m.id)===Number(memberIdTocado);});
+      if(mem2) mem2.roles=snapshotMemberRoles;
+    }
+    await saveK(SK.users,S.users);
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   try{if(typeof window.syncNow==="function")window.syncNow();}catch(_e){}
   cfgCloseUserForm();cfgRenderUsuarios();
 }
 async function cfgDeleteUser(id){
   if(!confirm('¿Eliminar este usuario?'))return;
+  var user=S.users.find(function(u){return u.id===id;});
   S.users=S.users.filter(u=>u.id!==id);
-  await saveK(SK.users,S.users);cfgRenderUsuarios();
+  await saveK(SK.users,S.users);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('cfgDeleteUser Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(user) S.users.push(user);
+    await saveK(SK.users,S.users);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  cfgRenderUsuarios();
 }
 function cfgCloseUserForm(){document.getElementById('cfg-user-form').classList.add('hidden');cfgEditingUserId=null;}
 
@@ -5334,27 +6334,45 @@ async function cfgSaveRole(){
   if(!name){alert('Ingresá un nombre');return;}
   const color=document.getElementById('cfg-rf-color').value;
   const desc=document.getElementById('cfg-rf-desc').value.trim();
-  if(cfgEditingRoleId) Object.assign(S.roles.find(x=>x.id===cfgEditingRoleId),{name,color,desc});
-  else S.roles.push({id:name.toLowerCase().replace(/\s+/g,'_')+Date.now(),name,color,desc});
-  await saveK(SK.roles,S.roles);cfgCloseRoleForm();cfgRenderRoles();
+  var esNuevo=!cfgEditingRoleId;
+  var snapshot=null, nuevoRoleId=null;
+  if(cfgEditingRoleId){
+    var existing=S.roles.find(x=>x.id===cfgEditingRoleId);
+    snapshot=Object.assign({},existing);
+    Object.assign(existing,{name,color,desc});
+  } else {
+    nuevoRoleId=name.toLowerCase().replace(/\s+/g,'_')+Date.now();
+    S.roles.push({id:nuevoRoleId,name,color,desc});
+  }
+  await saveK(SK.roles,S.roles);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('cfgSaveRole Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(esNuevo){ S.roles=S.roles.filter(function(r){return r.id!==nuevoRoleId;}); }
+    else { var ex2=S.roles.find(function(r){return r.id===cfgEditingRoleId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
+    await saveK(SK.roles,S.roles);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  cfgCloseRoleForm();cfgRenderRoles();
 }
 async function cfgDeleteRole(id){
   if(!confirm('¿Eliminar este rol? Se quitará de todos los miembros.'))return;
+  var role=S.roles.find(function(r){return r.id===id;});
+  var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
   S.roles=S.roles.filter(r=>r.id!==id);
   S.members.forEach(m=>{m.roles=(m.roles||[]).filter(rid=>rid!==id);});
-  await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);cfgRenderRoles();
+  await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('cfgDeleteRole Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(role) S.roles.push(role);
+    afectados.forEach(function(a){ a.m.roles=a.roles; });
+    await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  cfgRenderRoles();
 }
 function cfgCloseRoleForm(){document.getElementById('cfg-role-form').classList.add('hidden');cfgEditingRoleId=null;}
 
@@ -6109,6 +7127,7 @@ async function gdvSaveRecord(){
 
   // ── Auto-assign group to "Nuevos" so they appear in next encounter ──
   var membersUpdated=false;
+  var vinculosPrevios=[];
   for(let i=0;i<gdvVisitsNew.length;i++){
     var mid=gdvVisitsNewIds[i];
     var m=mid?S.members.find(function(x){return x.id===mid;}):null;
@@ -6118,12 +7137,22 @@ async function gdvSaveRecord(){
       m=S.members.find(function(x){return fullName(x).toLowerCase()===nombreBuscado.toLowerCase();});
     }
     if(m&&!m.grupoId){
+      vinculosPrevios.push(m);
       m.grupoId=gid; // Assign to this group
       await nvAplicarParticipando(m);
       membersUpdated=true;
     }
   }
-  if(membersUpdated) await saveK(SK.members,S.members);
+  if(membersUpdated){
+    await saveK(SK.members,S.members);
+    try{
+      if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    }catch(e){
+      vinculosPrevios.forEach(function(m){ m.grupoId=null; });
+      await saveK(SK.members,S.members);
+      alert('El encuentro se guardó, pero no se pudo vincular a las Personas Nuevas con el Grupo. Verificá tu conexión y volvé a intentarlo desde Rebaños.');
+    }
+  }
 
   const al=document.getElementById('gdv-fac-alert');
   al.textContent=sinEncuentro
@@ -6268,6 +7297,20 @@ document.addEventListener('click', function(e){
     const ngDd=document.getElementById('ng-ac-new');
     if(ngDd&&ngInp&&!ngInp.contains(e.target)&&!ngDd.contains(e.target)){
       ngDd.style.display='none';
+    }
+  }
+  {
+    const respInp=document.getElementById('agenda-f-resp-search');
+    const respDd=document.getElementById('agenda-f-resp-results');
+    if(respDd&&respInp&&!respInp.contains(e.target)&&!respDd.contains(e.target)){
+      respDd.style.display='none';
+    }
+  }
+  {
+    const asigInp=document.getElementById('agenda-cl-tarea-asig-search');
+    const asigDd=document.getElementById('agenda-cl-tarea-asig-results');
+    if(asigDd&&asigInp&&!asigInp.contains(e.target)&&!asigDd.contains(e.target)){
+      asigDd.style.display='none';
     }
   }
 });
@@ -6884,15 +7927,19 @@ function gdvRenderRegistros(){
 }
 async function gdvDeleteRecord(id){
   if(!confirm('¿Eliminar este registro? El dashboard se actualizará.'))return;
+  var r=S.records.find(function(x){return x.id===id;});
   S.records=S.records.filter(r=>r.id!==id);
   addTombstone(SK.records,id);
-  await saveK(SK.records,S.records);gdvRenderRegistros();gdvRenderDashboard();
+  await saveK(SK.records,S.records);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('gdvDeleteRecord Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(r) S.records.push(r);
+    await saveK(SK.records,S.records);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  gdvRenderRegistros();gdvRenderDashboard();
 }
 
 function gdvEditRecord(id){
@@ -6945,6 +7992,8 @@ async function gdvSaveEditRec(){
   var id=window._gdvEditRecId;
   var r=S.records.find(x=>String(x.id)===String(id));
   if(!r||r.sinEncuentro){gdvCloseEditRec();return;}
+  var prevAsistencia=JSON.parse(JSON.stringify(r.asistencia));
+  var prevTs=r._ts;
   Object.keys(r.asistencia).forEach(function(k){
     var cb=document.getElementById('gdv-edit-att-'+k);
     if(cb) r.asistencia[k].state=cb.checked?'presente':'ausente';
@@ -6954,8 +8003,11 @@ async function gdvSaveEditRec(){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('gdvSaveEditRec Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    r.asistencia=prevAsistencia;
+    r._ts=prevTs;
+    await saveK(SK.records,S.records);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   gdvCloseEditRec();
   gdvRenderRegistros();
@@ -7036,27 +8088,43 @@ async function gdvSaveMember(){
     estado:document.getElementById('gdv-mf-estado').value,
     tel:document.getElementById('gdv-mf-tel').value.trim(),
     roles:[...gdvSelectedRoles],dir:''};
-  if(gdvEditingMemberId)Object.assign(S.members.find(x=>x.id===gdvEditingMemberId),data);
-  else S.members.push({id:Date.now(),...data});
-  await saveK(SK.members,S.members);gdvCloseMemberForm();gdvRenderMiembros();
+  var esNuevo=!gdvEditingMemberId;
+  var snapshot=null, nuevoId=null;
+  if(gdvEditingMemberId){
+    var existing=S.members.find(x=>x.id===gdvEditingMemberId);
+    snapshot=Object.assign({},existing);
+    Object.assign(existing,data);
+  } else {
+    nuevoId=Date.now();
+    S.members.push({id:nuevoId,...data});
+  }
+  await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('gdvSaveMember Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(esNuevo){ S.members=S.members.filter(function(m){return m.id!==nuevoId;}); }
+    else { var ex2=S.members.find(function(m){return m.id===gdvEditingMemberId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  gdvCloseMemberForm();gdvRenderMiembros();
 }
 async function gdvDeleteMember(id){
   if(!confirm('¿Eliminar?'))return;
+  var m=S.members.find(function(x){return x.id===id;});
   S.members=S.members.filter(m=>m.id!==id);
   addTombstone(SK.members,id);
-  await saveK(SK.members,S.members);gdvRenderMiembros();
+  await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('gdvDeleteMember Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(m) S.members.push(m);
+    await saveK(SK.members,S.members);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  gdvRenderMiembros();
 }
 function gdvCloseMemberForm(){document.getElementById('gdv-member-form').classList.add('hidden');gdvEditingMemberId=null;}
 
@@ -7106,15 +8174,27 @@ async function gdvSaveGroup(){
   const name=document.getElementById('gdv-gf-name').value.trim();
   if(!name){alert('Ingresá un nombre');return;}
   const data={name,type:document.getElementById('gdv-gf-gender').value,facId:parseInt(document.getElementById('gdv-gf-fac').value)||null};
-  if(gdvEditingGroupId)Object.assign(S.groups.find(x=>x.id===gdvEditingGroupId),data);
-  else S.groups.push({id:Date.now(),...data});
-  await saveK(SK.groups,S.groups);gdvCloseGroupForm();gdvRenderGrupos();
+  var esNuevo=!gdvEditingGroupId;
+  var snapshot=null, nuevoId=null;
+  if(gdvEditingGroupId){
+    var existing=S.groups.find(x=>x.id===gdvEditingGroupId);
+    snapshot=Object.assign({},existing);
+    Object.assign(existing,data);
+  } else {
+    nuevoId=Date.now();
+    S.groups.push({id:nuevoId,...data});
+  }
+  await saveK(SK.groups,S.groups);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('gdvSaveGroup Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(esNuevo){ S.groups=S.groups.filter(function(g){return g.id!==nuevoId;}); }
+    else { var ex2=S.groups.find(function(g){return g.id===gdvEditingGroupId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
+    await saveK(SK.groups,S.groups);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  gdvCloseGroupForm();gdvRenderGrupos();
 }
 function gdvCloseGroupForm(){document.getElementById('gdv-group-form').classList.add('hidden');gdvEditingGroupId=null;}
 
@@ -7165,26 +8245,42 @@ async function gdvSaveUser(){
   const role=document.getElementById('gdv-uf-role').value;
   const groupId=parseInt(document.getElementById('gdv-uf-group').value)||null;
   if(!name||!user||!pass){alert('Completá todos los campos');return;}
-  if(gdvEditingUserId)Object.assign(S.users.find(x=>x.id===gdvEditingUserId),{name,user,pass,role,groupId});
-  else S.users.push({id:Date.now(),name,user,pass,role,groupId});
-  await saveK(SK.users,S.users);gdvCloseUserForm();gdvRenderUsuarios();
+  var esNuevo=!gdvEditingUserId;
+  var snapshot=null, nuevoId=null;
+  if(gdvEditingUserId){
+    var existing=S.users.find(x=>x.id===gdvEditingUserId);
+    snapshot=Object.assign({},existing);
+    Object.assign(existing,{name,user,pass,role,groupId});
+  } else {
+    nuevoId=Date.now();
+    S.users.push({id:nuevoId,name,user,pass,role,groupId});
+  }
+  await saveK(SK.users,S.users);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('gdvSaveUser Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(esNuevo){ S.users=S.users.filter(function(u){return u.id!==nuevoId;}); }
+    else { var ex2=S.users.find(function(u){return u.id===gdvEditingUserId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
+    await saveK(SK.users,S.users);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  gdvCloseUserForm();gdvRenderUsuarios();
 }
 async function gdvDeleteUser(id){
   if(!confirm('¿Eliminar?'))return;
+  var u=S.users.find(function(x){return x.id===id;});
   S.users=S.users.filter(u=>u.id!==id);
-  await saveK(SK.users,S.users);gdvRenderUsuarios();
+  await saveK(SK.users,S.users);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('gdvDeleteUser Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(u) S.users.push(u);
+    await saveK(SK.users,S.users);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  gdvRenderUsuarios();
 }
 function gdvCloseUserForm(){document.getElementById('gdv-user-form').classList.add('hidden');gdvEditingUserId=null;}
 
@@ -7218,27 +8314,45 @@ async function gdvSaveRole(){
   if(!name){alert('Ingresá nombre');return;}
   const color=document.getElementById('gdv-rf-color').value;
   const desc=document.getElementById('gdv-rf-desc').value.trim();
-  if(gdvEditingRoleId)Object.assign(S.roles.find(x=>x.id===gdvEditingRoleId),{name,color,desc});
-  else S.roles.push({id:name.toLowerCase().replace(/\s+/g,'_')+Date.now(),name,color,desc});
-  await saveK(SK.roles,S.roles);gdvCloseRoleForm();gdvRenderRoles();
+  var esNuevo=!gdvEditingRoleId;
+  var snapshot=null, nuevoRoleId=null;
+  if(gdvEditingRoleId){
+    var existing=S.roles.find(x=>x.id===gdvEditingRoleId);
+    snapshot=Object.assign({},existing);
+    Object.assign(existing,{name,color,desc});
+  } else {
+    nuevoRoleId=name.toLowerCase().replace(/\s+/g,'_')+Date.now();
+    S.roles.push({id:nuevoRoleId,name,color,desc});
+  }
+  await saveK(SK.roles,S.roles);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('gdvSaveRole Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(esNuevo){ S.roles=S.roles.filter(function(r){return r.id!==nuevoRoleId;}); }
+    else { var ex2=S.roles.find(function(r){return r.id===gdvEditingRoleId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
+    await saveK(SK.roles,S.roles);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  gdvCloseRoleForm();gdvRenderRoles();
 }
 async function gdvDeleteRole(id){
   if(!confirm('¿Eliminar este rol?'))return;
+  var role=S.roles.find(function(r){return r.id===id;});
+  var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
   S.roles=S.roles.filter(r=>r.id!==id);
   S.members.forEach(m=>{m.roles=(m.roles||[]).filter(rid=>rid!==id);});
-  await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);gdvRenderRoles();
+  await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('gdvDeleteRole Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(role) S.roles.push(role);
+    afectados.forEach(function(a){ a.m.roles=a.roles; });
+    await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  gdvRenderRoles();
 }
 function gdvCloseRoleForm(){document.getElementById('gdv-role-form').classList.add('hidden');gdvEditingRoleId=null;}
 
@@ -8556,8 +9670,15 @@ function nvDiasAlerta(){
 }
 async function nvSetDiasAlerta(val){
   const v=parseInt(val)||3;
+  const prev=localStorage.getItem('gdv_nv_dias_alerta');
   await saveK('gdv_nv_dias_alerta', v);
-  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){}
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    localStorage.setItem('gdv_nv_dias_alerta', prev);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   renderNuevos();
 }
 function nvFechaRegDate(m){
@@ -8932,21 +10053,25 @@ async function nvGuardarComentario(){
   const txt=(document.getElementById('nv-comentario-txt')?.value||'').trim();
   const huboSeguimiento=nvDraftSeguimientoSet;
   if(!txt&&!huboSeguimiento){showToast('No hay cambios para confirmar','#6B7280');return;}
+  var comentarioAgregado=null;
   if(txt){
     if(!m.comentarios) m.comentarios=[];
-    m.comentarios.push({
+    comentarioAgregado={
       texto:txt,
       autor:currentUser.name,
       ts:Date.now()
-    });
+    };
+    m.comentarios.push(comentarioAgregado);
   }
   document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('nvGuardarComentario Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(comentarioAgregado) m.comentarios=m.comentarios.filter(function(c){return c!==comentarioAgregado;});
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   nvClosePromote();
   renderNuevos();
@@ -8958,6 +10083,7 @@ async function nvCambiarSubEstadoManual(nuevoSubEstado){
   if(!m) return;
   const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
   const anterior=m.subEstado||'Ingresado';
+  var snapshot={subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice()};
   m.subEstado=nuevoSubEstado;
   if(nuevoSubEstado==='Contactado'&&anterior!=='Contactado'){
     m.contactadoPor=currentUser?.name||'Sistema';
@@ -8972,7 +10098,10 @@ async function nvCambiarSubEstadoManual(nuevoSubEstado){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    Object.assign(m,snapshot);
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   nvClosePromote();
   renderNuevos();
@@ -9022,6 +10151,7 @@ async function nvGuardarComentarioContactar(){
     alert('Para registrar el primer contacto escribí un comentario de al menos 10 caracteres (cómo fue, qué se conversó).');
     return;
   }
+  var snapshot={subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice()};
   if(!m.comentarios) m.comentarios=[];
   m.comentarios.push({texto:txt,autor:currentUser?.name||'Sistema',ts:Date.now()});
   if(esPrimerContacto){
@@ -9036,7 +10166,10 @@ async function nvGuardarComentarioContactar(){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    showToast('⚠️ Guardado local OK pero no se pudo sincronizar con la nube. Verificá tu red.','#D97706');
+    Object.assign(m,snapshot);
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   if(esPrimerContacto){
     nvCloseContactar();
@@ -9058,6 +10191,7 @@ async function nvPromover(condicion){
     document.getElementById('nv-comentario-txt')?.focus();
     return;
   }
+  var snapshot={condicion:m.condicion,subEstado:m.subEstado,comentarios:(m.comentarios||[]).slice()};
   const condAnterior=m.condicion||'Nuevo';
   m.condicion=condicion;
   if(condicion!=='Nuevo'){
@@ -9079,7 +10213,10 @@ async function nvPromover(condicion){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    showToast('⚠️ Guardado local OK pero no se pudo sincronizar con la nube. Verificá tu red.','#D97706');
+    Object.assign(m,snapshot);
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   nvClosePromote();
   renderNuevos();
@@ -9100,6 +10237,7 @@ async function nvDarDeBaja(){
     return;
   }
   if(!confirm('¿Pasar a Histórico a '+fullName(m)+'?')) return;
+  var snapshot=Object.assign({},m);
   m.condicion='Historico';
   m.subEstado=null;
   m.estado='Baja';
@@ -9113,6 +10251,14 @@ async function nvDarDeBaja(){
   });
   document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(m,snapshot);
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   nvClosePromote();
   renderNuevos();
   showToast(fullName(m)+' pasado/a a Histórico','#6B7280');
@@ -9187,6 +10333,7 @@ function nvCerrarEditar(){
 async function nvGuardarEditar(){
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
+  var snapshot=Object.assign({},m);
   m.nombre=document.getElementById('nv-edit-nombre').value.trim();
   m.apellido=document.getElementById('nv-edit-apellido').value.trim();
   m.tel=document.getElementById('nv-edit-tel').value.trim();
@@ -9213,8 +10360,10 @@ async function nvGuardarEditar(){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('nvGuardarEditar Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    Object.assign(m,snapshot);
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   nvCerrarEditar();
   var campSection=document.getElementById('nv-campana-section');
@@ -9226,6 +10375,7 @@ async function nvGuardarEditar(){
 async function nvReactivar(){
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
+  var snapshot=Object.assign({},m);
   const subEstadoAnterior=m.subEstado||'Ingresado';
   m.condicion='Nuevo';
   m.subEstado='Ingresado';
@@ -9245,6 +10395,14 @@ async function nvReactivar(){
   });
   if(document.getElementById('nv-comentario-txt')) document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(m,snapshot);
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   nvClosePromote();
   renderNuevos();
   showToast('♻️ '+fullName(m)+' re-activado como Nuevo','#16A34A');
@@ -9586,10 +10744,18 @@ function nvCampCloseGraduar(){
 async function nvGraduarUno(destino){
   var m=S.members.find(function(x){return x.id===nvGraduarId;});
   if(!m) return;
+  var snapshot=Object.assign({},m);
   await nvAplicarGraduacion(m, destino);
-  nvCampCloseGraduar();
   await saveK(SK.members,S.members);
-  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){ showToast('⚠️ Guardado sin sincronizar','#DC2626'); }
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(m,snapshot);
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  nvCampCloseGraduar();
   nvRenderCampana();
   showToast('🎓 '+fullName(m)+' — graduado/a a '+(destino==='Nuevo'?'Nuevos Contactos':'Histórico'),'#16A34A');
 }
@@ -9598,12 +10764,23 @@ async function nvGraduarSeleccionados(destino){
   if(!nvCampSeleccionados.length) return;
   var nombres=nvCampSeleccionados.map(function(id){var m=S.members.find(function(x){return x.id===id;});return m?fullName(m):null;}).filter(Boolean);
   if(!confirm('¿Graduar '+nvCampSeleccionados.length+' persona'+(nvCampSeleccionados.length!==1?'s':'')+' a '+(destino==='Nuevo'?'Nuevos Contactos':'Histórico')+'?')) return;
+  var snapshots=[];
   nvCampSeleccionados.forEach(function(id){
     var m=S.members.find(function(x){return x.id===id;});
-    if(m) nvAplicarGraduacion(m, destino);
+    if(m){ snapshots.push({id:id,data:Object.assign({},m)}); nvAplicarGraduacion(m, destino); }
   });
   await saveK(SK.members,S.members);
-  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){ showToast('⚠️ Guardado sin sincronizar','#DC2626'); }
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    snapshots.forEach(function(s){
+      var m=S.members.find(function(x){return x.id===s.id;});
+      if(m) Object.assign(m,s.data);
+    });
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   nvCampSeleccionados=[];
   nvRenderCampana();
   showToast('🎓 '+nombres.length+' persona'+(nombres.length!==1?'s':'')+' graduada'+(nombres.length!==1?'s':''),'#16A34A');
@@ -9651,9 +10828,17 @@ async function nvCampGuardarComentario(){
   var txt=(document.getElementById('nv-camp-com-txt')?.value||'').trim();
   if(!txt){ showToast('Escribí un comentario primero','#D97706'); return; }
   if(!m.comentarios) m.comentarios=[];
-  m.comentarios.push({texto:txt,autor:currentUser?.name||'Sistema',ts:Date.now()});
+  var nuevoComentario={texto:txt,autor:currentUser?.name||'Sistema',ts:Date.now()};
+  m.comentarios.push(nuevoComentario);
   await saveK(SK.members,S.members);
-  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){ showToast('⚠️ Guardado sin sincronizar','#DC2626'); }
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    m.comentarios=m.comentarios.filter(function(c){return c!==nuevoComentario;});
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   document.getElementById('nv-camp-com-txt').value='';
   nvCampRenderComentarios(m);
   showToast('💬 Comentario guardado','#16A34A');
@@ -10008,11 +11193,24 @@ function cfgResetPermisosRol(){
   document.body.appendChild(confirmDiv);
 }
 
-function cfgConfirmarReset(){
+async function cfgConfirmarReset(){
   if(!cfgPermRolSeleccionado) return;
   cfgCerrarConfirmReset();
+  const prev=JSON.parse(JSON.stringify(PERMISOS[cfgPermRolSeleccionado]||{}));
   PERMISOS[cfgPermRolSeleccionado]=JSON.parse(JSON.stringify(DEFAULT_PERMISOS[cfgPermRolSeleccionado]||{}));
-  savePermisos();
+  await savePermisos();
+  try{
+    const verificado=localStorage.getItem('gdv_permisos');
+    const ts=Date.now();
+    if(typeof window.fbSavePermisos==='function') await window.fbSavePermisos(verificado);
+    else await window.fbUpload(true);
+    localStorage.setItem('_local_ts_gdv_permisos', String(ts));
+  }catch(e){
+    PERMISOS[cfgPermRolSeleccionado]=prev;
+    await savePermisos();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   cfgRenderPermisosTabla();
   showToast('↺ Permisos restaurados a los valores originales','#1F4E79');
 }
@@ -10095,7 +11293,6 @@ async function cfgSavePermisos(){
     alert('❌ Error al guardar permisos.');
     return;
   }
-  window._permisosEditing=false;
   // Usar fbSavePermisos para subir con gdv_permisos_ts correcto
   // Esto garantiza que el timestamp específico de permisos se guarda en Firebase
   // y el download no los pisa al recargar
@@ -10107,10 +11304,12 @@ async function cfgSavePermisos(){
       await window.fbUpload(true);
     }
     localStorage.setItem('_local_ts_gdv_permisos', String(ts));
-    showToast('✅ Permisos guardados ☁️','#16A34A');
   }catch(e){
-    showToast('⚠️ Permisos guardados localmente pero NO en la nube','#D97706');
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  window._permisosEditing=false;
+  showToast('✅ Permisos guardados ☁️','#16A34A');
   setTimeout(function(){
     document.querySelectorAll('[id^="cfg-tab-"]').forEach(b=>b.className='btn btn-sm');
     const wrap=document.getElementById('cfg-content');
@@ -10121,8 +11320,21 @@ async function cfgSavePermisos(){
 }
 
 async function cfgResetPermisos(){
+  const prev=JSON.parse(JSON.stringify(PERMISOS));
   PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS)); // sets directly, bypasses guard
   await savePermisos();
+  try{
+    const verificado=localStorage.getItem('gdv_permisos');
+    const ts=Date.now();
+    if(typeof window.fbSavePermisos==='function') await window.fbSavePermisos(verificado);
+    else await window.fbUpload(true);
+    localStorage.setItem('_local_ts_gdv_permisos', String(ts));
+  }catch(e){
+    PERMISOS=prev;
+    await savePermisos();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   cfgRenderPermisosTabla();
   showToast('↺ Permisos restaurados','#1F4E79');
 }
@@ -10174,18 +11386,25 @@ async function saveRoleModal(){
   if(!name){alert('Ingresá un nombre para el rol');return;}
   const color=document.getElementById('rm-color').value;
   const desc=document.getElementById('rm-desc').value.trim();
+  var esNuevo=!roleModalEditingId;
+  var snapshot=null, nuevoId=null;
   if(roleModalEditingId){
-    Object.assign(S.roles.find(x=>x.id===roleModalEditingId),{name,color,desc});
+    var existing=S.roles.find(x=>x.id===roleModalEditingId);
+    snapshot=Object.assign({},existing);
+    Object.assign(existing,{name,color,desc});
   } else {
-    const id=name.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')+Date.now();
-    S.roles.push({id,name,color,desc});
+    nuevoId=name.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')+Date.now();
+    S.roles.push({id:nuevoId,name,color,desc});
   }
   await saveK(SK.roles,S.roles);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('saveRoleModal Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(esNuevo){ S.roles=S.roles.filter(function(r){return r.id!==nuevoId;}); }
+    else { var ex2=S.roles.find(function(r){return r.id===roleModalEditingId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
+    await saveK(SK.roles,S.roles);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   closeRoleModal();
   if(roleModalCallback) roleModalCallback();
@@ -10220,16 +11439,21 @@ function showRoleMembers(roleId, roleName){
 async function deleteRoleGlobal(id, callback){
   const r=S.roles.find(x=>x.id===id);
   if(!confirm(`¿Eliminar el rol "${r?.name}"? Se quitará de todos los miembros.`)) return;
+  var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
   S.roles=S.roles.filter(x=>x.id!==id);
   S.members.forEach(m=>{m.roles=(m.roles||[]).filter(rid=>rid!==id);});
   await saveK(SK.roles,S.roles);
+  await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('deleteRoleGlobal Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(r) S.roles.push(r);
+    afectados.forEach(function(a){ a.m.roles=a.roles; });
+    await saveK(SK.roles,S.roles);
+    await saveK(SK.members,S.members);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
-  await saveK(SK.members,S.members);
   if(callback) callback();
 }
 
@@ -10764,6 +11988,8 @@ async function discToggleCompletado(pasoId, memberId){
   if(!paso) return;
   if(!paso.completados) paso.completados={};
   var yaCompletado=paso.completados[memberId];
+  var snapshotPaso={completados:Object.assign({},paso.completados),fechasCompletado:Object.assign({},paso.fechasCompletado||{})};
+  var miembroTocado=null, snapshotFormacion=null;
 
   if(!yaCompletado){
     // Validar aprobacion: max 1 ausencia
@@ -10785,17 +12011,13 @@ async function discToggleCompletado(pasoId, memberId){
     // Auto-alimentar Formación del miembro
     var miembro=S.members.find(function(m){return m.id==memberId;});
     if(miembro){
-      if(!miembro.formacion) miembro.formacion=[];
-      var yaEnForm=miembro.formacion.find(function(f){return f.pasoId===pasoId&&f.fuente==='auto';});
+      var yaEnForm=(miembro.formacion||[]).find(function(f){return f.pasoId===pasoId&&f.fuente==='auto';});
       if(!yaEnForm){
+        miembroTocado=miembro;
+        snapshotFormacion=(miembro.formacion||[]).slice();
+        if(!miembro.formacion) miembro.formacion=[];
         miembro.formacion.push({pasoId,pasoNombre:paso.nombre,fechaCompletado:ultFecha,fuente:'auto'});
         await saveK(SK.members,S.members);
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    console.error('discToggleCompletado Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
-  }
       }
     }
   } else {
@@ -10803,6 +12025,15 @@ async function discToggleCompletado(pasoId, memberId){
   }
 
   await saveK(SK.discPasos,S.discPasos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(paso,snapshotPaso);
+    if(miembroTocado&&snapshotFormacion){ miembroTocado.formacion=snapshotFormacion; await saveK(SK.members,S.members); }
+    await saveK(SK.discPasos,S.discPasos);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   var c=document.getElementById('disc-content');
   if(c) discRenderDashboard(c);
   showToast(paso.completados[memberId]?'✅ Marcado como Completado':'⬜ Marcado como Incompleto',
@@ -10811,8 +12042,82 @@ async function discToggleCompletado(pasoId, memberId){
 
 function fgPopup(e,fecha,fuente){e.stopPropagation();document.querySelectorAll('.fg-popup').forEach(function(x){x.remove();});var div=document.createElement('div');div.className='fg-popup';div.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:14px 18px;box-shadow:0 4px 20px rgba(0,0,0,0.18);font-size:13px;min-width:160px';div.innerHTML='<button onclick="this.parentElement.remove()" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:16px;line-height:1;color:#9CA3AF;cursor:pointer;padding:2px 4px" title="Cerrar">✕</button><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">✅ Completado</div><div style="color:#6B7280;font-size:11px;margin-bottom:4px">Fecha</div><div style="font-weight:600;margin-bottom:10px">'+fecha+'</div><div style="color:#6B7280;font-size:11px;margin-bottom:4px">Origen</div><div style="font-weight:600">'+fuente+'</div>';var r=e.target.getBoundingClientRect();div.style.top=(r.bottom+6)+'px';div.style.left=Math.max(8,r.left-40)+'px';document.body.appendChild(div);setTimeout(function(){document.addEventListener('click',function h(){div.remove();document.removeEventListener('click',h);});},50);}
 function discGenLabel(pasoId,anio){var ant=(S.discCursadas||[]).filter(function(c){return c.pasoId===pasoId&&c.anio===anio;}).length;var p=S.discPasos.find(function(x){return x.id===pasoId;});return (p?p.nombre:'Paso')+' — '+(ant+1)+'/'+anio;}
-async function discAbrirCursada(pasoId){var paso=S.discPasos.find(function(p){return p.id===pasoId;});if(!paso)return;var activa=(S.discCursadas||[]).find(function(c){return c.pasoId===pasoId&&c.estado==='Activo';});if(activa){showToast('Ya hay una cursada activa para '+paso.nombre,'#D97706');return;}var anio=new Date().getFullYear();if(!S.discCursadas)S.discCursadas=[];var recsPrev=S.discRecords.filter(function(r){return r.pasoId===pasoId&&!r.cursadaId&&r.asistencia;});var memPrev=[...new Set(recsPrev.flatMap(function(r){return Object.keys(r.asistencia).filter(function(id){return r.asistencia[id]&&r.asistencia[id].state==='presente';})}))].map(Number).filter(Boolean);var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorIds:paso.discipuladorIds||[],miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:''};S.discCursadas.push(nc);S.discRecords.forEach(function(r){if(r.pasoId===pasoId&&!r.cursadaId)r.cursadaId=nc.id;});await saveK('gdv_disc_cursadas',S.discCursadas);await saveK('gdv_disc_records',S.discRecords);try{if(typeof window.fbUpload==='function')await window.fbUpload(true);}catch(e){}showToast('✅ Cursada '+nc.label+' iniciada'+(memPrev.length?' con '+memPrev.length+' integrantes':''),'#16A34A');var c=document.getElementById('disc-content');if(c)discRenderCursada(c);}
-async function discCerrarCursada(cursadaId){var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});if(!cursada)return;if(!confirm('¿Cerrar la cursada "'+cursada.label+'"?\nLos miembros con ≥75% serán marcados Completado.'))return;var recs=S.discRecords.filter(function(r){return (r.cursadaId===cursadaId||(r.pasoId===cursada.pasoId&&!r.cursadaId))&&r.asistencia;});var total=recs.length;var completados=0;cursada.miembros.forEach(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;if(!m.formacion)m.formacion=[];m.formacion=m.formacion.filter(function(f){return !(String(f.pasoId)===String(cursada.pasoId)&&f.fuente==='cursado'&&f.cursadaId===cursadaId);});if(pct>=75){m.formacion.push({pasoId:cursada.pasoId,cursadaId:cursadaId,cursadaLabel:cursada.label,pasoNombre:cursada.pasoNombre,fechaCompletado:todayAA(),fuente:'cursado'});completados++;}});cursada.estado='Completado';cursada.fechaCierre=todayAA();if(!cursada.num){var _a=new Date().getFullYear();var _ant=(S.discCursadas||[]).filter(function(c){return c.pasoId===cursada.pasoId&&c.anio===_a&&c.id!==cursada.id;}).length;cursada.num=_ant+1;cursada.anio=_a;cursada.label=cursada.pasoNombre+' — '+cursada.num+'/'+_a;}await saveK('gdv_disc_cursadas',S.discCursadas);await saveK('gdv_m5',S.members);try{if(typeof window.fbUpload==='function')await window.fbUpload(true);}catch(e){}showToast('✅ Cursada cerrada — '+completados+' completados','#16A34A');var c=document.getElementById('disc-content');if(c)discRenderCursada(c);}
+async function discAbrirCursada(pasoId){
+  var paso=S.discPasos.find(function(p){return p.id===pasoId;});
+  if(!paso) return;
+  var activa=(S.discCursadas||[]).find(function(c){return c.pasoId===pasoId&&c.estado==='Activo';});
+  if(activa){ showToast('Ya hay una cursada activa para '+paso.nombre,'#D97706'); return; }
+  var anio=new Date().getFullYear();
+  if(!S.discCursadas) S.discCursadas=[];
+  var recsPrev=S.discRecords.filter(function(r){return r.pasoId===pasoId&&!r.cursadaId&&r.asistencia;});
+  var memPrev=[...new Set(recsPrev.flatMap(function(r){return Object.keys(r.asistencia).filter(function(id){return r.asistencia[id]&&r.asistencia[id].state==='presente';});}))].map(Number).filter(Boolean);
+  var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorIds:paso.discipuladorIds||[],miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:''};
+  S.discCursadas.push(nc);
+  var recordsTocados=[];
+  S.discRecords.forEach(function(r){ if(r.pasoId===pasoId&&!r.cursadaId){ recordsTocados.push(r); r.cursadaId=nc.id; } });
+  await saveK('gdv_disc_cursadas',S.discCursadas);
+  await saveK('gdv_disc_records',S.discRecords);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.discCursadas=S.discCursadas.filter(function(c){return c.id!==nc.id;});
+    recordsTocados.forEach(function(r){ r.cursadaId=null; });
+    await saveK('gdv_disc_cursadas',S.discCursadas);
+    await saveK('gdv_disc_records',S.discRecords);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Cursada '+nc.label+' iniciada'+(memPrev.length?' con '+memPrev.length+' integrantes':''),'#16A34A');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+}
+async function discCerrarCursada(cursadaId){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
+  if(!cursada) return;
+  if(!confirm('¿Cerrar la cursada "'+cursada.label+'"?\nLos miembros con ≥75% serán marcados Completado.')) return;
+  var recs=S.discRecords.filter(function(r){return (r.cursadaId===cursadaId||(r.pasoId===cursada.pasoId&&!r.cursadaId))&&r.asistencia;});
+  var total=recs.length;
+  var completados=0;
+  var snapshotCursada={estado:cursada.estado,fechaCierre:cursada.fechaCierre,num:cursada.num,anio:cursada.anio,label:cursada.label};
+  var snapshotFormaciones=[];
+  cursada.miembros.forEach(function(mid){
+    var m=S.members.find(function(x){return x.id===mid;});
+    if(!m) return;
+    var asist=recs.filter(function(r){return r.asistencia[mid];}).length;
+    var pct=total>0?Math.round(asist/total*100):0;
+    if(!m.formacion) m.formacion=[];
+    snapshotFormaciones.push({m:m,formacion:m.formacion.slice()});
+    m.formacion=m.formacion.filter(function(f){return !(String(f.pasoId)===String(cursada.pasoId)&&f.fuente==='cursado'&&f.cursadaId===cursadaId);});
+    if(pct>=75){
+      m.formacion.push({pasoId:cursada.pasoId,cursadaId:cursadaId,cursadaLabel:cursada.label,pasoNombre:cursada.pasoNombre,fechaCompletado:todayAA(),fuente:'cursado'});
+      completados++;
+    }
+  });
+  cursada.estado='Completado';
+  cursada.fechaCierre=todayAA();
+  if(!cursada.num){
+    var _a=new Date().getFullYear();
+    var _ant=(S.discCursadas||[]).filter(function(c){return c.pasoId===cursada.pasoId&&c.anio===_a&&c.id!==cursada.id;}).length;
+    cursada.num=_ant+1;
+    cursada.anio=_a;
+    cursada.label=cursada.pasoNombre+' — '+cursada.num+'/'+_a;
+  }
+  await saveK('gdv_disc_cursadas',S.discCursadas);
+  await saveK('gdv_m5',S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(cursada,snapshotCursada);
+    snapshotFormaciones.forEach(function(s){ s.m.formacion=s.formacion; });
+    await saveK('gdv_disc_cursadas',S.discCursadas);
+    await saveK('gdv_m5',S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Cursada cerrada — '+completados+' completados','#16A34A');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+}
 
 // Super Admin: deshacer el Cierre de una Cursada — vuelve a Activo y saca las Formaciones auto-marcadas por ese cierre
 async function discRevertirCierre(cursadaId){
@@ -10821,15 +12126,27 @@ async function discRevertirCierre(cursadaId){
   if(!cursada) return;
   if(cursada.estado!=='Completado'){ showToast('Esta cursada no está cerrada','#D97706'); return; }
   if(!confirm('¿Revertir el cierre de "'+cursada.label+'"?\nVuelve a quedar Activa y se sacan las Formaciones que se marcaron automáticamente al cerrarla.')) return;
+  var snapshotCursada={estado:cursada.estado,fechaCierre:cursada.fechaCierre};
+  var snapshotFormaciones=[];
   S.members.forEach(function(m){
     if(!m.formacion) return;
+    snapshotFormaciones.push({m:m,formacion:m.formacion.slice()});
     m.formacion=m.formacion.filter(function(f){return !(f.cursadaId===cursadaId&&f.fuente==='cursado');});
   });
   cursada.estado='Activo';
   cursada.fechaCierre='';
   await saveK('gdv_disc_cursadas',S.discCursadas);
   await saveK(SK.members,S.members);
-  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){}
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(cursada,snapshotCursada);
+    snapshotFormaciones.forEach(function(s){ s.m.formacion=s.formacion; });
+    await saveK('gdv_disc_cursadas',S.discCursadas);
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   showToast('↩️ Cierre revertido — la cursada volvió a Activo','#D97706');
   var c=document.getElementById('disc-content');
   if(c){ if(document.getElementById('disc-tab-historico')&&document.getElementById('disc-tab-historico').className.includes('btn-primary')) discRenderHistorico(c); else discRenderCursada(c); }
@@ -10842,12 +12159,22 @@ async function discRevertirInicio(cursadaId){
   if(!cursada) return;
   if(cursada.estado!=='Activo'){ showToast('Esta cursada ya no está en curso','#D97706'); return; }
   if(!confirm('¿Revertir el inicio de "'+cursada.label+'"?\nSe elimina esta cursada. Los encuentros ya cargados quedan sin cursada asociada y se podrán re-agrupar al iniciar una nueva.')) return;
-  S.discRecords.forEach(function(r){ if(r.cursadaId===cursadaId) r.cursadaId=null; });
+  var recordsTocados=[];
+  S.discRecords.forEach(function(r){ if(r.cursadaId===cursadaId){ recordsTocados.push(r); r.cursadaId=null; } });
   S.discCursadas=(S.discCursadas||[]).filter(function(c){return c.id!==cursadaId;});
   addTombstone('gdv_disc_cursadas',cursadaId);
   await saveK('gdv_disc_cursadas',S.discCursadas);
   await saveK('gdv_disc_records',S.discRecords);
-  try{ if(typeof window.fbUpload==='function') await window.fbUpload(true); }catch(e){}
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.discCursadas.push(cursada);
+    recordsTocados.forEach(function(r){ r.cursadaId=cursadaId; });
+    await saveK('gdv_disc_cursadas',S.discCursadas);
+    await saveK('gdv_disc_records',S.discRecords);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   showToast('↩️ Inicio revertido','#D97706');
   var c=document.getElementById('disc-content');
   if(c) discRenderCursada(c);
@@ -10977,13 +12304,17 @@ function discCloseAsignacion(){
 async function discGuardarAsignacion(){
   var paso=S.discPasos.find(function(p){return p.id===discAsignandoPasoId;});
   if(!paso) return;
+  var snapshot={discipuladorIds:(paso.discipuladorIds||[]).slice(),miembros:(paso.miembros||[]).slice()};
   paso.discipuladorIds=[...document.querySelectorAll('.disc-disc-cb:checked')].map(function(cb){return parseInt(cb.value);});
   paso.miembros=[...document.querySelectorAll('.disc-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
   await saveK(SK.discPasos,S.discPasos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    Object.assign(paso,snapshot);
+    await saveK(SK.discPasos,S.discPasos);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   discCloseAsignacion();
   var c=document.getElementById('disc-content');
@@ -11056,21 +12387,25 @@ async function discGuardarCurso(){
     return;
   }
   var esNuevo=!discEditingPasoId;
-  var paso;
+  var paso, snapshot=null;
   if(esNuevo){
     paso={id:Date.now(),nombre,nivel,capitulos,discipuladorIds:[],miembros:[],estado:'Activo',completados:{}};
     S.discPasos.push(paso);
   } else {
     paso=S.discPasos.find(function(p){return p.id===discEditingPasoId;});
     if(!paso) return;
+    snapshot={nombre:paso.nombre,nivel:paso.nivel,capitulos:(paso.capitulos||[]).slice()};
     paso.nombre=nombre; paso.nivel=nivel; paso.capitulos=capitulos;
   }
   await saveK(SK.discPasos,S.discPasos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('discGuardarCurso Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(esNuevo){ S.discPasos=S.discPasos.filter(function(p){return p.id!==paso.id;}); }
+    else { Object.assign(paso,snapshot); }
+    await saveK(SK.discPasos,S.discPasos);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   discCloseModal();
   var c=document.getElementById('disc-content');
@@ -11081,13 +12416,16 @@ async function discGuardarCurso(){
 async function discToggleEstado(pasoId){
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   if(!paso) return;
+  var prev=paso.estado;
   paso.estado=paso.estado==='Activo'?'Inactivo':'Activo';
   await saveK(SK.discPasos,S.discPasos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('discToggleEstado Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    paso.estado=prev;
+    await saveK(SK.discPasos,S.discPasos);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   discTab('cursos', document.getElementById('disc-tab-cursos'));
 }
@@ -11266,14 +12604,17 @@ async function discGuardarAsistencia(){
 // ── Registros ──
 async function discDeleteRecord(id){
   if(!confirm('¿Eliminar este registro? Los dashboards se actualizarán.')) return;
-  S.discRecords=S.discRecords.filter(function(r){return r.id!==id;});
+  var r=S.discRecords.find(function(x){return x.id===id;});
+  S.discRecords=S.discRecords.filter(function(x){return x.id!==id;});
   addTombstone(SK.discRecords,id);
   await saveK(SK.discRecords,S.discRecords);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('discDeleteRecord Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    if(r) S.discRecords.push(r);
+    await saveK(SK.discRecords,S.discRecords);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   var c=document.getElementById('disc-registros-wrap');
   if(c) discRenderRegistros(c);
@@ -11326,6 +12667,8 @@ async function discSaveEdit(){
   var id=window._discEditId;
   var r=S.discRecords.find(function(x){return x.id===id;});
   if(!r) return;
+  var prevAsistencia=JSON.parse(JSON.stringify(r.asistencia));
+  var prevTs=r._ts;
   Object.keys(r.asistencia).forEach(function(k){
     var sel=document.getElementById('disc-edit-'+k);
     if(sel) r.asistencia[k].state=sel.value;
@@ -11335,8 +12678,11 @@ async function discSaveEdit(){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    console.error('discSaveEdit Firebase error:',e);
-    showToast('⚠️ Guardado sin sincronizar — verificá tu conexión','#DC2626');
+    r.asistencia=prevAsistencia;
+    r._ts=prevTs;
+    await saveK(SK.discRecords,S.discRecords);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
   discCloseEdit();
   var c=document.getElementById('disc-registros-wrap');
@@ -12042,8 +13388,13 @@ async function importarTodo(event){
       ofMaterias      = backup.of.materias      || [];
       ofSave();
       input.value='';
-      // Sync to Firebase after import
-      if(window.fbReady && window.fbUpload) await window.fbUpload();
+      // Sync to Firebase after import — bloquear si falla, NO recargar con datos sin confirmar
+      try{
+        if(window.fbReady && window.fbUpload) await window.fbUpload(true);
+      }catch(syncErr){
+        alert('El respaldo se guardó en este dispositivo, pero no se pudo sincronizar con la nube. Verificá tu conexión y volvé a intentar la importación antes de recargar la página.');
+        return;
+      }
       showToast('✅ Datos importados y sincronizados con la nube', '#16A34A');
       setTimeout(()=>location.reload(), 2000);
     } catch(err){

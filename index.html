@@ -62,6 +62,18 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#2E75B6}
 
 /* ══ GRUPOS DE VIDA STYLES ══ */
 .gdv-app{max-width:720px;margin:0 auto;padding:1rem}
+
+/* ── Modales que aprovechan más ancho en pantallas grandes (desktop) ── */
+.modal-box-resp{width:100%;max-height:90vh;overflow-y:auto}
+.modal-box-md.modal-box-resp{max-width:480px}
+.modal-box-lg.modal-box-resp{max-width:560px}
+.form-grid-2{display:block}
+@media (min-width:900px){
+  .modal-box-md.modal-box-resp{max-width:680px}
+  .modal-box-lg.modal-box-resp{max-width:760px}
+  .form-grid-2{display:grid;grid-template-columns:1fr 1fr;column-gap:24px}
+  .form-grid-2>.form-col-full{grid-column:1/-1}
+}
 .card{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:1.25rem;margin-bottom:1rem;box-shadow:0 2px 12px rgba(0,0,0,0.2)}
 .card-title{font-size:15px;font-weight:600;color:#1F4E79;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1rem}
@@ -4627,15 +4639,20 @@ function buildAgendaHTML(){
 
     <!-- Modal: crear/editar evento -->
     <div id="agenda-form-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:320;align-items:center;justify-content:center;padding:1rem">
-      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+      <div class="modal-box-md modal-box-resp" style="background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 12px 40px rgba(0,0,0,.2)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
           <div style="font-size:15px;font-weight:700;color:#1F4E79" id="agenda-form-titulo">Nuevo evento</div>
           <button onclick="agendaCloseForm()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1" title="Cerrar">✕</button>
         </div>
+        <div class="form-grid-2">
+        <div class="form-col-full">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Título *</label>
         <input type="text" id="agenda-f-titulo" placeholder="Ej: Ensayo de Alabanza" style="margin-bottom:10px">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Descripción</label>
         <textarea id="agenda-f-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;margin-bottom:10px;font-family:inherit"></textarea>
+        </div>
+
+        <div>
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Servicio/Ministerio</label>
         <select id="agenda-f-ministerio" style="margin-bottom:10px"><option value="">— Sin asignar —</option></select>
         <div style="background:#F5F3FF;border-radius:10px;padding:10px 12px;margin-bottom:10px">
@@ -4649,7 +4666,7 @@ function buildAgendaHTML(){
             <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha *</label>
               <input type="date" id="agenda-f-fecha"></div>
             <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hora</label>
-              <input type="time" id="agenda-f-hora"></div>
+              <input type="time" id="agenda-f-hora" step="900"></div>
           </div>
         </div>
 
@@ -4661,12 +4678,14 @@ function buildAgendaHTML(){
               <input type="date" id="agenda-f-fecha-hasta"></div>
           </div>
           <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Hora <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
-          <input type="time" id="agenda-f-hora-periodo" style="margin-bottom:10px">
+          <input type="time" id="agenda-f-hora-periodo" step="900" style="margin-bottom:10px">
         </div>
 
         <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Lugar</label>
         <input type="text" id="agenda-f-lugar" placeholder="Ej: Salón principal" style="margin-bottom:10px">
+        </div>
 
+        <div>
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Responsable <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
         <div id="agenda-f-resp-chip" style="display:none;margin-bottom:6px"></div>
         <div style="position:relative;margin-bottom:10px">
@@ -4700,39 +4719,47 @@ function buildAgendaHTML(){
             <input type="date" id="agenda-f-recur-hasta">
           </div>
         </div>
+        </div>
 
-        <div style="display:flex;gap:8px;justify-content:flex-end">
+        <div class="form-col-full" style="display:flex;gap:8px;justify-content:flex-end">
           <button class="btn" onclick="agendaCloseForm()">Cancelar</button>
           <button class="btn btn-primary" onclick="agendaGuardarEvento()">Guardar</button>
+        </div>
         </div>
       </div>
     </div>
 
     <!-- Modal: crear Checklist -->
     <div id="agenda-cl-crear-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:340;align-items:center;justify-content:center;padding:1rem">
-      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+      <div class="modal-box-md modal-box-resp" style="background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 12px 40px rgba(0,0,0,.2)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
           <div style="font-size:15px;font-weight:700;color:#1F4E79">Nuevo Checklist — <span id="agenda-cl-crear-titulo"></span></div>
           <button onclick="agendaCerrarModalCrearChecklist()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1">✕</button>
         </div>
+        <div class="form-grid-2">
+        <div>
         <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Coordinadores <span style="font-weight:400;color:#9CA3AF">(1 a 4 — el Responsable de la Actividad entra por defecto)</span></label>
         <input type="text" placeholder="Buscar..." oninput="discFilterList(this.value,'agenda-cl-coord-list')" style="width:100%;margin-bottom:6px">
-        <div id="agenda-cl-coord-list" style="max-height:150px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:14px"></div>
+        <div id="agenda-cl-coord-list" style="max-height:220px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:14px"></div>
+        </div>
 
+        <div>
         <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Colaboradores <span style="font-weight:400;color:#9CA3AF">(sin límite)</span></label>
         <input type="text" placeholder="Buscar..." oninput="discFilterList(this.value,'agenda-cl-colab-list')" style="width:100%;margin-bottom:6px">
-        <div id="agenda-cl-colab-list" style="max-height:150px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:14px"></div>
+        <div id="agenda-cl-colab-list" style="max-height:220px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:14px"></div>
+        </div>
 
-        <div style="display:flex;gap:8px;justify-content:flex-end">
+        <div class="form-col-full" style="display:flex;gap:8px;justify-content:flex-end">
           <button class="btn" onclick="agendaCerrarModalCrearChecklist()">Cancelar</button>
           <button class="btn btn-primary" onclick="agendaGuardarChecklistNuevo()">Crear Checklist</button>
+        </div>
         </div>
       </div>
     </div>
 
     <!-- Modal: detalle del Checklist -->
     <div id="agenda-cl-detalle-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:340;align-items:center;justify-content:center;padding:1rem">
-      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+      <div class="modal-box-lg modal-box-resp" style="background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 12px 40px rgba(0,0,0,.2)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
           <div>
             <div style="font-size:15px;font-weight:700;color:#1F4E79" id="agenda-cl-det-titulo">—</div>
@@ -4743,15 +4770,23 @@ function buildAgendaHTML(){
         <div id="agenda-cl-det-equipo" style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:1rem;font-size:12.5px"></div>
         <div id="agenda-cl-det-cerrar-wrap" style="margin-bottom:1rem"></div>
         <div id="agenda-cl-det-add-wrap" style="display:none;margin-bottom:1rem;background:#F9FAFB;border-radius:10px;padding:10px 12px">
-          <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Nueva tarea</label>
-          <input type="text" id="agenda-cl-nueva-tarea" placeholder="Título de la tarea..." style="width:100%;margin-bottom:8px">
-          <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Asignar a <span style="font-weight:400;color:#9CA3AF">(1 a 3 personas — obligatorio)</span></label>
-          <div id="agenda-cl-tarea-asig-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
-          <div style="position:relative;margin-bottom:8px">
-            <input type="text" id="agenda-cl-tarea-asig-search" placeholder="Buscar..." oninput="agendaSearchAsignado(this.value)" autocomplete="off">
-            <div id="agenda-cl-tarea-asig-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:160px;overflow-y:auto"></div>
+          <div class="form-grid-2">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Nueva tarea</label>
+            <input type="text" id="agenda-cl-nueva-tarea" placeholder="Título de la tarea..." style="width:100%;margin-bottom:8px">
           </div>
-          <button class="btn btn-primary btn-sm" style="width:100%" onclick="agendaCrearTarea()">+ Agregar tarea</button>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Asignar a <span style="font-weight:400;color:#9CA3AF">(1 a 3 personas — obligatorio)</span></label>
+            <div id="agenda-cl-tarea-asig-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+            <div style="position:relative;margin-bottom:8px">
+              <input type="text" id="agenda-cl-tarea-asig-search" placeholder="Buscar..." oninput="agendaSearchAsignado(this.value)" autocomplete="off">
+              <div id="agenda-cl-tarea-asig-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:160px;overflow-y:auto"></div>
+            </div>
+          </div>
+          <div class="form-col-full">
+            <button class="btn btn-primary btn-sm" style="width:100%" onclick="agendaCrearTarea()">+ Agregar tarea</button>
+          </div>
+          </div>
         </div>
         <div id="agenda-cl-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem"></div>
         <div id="agenda-cl-det-tareas"></div>

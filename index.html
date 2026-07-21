@@ -1363,6 +1363,18 @@ function ngGetFilteredRecords(){
   return recs;
 }
 
+// Determina si una entrada de asistencia entra en el conteo según el filtro de Sexo
+// del dashboard NG (incluye el caso especial "Líderes y Colabs"). Usado por todas las
+// pestañas del dashboard (Semanas, Evolución, Ranking, % Asistencia, tarjetas) para que
+// el filtro se aplique de forma consistente en todos lados.
+function ngMatchesSexoFilter(a){
+  var esLC=!!(a&&(a.esLider||a.esColab));
+  if(ngFilSexo==='lideres') return esLC;
+  if(esLC) return false;
+  if(ngFilSexo && a.genero!==ngFilSexo) return false;
+  return true;
+}
+
 // ── DASHBOARD ──────────────────────────────────────────────────────
 function ngRenderDashboard(c){
   if(!c) c=document.getElementById('ng-tab-content');
@@ -1430,45 +1442,58 @@ function ngDashTab(tab,btn){
   else if(tab==='nuevos') ngRenderNuevosPanel();
 }
 
+// Agrupa el "tipo" de cada Comunidad NG en las 3 categorías que se muestran en el
+// dashboard. Hoy 'Preadolescentes' se agrupa dentro de "Niños" (mismo criterio que usa
+// Marito: Rojo + Naranja + Preadolescentes = Niños). Si mañana se suman más tipos que
+// deban tener su propia categoría, alcanza con agregarlos acá.
+function ngCategoriaDeTipo(tipo){
+  if(tipo==='Jóvenes') return 'Jóvenes';
+  if(tipo==='Adolescentes') return 'Adoles';
+  if(tipo==='Niños'||tipo==='Preadolescentes') return 'Niños';
+  return tipo||'Otros';
+}
+
 function ngGetStatData(){
   var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
-  var allLiderIds=new Set();
-  (S.ngComunidades||[]).forEach(function(ngx){
-    (ngx.liderIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
-    (ngx.colaboradorIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
-  });
-  var coms=new Set(recs.map(function(r){return r.comunidadId;}));
-  var varones=0,chicas=0,presTotal=0,varNuevos=0,chkNuevas=0;
+  var comMap={};
+  (S.ngComunidades||[]).forEach(function(c){comMap[Number(c.id)]=c;});
+  // "Comunidades" = cantidad de categorías distintas presentes entre las Comunidades activas
+  // (no la cantidad de Grupos — eso es lo que estaba mal antes)
+  var comsActivas=(S.ngComunidades||[]).filter(function(c){return c.estado!=='Inactivo';});
+  var categoriasActivas=new Set(comsActivas.map(function(c){return ngCategoriaDeTipo(c.tipo);}));
+  var porCategoria={}; // categoria -> {pres, nuevos}
+  var presTotal=0,nuevosTotal=0;
   recs.forEach(function(r){
-    Object.entries(r.asistencia||{}).forEach(function(e){
-      var a=e[1];
-      if(a.esLider||a.esColab) return;
+    var com=comMap[Number(r.comunidadId)];
+    var cat=ngCategoriaDeTipo(com?com.tipo:null);
+    if(!porCategoria[cat]) porCategoria[cat]={pres:0,nuevos:0};
+    Object.values(r.asistencia||{}).forEach(function(a){
+      if(!ngMatchesSexoFilter(a)) return;
       if(a.state!=='presente') return;
       presTotal++;
-      if(a.genero==='H') varones++;
-      else if(a.genero==='M') chicas++;
+      porCategoria[cat].pres++;
     });
-    (r.visitsNew||[]).forEach(function(n){
-      // Simple heuristic: can't determine gender from name easily
-      varNuevos++;  // show total as varones nuevos for now
-    });
+    if(ngFilSexo!=='lideres'){
+      var nNew=(r.visitsNew||[]).length;
+      nuevosTotal+=nNew;
+      porCategoria[cat].nuevos+=nNew;
+    }
   });
-  var totalPartic=new Set();
-  recs.forEach(function(r){Object.keys(r.asistencia||{}).forEach(function(id){if(!allLiderIds.has(Number(id))) totalPartic.add(id);});});
-  return {comunidades:coms.size,participantes:totalPartic.size,varones,chicas,presTotal,varNuevos,chkNuevas};
+  return {categoriasCount:categoriasActivas.size,porCategoria,presTotal,nuevosTotal};
 }
 
 function ngRenderDashStats(){
   var s=ngGetStatData();
   var el=document.getElementById('ng-stat-cards');
   if(!el) return;
+  var pc=s.porCategoria;
   var stats=[
-    {icon:'🌿',label:'Comunidades',val:s.comunidades},
-    {icon:'👥',label:'Participantes',val:s.participantes},
-    {icon:'👦',label:'Varones',val:s.varones},
-    {icon:'👧',label:'Chicas',val:s.chicas},
+    {icon:'🌿',label:'Comunidades',val:s.categoriasCount},
+    {icon:'🧑',label:'Jóvenes',val:(pc['Jóvenes']&&pc['Jóvenes'].pres)||0},
+    {icon:'🧒',label:'Adoles',val:(pc['Adoles']&&pc['Adoles'].pres)||0},
+    {icon:'👶',label:'Niños',val:(pc['Niños']&&pc['Niños'].pres)||0},
     {icon:'✅',label:'Total Presentes',val:s.presTotal},
-    {icon:'🌱',label:'Nuevos',val:s.varNuevos},
+    {icon:'🌱',label:'Nuevos',val:s.nuevosTotal},
   ];
   el.innerHTML=stats.map(function(s){
     return '<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:14px 10px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px">'+
@@ -1512,7 +1537,7 @@ function ngRenderSemanas(){
           return;
         }
         var att=Object.values(r.asistencia||{});
-        var main=att.filter(function(a){return !a.esLider&&!a.esColab;});
+        var main=att.filter(ngMatchesSexoFilter);
         var pres=main.filter(function(a){return a.state==='presente';}).length;
         var tot=main.length;
         var pct=tot?Math.round(pres/tot*100):0;
@@ -1546,13 +1571,12 @@ function ngRenderEvolucion(){
     var key=anio+'-S'+String(semana).padStart(2,'0');
     if(!byWeek[key]) byWeek[key]={h:0,m:0,semana:semana,anio:anio,new:0};
     Object.values(r.asistencia||{}).forEach(function(a){
-      if(a.esLider||a.esColab) return;
+      if(!ngMatchesSexoFilter(a)) return;
       if(a.state!=='presente') return;
-      if(ngFilSexo&&ngFilSexo!=='lideres'&&a.genero!==ngFilSexo) return;
       if(a.genero==='H') byWeek[key].h++;
       else if(a.genero==='M') byWeek[key].m++;
     });
-    byWeek[key].new+=(r.visitsNew||[]).length;
+    if(ngFilSexo!=='lideres') byWeek[key].new+=(r.visitsNew||[]).length;
   });
   var sorted=Object.keys(byWeek).sort();
   if(!sorted.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
@@ -1577,11 +1601,11 @@ function ngRenderEvolucion(){
   if(ngCharts.evo){try{ngCharts.evo.destroy();}catch(e){} ngCharts.evo=null;}
   var labels=sorted.map(function(k){return 'Semana '+byWeek[k].semana;});
   var datasets=[];
-  if(!ngFilSexo||ngFilSexo==='H') datasets.push({
+  if(!ngFilSexo||ngFilSexo==='H'||ngFilSexo==='lideres') datasets.push({
     label:'Hombres',data:sorted.map(function(k){return byWeek[k].h;}),
     borderColor:'#1565C0',backgroundColor:'rgba(21,101,192,0.1)',tension:0.3,fill:true,pointRadius:5
   });
-  if(!ngFilSexo||ngFilSexo==='M') datasets.push({
+  if(!ngFilSexo||ngFilSexo==='M'||ngFilSexo==='lideres') datasets.push({
     label:'Mujeres',data:sorted.map(function(k){return byWeek[k].m;}),
     borderColor:'#C0006A',backgroundColor:'rgba(192,0,106,0.1)',tension:0.3,fill:true,pointRadius:5
   });
@@ -1608,7 +1632,7 @@ function ngRenderRanking(){
     var pres=0,tot=0;
     comRecs.forEach(function(r){
       Object.values(r.asistencia||{}).forEach(function(a){
-        if(a.esLider||a.esColab) return;
+        if(!ngMatchesSexoFilter(a)) return;
         tot++;if(a.state==='presente') pres++;
       });
     });
@@ -1648,7 +1672,7 @@ function ngRenderPctAsist(){
     var pres=0,aus=0;
     comRecs.forEach(function(r){
       Object.values(r.asistencia||{}).forEach(function(a){
-        if(a.esLider||a.esColab) return;
+        if(!ngMatchesSexoFilter(a)) return;
         if(a.state==='presente') pres++;else aus++;
       });
     });
@@ -1788,7 +1812,7 @@ function ngApplyFilters(){
   ngFilHasta=document.getElementById('ng-df-hasta')?.value||'';
   ngFilComunidad=document.getElementById('ng-df-com')?.value?parseInt(document.getElementById('ng-df-com').value):null;
   ngFilSexo=document.getElementById('ng-df-sex')?.value||'';
-  ngRenderDashboardStats();
+  ngRenderDashStats();
   ngRenderActiveDashTab();
 }
 
@@ -1800,117 +1824,8 @@ function ngResetFilters(){
   if((el=document.getElementById('ng-df-hasta'))) el.value='';
   if((el=document.getElementById('ng-df-com'))) el.value='';
   if((el=document.getElementById('ng-df-sex'))) el.value='';
-  ngRenderDashboardStats();
+  ngRenderDashStats();
   ngRenderActiveDashTab();
-}
-
-function ngRenderDashboardStats(){
-  var d=document.getElementById('ng-dash-content');
-  if(!d) return;
-  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
-  var total=recs.length;
-  var totalAtt=0,totalPres=0,totalNew=0;
-  recs.forEach(function(r){
-    Object.values(r.asistencia||{}).forEach(function(a){
-      if(a.esLider||a.esColab) return; // exclude leaders from main stats
-      totalAtt++;
-      if(a.state==='presente') totalPres++;
-    });
-    totalNew+=(r.visitsNew||[]).length;
-  });
-  var pctPres=totalAtt?Math.round(totalPres/totalAtt*100):0;
-  var stats=[
-    {label:'Encuentros',val:total,icon:'📅'},
-    {label:'Promedio asistencia',val:total?Math.round(totalPres/total):0,icon:'👥'},
-    {label:'% Asistencia',val:pctPres+'%',icon:'📊'},
-    {label:'Personas nuevas',val:totalNew,icon:'🌱'},
-  ];
-  d.innerHTML=
-    '<div class="stat-grid" style="margin-bottom:1rem">'+
-      stats.map(function(s){
-        return '<div class="stat-card"><div style="font-size:1.5rem">'+s.icon+'</div>'+
-          '<div style="font-size:1.5rem;font-weight:700;color:#1F4E79">'+s.val+'</div>'+
-          '<div style="font-size:12px;color:#6B7280">'+s.label+'</div></div>';
-      }).join('')+
-    '</div>'+
-    ngRenderAsistenciaMiembros(recs);
-}
-
-function ngRenderAsistenciaMiembros(recs){
-  if(!recs.length) return '<div class="card" style="text-align:center;padding:1.5rem;color:#9CA3AF">Sin registros para el período seleccionado</div>';
-  var memberStats=[];
-  var encPerCom={};
-  recs.forEach(function(r){
-    var cid=Number(r.comunidadId);
-    encPerCom[cid]=(encPerCom[cid]||0)+1;
-  });
-  // Build leader IDs across all NG communities
-  var allLiderIds=new Set();
-  (S.ngComunidades||[]).forEach(function(ngx){
-    (ngx.liderIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
-    (ngx.colaboradorIds||[]).forEach(function(id){allLiderIds.add(Number(id));});
-  });
-  // For leaders filter: look at ALL records' asistencia for leader ids
-  var leaderRecs=ngFilSexo==='lideres'?ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;}):[];
-  var leaderEncPerCom={};
-  leaderRecs.forEach(function(r){var cid=Number(r.comunidadId);leaderEncPerCom[cid]=(leaderEncPerCom[cid]||0)+1;});
-
-  // Build a map of leader → community for lookup
-  var liderComMap={};
-  (S.ngComunidades||[]).forEach(function(ngx){
-    (ngx.liderIds||[]).concat(ngx.colaboradorIds||[]).forEach(function(id){
-      liderComMap[Number(id)]=Number(ngx.id);
-    });
-  });
-  S.members.filter(function(m){
-    if(m.estado==='Baja') return false;
-    if(ngFilSexo==='lideres') return allLiderIds.has(Number(m.id));
-    return m.grupoId&&encPerCom[Number(m.grupoId)]>0&&!allLiderIds.has(Number(m.id));
-  }).forEach(function(m){
-    if(ngFilSexo&&ngFilSexo!=='lideres'&&m.genero!==ngFilSexo) return;
-    // For community filter: leaders use liderComMap, members use grupoId
-    var memberComId=ngFilSexo==='lideres'?(liderComMap[Number(m.id)]||Number(m.grupoId)):Number(m.grupoId);
-    if(ngFilComunidad&&memberComId!==Number(ngFilComunidad)) return;
-    // Find this member's community (for leaders: via liderIds/colaboradorIds; for members: via grupoId)
-    var myCid=Number(m.grupoId);
-    if(ngFilSexo==='lideres'){
-      var myCom2=(S.ngComunidades||[]).find(function(ngx){
-        return (ngx.liderIds||[]).map(Number).includes(Number(m.id))||
-               (ngx.colaboradorIds||[]).map(Number).includes(Number(m.id));
-      });
-      if(myCom2) myCid=Number(myCom2.id);
-    }
-    // Count encounters for this community
-    var useRecs2=ngFilSexo==='lideres'?leaderRecs:recs;
-    var comRecs2=useRecs2.filter(function(r){return Number(r.comunidadId)===myCid;});
-    var totalEnc=comRecs2.length;
-    if(!totalEnc) return;
-    // Count presencias for this member
-    var presencias=comRecs2.reduce(function(acc,r){
-      var att=r.asistencia||{};
-      var entry=att[m.id]||att[String(m.id)];
-      return acc+(entry&&entry.state==='presente'?1:0);
-    },0);
-    var ngx2=S.ngComunidades.find(function(x){return Number(x.id)===myCid;});
-    memberStats.push({nombre:m.nombre,apellido:m.apellido,comunidad:ngx2?ngx2.name:'—',presencias,totalEnc,pct:totalEnc?Math.round(presencias/totalEnc*100):0});
-  });
-  memberStats.sort(function(a,b){return b.pct-a.pct||b.presencias-a.presencias;});
-  if(!memberStats.length) return '<div class="card" style="text-align:center;padding:1.5rem;color:#9CA3AF">Sin datos de asistencia para los filtros seleccionados</div>';
-  return '<div class="card" style="padding:0;overflow:hidden">'+
-    '<table><thead><tr>'+
-      '<th>Nombre</th><th>Comunidad</th><th>Presencias</th><th>Encuentros</th><th>%</th>'+
-    '</tr></thead><tbody>'+
-    memberStats.map(function(s){
-      var color=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';
-      return '<tr>'+
-        '<td style="font-weight:600">'+s.apellido+', '+s.nombre+'</td>'+
-        '<td style="font-size:12px;color:#6B7280">'+s.comunidad+'</td>'+
-        '<td style="text-align:center">'+s.presencias+'</td>'+
-        '<td style="text-align:center">'+s.totalEnc+'</td>'+
-        '<td style="text-align:center;font-weight:700;color:'+color+'">'+s.pct+'%</td>'+
-      '</tr>';
-    }).join('')+
-    '</tbody></table></div>';
 }
 
 // ── CARGAR ASISTENCIA ──────────────────────────────────────────────
@@ -2472,7 +2387,9 @@ async function ngDeleteRecord(id){
     showToast('🗑️ Registro eliminado','#DC2626');
   }catch(e){
     S.ngRecords.splice(idx,0,removed);
-    alert('No se pudo eliminar. Verificá tu conexión.');
+    await saveK(SK.ngRecords,S.ngRecords);
+    ngRenderRegistrosList();
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
   }
 }
 

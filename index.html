@@ -1151,6 +1151,7 @@ const DEFAULT_USERS=[
 let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[],checklistSecciones:[]};
 let currentUser=null;
 let gdvCharts={};
+let ngCharts={};
 
 // OF state managed in OF MODULE v2
 
@@ -1482,7 +1483,8 @@ function ngRenderSemanas(){
   var p=document.getElementById('ng-panel-semanas');
   if(!p) return;
   var recs=ngGetFilteredRecords().sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
-  var coms=(ngFilComunidad?S.ngComunidades.filter(function(c){return Number(c.id)===Number(ngFilComunidad);}):S.ngComunidades)||[];
+  var comsActivas=(S.ngComunidades||[]).filter(function(c){return c.estado!=='Inactivo';});
+  var coms=(ngFilComunidad?comsActivas.filter(function(c){return Number(c.id)===Number(ngFilComunidad);}):comsActivas);
   if(!coms.length||!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
   // Get unique weeks
   var weeks=[];
@@ -1536,47 +1538,63 @@ function ngRenderEvolucion(){
   if(!p) return;
   var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;}).sort(function(a,b){return a.fecha.localeCompare(b.fecha);});
   if(!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
-  // Group by date, count presentes
-  var byDate={};
+  // Agrupar por semana ISO — Hombres y Mujeres presentes (mismo criterio que Grupos de Vida)
+  var byWeek={};
   recs.forEach(function(r){
-    if(!byDate[r.fecha]) byDate[r.fecha]={pres:0,aus:0,new:0};
+    var semana=getISOWeek(r.fecha);
+    var anio=r.fecha.substring(0,4);
+    var key=anio+'-S'+String(semana).padStart(2,'0');
+    if(!byWeek[key]) byWeek[key]={h:0,m:0,semana:semana,anio:anio,new:0};
     Object.values(r.asistencia||{}).forEach(function(a){
       if(a.esLider||a.esColab) return;
-      if(a.state==='presente') byDate[r.fecha].pres++;
-      else byDate[r.fecha].aus++;
+      if(a.state!=='presente') return;
+      if(ngFilSexo&&ngFilSexo!=='lideres'&&a.genero!==ngFilSexo) return;
+      if(a.genero==='H') byWeek[key].h++;
+      else if(a.genero==='M') byWeek[key].m++;
     });
-    byDate[r.fecha].new+=(r.visitsNew||[]).length;
+    byWeek[key].new+=(r.visitsNew||[]).length;
   });
-  var dates=Object.keys(byDate).sort();
-  if(!dates.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
-  var maxPres=Math.max.apply(null,dates.map(function(d){return byDate[d].pres;}));
-  var html='<div class="card"><div class="card-title">📈 Evolución — Presentes por encuentro</div>'+
-    '<div style="overflow-x:auto"><div style="display:flex;align-items:flex-end;gap:6px;min-height:180px;padding:8px 0">';
-  dates.forEach(function(d){
-    var v=byDate[d];
-    var h=maxPres>0?Math.round((v.pres/maxPres)*140):0;
-    var pct=Math.round((v.pres/(v.pres+v.aus||1))*100);
-    var col=pct>=75?'#16A34A':pct>=50?'#1F4E79':'#DC2626';
-    html+='<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:44px">'+
-      '<span style="font-size:11px;font-weight:700;color:'+col+'">'+pct+'%</span>'+
-      '<div style="width:36px;background:'+col+';border-radius:4px 4px 0 0;height:'+h+'px;min-height:4px"></div>'+
-      '<span style="font-size:10px;color:#9CA3AF;writing-mode:vertical-rl;transform:rotate(180deg);max-height:60px">'+d.slice(5)+'</span>'+
-    '</div>';
-  });
-  html+='</div></div>';
-  // Summary table
-  html+='<table style="margin-top:8px"><thead><tr><th>Fecha</th><th>Presentes</th><th>Ausentes</th><th>% Asist.</th><th>Nuevos</th></tr></thead><tbody>';
-  dates.slice().reverse().forEach(function(d){
-    var v=byDate[d];
-    var pct=Math.round((v.pres/(v.pres+v.aus||1))*100);
-    var col=pct>=75?'#16A34A':pct>=50?'#D97706':'#DC2626';
-    html+='<tr><td>'+d+'</td><td style="text-align:center;color:#16A34A">'+v.pres+'</td>'+
-      '<td style="text-align:center;color:#DC2626">'+v.aus+'</td>'+
-      '<td style="text-align:center;font-weight:700;color:'+col+'">'+pct+'%</td>'+
+  var sorted=Object.keys(byWeek).sort();
+  if(!sorted.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
+  var html='<div class="card"><div class="card-title">📈 Evolución — Hombres y Mujeres por semana</div>'+
+    '<div id="ng-chart-evo-wrap" style="height:220px"><canvas id="ng-chart-evo"></canvas></div>'+
+    '<table style="margin-top:12px"><thead><tr><th>Semana</th><th>Hombres</th><th>Mujeres</th><th>Total</th><th>Nuevos</th></tr></thead><tbody>';
+  sorted.slice().reverse().forEach(function(k){
+    var v=byWeek[k];
+    html+='<tr><td>Semana '+v.semana+' ('+v.anio+')</td>'+
+      '<td style="text-align:center;color:#1565C0">'+v.h+'</td>'+
+      '<td style="text-align:center;color:#C0006A">'+v.m+'</td>'+
+      '<td style="text-align:center;font-weight:700">'+(v.h+v.m)+'</td>'+
       '<td style="text-align:center;color:#7C3AED">'+v.new+'</td></tr>';
   });
   html+='</tbody></table></div>';
   p.innerHTML=html;
+
+  var canvas=document.getElementById('ng-chart-evo');
+  if(!canvas||typeof Chart==='undefined') return;
+  var existingChart=Chart.getChart?Chart.getChart('ng-chart-evo'):null;
+  if(existingChart) existingChart.destroy();
+  if(ngCharts.evo){try{ngCharts.evo.destroy();}catch(e){} ngCharts.evo=null;}
+  var labels=sorted.map(function(k){return 'Semana '+byWeek[k].semana;});
+  var datasets=[];
+  if(!ngFilSexo||ngFilSexo==='H') datasets.push({
+    label:'Hombres',data:sorted.map(function(k){return byWeek[k].h;}),
+    borderColor:'#1565C0',backgroundColor:'rgba(21,101,192,0.1)',tension:0.3,fill:true,pointRadius:5
+  });
+  if(!ngFilSexo||ngFilSexo==='M') datasets.push({
+    label:'Mujeres',data:sorted.map(function(k){return byWeek[k].m;}),
+    borderColor:'#C0006A',backgroundColor:'rgba(192,0,106,0.1)',tension:0.3,fill:true,pointRadius:5
+  });
+  ngCharts.evo=new Chart(canvas,{
+    type:'line',
+    data:{labels:labels,datasets:datasets},
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      scales:{y:{beginAtZero:true,ticks:{precision:0}}},
+      plugins:{legend:{position:'top',labels:{font:{size:11},boxWidth:20}}}
+    }
+  });
 }
 
 function ngRenderRanking(){
@@ -1595,23 +1613,24 @@ function ngRenderRanking(){
       });
     });
     var pct=tot?Math.round(pres/tot*100):0;
-    var avg=comRecs.length?Math.round(pres/comRecs.length):0;
+    var avg=comRecs.length?(pres/comRecs.length):0;
     return {name:com.name,tipo:com.tipo,enc:comRecs.length,pres,tot,pct,avg};
-  }).filter(function(c){return c.enc>0;}).sort(function(a,b){return b.pct-a.pct;});
-  var html='<div class="card"><div class="card-title">🏆 Ranking — Promedio de presentes</div>';
+  }).filter(function(c){return c.enc>0;}).sort(function(a,b){return b.avg-a.avg;});
+  var maxAvg=comData.length?(comData[0].avg||1):1;
+  var html='<div class="card"><div class="card-title">🏆 Ranking — Promedio de presentes por encuentro</div>';
   comData.forEach(function(c,i){
-    var col=c.pct>=75?'#16A34A':c.pct>=50?'#1F4E79':'#DC2626';
+    var barPct=maxAvg?Math.round(c.avg/maxAvg*100):0;
+    var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    var col=i===0?'#F59E0B':i===1?'#9CA3AF':i===2?'#CD7C2F':'#1F4E79';
     html+='<div style="margin-bottom:14px">'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
-        '<span style="font-size:13px;font-weight:700;color:#6B7280;min-width:20px">'+(i+1)+'.</span>'+
-        '<span style="font-size:13px;font-weight:600;flex:1">'+c.name+'</span>'+
-        '<span style="font-size:11px;color:#6B7280">'+c.pres+'/'+c.tot+'</span>'+
-        '<strong style="font-size:13px;color:'+col+';min-width:38px;text-align:right">'+c.pct+'%</strong>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'+
+        '<span style="font-size:13px;font-weight:700;flex:1">'+medal+' #'+(i+1)+' '+c.name+'</span>'+
+        '<span style="font-size:12px;color:#6B7280"><strong style="color:'+col+'">'+c.avg.toFixed(1)+'</strong> prom · '+c.enc+' encuentro'+(c.enc>1?'s':'')+' · '+c.pres+' presentes</span>'+
       '</div>'+
       '<div style="height:8px;background:#F3F4F6;border-radius:4px">'+
-        '<div style="height:8px;background:'+col+';border-radius:4px;width:'+c.pct+'%"></div>'+
+        '<div style="height:8px;background:'+col+';border-radius:4px;width:'+barPct+'%"></div>'+
       '</div>'+
-      '<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+c.tipo+' · prom. '+c.avg+'/enc · '+c.enc+' encuentro'+(c.enc>1?'s':'')+'</div>'+
+      '<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+c.tipo+' · '+c.pct+'% de asistencia en el período</div>'+
     '</div>';
   });
   html+='</div>';
@@ -1733,9 +1752,14 @@ function ngRenderNuevosPanel(){
     html+='<div style="margin-bottom:12px">'+
       '<div style="font-size:12px;font-weight:600;color:#6B7280;margin-bottom:4px">'+r.fecha+' · '+(ng?ng.name:'—')+'</div>';
     (r.visitsNew||[]).forEach(function(n){
-      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#F0FDF4;border-radius:6px;margin-bottom:3px">'+
+      var m=S.members.find(function(x){return fullName(x).toLowerCase()===n.toLowerCase();});
+      var altaTxt=m&&m.fechaIngreso?saFmtDate(m.fechaIngreso):'—';
+      var edadTxt=m&&m.fnac?saCalcEdad(m.fnac):'—';
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#F0FDF4;border-radius:6px;margin-bottom:3px;flex-wrap:wrap">'+
         '<span style="font-size:14px">🌱</span>'+
-        '<span style="font-size:13px;font-weight:600;color:#166534">'+n+'</span>'+
+        '<span style="font-size:13px;font-weight:600;color:#166534;flex:1">'+n+'</span>'+
+        '<span style="font-size:11px;color:#166534;background:#DCFCE7;padding:2px 8px;border-radius:6px;white-space:nowrap">📅 '+altaTxt+'</span>'+
+        '<span style="font-size:11px;color:#166534;background:#DCFCE7;padding:2px 8px;border-radius:6px;white-space:nowrap">🎂 '+edadTxt+'</span>'+
       '</div>';
     });
     html+='</div>';
@@ -2288,11 +2312,11 @@ function ngRenderRegistrosList(){
     var presentes=Object.values(r.asistencia||{}).filter(function(a){return a.state==='presente';}).length;
     var total=Object.keys(r.asistencia||{}).length;
     var nuevos=(r.visitsNew||[]).length;
-    var encuentroLabel=r.encuentroNum===2?'2° Encuentro':'1° Encuentro';
+    var encuentroSuffix=(!r.sinEncuentro&&r.encuentroNum===2)?' · 2° Encuentro':'';
     return '<div class="card" style="margin-bottom:8px;padding:12px 16px">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'+
         '<div>'+
-          '<div style="font-weight:700;color:#1F4E79;font-size:14px">'+comName+' — '+r.fecha+(r.sinEncuentro?' <span style="color:#92400E">(Sin encuentro)</span>':' · '+encuentroLabel)+'</div>'+
+          '<div style="font-weight:700;color:#1F4E79;font-size:14px">'+comName+' — '+r.fecha+(r.sinEncuentro?' <span style="color:#92400E">(Sin encuentro)</span>':encuentroSuffix)+'</div>'+
           (!r.sinEncuentro?'<div style="font-size:12px;color:#6B7280">✅ '+presentes+'/'+total+' presentes'+(nuevos?' · 🌱 '+nuevos+' nuevo'+(nuevos>1?'s':''):'')+'</div>':'')+
         '</div>'+
         (isSuperAdmin()?'<div style="display:flex;gap:4px">'
@@ -2743,6 +2767,8 @@ function goHome(){
   document.getElementById('screen-app').classList.remove('show');
   Object.values(gdvCharts).forEach(c=>{try{c.destroy();}catch(e){}});
   gdvCharts={};
+  Object.values(ngCharts).forEach(c=>{try{c.destroy();}catch(e){}});
+  ngCharts={};
 }
 
 // ════════════════════════════════════════════════════════════

@@ -2607,6 +2607,7 @@ const DEFAULT_MODULES = [
   {key:'disc',       icon:'📖',  name:'Discipulado',           desc:'Seguimiento de niveles de discipulado. Pasos N1, N2 y N3 con asistencia y capítulos.', tag:'Módulo activo', tagClass:'tag-green',  action:'openDiscipulado', activo:true},
   {key:'of',         icon:'👨‍👩‍👧',  name:'Orientación Familiar', desc:'Gestión de alumnos, asistencia, pagos y participación del curso.',                 tag:'Módulo activo', tagClass:'tag-purple', action:'openOF', activo:true},
   {key:'agenda',     icon:'📅',  name:'Agenda Ministerial',   desc:'Calendario de eventos y actividades por Servicio/Ministerio, con recurrencia semanal o mensual.', tag:'Módulo activo', tagClass:'tag-blue', action:'openAgenda', activo:false},
+  {key:'equipo',     icon:'🤝',  name:'Trabajo en Equipo',    desc:'Checklists colaborativos para organizar actividades: coordinadores, colaboradores y tareas asignadas.', tag:'Módulo activo', tagClass:'tag-purple', action:'openEquipo', activo:false},
   {key:'config',     icon:'⚙️',  name:'Configuración',         desc:'Gestión de grupos, usuarios del sistema y roles. Solo accesible para Super Admin.',   tag:'Solo Super Admin', tagClass:'tag-green', action:'openConfig', activo:true},
 ];
 
@@ -2642,7 +2643,7 @@ function renderModulesGrid(){
     miembros:canAccessMiembros(), nuevos:canAccessNuevos(),
     gdv:canAccessGdV(), ng:canAccessNG(),
     disc:canAccessDisc(), of:canAccessOF(), config:canAccessConfig(),
-    agenda:canAccessAgenda()
+    agenda:canAccessAgenda(), equipo:canAccessEquipo()
   };
   allMods.forEach(function(mod){
     var tienePermiso=accessMap[mod.key];
@@ -4637,29 +4638,16 @@ function openAgenda(){
   document.getElementById('app-topbar-title').textContent='📅 Agenda Ministerial';
   document.getElementById('app-topbar-user').textContent=currentUser.name;
   document.getElementById('app-content').innerHTML=buildAgendaHTML();
-  agendaChecklistTab('activos', document.getElementById('agenda-cl-btn-activos'));
+  agendaTab('activos', document.getElementById('agenda-tab-btn-activos'));
   agendaRenderBanner();
 }
 
 function buildAgendaHTML(){
   return `<div class="gdv-app">
     <div id="agenda-banner-wrap" style="display:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 16px;margin-bottom:1rem"></div>
-    <div class="nav" style="margin-bottom:1rem">
-      <button class="nav-btn active" id="agenda-top-btn-checklist" onclick="agendaTopTab('checklist',this)">📋 Checklist</button>
-      <button class="nav-btn" id="agenda-top-btn-eventos" onclick="agendaTopTab('eventos',this)">📅 Eventos</button>
-    </div>
-
-    <!-- ═══════════════ CHECKLIST ═══════════════ -->
-    <div id="agenda-top-checklist">
-      <div class="nav" style="margin-bottom:1rem">
-        <button class="nav-btn active" id="agenda-cl-btn-activos" onclick="agendaChecklistTab('activos',this)">🟢 Activos</button>
-        <button class="nav-btn" id="agenda-cl-btn-historico" onclick="agendaChecklistTab('historico',this)">📁 Histórico</button>
-      </div>
-      <div id="agenda-checklist-list"></div>
-    </div>
 
     <!-- ═══════════════ EVENTOS ═══════════════ -->
-    <div id="agenda-top-eventos" style="display:none">
+    <div id="agenda-top-eventos">
       <div class="nav" style="margin-bottom:1rem">
         <button class="nav-btn active" id="agenda-tab-btn-activos" onclick="agendaTab('activos',this)">🟢 Activos</button>
         <button class="nav-btn" id="agenda-tab-btn-historico" onclick="agendaTab('historico',this)">📁 Histórico</button>
@@ -4886,20 +4874,111 @@ function buildAgendaHTML(){
   </div>`;
 }
 
-function agendaTopTab(tab,btn){
-  document.querySelectorAll('.nav-btn[onclick*="agendaTopTab"]').forEach(function(b){b.classList.remove('active');});
-  if(btn) btn.classList.add('active');
-  var cl=document.getElementById('agenda-top-checklist');
-  var ev=document.getElementById('agenda-top-eventos');
-  if(tab==='eventos'){
-    if(cl) cl.style.display='none';
-    if(ev) ev.style.display='block';
-    agendaTab('activos');
-  } else {
-    if(cl) cl.style.display='block';
-    if(ev) ev.style.display='none';
-    agendaChecklistTab('activos');
-  }
+// ══════════════════════════════════════════════════════════════════
+// TRABAJO EN EQUIPO (Checklists) — separado de Agenda Ministerial
+// Reutiliza las mismas funciones agendaChecklist*/agendaCl* que ya
+// existían (cada Checklist sigue ligado a un Evento de Agenda vía
+// eventoId — eso no cambió, solo dónde se accede a la lista).
+// ══════════════════════════════════════════════════════════════════
+function canAccessEquipo(){
+  // Mismo criterio que Agenda: el módulo Checklist se separó de ahí
+  // en la navegación, pero no cambió quién puede verlo.
+  return canAccessAgenda();
+}
+
+function openEquipo(){
+  document.getElementById('screen-home').classList.add('hidden');
+  document.getElementById('screen-app').classList.add('show');
+  document.getElementById('app-topbar-title').textContent='🤝 Trabajo en Equipo';
+  document.getElementById('app-topbar-user').textContent=currentUser.name;
+  document.getElementById('app-content').innerHTML=buildEquipoHTML();
+  agendaChecklistTab('activos', document.getElementById('agenda-cl-btn-activos'));
+}
+
+function buildEquipoHTML(){
+  return `<div class="gdv-app">
+    <div class="nav" style="margin-bottom:1rem">
+      <button class="nav-btn active" id="agenda-cl-btn-activos" onclick="agendaChecklistTab('activos',this)">🟢 Activos</button>
+      <button class="nav-btn" id="agenda-cl-btn-historico" onclick="agendaChecklistTab('historico',this)">📁 Histórico</button>
+    </div>
+    <div id="agenda-checklist-list"></div>
+
+    <!-- Modal: crear Checklist -->
+    <div id="agenda-cl-crear-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:340;align-items:center;justify-content:center;padding:1rem">
+      <div class="modal-box-md modal-box-resp" style="background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:15px;font-weight:700;color:#1F4E79">Nuevo Checklist — <span id="agenda-cl-crear-titulo"></span></div>
+          <button onclick="agendaCerrarModalCrearChecklist()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1">✕</button>
+        </div>
+        <div class="form-grid-2">
+        <div>
+        <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Coordinadores <span style="font-weight:400;color:#9CA3AF">(1 a 4 — el Responsable de la Actividad entra por defecto)</span></label>
+        <input type="text" placeholder="Buscar..." oninput="discFilterList(this.value,'agenda-cl-coord-list')" style="width:100%;margin-bottom:6px">
+        <div id="agenda-cl-coord-list" style="max-height:220px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:14px"></div>
+        </div>
+
+        <div>
+        <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Colaboradores <span style="font-weight:400;color:#9CA3AF">(sin límite)</span></label>
+        <input type="text" placeholder="Buscar..." oninput="discFilterList(this.value,'agenda-cl-colab-list')" style="width:100%;margin-bottom:6px">
+        <div id="agenda-cl-colab-list" style="max-height:220px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:14px"></div>
+        </div>
+
+        <div class="form-col-full" style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn" onclick="agendaCerrarModalCrearChecklist()">Cancelar</button>
+          <button class="btn btn-primary" onclick="agendaGuardarChecklistNuevo()">Crear Checklist</button>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: detalle del Checklist -->
+    <div id="agenda-cl-detalle-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:340;align-items:center;justify-content:center;padding:1rem">
+      <div class="modal-box-lg modal-box-resp" style="background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#1F4E79" id="agenda-cl-det-titulo">—</div>
+            <div id="agenda-cl-det-estado" style="font-size:11px;margin-top:2px"></div>
+          </div>
+          <button onclick="agendaCerrarModalDetalleChecklist()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1">✕</button>
+        </div>
+        <div id="agenda-cl-det-equipo" style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:1rem;font-size:12.5px"></div>
+        <div id="agenda-cl-det-cerrar-wrap" style="margin-bottom:1rem"></div>
+        <div id="agenda-cl-det-add-wrap" style="display:none;margin-bottom:1rem;background:#F9FAFB;border-radius:10px;padding:10px 12px">
+          <div class="form-grid-2">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Nueva tarea</label>
+            <input type="text" id="agenda-cl-nueva-tarea" placeholder="Título de la tarea..." style="width:100%;margin-bottom:8px">
+            <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Sección</label>
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+              <select id="agenda-cl-nueva-tarea-seccion" style="flex:1"></select>
+              <button class="btn btn-sm" type="button" onclick="agendaCrearSeccion()" title="Nueva Sección">+ Sección</button>
+            </div>
+            <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Prioridad</label>
+            <select id="agenda-cl-nueva-tarea-prioridad" style="margin-bottom:8px">
+              <option value="Alta">🔴 Alta</option>
+              <option value="Media" selected>🟡 Media</option>
+              <option value="Baja">🟢 Baja</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Asignar a <span style="font-weight:400;color:#9CA3AF">(1 a 3 personas — obligatorio)</span></label>
+            <div id="agenda-cl-tarea-asig-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+            <div style="position:relative;margin-bottom:8px">
+              <input type="text" id="agenda-cl-tarea-asig-search" placeholder="Buscar..." oninput="agendaSearchAsignado(this.value)" autocomplete="off">
+              <div id="agenda-cl-tarea-asig-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:160px;overflow-y:auto"></div>
+            </div>
+          </div>
+          <div class="form-col-full">
+            <button class="btn btn-primary btn-sm" style="width:100%" onclick="agendaCrearTarea()">+ Agregar tarea</button>
+          </div>
+          </div>
+        </div>
+        <div id="agenda-cl-secciones-toggle" style="margin-bottom:.5rem"></div>
+        <div id="agenda-cl-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem"></div>
+        <div id="agenda-cl-det-tareas"></div>
+      </div>
+    </div>
+  </div>`;
 }
 
 function agendaTab(tab,btn){

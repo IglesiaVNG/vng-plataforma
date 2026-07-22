@@ -30,7 +30,10 @@ body{font-family:Arial,sans-serif;background:#F5F7FA;color:#1F2937;background-im
 .home-menu-btn{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.93);border:1px solid rgba(255,255,255,0.7);border-radius:10px;padding:9px 14px;font-size:13px;font-weight:600;color:#1F4E79;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.25)}
 .home-menu-btn:hover{box-shadow:0 4px 16px rgba(0,0,0,0.3)}
 .home-menu-catcher{position:fixed;inset:0;z-index:510}
-.home-menu-dropdown{position:absolute;top:calc(100% + 8px);left:0;background:#fff;border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,0.3);width:250px;max-width:78vw;max-height:min(70vh,480px);overflow-y:auto;padding:6px}
+.home-menu-dropdown{position:absolute;top:calc(100% + 8px);left:0;background:#fff;border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,0.3);width:250px;max-width:78vw;max-height:min(85vh,560px);overflow-y:auto;padding:6px;scrollbar-width:thin;scrollbar-color:#D1D5DB transparent}
+.home-menu-dropdown::-webkit-scrollbar{width:6px}
+.home-menu-dropdown::-webkit-scrollbar-track{background:transparent}
+.home-menu-dropdown::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px}
 .home-menu-item{display:flex;align-items:center;gap:12px;padding:11px 10px;border-radius:8px;cursor:pointer}
 .home-menu-item:hover{background:#F3F4F6}
 .home-menu-item.coming-soon{opacity:.5;cursor:default}
@@ -285,7 +288,7 @@ window.markFieldError = function(el, msg){
     <!-- PRÓXIMOS EVENTOS -->
     <div id="home-eventos-wrap" style="margin-bottom:1.25rem"></div>
     <div class="home-menu-wrap">
-      <button class="home-menu-btn" id="home-menu-btn" onclick="toggleHomeMenu()">☰ Módulos</button>
+      <button class="home-menu-btn" id="home-menu-btn" onclick="toggleHomeMenu()">☰ Menú</button>
       <div id="home-menu-dropdown" class="home-menu-dropdown hidden">
         <div id="modules-grid"></div>
       </div>
@@ -444,7 +447,7 @@ window.fbUpload = async function(force) {
   } catch(e) {
     console.error('Firebase upload error:', e);
     window.showToast && window.showToast('⚠️ Error Firebase: ' + e.message, '#DC2626');
-    return false;
+    throw e; // CRÍTICO: sin este throw, ningún catch() de las funciones de guardado de la app se dispara nunca
   }
 };
 
@@ -2126,6 +2129,7 @@ async function ngSaveRecord(){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     S.ngRecords.pop();
+    await saveK(SK.ngRecords,S.ngRecords);
     var al=document.getElementById('ng-alert');
     if(al){al.textContent='❌ Error al guardar. Verificá tu conexión.';al.classList.remove('hidden');}
     return;
@@ -2350,13 +2354,15 @@ async function ngSaveEditRec(){
   var prevFecha=r.fecha;
   var prevAsistencia=r.sinEncuentro?null:JSON.parse(JSON.stringify(r.asistencia));
   var prevTs=r.ts;
+  var prevTsNum=r._ts;
   r.fecha=nuevaFecha;
   if(!r.sinEncuentro&&window._ngEditAtt){
     Object.keys(window._ngEditAtt).forEach(function(k){
       if(r.asistencia[k]) r.asistencia[k].state=window._ngEditAtt[k].state;
     });
   }
-  r.ts=new Date().toISOString(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  r.ts=new Date().toISOString();
+  r._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   await saveK(SK.ngRecords,S.ngRecords);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -2364,6 +2370,7 @@ async function ngSaveEditRec(){
     r.fecha=prevFecha;
     if(prevAsistencia) r.asistencia=prevAsistencia;
     r.ts=prevTs;
+    r._ts=prevTsNum;
     await saveK(SK.ngRecords,S.ngRecords);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -2637,13 +2644,16 @@ function getModulesConfig(){
 
 async function saveModulesConfig(modules){
   // Only save name+desc+activo overrides (not icon/action which son hardcoded)
+  var snapshotPrevio=S.modulesConfig;
   var toSave=modules.map(function(m){return {key:m.key,name:m.name,desc:m.desc,activo:m.activo};});
   S.modulesConfig=toSave;
   await saveK(SK.modulesConfig, S.modulesConfig);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    alert('No se pudo guardar en la nube. Verificá tu conexión.');
+    S.modulesConfig=snapshotPrevio;
+    await saveK(SK.modulesConfig, S.modulesConfig);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return false;
   }
   return true;
@@ -3634,10 +3644,13 @@ async function saSaveMember(){
   if(data.fnac==='__INVALID__') return; // fnac inválido — alert ya mostrado
   data.fnac=data.fnac||'';
   let target;
+  let snapshotPrevio=null;
+  let esNuevo=false;
   if(saEditingMemberId){
     target=S.members.find(x=>Number(x.id)===Number(saEditingMemberId));
-    if(target) Object.assign(target,data); // Estado no se toca acá — se cambia solo con Dar de baja/Reactivar
+    if(target){ snapshotPrevio=Object.assign({},target); Object.assign(target,data); } // Estado no se toca acá — se cambia solo con Dar de baja/Reactivar
   } else {
+    esNuevo=true;
     target={id:Date.now(),estado:'Activo',...data};
     S.members.push(target);
   }
@@ -3646,10 +3659,15 @@ async function saSaveMember(){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    // Firebase failed — don't close the form
+    // Firebase failed — revertir el cambio en memoria y en localStorage, no cerrar el formulario
+    if(esNuevo){
+      S.members=S.members.filter(function(m){return m.id!==target.id;});
+    } else if(target&&snapshotPrevio){
+      Object.assign(target,snapshotPrevio);
+    }
+    await saveK(SK.members,S.members);
     const errMsg='No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.';
     alert(errMsg);
-    // Restore the original member data in memory so nothing is half-saved
     return;
   }
   // Only reach here if Firebase confirmed
@@ -4260,6 +4278,11 @@ async function ngSaveComunidad(){
   var liderIds=[...document.querySelectorAll('.ng-lider-cb:checked')].map(function(cb){return parseInt(cb.value);});
   var colaboradorIds=[...document.querySelectorAll('.ng-colab-cb:checked')].map(function(cb){return parseInt(cb.value);});
   var estado=document.getElementById('ng-f-activa')?.checked?'Activo':'Inactivo';
+
+  // Snapshot para poder revertir todo (Comunidad + roles de miembros) si falla la nube
+  var snapshotNgComunidades=JSON.parse(JSON.stringify(S.ngComunidades));
+  var snapshotRoles=S.members.map(function(m){return {m:m,roles:[...(m.roles||[])],_ts:m._ts};});
+
   if(ngEditingId){
     var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(ngEditingId);});
     if(ng){ Object.assign(ng,{name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado}); }
@@ -4303,7 +4326,11 @@ async function ngSaveComunidad(){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    alert('No se pudo guardar en la nube. Verificá tu conexión.');
+    S.ngComunidades=snapshotNgComunidades;
+    snapshotRoles.forEach(function(s){ s.m.roles=s.roles; s.m._ts=s._ts; });
+    await saveK(SK.ngComunidades, S.ngComunidades);
+    await saveK(SK.members, S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
   ngCloseForm();
@@ -4462,17 +4489,26 @@ async function ministerioSaveMinisterio(){
   var liderIds=[...document.querySelectorAll('.min-lider-cb:checked')].map(function(cb){return parseInt(cb.value);});
   var coordinadorIds=[...document.querySelectorAll('.min-coord-cb:checked')].map(function(cb){return parseInt(cb.value);});
   var colaboradorIds=[...document.querySelectorAll('.min-colab-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  var snapshotMin=null, esNuevoMin=false, nuevoMinRef=null, min;
   if(ministerioEditingId){
-    var min=S.ministerios.find(function(x){return Number(x.id)===Number(ministerioEditingId);});
-    if(min){ Object.assign(min,{nombre,area,liderIds,coordinadorIds,colaboradorIds}); }
+    min=S.ministerios.find(function(x){return Number(x.id)===Number(ministerioEditingId);});
+    if(min){ snapshotMin=Object.assign({},min); Object.assign(min,{nombre,area,liderIds,coordinadorIds,colaboradorIds}); }
   } else {
-    S.ministerios.push({id:Date.now(),nombre,area,liderIds,coordinadorIds,colaboradorIds,estado:'Activo'});
+    esNuevoMin=true;
+    nuevoMinRef={id:Date.now(),nombre,area,liderIds,coordinadorIds,colaboradorIds,estado:'Activo'};
+    S.ministerios.push(nuevoMinRef);
   }
   await saveK(SK.ministerios,S.ministerios);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    alert('No se pudo guardar en la nube. Verificá tu conexión.');
+    if(esNuevoMin){
+      S.ministerios=S.ministerios.filter(function(x){return x!==nuevoMinRef;});
+    } else if(min&&snapshotMin){
+      Object.assign(min,snapshotMin);
+    }
+    await saveK(SK.ministerios,S.ministerios);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
   ministerioCloseForm();
@@ -4497,6 +4533,7 @@ async function ministerioDeleteMinisterio(id){
     showToast('✅ Eliminado','#16A34A');
   }catch(e){
     S.ministerios.push(min);
+    await saveK(SK.ministerios,S.ministerios);
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
 }
@@ -4569,17 +4606,26 @@ async function campanaSaveCampana(){
   if(!nombre){ alert('Ingresá el Nombre de la Campaña'); return; }
   var fechaInicio=document.getElementById('camp-f-desde')?.value||'';
   var fechaFin=document.getElementById('camp-f-hasta')?.value||'';
+  var snapshotCamp=null, esNuevaCamp=false, nuevaCampRef=null, camp;
   if(campanaEditingId){
-    var camp=S.campanas.find(function(x){return Number(x.id)===Number(campanaEditingId);});
-    if(camp){ camp.nombre=nombre; camp.fechaInicio=fechaInicio; camp.fechaFin=fechaFin; }
+    camp=S.campanas.find(function(x){return Number(x.id)===Number(campanaEditingId);});
+    if(camp){ snapshotCamp=Object.assign({},camp); camp.nombre=nombre; camp.fechaInicio=fechaInicio; camp.fechaFin=fechaFin; }
   } else {
-    S.campanas.push({id:Date.now(),nombre,fechaInicio,fechaFin,activo:true,ts:Date.now()});
+    esNuevaCamp=true;
+    nuevaCampRef={id:Date.now(),nombre,fechaInicio,fechaFin,activo:true,ts:Date.now()};
+    S.campanas.push(nuevaCampRef);
   }
   await saveK(SK.campanas,S.campanas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    alert('No se pudo guardar en la nube. Verificá tu conexión.');
+    if(esNuevaCamp){
+      S.campanas=S.campanas.filter(function(x){return x!==nuevaCampRef;});
+    } else if(camp&&snapshotCamp){
+      Object.assign(camp,snapshotCamp);
+    }
+    await saveK(SK.campanas,S.campanas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
   campanaCloseForm();
@@ -4623,6 +4669,7 @@ async function campanaDeleteCampana(id){
     showToast('✅ Eliminada','#16A34A');
   }catch(e){
     S.campanas.push(camp);
+    await saveK(SK.campanas,S.campanas);
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
 }
@@ -5340,18 +5387,30 @@ async function agendaGuardarEvento(){
     tipoFecha:esPeriodo?'periodo':'unica',fechaDesde:esPeriodo?fechaDesde:'',fechaHasta:esPeriodo?fechaHasta:'',
     responsableId:agendaSelectedResponsableId,personasAsignadas,recordatorio,recurrencia};
 
+  var snapshotEvento=null;
+  var esNuevoEvento=false;
+  var nuevoEventoRef=null;
+  var ev;
   if(agendaEditingId){
-    var ev=S.eventos.find(function(x){return Number(x.id)===Number(agendaEditingId);});
-    if(ev) Object.assign(ev,data);
+    ev=S.eventos.find(function(x){return Number(x.id)===Number(agendaEditingId);});
+    if(ev){ snapshotEvento=Object.assign({},ev); Object.assign(ev,data); }
   } else {
-    S.eventos.push(Object.assign({id:Date.now(),estado:'Activo',creadoPor:currentUser?.name||'Sistema',ts:Date.now()},data));
+    esNuevoEvento=true;
+    nuevoEventoRef=Object.assign({id:Date.now(),estado:'Activo',creadoPor:currentUser?.name||'Sistema',ts:Date.now()},data);
+    S.eventos.push(nuevoEventoRef);
   }
 
   await saveK(SK.eventos,S.eventos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    alert('No se pudo guardar en la nube. Verificá tu conexión.');
+    if(esNuevoEvento){
+      S.eventos=S.eventos.filter(function(x){return x!==nuevoEventoRef;});
+    } else if(ev&&snapshotEvento){
+      Object.assign(ev,snapshotEvento);
+    }
+    await saveK(SK.eventos,S.eventos);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
   agendaCloseForm();
@@ -5382,6 +5441,7 @@ async function agendaEliminarEvento(id){
     showToast('🗑️ Evento eliminado','#DC2626');
   }catch(e){
     S.eventos.push(ev);
+    await saveK(SK.eventos,S.eventos);
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
 }
@@ -6394,6 +6454,7 @@ async function cfgDeleteGroup(id){
   }catch(e){
     // Revert on failure
     S.groups.push(g);
+    await saveK(SK.groups, S.groups);
     alert('No se pudo eliminar en la nube. Verificá tu conexión e intentá de nuevo.');
   }
 }
@@ -6491,33 +6552,51 @@ async function cfgSaveGroup(){
   const dia=document.getElementById('cfg-gf-dia')?.value||'';
   const horario=document.getElementById('cfg-gf-horario')?.value||'';
 
+  var snapshotGrupo=null;
+  var esNuevoGrupo=false;
+  var nuevoGrupoRef=null;
+  var facAnteriorRoles=null;
   if(cfgEditingGroupId){
     const g=S.groups.find(x=>x.id===cfgEditingGroupId);
+    snapshotGrupo=Object.assign({},g);
     // If facilitador changed, remove 'facilitador' role from old one
     if(g.facId && g.facId!==facId){
       const oldFac=S.members.find(m=>m.id===g.facId);
-      if(oldFac) oldFac.roles=(oldFac.roles||[]).filter(r=>r!=='facilitador');
+      if(oldFac){ facAnteriorRoles={member:oldFac,roles:[...(oldFac.roles||[])]}; oldFac.roles=(oldFac.roles||[]).filter(r=>r!=='facilitador'); }
     }
     Object.assign(g,{name,type,facId,facId2,dia,horario});
   } else {
-    S.groups.push({id:Date.now(),name,type,facId,facId2,dia,horario,miembros:[]});
+    esNuevoGrupo=true;
+    nuevoGrupoRef={id:Date.now(),name,type,facId,facId2,dia,horario,miembros:[]};
+    S.groups.push(nuevoGrupoRef);
   }
 
   // Assign 'facilitador' role to selected member
+  var facRolAgregado=null;
   if(facId){
     const fac=S.members.find(m=>m.id===facId);
     if(fac && !(fac.roles||[]).includes('facilitador')){
       fac.roles=[...(fac.roles||[]),'facilitador'];
+      facRolAgregado=fac;
     }
   }
 
   await saveK(SK.groups,S.groups);
   await saveK(SK.members,S.members);
   try{
-    await saveK(SK.groups, S.groups);
-    await saveK(SK.members, S.members);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
+    // Revertir todo lo que se tocó en memoria y volver a guardar localmente
+    if(esNuevoGrupo){
+      S.groups=S.groups.filter(function(x){return x!==nuevoGrupoRef;});
+    } else if(snapshotGrupo){
+      const g=S.groups.find(x=>x.id===cfgEditingGroupId);
+      if(g) Object.assign(g,snapshotGrupo);
+    }
+    if(facAnteriorRoles){ facAnteriorRoles.member.roles=facAnteriorRoles.roles; }
+    if(facRolAgregado){ facRolAgregado.roles=(facRolAgregado.roles||[]).filter(r=>r!=='facilitador'); }
+    await saveK(SK.groups, S.groups);
+    await saveK(SK.members, S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -7561,8 +7640,10 @@ async function gdvSaveRecord(){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
+    S.records=S.records.filter(function(r){return r.id!==rec.id;});
+    await saveK(SK.records,S.records);
     const al2=document.getElementById('gdv-fac-alert');
-    if(al2){ al2.textContent='❌ Error al guardar en la nube. Verificá tu red e intentá de nuevo.'; al2.classList.remove('hidden'); }
+    if(al2){ al2.textContent='❌ Error al guardar en la nube. Verificá tu conexión e intentá de nuevo.'; al2.classList.remove('hidden'); }
     return; // don't show success, don't reset form
   }
 
@@ -10762,6 +10843,7 @@ async function nvEliminarContacto(id){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     S.members.push(m);
+    await saveK(SK.members,S.members);
     alert('No se pudo eliminar en la nube. Verificá tu conexión.');
     return;
   }
@@ -11537,6 +11619,7 @@ async function nvSaveInlineForm(){
       if(typeof window.fbUpload==='function') await window.fbUpload(true);
     }catch(e){
       S.members=S.members.filter(function(m){return m.id!==nuevo.id;});
+      await saveK(SK.members, S.members);
       throw new Error('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     }
     nvCloseInlineForm();
@@ -11766,6 +11849,9 @@ function cfgOpenSection(sec){
   }
 }
 async function cfgSavePermisos(){
+  // Snapshot de la última versión sincronizada, por si hay que revertir
+  const rawPrevio=localStorage.getItem('gdv_permisos');
+  const permisosPrevios=rawPrevio?JSON.parse(rawPrevio):null;
   // Guardar en localStorage primero
   await savePermisos();
   const verificado=localStorage.getItem('gdv_permisos');
@@ -11785,6 +11871,11 @@ async function cfgSavePermisos(){
     }
     localStorage.setItem('_local_ts_gdv_permisos', String(ts));
   }catch(e){
+    // Revertir a la última versión sincronizada, tanto en memoria como en localStorage
+    if(permisosPrevios){
+      PERMISOS=permisosPrevios;
+      localStorage.setItem('gdv_permisos', rawPrevio);
+    }
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -13120,6 +13211,7 @@ async function discGuardarAsistencia(){
     dCloudOk=true;
   }catch(e){
     S.discRecords.pop();
+    await saveK(SK.discRecords,S.discRecords);
     var alErr=document.getElementById('disc-alert');
     if(alErr){alErr.textContent='❌ Error al guardar en la nube. Verificá tu conexión e intentá de nuevo.';alErr.classList.remove('hidden');}
     return;
@@ -13285,7 +13377,11 @@ async function fbSyncManual(){
     return;
   }
   showToast('☁️ Sincronizando...', '#1F4E79');
-  await window.fbUpload(true); // force = true
+  try{
+    await window.fbUpload(true); // force = true
+  }catch(e){
+    // El toast de error ya lo muestra fbUpload — acá solo evitamos una excepción sin atrapar
+  }
 }
 
 async function fbSyncDown(){
@@ -13630,8 +13726,11 @@ function pauCargarDatos(){
   document.getElementById('pau-step2').style.display='block';
 }
 
-function pauGuardar(){
+async function pauGuardar(){
   if(!pauSelectedId) return;
+  var btn=document.querySelector('#pau-step2 button[onclick="pauGuardar()"]');
+  if(btn){ btn.disabled=true; btn.textContent='Guardando...'; }
+  var ok=false;
   try{
     var members=JSON.parse(localStorage.getItem('gdv_m5')||'[]');
     var m=members.find(function(x){return x.id===pauSelectedId;});
@@ -13640,12 +13739,24 @@ function pauGuardar(){
       m.fnac=document.getElementById('pau-fnac').value.trim();
       m.dir=document.getElementById('pau-barrio').value.trim();
       localStorage.setItem('gdv_m5',JSON.stringify(members));
-      // Upload to Firebase immediately so the update isn't lost
-      if(window.fbUpload) window.fbUpload(true);
+      // Reintenta la subida a Firebase varias veces antes de darse por vencido —
+      // esta persona probablemente no vuelva a abrir este link
+      for(var intento=0; intento<8 && !ok; intento++){
+        if(window.fbUpload){
+          try{ ok=await window.fbUpload(true); }catch(e){ ok=false; }
+        }
+        if(!ok) await new Promise(function(r){ setTimeout(r,1200); });
+      }
     }
   }catch(e){}
+  if(btn){ btn.disabled=false; btn.textContent='Guardar'; }
   document.getElementById('pau-step2').style.display='none';
-  document.getElementById('pau-success').style.display='block';
+  if(ok){
+    document.getElementById('pau-success').style.display='block';
+  } else {
+    alert('Tus datos quedaron guardados en este dispositivo, pero no se pudieron enviar a la iglesia por un problema de conexión. Volvé a intentarlo cuando tengas mejor señal, o avisá directamente a la iglesia.');
+    document.getElementById('pau-step2').style.display='block';
+  }
 }
 
 // ════════════════════════════════════════════════════════════

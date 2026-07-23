@@ -555,6 +555,25 @@ function addTombstone(key, id){
 // llega ni a intentar guardar nada, y por eso ningún borrado quedaba protegido de verdad.
 window.addTombstone = addTombstone;
 
+// Verifica si un registro que está bloqueando un guardado (por duplicado de semana)
+// realmente llegó a subir alguna vez a la nube. Si no está ahí, es un "fantasma" —
+// un intento de carga de antes de las correcciones de esta semana que falló en
+// silencio para subir pero quedó pegado en localStorage — y se puede limpiar solo,
+// sin que alguien tenga que ir a buscarlo a mano dispositivo por dispositivo.
+window.fbCheckOrphan = async function(docName, key, recordId){
+  try{
+    const snap = await getDoc(doc(db, VNG_COL, docName));
+    if(!snap.exists()) return true;
+    const cloudData = snap.data();
+    if(!cloudData[key]) return true;
+    const arr = JSON.parse(cloudData[key]);
+    return !arr.some(function(r){ return String(r.id)===String(recordId); });
+  }catch(e){
+    console.warn('No se pudo verificar si el registro es huérfano:', e);
+    return false; // ante la duda, no lo tratamos como huérfano — más seguro
+  }
+};
+
 // Alias para compatibilidad con código existente
 function mergeMembers(localStr, cloudStr){ return mergeByTs(localStr, cloudStr, '_tomb_gdv_m5'); }
 window.fbDownload = async function() {
@@ -2195,8 +2214,22 @@ async function ngSaveRecord(){
   var semana=getWeekKey(fecha);
   var existing=S.ngRecords.filter(function(r){return Number(r.comunidadId)===Number(cid)&&getWeekKey(r.fecha)===semana&&!r.sinEncuentro;});
   if(existing.length>=1&&!sinEnc){
-    alert('Ya hay un encuentro registrado esta semana para esta comunidad ('+fmtAA(existing[0].fecha)+').');
-    return;
+    // Antes de bloquear, verificar si el registro "existente" es en realidad un fantasma
+    // (una carga vieja que nunca llegó a subir a la nube) — si lo es, se limpia solo y se sigue,
+    // sin que nadie tenga que ir a destrabarlo a mano.
+    if(typeof window.fbCheckOrphan==='function'){
+      var esHuerfanoNg=await window.fbCheckOrphan('ng','gdv_ng_records',existing[0].id);
+      if(esHuerfanoNg){
+        S.ngRecords=S.ngRecords.filter(function(r){return r.id!==existing[0].id;});
+        await saveK(SK.ngRecords,S.ngRecords);
+        showToast('🔄 Se limpió un intento de carga anterior que nunca había llegado a la nube. Continuá cargando.','#1F4E79');
+        existing=S.ngRecords.filter(function(r){return Number(r.comunidadId)===Number(cid)&&getWeekKey(r.fecha)===semana&&!r.sinEncuentro;});
+      }
+    }
+    if(existing.length>=1&&!sinEnc){
+      alert('Ya hay un encuentro registrado esta semana para esta comunidad ('+fmtAA(existing[0].fecha)+').');
+      return;
+    }
   }
   // State already updated via ngToggleBtn - no need to re-read from DOM
   // Tag each entry with esLider flag for dashboard filtering
@@ -7709,8 +7742,21 @@ async function gdvSaveRecord(){
     return sem===semanaFecha && anio===anioFecha;
   });
   if(yaExiste){
-    alert('Ya existe un registro para la Semana '+semanaFecha+'.');
-    return;
+    // Antes de bloquear, verificar si el registro "existente" es en realidad un fantasma
+    // (una carga vieja que nunca llegó a subir a la nube) — si lo es, se limpia solo y se sigue,
+    // sin que nadie tenga que ir a destrabarlo a mano.
+    var esHuerfanoGdv=false;
+    if(typeof window.fbCheckOrphan==='function'){
+      esHuerfanoGdv=await window.fbCheckOrphan('records','gdv_r5',yaExiste.id);
+    }
+    if(esHuerfanoGdv){
+      S.records=S.records.filter(function(r){return r.id!==yaExiste.id;});
+      await saveK(SK.records,S.records);
+      showToast('🔄 Se limpió un intento de carga anterior que nunca había llegado a la nube. Continuá cargando.','#1F4E79');
+    } else {
+      alert('Ya existe un registro para la Semana '+semanaFecha+'.');
+      return;
+    }
   }
 
   if(!sinEncuentro&&!Object.keys(gdvFacAtt).length){alert('El grupo no tiene miembros cargados');return;}
@@ -13282,8 +13328,21 @@ async function discGuardarAsistencia(){
     return getISOWeek(r.fecha)===semana && parseLocalDate(r.fecha).getFullYear()===anio;
   });
   if(yaExiste){
-    alert('Ya existe un registro para la Semana '+semana+' en este Paso.');
-    return;
+    // Antes de bloquear, verificar si el registro "existente" es en realidad un fantasma
+    // (una carga vieja que nunca llegó a subir a la nube) — si lo es, se limpia solo y se sigue,
+    // sin que nadie tenga que ir a destrabarlo a mano.
+    var esHuerfanoDisc=false;
+    if(typeof window.fbCheckOrphan==='function'){
+      esHuerfanoDisc=await window.fbCheckOrphan('disc','gdv_disc_records',yaExiste.id);
+    }
+    if(esHuerfanoDisc){
+      S.discRecords=S.discRecords.filter(function(r){return r.id!==yaExiste.id;});
+      await saveK(SK.discRecords,S.discRecords);
+      showToast('🔄 Se limpió un intento de carga anterior que nunca había llegado a la nube. Continuá cargando.','#1F4E79');
+    } else {
+      alert('Ya existe un registro para la Semana '+semana+' en este Paso.');
+      return;
+    }
   }
 
   var cursada=(S.discCursadas||[]).find(function(cu){return cu.id===pasoId;});var paso=cursada?S.discPasos.find(function(p){return p.id===cursada.pasoId;}):null;var realPasoId=cursada?cursada.pasoId:pasoId;

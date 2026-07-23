@@ -884,8 +884,19 @@ function getWeekLabel(offsetWeeks=0){
   const fmtD=d=>`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
   return `${fmtD(start)} al ${fmtD(end)}/${String(end.getFullYear()).slice(2)}`;
 }
+// Parsea "YYYY-MM-DD" como medianoche LOCAL. new Date("YYYY-MM-DD") lo interpreta como
+// medianoche UTC, y en husos horarios negativos (Argentina UTC-3) eso lo corre al día
+// anterior — cerca de un lunes, corría el cálculo de semana ISO y permitía "duplicados"
+// entre días que en realidad son de la misma semana.
+function parseLocalDate(d){
+  if(typeof d==='string'){
+    const m=d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m) return new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
+  }
+  return new Date(d);
+}
 function getISOWeek(d){
-  const dt=new Date(d);
+  const dt=parseLocalDate(d);
   dt.setHours(0,0,0,0);
   dt.setDate(dt.getDate()+3-(dt.getDay()+6)%7);
   const week1=new Date(dt.getFullYear(),0,4);
@@ -1276,7 +1287,7 @@ function canAccessNG(){
 // NUEVAS GENERACIONES MODULE
 // ══════════════════════════════════════════════════════════════════
 var ngCurrentComunidadId=null;
-var ngFilDesde=(function(){var d=new Date();d.setDate(d.getDate()-14);return d.toISOString().slice(0,10);})();
+var ngFilDesde=limiteFechaCarga().min;
 var ngFilHasta='',ngFilComunidad=null,ngFilSexo='';
 
 function openNG(){
@@ -1820,7 +1831,7 @@ function ngApplyFilters(){
 }
 
 function ngResetFilters(){
-  ngFilDesde=(function(){var d=new Date();d.setDate(d.getDate()-14);return d.toISOString().slice(0,10);})();
+  ngFilDesde=limiteFechaCarga().min;
   ngFilHasta=''; ngFilComunidad=null; ngFilSexo='';
   var el;
   if((el=document.getElementById('ng-df-desde'))) el.value=ngFilDesde;
@@ -2181,7 +2192,7 @@ async function ngSaveRecord(){
 function ngRenderRegistros(c){
   if(!c) c=document.getElementById('ng-tab-content');
   var hoy=today();
-  var d2w=(function(){var d=new Date();d.setDate(d.getDate()-14);return d.toISOString().slice(0,10);})();
+  var d2w=limiteFechaCarga().min;
   var coms=isSuperAdmin()?(S.ngComunidades||[]).filter(function(ng){return ng.estado!=='Inactivo';}):ngGetMisComunidades();
   var comOpts=coms.map(function(ng){return '<option value="'+ng.id+'">'+ng.name+'</option>';}).join('');
   c.innerHTML=
@@ -2201,7 +2212,7 @@ function ngRenderRegistros(c){
 }
 
 function ngResetRegFiltros(){
-  var d2w=(function(){var d=new Date();d.setDate(d.getDate()-14);return d.toISOString().slice(0,10);})();
+  var d2w=limiteFechaCarga().min;
   var el;
   if((el=document.getElementById('ng-rf-desde'))) el.value=d2w;
   if((el=document.getElementById('ng-rf-hasta'))) el.value=today();
@@ -6901,7 +6912,7 @@ function cfgCloseRoleForm(){document.getElementById('cfg-role-form').classList.a
 // ════════════════════════════════════════════════════════════
 let gdvFacAtt={},gdvVisitsOther=[],gdvVisitsNew=[],gdvVisitsNewIds=[],gdvSelectedRoles=[];
 let gdvEditingGroupId=null,gdvEditingUserId=null,gdvEditingMemberId=null,gdvEditingRoleId=null;
-var _d2w=(function(){var d=new Date();d.setDate(d.getDate()-14);return d.toISOString().slice(0,10);})();
+var _d2w=limiteFechaCarga().min;
 let gdvFilDesde=_d2w,gdvFilHasta='',gdvFilGrupos=null,gdvFilSexo='';
 let gdvMrSortAsc=true,gdvMrVisible=20;
 
@@ -7327,10 +7338,10 @@ function gdvCheckDuplicateWeek(gid){
   var fecha=document.getElementById('gdv-fecha')?.value;
   if(!gid||!fecha){alert.style.display='none';return;}
   var semana=getISOWeek(fecha);
-  var anio=new Date(fecha).getFullYear();
+  var anio=parseLocalDate(fecha).getFullYear();
   var existe=S.records.find(function(r){
     if(r.grupoId!==gid) return false;
-    return getISOWeek(r.fecha)===semana && new Date(r.fecha).getFullYear()===anio;
+    return getISOWeek(r.fecha)===semana && parseLocalDate(r.fecha).getFullYear()===anio;
   });
   if(existe){
     alert.style.display='block';
@@ -7595,14 +7606,14 @@ async function gdvSaveRecord(){
   // (sin excepciones — al menos hay que marcarla como "Sin Encuentro")
   {
     const semanaActualNum=getISOWeek(lim.max);
-    const anioActualNum=new Date(lim.max).getFullYear();
-    const esSemanaActual=getISOWeek(fecha)===semanaActualNum && new Date(fecha).getFullYear()===anioActualNum;
+    const anioActualNum=parseLocalDate(lim.max).getFullYear();
+    const esSemanaActual=getISOWeek(fecha)===semanaActualNum && parseLocalDate(fecha).getFullYear()===anioActualNum;
     if(esSemanaActual){
       const semanaAntNum=getISOWeek(lim.min);
-      const anioAntNum=new Date(lim.min).getFullYear();
+      const anioAntNum=parseLocalDate(lim.min).getFullYear();
       const existeAnterior=S.records.some(function(r){
         if(r.grupoId!==gid) return false;
-        return getISOWeek(r.fecha)===semanaAntNum && new Date(r.fecha).getFullYear()===anioAntNum;
+        return getISOWeek(r.fecha)===semanaAntNum && parseLocalDate(r.fecha).getFullYear()===anioAntNum;
       });
       if(!existeAnterior){
         alert('⚠️ Todavía no cargaste la semana anterior para este grupo. Cargala primero — como mínimo marcá "Sin Encuentro" — antes de cargar la semana actual.');
@@ -7613,11 +7624,11 @@ async function gdvSaveRecord(){
 
   // ── Control de duplicados por semana ──
   const semanaFecha=getISOWeek(fecha);
-  const anioFecha=new Date(fecha).getFullYear();
+  const anioFecha=parseLocalDate(fecha).getFullYear();
   const yaExiste=S.records.find(function(r){
     if(r.grupoId!==gid) return false;
     const sem=getISOWeek(r.fecha);
-    const anio=new Date(r.fecha).getFullYear();
+    const anio=parseLocalDate(r.fecha).getFullYear();
     return sem===semanaFecha && anio===anioFecha;
   });
   if(yaExiste){
@@ -7769,8 +7780,7 @@ function gdvRenderFacChart(recs){
   });
 }
 function gdvGetDefaultDates(){
-  const {start,end}=getWeekDates(0);
-  return {desde:dateToStr(start),hasta:dateToStr(end)};
+  return {desde:limiteFechaCarga().min,hasta:today()};
 }
 
 function gdvInitFilters(){
@@ -8193,7 +8203,7 @@ function gdvRenderWeeklyStatus(){
   var colores = {
     'reportado':     {bg:'#F0FDF4', border:'#86EFAC', dot:'#16A34A', label:'Reportó'},
     'mixto':         {bg:'#F0FDF4', border:'#86EFAC', dot:'#16A34A', label:'Reportó'},
-    'sin-encuentro': {bg:'#FFFBEB', border:'#FCD34D', dot:'#D97706', label:'Sin encuentro'},
+    'sin-encuentro': {bg:'#F5F3FF', border:'#C4B5FD', dot:'#7C3AED', label:'Sin encuentro'},
     'sin-reporte':   {bg:'#FFF5F5', border:'#FCA5A5', dot:'#DC2626', label:'Sin reporte'}
   };
 
@@ -8202,7 +8212,7 @@ function gdvRenderWeeklyStatus(){
   html += '<div style="font-size:14px;font-weight:600;color:#1F4E79">Período: ' + periodoLabel + '</div>';
   html += '<div style="font-size:12px;color:#6B7280;margin-top:3px">';
   html += '<span style="color:#16A34A;font-weight:600">&#10003; ' + reportados + ' con reporte</span>';
-  html += ' &nbsp;&middot;&nbsp; <span style="color:#D97706;font-weight:600">&#9208; ' + sinEncs + ' sin encuentro</span>';
+  html += ' &nbsp;&middot;&nbsp; <span style="color:#7C3AED;font-weight:600">&#9208; ' + sinEncs + ' sin encuentro</span>';
   html += ' &nbsp;&middot;&nbsp; <span style="color:#DC2626;font-weight:600">&#10007; ' + sinReporte + ' sin ningún registro</span>';
   html += '</div></div>';
   html += '<div style="font-size:12px;color:#9CA3AF;font-style:italic">Cambiá las fechas arriba para filtrar</div>';
@@ -8538,11 +8548,11 @@ async function gdvSaveEditRec(){
   if(nuevaFecha>today()){ alert('No podés poner una fecha futura.'); return; }
   if(nuevaFecha!==r.fecha){
     var semanaNueva=getISOWeek(nuevaFecha);
-    var anioNueva=new Date(nuevaFecha).getFullYear();
+    var anioNueva=parseLocalDate(nuevaFecha).getFullYear();
     var yaExiste=S.records.some(function(x){
       if(x.id===r.id) return false;
       if(x.grupoId!==r.grupoId) return false;
-      return getISOWeek(x.fecha)===semanaNueva && new Date(x.fecha).getFullYear()===anioNueva;
+      return getISOWeek(x.fecha)===semanaNueva && parseLocalDate(x.fecha).getFullYear()===anioNueva;
     });
     if(yaExiste){
       alert('Ya existe otro registro de este grupo para la semana de esa fecha. Elegí otra fecha, o eliminá el duplicado primero.');
@@ -13096,10 +13106,10 @@ function discCheckDuplicateWeek(){
   var fecha=document.getElementById('disc-fecha')?.value;
   if(!cursadaId||!fecha){alertEl.style.display='none';return;}
   var semana=getISOWeek(fecha);
-  var anio=new Date(fecha).getFullYear();
+  var anio=parseLocalDate(fecha).getFullYear();
   var existe=S.discRecords.find(function(r){
     if((r.cursadaId||r.pasoId)!==cursadaId) return false;
-    return getISOWeek(r.fecha)===semana && new Date(r.fecha).getFullYear()===anio;
+    return getISOWeek(r.fecha)===semana && parseLocalDate(r.fecha).getFullYear()===anio;
   });
   if(existe){
     alertEl.style.display='block';
@@ -13189,10 +13199,10 @@ async function discGuardarAsistencia(){
 
   // Check for duplicate week (same paso + same ISO week)
   var semana=getISOWeek(fecha);
-  var anio=new Date(fecha).getFullYear();
+  var anio=parseLocalDate(fecha).getFullYear();
   var yaExiste=S.discRecords.find(function(r){
     if((r.cursadaId||r.pasoId)!==pasoId) return false;
-    return getISOWeek(r.fecha)===semana && new Date(r.fecha).getFullYear()===anio;
+    return getISOWeek(r.fecha)===semana && parseLocalDate(r.fecha).getFullYear()===anio;
   });
   if(yaExiste){
     alert('Ya existe un registro para la Semana '+semana+' en este Paso.');
@@ -13297,11 +13307,11 @@ async function discSaveEdit(){
   if(nuevaFecha!==r.fecha){
     var claveGrupo=r.cursadaId||r.pasoId;
     var semanaNueva=getISOWeek(nuevaFecha);
-    var anioNueva=new Date(nuevaFecha).getFullYear();
+    var anioNueva=parseLocalDate(nuevaFecha).getFullYear();
     var yaExiste=S.discRecords.some(function(x){
       if(x.id===r.id) return false;
       if((x.cursadaId||x.pasoId)!==claveGrupo) return false;
-      return getISOWeek(x.fecha)===semanaNueva && new Date(x.fecha).getFullYear()===anioNueva;
+      return getISOWeek(x.fecha)===semanaNueva && parseLocalDate(x.fecha).getFullYear()===anioNueva;
     });
     if(yaExiste){
       alert('Ya existe otro registro de este Paso para la semana de esa fecha. Elegí otra fecha, o eliminá el duplicado primero.');

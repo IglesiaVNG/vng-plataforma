@@ -625,6 +625,33 @@ window.fbLoadPermisos = async function() {
 };
 console.log('Firebase: initialized OK');
 
+// ── Chequeo de versión: fuerza actualización automática en dispositivos con caché vieja ──
+// IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
+// (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
+// Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
+const APP_VERSION = '2026-07-22-a';
+window._vngUpdating = false;
+async function fbCheckVersion(){
+  try{
+    const ref = doc(db, VNG_COL, 'config');
+    const snap = await getDoc(ref);
+    const stored = snap.exists() ? (snap.data()._app_version||'') : '';
+    if(!stored || APP_VERSION > stored){
+      // Esta es la versión más nueva vista hasta ahora — queda marcada para que
+      // los dispositivos con una versión vieja abierta se enteren y se actualicen solos
+      await setDoc(ref, {_app_version: APP_VERSION}, {merge:true});
+    } else if(stored > APP_VERSION && !window._vngUpdating){
+      window._vngUpdating = true;
+      window.showToast && window.showToast('🔄 Hay una versión nueva de la app. Actualizando en unos segundos...', '#1F4E79');
+      setTimeout(function(){
+        location.href = location.pathname + '?v=' + Date.now();
+      }, 5000);
+    }
+  }catch(e){ console.warn('No se pudo chequear la versión de la app:', e); }
+}
+fbCheckVersion();
+setInterval(fbCheckVersion, 90000); // reintentar cada 90 segundos mientras la app esté abierta
+
 // Auto-download when Firebase is ready (fixes mobile timing issue)
 window.fbDownload().then(function(hasData) {
   // Cargar permisos desde Firebase separadamente via fbLoadPermisos (tiene acceso al scope correcto)
@@ -2441,9 +2468,9 @@ async function ngDeleteRecord(id){
   var removed=S.ngRecords.splice(idx,1)[0];
   addTombstone(SK.ngRecords,id);
   await saveK(SK.ngRecords,S.ngRecords);
+  ngRenderRegistrosList(); // reflejar el borrado al instante — no esperar a la nube
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
-    ngRenderRegistrosList();
     showToast('🗑️ Registro eliminado','#DC2626');
   }catch(e){
     S.ngRecords.splice(idx,0,removed);
@@ -8505,15 +8532,15 @@ async function gdvDeleteRecord(id){
   S.records=S.records.filter(r=>r.id!==id);
   addTombstone(SK.records,id);
   await saveK(SK.records,S.records);
+  gdvRenderRegistros();gdvRenderDashboard(); // reflejar el borrado al instante — no esperar a la nube
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     if(r) S.records.push(r);
     await saveK(SK.records,S.records);
+    gdvRenderRegistros();gdvRenderDashboard();
     alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
-    return;
   }
-  gdvRenderRegistros();gdvRenderDashboard();
 }
 
 function gdvEditRecord(id){
@@ -13281,17 +13308,19 @@ async function discDeleteRecord(id){
   S.discRecords=S.discRecords.filter(function(x){return x.id!==id;});
   addTombstone(SK.discRecords,id);
   await saveK(SK.discRecords,S.discRecords);
+  var c=document.getElementById('disc-registros-wrap');
+  if(c) discRenderRegistros(c);
+  discRenderDashboard(document.getElementById('disc-dashboard-wrap')); // reflejar el borrado al instante — no esperar a la nube
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     if(r) S.discRecords.push(r);
     await saveK(SK.discRecords,S.discRecords);
+    var c2=document.getElementById('disc-registros-wrap');
+    if(c2) discRenderRegistros(c2);
+    discRenderDashboard(document.getElementById('disc-dashboard-wrap'));
     alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
-    return;
   }
-  var c=document.getElementById('disc-registros-wrap');
-  if(c) discRenderRegistros(c);
-  discRenderDashboard(document.getElementById('disc-dashboard-wrap'));
 }
 
 function discEditRecord(id){

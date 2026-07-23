@@ -878,7 +878,14 @@ function getWeekDates(offsetWeeks=0){
   const end=new Date(d); end.setDate(end.getDate()+6);
   return {start,end};
 }
-function dateToStr(d){return d.toISOString().split('T')[0];}
+function dateToStr(d){
+  // Usa componentes LOCALES (no toISOString, que es UTC y corre la fecha
+  // un día para adelante de noche en husos horarios negativos como Argentina)
+  var y=d.getFullYear();
+  var m=String(d.getMonth()+1).padStart(2,'0');
+  var day=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
 function getWeekLabel(offsetWeeks=0){
   const {start,end}=getWeekDates(offsetWeeks);
   const fmtD=d=>`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -1214,9 +1221,9 @@ async function initStorage(){
   try{if(typeof window.syncNow==="function")window.syncNow();}catch(_e){}
 }
 
-function today(){return new Date().toISOString().split('T')[0];}
+function today(){return dateToStr(new Date());}
 function fmt(d){return fmtAA(d);}
-function todayAA(){var d=new Date();return fmtAA(d.toISOString().slice(0,10));}
+function todayAA(){return fmtAA(today());}
 function initials(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();}
 function pct(a,b){return b?Math.round(a/b*100):0;}
 function fullName(m){return `${m.nombre} ${m.apellido}`.trim();}
@@ -3716,7 +3723,7 @@ async function saDarDeBaja(id){
     alert('El motivo de baja es obligatorio y debe tener al menos 10 caracteres.');
     return;
   }
-  const hoy=new Date().toISOString().split('T')[0];
+  const hoy=today();
   Object.assign(m,{estado:'Baja',fechaBaja:hoy,motivoBaja:motivo.trim()});
   await saveK(SK.members,S.members);
   saCloseDetail();
@@ -3765,14 +3772,14 @@ async function saQuickToggleEstado(id){
   }
   m.estadoHistorial=m.estadoHistorial||[];
   m.estadoHistorial.push({
-    fecha:new Date().toISOString().slice(0,10),
+    fecha:today(),
     de:estadoActual,
     a:nuevoEstado,
     motivo
   });
   m.estadoMotivo=motivo;
-  m.estadoMotivoFecha=new Date().toISOString().slice(0,10);
-  if(nuevoEstado==='Baja') m.fechaBaja=new Date().toISOString().slice(0,10);
+  m.estadoMotivoFecha=today();
+  if(nuevoEstado==='Baja') m.fechaBaja=today();
   else m.fechaBaja='';
   await saveK(SK.members,S.members);
   try{
@@ -5514,7 +5521,7 @@ function agendaRenderOcurrenciasList(ocs, wrapId, emptyMsg){
 
 function agendaRenderProximos(){
   var hastaEl=document.getElementById('agenda-prox-hasta');
-  if(hastaEl&&!hastaEl.value){ var d=new Date(); d.setDate(d.getDate()+15); hastaEl.value=d.toISOString().slice(0,10); }
+  if(hastaEl&&!hastaEl.value){ var d=new Date(); d.setDate(d.getDate()+15); hastaEl.value=dateToStr(d); }
 
   var minSel=document.getElementById('agenda-prox-ministerio');
   if(minSel&&minSel.options.length<=1){
@@ -5558,7 +5565,7 @@ function agendaRenderHistoricoEventos(){
 function agendaResetProximosFiltro(){
   var hastaEl=document.getElementById('agenda-prox-hasta');
   var minSel=document.getElementById('agenda-prox-ministerio');
-  if(hastaEl){ var d=new Date(); d.setDate(d.getDate()+15); hastaEl.value=d.toISOString().slice(0,10); }
+  if(hastaEl){ var d=new Date(); d.setDate(d.getDate()+15); hastaEl.value=dateToStr(d); }
   if(minSel) minSel.value='';
   agendaRenderProximos();
 }
@@ -7705,10 +7712,10 @@ function gdvRenderMyHistory(){
   // Date filter - default last 30 days
   const hastaEl=document.getElementById('gdv-hist-hasta');
   const desdeEl=document.getElementById('gdv-hist-desde');
-  if(hastaEl&&!hastaEl.value) hastaEl.value=new Date().toISOString().slice(0,10);
+  if(hastaEl&&!hastaEl.value) hastaEl.value=today();
   if(desdeEl&&!desdeEl.value){
     const d30=new Date(); d30.setDate(d30.getDate()-30);
-    desdeEl.value=d30.toISOString().slice(0,10);
+    desdeEl.value=dateToStr(d30);
   }
   const fd=desdeEl?.value||'';
   const fh=hastaEl?.value||'';
@@ -8402,7 +8409,7 @@ function gdvRenderRegistros(){
   // Default: last 2 weeks if no date set
   var _regDesde=document.getElementById('gdv-reg-desde');
   var _regHasta=document.getElementById('gdv-reg-hasta');
-  if(_regDesde&&!_regDesde.value){var _d=new Date();_d.setDate(_d.getDate()-14);_regDesde.value=_d.toISOString().slice(0,10);}
+  if(_regDesde&&!_regDesde.value){_regDesde.value=limiteFechaCarga().min;}
   const fd=_regDesde?.value||'';
   const fh=_regHasta?.value||'';
   const sel=document.getElementById('gdv-reg-grupo');
@@ -8962,7 +8969,7 @@ function ofIni(n,a){return((n||'')[0]||'').toUpperCase()+((a||'')[0]||'').toUppe
 function ofIsActivo(aid,mes){return ofParticipacion[`${aid}_${mes}`]!==false;}
 function ofMateriasActivas(){return ofMaterias.filter(m=>m.estado==='Activo');}
 function ofFmtDate(d){if(!d)return'';const p=d.split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:d;}
-function ofDateInput(){const d=new Date();return d.toISOString().split('T')[0];}
+function ofDateInput(){return today();}
 
 function openOF(){
   document.getElementById('screen-home').classList.add('hidden');
@@ -11092,8 +11099,8 @@ function nvResetDashboardFiltros(){
   const desdeEl=document.getElementById('nv-dash-desde');
   const hastaEl=document.getElementById('nv-dash-hasta');
   const sexoEl=document.getElementById('nv-dash-sexo');
-  if(desdeEl) desdeEl.value=d.toISOString().slice(0,10);
-  if(hastaEl) hastaEl.value=new Date().toISOString().slice(0,10);
+  if(desdeEl) desdeEl.value=dateToStr(d);
+  if(hastaEl) hastaEl.value=today();
   if(sexoEl) sexoEl.value='';
   nvRenderDashboard();
 }
@@ -11103,9 +11110,9 @@ function nvRenderDashboard(){
   const hastaEl=document.getElementById('nv-dash-hasta');
   if(desdeEl&&!desdeEl.value){
     const d=new Date(); d.setMonth(d.getMonth()-1);
-    desdeEl.value=d.toISOString().slice(0,10);
+    desdeEl.value=dateToStr(d);
   }
-  if(hastaEl&&!hastaEl.value) hastaEl.value=new Date().toISOString().slice(0,10);
+  if(hastaEl&&!hastaEl.value) hastaEl.value=today();
 
   const cohort=nvGetDashboardCohort();
   const total=cohort.length;

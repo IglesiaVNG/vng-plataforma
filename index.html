@@ -426,10 +426,40 @@ window.fbUpload = async function(force) {
     console.log('Firebase: upload skipped — no real data in localStorage');
     return true;
   }
+  // Arrays que se editan desde varios dispositivos (asistencia, miembros, checklists) —
+  // antes de subir hay que fusionarlos con lo que haya en la nube en ese momento,
+  // igual que ya hace la descarga. Si no, un dispositivo con datos viejos podía
+  // "resucitar" un registro que otro dispositivo ya había borrado, con solo subir
+  // su copia desactualizada encima.
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones'};
+  const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
     localStorage.setItem('_vng_last_upload', String(uploadTs));
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
+      const needsMerge = keys.some(function(k){ return MERGE_KEYS.includes(k) || TOMB_KEYS.includes(k); });
+      if(needsMerge){
+        try{
+          const snap = await getDoc(doc(db, VNG_COL, docName));
+          if(snap.exists()){
+            const cloudData=snap.data();
+            // Tombstones primero — el merge de datos necesita la lista ya unificada
+            keys.forEach(function(k){
+              if(TOMB_KEYS.includes(k) && cloudData[k]!==undefined){
+                localStorage.setItem(k, mergeTombstones(localStorage.getItem(k), cloudData[k]));
+              }
+            });
+            keys.forEach(function(k){
+              if(MERGE_KEYS.includes(k) && cloudData[k]!==undefined){
+                localStorage.setItem(k, mergeByTs(localStorage.getItem(k), cloudData[k], TOMB_MAP[k]));
+              }
+            });
+          }
+        }catch(e){
+          console.warn('No se pudo leer la nube antes de subir '+docName+' — se sube el local tal cual:', e);
+        }
+      }
       const data = { _ts: uploadTs };
       // Update local timestamps so download won't overwrite what we just uploaded
       keys.forEach(function(k){ localStorage.setItem('_local_ts_'+k, String(uploadTs)); });

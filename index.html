@@ -420,6 +420,7 @@ function fbHasRealData() {
     return Array.isArray(arr) && arr.length > 5; // more than 5 members = real data
   } catch(e) { return false; }
 }
+window.fbHasRealData = fbHasRealData; // se referencia desde fuera de este <script type="module">
 
 window.fbUpload = async function(force) {
   if(!force && !fbHasRealData()) {
@@ -546,6 +547,13 @@ function addTombstone(key, id){
   list.push({id:id, ts:Date.now()});
   localStorage.setItem(tkey, JSON.stringify(list));
 }
+// CRÍTICO: este archivo vive dentro de un <script type="module">, que tiene su propio
+// espacio aislado — las funciones acá adentro NO son visibles para el <script> principal
+// de la app (donde viven ngDeleteRecord, gdvDeleteRecord, etc.) a menos que se expongan
+// explícitamente en window. Sin esto, TODA función de borrado de la app tira
+// "ReferenceError: addTombstone is not defined" en el primer paso, en silencio — nunca
+// llega ni a intentar guardar nada, y por eso ningún borrado quedaba protegido de verdad.
+window.addTombstone = addTombstone;
 
 // Alias para compatibilidad con código existente
 function mergeMembers(localStr, cloudStr){ return mergeByTs(localStr, cloudStr, '_tomb_gdv_m5'); }

@@ -12611,6 +12611,7 @@ function buildDiscipuladoHTML(){
 
 let discEditingPasoId=null;
 let discAsignandoPasoId=null;
+let discAsignandoCursadaId=null;
 
 // Devuelve el/los nombres de Discipulador(es) de un Paso o Cursada, separados por coma
 function discDiscipuladoresLabel(obj){
@@ -12811,10 +12812,10 @@ async function discAbrirCursada(pasoId){
   if(!S.discCursadas) S.discCursadas=[];
   var recsPrev=S.discRecords.filter(function(r){return r.pasoId===pasoId&&!r.cursadaId&&r.asistencia;});
   var memPrev=[...new Set(recsPrev.flatMap(function(r){return Object.keys(r.asistencia).filter(function(id){return r.asistencia[id]&&r.asistencia[id].state==='presente';});}))].map(Number).filter(Boolean);
-  var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorIds:paso.discipuladorIds||[],miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:''};
+  var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorIds:paso.discipuladorIds||[],miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:'',_ts:Date.now()};
   S.discCursadas.push(nc);
   var recordsTocados=[];
-  S.discRecords.forEach(function(r){ if(r.pasoId===pasoId&&!r.cursadaId){ recordsTocados.push(r); r.cursadaId=nc.id; } });
+  S.discRecords.forEach(function(r){ if(r.pasoId===pasoId&&!r.cursadaId){ recordsTocados.push(r); r.cursadaId=nc.id; r._ts=Date.now(); } });
   await saveK('gdv_disc_cursadas',S.discCursadas);
   await saveK('gdv_disc_records',S.discRecords);
   try{
@@ -12862,6 +12863,8 @@ async function discCerrarCursada(cursadaId){
     cursada.anio=_a;
     cursada.label=cursada.pasoNombre+' — '+cursada.num+'/'+_a;
   }
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  snapshotFormaciones.forEach(function(s){ s.m._ts=Date.now(); });
   await saveK('gdv_disc_cursadas',S.discCursadas);
   await saveK('gdv_m5',S.members);
   try{
@@ -12895,6 +12898,8 @@ async function discRevertirCierre(cursadaId){
   });
   cursada.estado='Activo';
   cursada.fechaCierre='';
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  snapshotFormaciones.forEach(function(s){ s.m._ts=Date.now(); });
   await saveK('gdv_disc_cursadas',S.discCursadas);
   await saveK(SK.members,S.members);
   try{
@@ -12923,7 +12928,7 @@ async function discRevertirInicio(cursadaId){
   if(inscsAsociadas.length) msg+='\n\nTambién se van a eliminar '+inscsAsociadas.length+' inscripción'+(inscsAsociadas.length!==1?'es':'')+' por QR asociada'+(inscsAsociadas.length!==1?'s':'')+' a esta cursada.';
   if(!confirm(msg)) return;
   var recordsTocados=[];
-  S.discRecords.forEach(function(r){ if(r.cursadaId===cursadaId){ recordsTocados.push(r); r.cursadaId=null; } });
+  S.discRecords.forEach(function(r){ if(r.cursadaId===cursadaId){ recordsTocados.push(r); r.cursadaId=null; r._ts=Date.now(); } });
   S.discCursadas=(S.discCursadas||[]).filter(function(c){return c.id!==cursadaId;});
   addTombstone('gdv_disc_cursadas',cursadaId);
   var snapshotInscripciones=S.discInscripciones.slice();
@@ -12989,16 +12994,20 @@ function discRenderCursada(c){
     html+='<div style="font-size:15px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>';
     html+='<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+paso.nivel+' · '+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'')+'</div>';
     html+='<div style="font-size:12px;color:#6B7280;margin-top:4px">';
-    html+='Discipulador: <strong>'+discDiscipuladoresLabel(paso)+'</strong>';
-    html+=' · '+paso.miembros.length+' miembro'+(paso.miembros.length!==1?'s':'');
+    if(cursadaActiva){
+      html+='Discipulador: <strong>'+discDiscipuladoresLabel(cursadaActiva)+'</strong>';
+      html+=' · '+cursadaActiva.miembros.length+' miembro'+(cursadaActiva.miembros.length!==1?'s':'');
+    } else {
+      html+='<span style="color:#9CA3AF;font-style:italic">Sin cursada activa — sin discipulador ni integrantes por ahora</span>';
+    }
     html+='</div></div>';
     html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
     html+='<span class="badge '+(cursadaActiva?'b-ok':'b-muted')+'">'+(cursadaActiva?'Cursada Activa':'Sin cursada activa')+'</span>';
     if(cursadaActiva&&canAdminDisc()){
       html+='<label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:'+(cursadaActiva.qrAbierto?'#16A34A':'#9CA3AF')+';cursor:pointer;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:999px;padding:4px 10px" title="Acepta inscripciones por QR ahora mismo">'
-        +'<input type="checkbox" onchange="discToggleQrAbierto('+cursadaActiva.id+')" '+(cursadaActiva.qrAbierto?'checked':'')+' style="cursor:pointer">📱 QR abierto</label>';
+        +'<input type="checkbox" onchange="discToggleQrAbierto('+cursadaActiva.id+',this)" '+(cursadaActiva.qrAbierto?'checked':'')+' style="cursor:pointer">📱 QR abierto</label>';
       html+='<label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:'+(cursadaActiva.requiereValidacion?'#D97706':'#9CA3AF')+';cursor:pointer;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:999px;padding:4px 10px" title="Las inscripciones quedan pendientes hasta que alguien las valide">'
-        +'<input type="checkbox" onchange="discToggleRequiereValidacion('+cursadaActiva.id+')" '+(cursadaActiva.requiereValidacion?'checked':'')+' style="cursor:pointer">✅ Requiere validación</label>';
+        +'<input type="checkbox" onchange="discToggleRequiereValidacion('+cursadaActiva.id+',this)" '+(cursadaActiva.requiereValidacion?'checked':'')+' style="cursor:pointer">✅ Requiere validación</label>';
     }
     if(canAdminDisc()){
       html+='<button class="btn btn-sm btn-primary" onclick="discOpenAsignacion('+paso.id+')">👤 Asignar</button>';
@@ -13012,9 +13021,9 @@ function discRenderCursada(c){
       }
     }
     html+='</div></div>';
-    // Members list
-    if(paso.miembros.length){
-      var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+    // Members list — solo si hay cursada activa (si no, no hay a quién mostrar)
+    if(cursadaActiva&&cursadaActiva.miembros.length){
+      var mems=cursadaActiva.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
       html+='<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px">';
       mems.forEach(function(m){
         var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
@@ -13031,16 +13040,26 @@ function discRenderCursada(c){
 
 // ── Inscripciones por QR (esqueleto: interruptores + modelo de datos + revisión) ──
 
-async function discToggleQrAbierto(cursadaId){
+async function discToggleQrAbierto(cursadaId,checkboxEl){
   var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
   if(!cursada) return;
+  var nuevoValor=!cursada.qrAbierto;
+  var msg=nuevoValor
+    ?'¿Abrir el QR de inscripción para "'+cursada.label+'"?\nA partir de ahora, cualquiera que escanee el QR va a poder anotarse a esta cursada.'
+    :'¿Cerrar el QR de inscripción para "'+cursada.label+'"?\nNadie más va a poder anotarse por QR hasta que lo vuelvas a abrir de nuevo.';
+  if(!confirm(msg)){
+    if(checkboxEl) checkboxEl.checked=cursada.qrAbierto; // revertir visualmente, no se cambió nada
+    return;
+  }
   var snapshot=cursada.qrAbierto;
-  cursada.qrAbierto=!cursada.qrAbierto;
+  cursada.qrAbierto=nuevoValor;
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   await saveK(SK.discCursadas,S.discCursadas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     cursada.qrAbierto=snapshot;
+    cursada._ts=Date.now();
     await saveK(SK.discCursadas,S.discCursadas);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     var c1=document.getElementById('disc-content'); if(c1) discRenderCursada(c1);
@@ -13051,16 +13070,26 @@ async function discToggleQrAbierto(cursadaId){
   if(c) discRenderCursada(c);
 }
 
-async function discToggleRequiereValidacion(cursadaId){
+async function discToggleRequiereValidacion(cursadaId,checkboxEl){
   var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
   if(!cursada) return;
+  var nuevoValor=!cursada.requiereValidacion;
+  var msg=nuevoValor
+    ?'¿Activar "Requiere validación" para "'+cursada.label+'"?\nA partir de ahora, las inscripciones nuevas quedan pendientes hasta que alguien las apruebe manualmente.'
+    :'¿Desactivar "Requiere validación" para "'+cursada.label+'"?\nA partir de ahora, las inscripciones nuevas se auto-aprueban y se suman directo a la cursada, sin que nadie las revise.';
+  if(!confirm(msg)){
+    if(checkboxEl) checkboxEl.checked=cursada.requiereValidacion; // revertir visualmente, no se cambió nada
+    return;
+  }
   var snapshot=cursada.requiereValidacion;
-  cursada.requiereValidacion=!cursada.requiereValidacion;
+  cursada.requiereValidacion=nuevoValor;
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   await saveK(SK.discCursadas,S.discCursadas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     cursada.requiereValidacion=snapshot;
+    cursada._ts=Date.now();
     await saveK(SK.discCursadas,S.discCursadas);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     var c1=document.getElementById('disc-content'); if(c1) discRenderCursada(c1);
@@ -13188,15 +13217,19 @@ async function discAprobarInscripcion(id){
   insc.estado='aprobada';
   insc.aprobadoPor=(typeof currentUser!=='undefined'&&currentUser)?currentUser.id:null;
   insc.fechaAprobacion=Date.now();
+  insc._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   if(!cursada.miembros) cursada.miembros=[];
   if(!cursada.miembros.includes(insc.miembroId)) cursada.miembros.push(insc.miembroId);
+  cursada._ts=Date.now();
   await saveK(SK.discInscripciones,S.discInscripciones);
   await saveK(SK.discCursadas,S.discCursadas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     Object.assign(insc,snapshotInsc);
+    insc._ts=Date.now();
     cursada.miembros=snapshotMiembros;
+    cursada._ts=Date.now();
     await saveK(SK.discInscripciones,S.discInscripciones);
     await saveK(SK.discCursadas,S.discCursadas);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
@@ -13215,11 +13248,13 @@ async function discRechazarInscripcion(id){
   insc.estado='rechazada';
   insc.aprobadoPor=(typeof currentUser!=='undefined'&&currentUser)?currentUser.id:null;
   insc.fechaAprobacion=Date.now();
+  insc._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   await saveK(SK.discInscripciones,S.discInscripciones);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     Object.assign(insc,snapshot);
+    insc._ts=Date.now();
     await saveK(SK.discInscripciones,S.discInscripciones);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -13257,12 +13292,19 @@ function discOpenAsignacion(pasoId){
   discAsignandoPasoId=pasoId;
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   if(!paso) return;
+  var cursadaActiva=(S.discCursadas||[]).find(function(cu){return cu.pasoId===pasoId&&cu.estado==='Activo';});
+  discAsignandoCursadaId=cursadaActiva?cursadaActiva.id:null;
+  var target=cursadaActiva||paso; // de dónde leer/guardar: la cursada en curso, o el paso como staging de la próxima
+
   document.getElementById('disc-asig-title').textContent='Asignar — '+paso.nombre;
   document.getElementById('disc-asig-curso-info').innerHTML=
     '<strong>'+paso.nombre+'</strong> · '+paso.nivel+' · '+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'')
-    +'<div style="margin-top:2px;color:#9CA3AF">El Nombre, Nivel y Capítulos se editan desde 🎓 Cursos</div>';
+    +'<div style="margin-top:2px;color:#9CA3AF">El Nombre, Nivel y Capítulos se editan desde 🎓 Cursos</div>'
+    +(cursadaActiva
+      ?'<div style="margin-top:4px;color:#7C3AED;font-weight:600">✏️ Editando la cursada activa: '+cursadaActiva.label+'</div>'
+      :'<div style="margin-top:4px;color:#9CA3AF">Sin cursada activa: el Discipulador elegido acá sí se hereda al iniciar la próxima Cursada. Los Integrantes NO — cada Cursada nueva arranca sin integrantes y se arma con 👤 Asignar (una vez activa) o con Inscripciones por QR aprobadas.</div>');
 
-  var discIds=paso.discipuladorIds||[];
+  var discIds=target.discipuladorIds||[];
   var discChecks=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
     var checked=discIds.includes(m.id);
     var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
@@ -13275,7 +13317,7 @@ function discOpenAsignacion(pasoId){
   }).join('');
 
   var memberChecks=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
-    var checked=paso.miembros.includes(m.id);
+    var checked=(target.miembros||[]).includes(m.id);
     var g=S.groups.find(function(x){return x.id===m.grupoId;});
     var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
     var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
@@ -13301,20 +13343,27 @@ function discOpenAsignacion(pasoId){
 function discCloseAsignacion(){
   document.getElementById('disc-asig-modal').style.display='none';
   discAsignandoPasoId=null;
+  discAsignandoCursadaId=null;
 }
 
 async function discGuardarAsignacion(){
   var paso=S.discPasos.find(function(p){return p.id===discAsignandoPasoId;});
   if(!paso) return;
-  var snapshot={discipuladorIds:(paso.discipuladorIds||[]).slice(),miembros:(paso.miembros||[]).slice()};
-  paso.discipuladorIds=[...document.querySelectorAll('.disc-disc-cb:checked')].map(function(cb){return parseInt(cb.value);});
-  paso.miembros=[...document.querySelectorAll('.disc-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
-  await saveK(SK.discPasos,S.discPasos);
+  var cursadaActiva=discAsignandoCursadaId?(S.discCursadas||[]).find(function(cu){return cu.id===discAsignandoCursadaId;}):null;
+  var target=cursadaActiva||paso;
+  var snapshot={discipuladorIds:(target.discipuladorIds||[]).slice(),miembros:(target.miembros||[]).slice()};
+  target.discipuladorIds=[...document.querySelectorAll('.disc-disc-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  target.miembros=[...document.querySelectorAll('.disc-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  if(cursadaActiva) target._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente (el paso no es MERGE_KEY, no lo necesita)
+  var key=cursadaActiva?'gdv_disc_cursadas':SK.discPasos;
+  var arr=cursadaActiva?S.discCursadas:S.discPasos;
+  await saveK(key,arr);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    Object.assign(paso,snapshot);
-    await saveK(SK.discPasos,S.discPasos);
+    Object.assign(target,snapshot);
+    if(cursadaActiva) target._ts=Date.now();
+    await saveK(key,arr);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -13549,7 +13598,7 @@ function discLoadPasoForm(){
   }
 
   discFacAtt={};
-  var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+  var mems=cursada.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
   // Default: Ausente
   mems.forEach(function(m){discFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
 
@@ -13996,7 +14045,8 @@ async function pdiEnviar(){
     id:nuevoId,cursadaId:cursadaId,miembroId:miembro.id,
     nombreIngresado:nombre,apellidoIngresado:apellido,celularIngresado:cel,
     estado:autoAprueba?'auto-aprobada':'pendiente',
-    fecha:Date.now(),aprobadoPor:null,fechaAprobacion:null
+    fecha:Date.now(),aprobadoPor:null,fechaAprobacion:null,
+    _ts:Date.now() // Marcar edición para que mergeByTs sepa cuál es más reciente
   };
 
   var guardadoLocal=false;
@@ -14006,6 +14056,7 @@ async function pdiEnviar(){
     if(autoAprueba){
       if(!cursada.miembros) cursada.miembros=[];
       if(!cursada.miembros.includes(miembro.id)) cursada.miembros.push(miembro.id);
+      cursada._ts=Date.now();
       localStorage.setItem('gdv_disc_cursadas',JSON.stringify(cursadas));
     }
     // Releer para confirmar que el guardado local realmente ocurrió (no asumirlo)
@@ -14384,6 +14435,7 @@ async function pauGuardar(){
       m.tel=document.getElementById('pau-cel').value.trim();
       m.fnac=document.getElementById('pau-fnac').value.trim();
       m.dir=document.getElementById('pau-barrio').value.trim();
+      m._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
       localStorage.setItem('gdv_m5',JSON.stringify(members));
       // Reintenta la subida a Firebase varias veces antes de darse por vencido —
       // esta persona probablemente no vuelva a abrir este link

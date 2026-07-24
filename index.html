@@ -401,7 +401,7 @@ const KEY_GROUPS = {
   'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_qr_actualizar'], // gdv_permisos se maneja via fbSavePermisos con su propio timestamp
   'members': ['_tomb_gdv_m5','gdv_m5'],
   'records': ['_tomb_gdv_r5','gdv_r5'],
-  'disc':    ['gdv_disc_pasos','_tomb_gdv_disc_records','gdv_disc_records','_tomb_gdv_disc_cursadas','gdv_disc_cursadas'],
+  'disc':    ['gdv_disc_pasos','_tomb_gdv_disc_records','gdv_disc_records','_tomb_gdv_disc_cursadas','gdv_disc_cursadas','_tomb_gdv_disc_inscripciones','gdv_disc_inscripciones'],
   'ng':      ['gdv_ng5','_tomb_gdv_ng_records','gdv_ng_records'],
   'modules': ['gdv_modules5'],
   'agenda':  ['gdv_ministerios','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas','_tomb_gdv_checklist_secciones','gdv_checklist_secciones'],
@@ -433,8 +433,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -592,8 +592,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -711,9 +711,9 @@ window.fbDownload().then(function(hasData) {
         S.members     = _ld('gdv_m5',            S.members     ||[]);
         S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
         S.discPasos      = _ld('gdv_disc_pasos',    S.discPasos      ||[]);
-        S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);S.discCursadas=_ld('gdv_disc_cursadas',S.discCursadas||[]);
+        S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);S.discCursadas=_ld('gdv_disc_cursadas',S.discCursadas||[]);S.discInscripciones=_ld('gdv_disc_inscripciones',S.discInscripciones||[]);
         (S.discPasos||[]).forEach(function(p){ if(!p.discipuladorIds) p.discipuladorIds=p.discipuladorId?[p.discipuladorId]:[]; });
-        (S.discCursadas||[]).forEach(function(cu){ if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[]; });
+        (S.discCursadas||[]).forEach(function(cu){ if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[]; if(cu.qrAbierto===undefined) cu.qrAbierto=false; if(cu.requiereValidacion===undefined) cu.requiereValidacion=true; });
   S.ngComunidades  = _ld('gdv_ng5',           S.ngComunidades  ||[]);
   S.ngRecords      = _ld('gdv_ng_records',    S.ngRecords      ||[]);
   S.modulesConfig  = _ld('gdv_modules5',      S.modulesConfig  ||[]);
@@ -772,6 +772,7 @@ const MODULES_PERM=[
     {key:'disc_cargar',    label:'Cargar Asistencia'},
     {key:'disc_registros', label:'Ver registros'},
     {key:'disc_pasos',     label:'Configurar Pasos (Admin)'},
+    {key:'disc_inscripciones', label:'Inscripciones por QR (Admin)'},
   ]},
   {key:'config', label:'Configuración', icon:'⚙️', screens:[
     {key:'config', label:'Acceso completo al sistema'},
@@ -791,16 +792,16 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'}
+  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',disc_inscripciones:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'}
 };
 
 let PERMISOS={};
@@ -1020,7 +1021,7 @@ function recordInWeek(fechaStr, offsetWeeks=0){
 // STORAGE
 // ════════════════════════════════════════════════════════════
 const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles:'gdv_roles5',
-  discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records',discCursadas:'gdv_disc_cursadas',
+  discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records',discCursadas:'gdv_disc_cursadas',discInscripciones:'gdv_disc_inscripciones',
   ngComunidades:'gdv_ng5',ngRecords:'gdv_ng_records',
   modulesConfig:'gdv_modules5',
   ministerios:'gdv_ministerios',eventos:'gdv_eventos',
@@ -1258,7 +1259,7 @@ const DEFAULT_USERS=[
 // ════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════
-let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[],checklistSecciones:[]};
+let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],discInscripciones:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[],checklistSecciones:[]};
 let currentUser=null;
 let gdvCharts={};
 let ngCharts={};
@@ -1277,13 +1278,16 @@ async function initStorage(){
   S.members    =load(SK.members,    DEFAULT_MEMBERS);
   S.roles      =load(SK.roles,      DEFAULT_ROLES);
   S.discPasos  =load(SK.discPasos,  DEFAULT_DISC_PASOS);
-  S.discRecords=load(SK.discRecords,[]);S.discCursadas=load('gdv_disc_cursadas',[]);
+  S.discRecords=load(SK.discRecords,[]);S.discCursadas=load('gdv_disc_cursadas',[]);S.discInscripciones=load(SK.discInscripciones,[]);
   // Migración: discipuladorId (único) → discipuladorIds (varios), sin perder lo ya asignado
   S.discPasos.forEach(function(p){
     if(!p.discipuladorIds) p.discipuladorIds=p.discipuladorId?[p.discipuladorId]:[];
   });
   S.discCursadas.forEach(function(cu){
     if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[];
+    // Migración: interruptores de inscripción por QR (Cursadas creadas antes de esta feature)
+    if(cu.qrAbierto===undefined) cu.qrAbierto=false;
+    if(cu.requiereValidacion===undefined) cu.requiereValidacion=true;
   });
   S.ministerios=load(SK.ministerios,[]);
   S.eventos    =load(SK.eventos,    []);
@@ -12566,6 +12570,7 @@ function buildDiscipuladoHTML(){
       <button id="disc-tab-dashboard" class="btn btn-primary btn-sm" onclick="discTab('dashboard',this)">📊 Dashboard</button>
       ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-cursos" class="btn btn-sm" onclick="discTab('cursos',this)">🎓 Cursos</button>`:''}
       ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-pasos" class="btn btn-sm" onclick="discTab('cursada',this)">📋 Cursada</button>`:''}
+      ${(isSuperAdmin()||canEjecutar('disc_inscripciones'))?`<button id="disc-tab-inscripciones" class="btn btn-sm" onclick="discTab('inscripciones',this)">📝 Inscripciones${discCountPendientes()?` <span style="background:#DC2626;color:#fff;border-radius:999px;padding:1px 7px;font-size:10px;margin-left:2px">${discCountPendientes()}</span>`:''}</button>`:''}
       <button id="disc-tab-cargar" class="btn btn-sm" onclick="discTab('cargar',this)">✏️ Cargar</button>
       <button id="disc-tab-registros" class="btn btn-sm" onclick="discTab('registros',this)">📄 Registros</button><button id="disc-tab-historico" class="btn btn-sm" onclick="discTab('historico',this)">📁 Histórico</button>
     </div>
@@ -12626,6 +12631,7 @@ function discTab(tab, btn){
   if(tab==='dashboard') discRenderDashboard(c);
   else if(tab==='cursos') discRenderCursos(c);
   else if(tab==='cursada'||tab==='pasos') discRenderCursada(c);
+  else if(tab==='inscripciones') discRenderInscripciones(c);
   else if(tab==='cargar') discRenderCargar(c);
   else if(tab==='registros') discRenderRegistros(c);else if(tab==='historico') discRenderHistorico(c);
 }
@@ -12978,6 +12984,12 @@ function discRenderCursada(c){
     html+='</div></div>';
     html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
     html+='<span class="badge '+(cursadaActiva?'b-ok':'b-muted')+'">'+(cursadaActiva?'Cursada Activa':'Sin cursada activa')+'</span>';
+    if(cursadaActiva&&canAdminDisc()){
+      html+='<label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:'+(cursadaActiva.qrAbierto?'#16A34A':'#9CA3AF')+';cursor:pointer;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:999px;padding:4px 10px" title="Acepta inscripciones por QR ahora mismo">'
+        +'<input type="checkbox" onchange="discToggleQrAbierto('+cursadaActiva.id+')" '+(cursadaActiva.qrAbierto?'checked':'')+' style="cursor:pointer">📱 QR abierto</label>';
+      html+='<label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:'+(cursadaActiva.requiereValidacion?'#D97706':'#9CA3AF')+';cursor:pointer;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:999px;padding:4px 10px" title="Las inscripciones quedan pendientes hasta que alguien las valide">'
+        +'<input type="checkbox" onchange="discToggleRequiereValidacion('+cursadaActiva.id+')" '+(cursadaActiva.requiereValidacion?'checked':'')+' style="cursor:pointer">✅ Requiere validación</label>';
+    }
     if(canAdminDisc()){
       html+='<button class="btn btn-sm btn-primary" onclick="discOpenAsignacion('+paso.id+')">👤 Asignar</button>';
       if(!cursadaActiva){html+='<button class="btn btn-sm" onclick="discAbrirCursada('+paso.id+')" style="background:#7C3AED;color:#fff;border:none">▶ Iniciar Cursada</button>';}
@@ -13002,6 +13014,196 @@ function discRenderCursada(c){
   });
   if(!S.discPasos.length) html='<div class="empty" style="padding:2rem">Sin Cursos cargados — creá uno primero desde 🎓 Cursos</div>';
   c.innerHTML=html;
+}
+
+// ── Inscripciones por QR (esqueleto: interruptores + modelo de datos + revisión) ──
+
+async function discToggleQrAbierto(cursadaId){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
+  if(!cursada) return;
+  var snapshot=cursada.qrAbierto;
+  cursada.qrAbierto=!cursada.qrAbierto;
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    cursada.qrAbierto=snapshot;
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    var c1=document.getElementById('disc-content'); if(c1) discRenderCursada(c1);
+    return;
+  }
+  showToast(cursada.qrAbierto?'📱 QR abierto — ya acepta inscripciones':'QR cerrado','#16A34A');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+}
+
+async function discToggleRequiereValidacion(cursadaId){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
+  if(!cursada) return;
+  var snapshot=cursada.requiereValidacion;
+  cursada.requiereValidacion=!cursada.requiereValidacion;
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    cursada.requiereValidacion=snapshot;
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    var c1=document.getElementById('disc-content'); if(c1) discRenderCursada(c1);
+    return;
+  }
+  showToast(cursada.requiereValidacion?'Ahora requiere validación manual':'⚠️ Ahora auto-aprueba sin validación','#D97706');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+}
+
+function discCountPendientes(){
+  return (S.discInscripciones||[]).filter(function(i){return i.estado==='pendiente';}).length;
+}
+
+let discInscFiltroEstado='pendiente';
+let discInscFiltroCursada='';
+
+function discRenderInscripciones(c){
+  var cursadaOpts=(S.discCursadas||[]).slice().sort(function(a,b){return b.id-a.id;}).map(function(cu){
+    return '<option value="'+cu.id+'"'+(discInscFiltroCursada===String(cu.id)?' selected':'')+'>'+cu.label+'</option>';
+  }).join('');
+
+  var estados=[
+    {key:'pendiente',label:'⏳ Pendientes'},
+    {key:'aprobada',label:'✅ Aprobadas'},
+    {key:'auto-aprobada',label:'✅ Auto-aprobadas'},
+    {key:'rechazada',label:'❌ Rechazadas'},
+    {key:'',label:'Todas'},
+  ];
+  var chips=estados.map(function(e){
+    return '<div class="chip'+(discInscFiltroEstado===e.key?' active':'')+'" onclick="discInscFiltroEstado=\''+e.key+'\';discRenderInscripciones(document.getElementById(\'disc-content\'))" style="display:inline-block;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;margin-right:6px;margin-bottom:6px;'+(discInscFiltroEstado===e.key?'background:#1F4E79;color:#fff':'background:#F3F4F6;color:#6B7280')+'">'+e.label+'</div>';
+  }).join('');
+
+  var list=(S.discInscripciones||[]).filter(function(i){
+    if(discInscFiltroEstado&&i.estado!==discInscFiltroEstado) return false;
+    if(discInscFiltroCursada&&String(i.cursadaId)!==discInscFiltroCursada) return false;
+    return true;
+  }).sort(function(a,b){return (b.fecha||0)-(a.fecha||0);});
+
+  var html='<div style="margin-bottom:1rem">'+chips+'</div>';
+  html+='<select onchange="discInscFiltroCursada=this.value;discRenderInscripciones(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;margin-bottom:1rem"><option value="">Todas las cursadas</option>'+cursadaOpts+'</select>';
+
+  if(!list.length){
+    html+='<div class="empty" style="padding:2rem">No hay inscripciones que coincidan con el filtro.</div>';
+    c.innerHTML=html;
+    return;
+  }
+
+  list.forEach(function(insc){
+    var cursada=(S.discCursadas||[]).find(function(cu){return cu.id===insc.cursadaId;});
+    var m=S.members.find(function(x){return x.id===insc.miembroId;});
+    var badgeClass=insc.estado==='pendiente'?'b-warn':(insc.estado==='rechazada'?'b-danger':'b-ok');
+    var badgeLabel=insc.estado==='pendiente'?'⏳ Pendiente':insc.estado==='rechazada'?'❌ Rechazada':insc.estado==='auto-aprobada'?'✅ Auto-aprobada':'✅ Aprobada';
+    var aprobador=insc.aprobadoPor?S.members.find(function(x){return x.id===insc.aprobadoPor;}):null;
+    html+='<div class="card" style="margin-bottom:10px">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">';
+    html+='<div>';
+    html+='<div style="font-size:14px;font-weight:700;color:#1F4E79">'+(m?fullName(m):'Miembro no encontrado (ID '+insc.miembroId+')')+'</div>';
+    html+='<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(cursada?cursada.label:'Cursada eliminada')+'</div>';
+    html+='<div style="font-size:11px;color:#9CA3AF;margin-top:4px">Ingresó: '+(insc.nombreIngresado||'—')+' '+(insc.apellidoIngresado||'')+' · Cel. terminado en '+(insc.celularIngresado||'—')+'</div>';
+    html+='<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+(insc.fecha?new Date(insc.fecha).toLocaleString('es-AR'):'')+'</div>';
+    if(insc.aprobadoPor&&(insc.estado==='aprobada'||insc.estado==='rechazada')){
+      html+='<div style="font-size:11px;color:#9CA3AF;margin-top:2px">Por: '+(aprobador?fullName(aprobador):'—')+' · '+(insc.fechaAprobacion?new Date(insc.fechaAprobacion).toLocaleString('es-AR'):'')+'</div>';
+    }
+    html+='</div>';
+    html+='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
+    html+='<span class="badge '+badgeClass+'">'+badgeLabel+'</span>';
+    html+='<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">';
+    if(insc.estado==='pendiente'){
+      html+='<button class="btn btn-sm" style="color:#16A34A" onclick="discAprobarInscripcion('+insc.id+')">✓ Aprobar</button>';
+      html+='<button class="btn btn-sm" style="color:#D97706" onclick="discRechazarInscripcion('+insc.id+')">✕ Rechazar</button>';
+    }
+    if(insc.estado==='pendiente'||insc.estado==='rechazada'){
+      html+='<button class="btn btn-sm btn-danger" onclick="discEliminarInscripcion('+insc.id+')">🗑 Eliminar</button>';
+    }
+    html+='</div></div></div></div>';
+  });
+
+  c.innerHTML=html;
+}
+
+async function discAprobarInscripcion(id){
+  var insc=(S.discInscripciones||[]).find(function(i){return i.id===id;});
+  if(!insc) return;
+  var cursada=(S.discCursadas||[]).find(function(cu){return cu.id===insc.cursadaId;});
+  if(!cursada){ alert('La cursada de esta inscripción ya no existe.'); return; }
+  var m=S.members.find(function(x){return x.id===insc.miembroId;});
+  if(!confirm('¿Aprobar la inscripción de '+(m?fullName(m):'esta persona')+' a "'+cursada.label+'"?\nSe va a sumar directo a la cursada activa.')) return;
+  var snapshotInsc={estado:insc.estado,aprobadoPor:insc.aprobadoPor,fechaAprobacion:insc.fechaAprobacion};
+  var snapshotMiembros=(cursada.miembros||[]).slice();
+  insc.estado='aprobada';
+  insc.aprobadoPor=(typeof currentUser!=='undefined'&&currentUser)?currentUser.id:null;
+  insc.fechaAprobacion=Date.now();
+  if(!cursada.miembros) cursada.miembros=[];
+  if(!cursada.miembros.includes(insc.miembroId)) cursada.miembros.push(insc.miembroId);
+  await saveK(SK.discInscripciones,S.discInscripciones);
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(insc,snapshotInsc);
+    cursada.miembros=snapshotMiembros;
+    await saveK(SK.discInscripciones,S.discInscripciones);
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Inscripción aprobada — se sumó a la cursada','#16A34A');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderInscripciones(c);
+}
+
+async function discRechazarInscripcion(id){
+  var insc=(S.discInscripciones||[]).find(function(i){return i.id===id;});
+  if(!insc) return;
+  if(!confirm('¿Rechazar esta inscripción?\nQueda registrada como rechazada, no se suma a la cursada.')) return;
+  var snapshot={estado:insc.estado,aprobadoPor:insc.aprobadoPor,fechaAprobacion:insc.fechaAprobacion};
+  insc.estado='rechazada';
+  insc.aprobadoPor=(typeof currentUser!=='undefined'&&currentUser)?currentUser.id:null;
+  insc.fechaAprobacion=Date.now();
+  await saveK(SK.discInscripciones,S.discInscripciones);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(insc,snapshot);
+    await saveK(SK.discInscripciones,S.discInscripciones);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('Inscripción rechazada','#D97706');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderInscripciones(c);
+}
+
+async function discEliminarInscripcion(id){
+  var insc=(S.discInscripciones||[]).find(function(i){return i.id===id;});
+  if(!insc) return;
+  if(insc.estado==='aprobada'||insc.estado==='auto-aprobada'){
+    showToast('Esta inscripción ya está aprobada — para sacarla de la cursada usá 👤 Asignar','#D97706');
+    return;
+  }
+  if(!confirm('¿Eliminar esta inscripción? Esta acción no se puede deshacer.')) return;
+  S.discInscripciones=(S.discInscripciones||[]).filter(function(i){return i.id!==id;});
+  addTombstone(SK.discInscripciones,id);
+  await saveK(SK.discInscripciones,S.discInscripciones);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.discInscripciones.push(insc);
+    await saveK(SK.discInscripciones,S.discInscripciones);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('🗑 Inscripción eliminada','#6B7280');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderInscripciones(c);
 }
 
 function discOpenAsignacion(pasoId){

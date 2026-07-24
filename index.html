@@ -12804,6 +12804,7 @@ function discGenLabel(pasoId,anio){var ant=(S.discCursadas||[]).filter(function(
 async function discAbrirCursada(pasoId){
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   if(!paso) return;
+  if(paso.estado!=='Activo'){ showToast('Este Curso está deshabilitado — no admite nuevas cursadas','#D97706'); return; }
   var activa=(S.discCursadas||[]).find(function(c){return c.pasoId===pasoId&&c.estado==='Activo';});
   if(activa){ showToast('Ya hay una cursada activa para '+paso.nombre,'#D97706'); return; }
   var anio=new Date().getFullYear();
@@ -12917,20 +12918,29 @@ async function discRevertirInicio(cursadaId){
   var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
   if(!cursada) return;
   if(cursada.estado!=='Activo'){ showToast('Esta cursada ya no está en curso','#D97706'); return; }
-  if(!confirm('¿Revertir el inicio de "'+cursada.label+'"?\nSe elimina esta cursada. Los encuentros ya cargados quedan sin cursada asociada y se podrán re-agrupar al iniciar una nueva.')) return;
+  var inscsAsociadas=(S.discInscripciones||[]).filter(function(i){return i.cursadaId===cursadaId;});
+  var msg='¿Revertir el inicio de "'+cursada.label+'"?\nSe elimina esta cursada. Los encuentros ya cargados quedan sin cursada asociada y se podrán re-agrupar al iniciar una nueva.';
+  if(inscsAsociadas.length) msg+='\n\nTambién se van a eliminar '+inscsAsociadas.length+' inscripción'+(inscsAsociadas.length!==1?'es':'')+' por QR asociada'+(inscsAsociadas.length!==1?'s':'')+' a esta cursada.';
+  if(!confirm(msg)) return;
   var recordsTocados=[];
   S.discRecords.forEach(function(r){ if(r.cursadaId===cursadaId){ recordsTocados.push(r); r.cursadaId=null; } });
   S.discCursadas=(S.discCursadas||[]).filter(function(c){return c.id!==cursadaId;});
   addTombstone('gdv_disc_cursadas',cursadaId);
+  var snapshotInscripciones=S.discInscripciones.slice();
+  inscsAsociadas.forEach(function(i){ addTombstone(SK.discInscripciones,i.id); });
+  S.discInscripciones=(S.discInscripciones||[]).filter(function(i){return i.cursadaId!==cursadaId;});
   await saveK('gdv_disc_cursadas',S.discCursadas);
   await saveK('gdv_disc_records',S.discRecords);
+  await saveK(SK.discInscripciones,S.discInscripciones);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     S.discCursadas.push(cursada);
     recordsTocados.forEach(function(r){ r.cursadaId=cursadaId; });
+    S.discInscripciones=snapshotInscripciones;
     await saveK('gdv_disc_cursadas',S.discCursadas);
     await saveK('gdv_disc_records',S.discRecords);
+    await saveK(SK.discInscripciones,S.discInscripciones);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -12951,13 +12961,13 @@ function discRenderCursos(c){
   var nivelMap={Inicial:{icon:'🔵',color:'#0369A1'},Intermedio:{icon:'🟣',color:'#7C3AED'},Avanzado:{icon:'🩷',color:'#BE185D'}};
   S.discPasos.forEach(function(paso){
     var nv=nivelMap[paso.nivel]||{icon:'⚪',color:'#6B7280'};
-    html+='<div class="card" style="margin-bottom:1rem">'
+    html+='<div class="card" style="margin-bottom:1rem'+(paso.estado!=='Activo'?';opacity:.65':'')+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
       +'<div>'
-      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+paso.nombre+(paso.estado!=='Activo'?' <span class="badge b-muted" style="font-weight:600">Deshabilitado</span>':'')+'</div>'
       +'<div style="font-size:12px;color:'+nv.color+';margin-top:4px;font-weight:600">'+nv.icon+' '+paso.nivel+'</div>'
       +'</div>'
-      +(esSuper?'<button class="btn btn-sm" onclick="discOpenModal('+paso.id+')">✏️ Editar</button>':'')
+      +(esSuper?'<button class="btn btn-sm" onclick="discOpenModal('+paso.id+')">✏️ Editar</button> <button class="btn btn-sm" onclick="discToggleEstado('+paso.id+')" style="color:#D97706">'+(paso.estado==='Activo'?'🚫 Deshabilitar':'✅ Habilitar')+'</button> <button class="btn btn-sm btn-danger" onclick="discEliminarPaso('+paso.id+')">🗑 Eliminar</button>':'')
       +'</div>'
       +'<div style="margin-top:10px;font-size:12px;color:#6B7280">'+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'')+'</div>'
       +(paso.capitulos.length?'<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px">'+paso.capitulos.map(function(cap,i){return '<div style="font-size:12px;color:#374151">Semana '+(i+1)+' — '+cap+'</div>';}).join('')+'</div>':'')
@@ -12992,7 +13002,10 @@ function discRenderCursada(c){
     }
     if(canAdminDisc()){
       html+='<button class="btn btn-sm btn-primary" onclick="discOpenAsignacion('+paso.id+')">👤 Asignar</button>';
-      if(!cursadaActiva){html+='<button class="btn btn-sm" onclick="discAbrirCursada('+paso.id+')" style="background:#7C3AED;color:#fff;border:none">▶ Iniciar Cursada</button>';}
+      if(!cursadaActiva){
+        if(isActivo) html+='<button class="btn btn-sm" onclick="discAbrirCursada('+paso.id+')" style="background:#7C3AED;color:#fff;border:none">▶ Iniciar Cursada</button>';
+        else html+='<span style="font-size:11px;color:#9CA3AF;font-style:italic">Curso deshabilitado — no admite nuevas cursadas</span>';
+      }
       else{
         html+='<button class="btn btn-sm" onclick="discCerrarCursada('+cursadaActiva.id+')" style="color:#DC2626">⏹ Cerrar Cursada</button>';
         if(esSuper) html+='<button class="btn btn-sm" onclick="discRevertirInicio('+cursadaActiva.id+')" style="color:#D97706" title="Deshace el inicio de esta cursada">↩️ Revertir inicio</button>';
@@ -13417,6 +13430,32 @@ async function discToggleEstado(pasoId){
     return;
   }
   discTab('cursos', document.getElementById('disc-tab-cursos'));
+}
+
+async function discEliminarPaso(pasoId){
+  if(!hasRole('super_admin')) return;
+  var paso=(S.discPasos||[]).find(function(p){return p.id===pasoId;});
+  if(!paso) return;
+  var cursadasAsociadas=(S.discCursadas||[]).filter(function(cu){return cu.pasoId===pasoId;});
+  if(cursadasAsociadas.length){
+    alert('El Curso "'+paso.nombre+'" ya tiene '+cursadasAsociadas.length+' cursada'+(cursadasAsociadas.length!==1?'s':'')+' asociada'+(cursadasAsociadas.length!==1?'s':'')+' (activa o histórica). No se puede eliminar sin perder ese historial — si alguna es un duplicado, revertila/eliminala primero desde 📋 Cursada o 📁 Histórico.');
+    return;
+  }
+  if(!confirm('¿Eliminar el Curso "'+paso.nombre+'"?\nEsta acción no se puede deshacer.')) return;
+  var snapshot=S.discPasos.slice();
+  S.discPasos=(S.discPasos||[]).filter(function(p){return p.id!==pasoId;});
+  await saveK(SK.discPasos,S.discPasos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.discPasos=snapshot;
+    await saveK(SK.discPasos,S.discPasos);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('🗑 Curso eliminado','#6B7280');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursos(c);
 }
 
 // ── Cargar asistencia ──
@@ -14677,6 +14716,18 @@ async function importarTodo(event){
 // ════════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════════
+// Los formularios públicos (QR) dependen de datos compartidos (cursadas, campañas, config)
+// que en un dispositivo que recién abre el link (localStorage vacío o viejo) pueden no reflejar
+// lo último de la nube todavía, porque el módulo de Firebase carga en paralelo y puede no haber
+// terminado. Antes de decidir si un formulario está abierto/cerrado, hay que esperarlo y refrescar.
+async function esperarFirebaseListo(maxIntentos){
+  for(var i=0;i<(maxIntentos||15);i++){
+    if(window.fbReady && typeof window.fbDownload==='function') return true;
+    await new Promise(function(r){ setTimeout(r,300); });
+  }
+  return false;
+}
+
 async function boot(){
   try{
     // Show DEV badge if in development environment
@@ -14694,6 +14745,15 @@ async function boot(){
     const params=new URLSearchParams(window.location.search);
     const form=params.get('form');
     const campanaParam=params.get('campana');
+    if(form==='nuevo'||form==='actualizar'||form==='disc-inscripcion'){
+      var fbListo=await esperarFirebaseListo(15); // hasta ~4.5s
+      if(fbListo){
+        try{ await window.fbDownload(); }catch(e){ console.error('No se pudo refrescar desde Firebase antes del formulario público:',e); }
+        await initStorage();
+      } else {
+        console.warn('Firebase no estuvo listo a tiempo — el formulario público puede usar datos locales desactualizados.');
+      }
+    }
     if(form==='nuevo'){ showPublicForm('nuevo', campanaParam); return; }
     if(form==='actualizar'){ showPublicForm('actualizar'); return; }
     if(form==='disc-inscripcion'){ showPublicForm('disc-inscripcion'); return; }

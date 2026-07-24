@@ -10156,8 +10156,29 @@ function buildNuevosHTML(){
             </select></div>
           <button class="btn btn-sm" onclick="nvCampanaAbrirQR()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">📱 Generar QR Campaña</button>
           <button class="btn btn-sm" onclick="nvCampanaCopiarTelefonos()" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">📋 Copiar teléfonos</button>
+          <button class="btn btn-sm" onclick="nvExportarCampanaExcel()" style="background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600">📊 Exportar a Excel</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;padding-top:10px;border-top:1px solid #F3F4F6">
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Ingresó desde</label>
+            <input type="date" id="nv-camp-desde" onchange="nvRenderCampana()"></div>
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Ingresó hasta</label>
+            <input type="date" id="nv-camp-hasta" onchange="nvRenderCampana()"></div>
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Sexo</label>
+            <select id="nv-camp-sexo" onchange="nvRenderCampana()">
+              <option value="">Todos</option><option value="H">Hombres</option><option value="M">Mujeres</option>
+            </select></div>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#6B7280;cursor:pointer;padding-bottom:7px">
+            <input type="checkbox" id="nv-camp-ocultar-contactados" onchange="nvRenderCampana()" style="cursor:pointer">Ocultar ya contactados</label>
+          <button class="btn btn-sm" onclick="document.getElementById('nv-camp-desde').value='';document.getElementById('nv-camp-hasta').value='';document.getElementById('nv-camp-sexo').value='';document.getElementById('nv-camp-ocultar-contactados').checked=false;nvRenderCampana()">↺ Ver todos</button>
         </div>
         <div id="nv-camp-info" style="font-size:12px;color:#6B7280"></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #F3F4F6">
+          <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">💬 Mensaje para WhatsApp (el material del día — usá <code>{nombre}</code> para personalizar)</label>
+          <textarea id="nv-camp-msg-wa" rows="2" placeholder="Ej: Hola {nombre}! Te comparto el material de hoy: ..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid #D1D5DB;resize:vertical"></textarea>
+          <div style="display:flex;justify-content:flex-end;margin-top:6px">
+            <button class="btn btn-sm btn-primary" onclick="nvGuardarMensajeWA()">Guardar mensaje</button>
+          </div>
+        </div>
       </div>
 
       <div id="nv-camp-toolbar" style="display:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px 14px;margin-bottom:1rem;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -11348,26 +11369,159 @@ function nvCampanaActual(){
   return id?S.campanas.find(function(c){return Number(c.id)===Number(id);}):null;
 }
 
+// Convierte "DD/MM/AA" (formato de fechaRegistro) a Date real, para poder ordenar/filtrar
+function nvParseFechaRegistro(s){
+  if(!s) return null;
+  var p=String(s).split('/');
+  if(p.length!==3) return null;
+  var dd=parseInt(p[0],10), mm=parseInt(p[1],10), yy=parseInt(p[2],10);
+  if(!dd||!mm||isNaN(yy)) return null;
+  var yyyy=yy<100?2000+yy:yy;
+  return new Date(yyyy,mm-1,dd);
+}
+
+// Lista de contactos de la campaña actual, filtrada por rango de fecha de ingreso y ordenada de más reciente a más antiguo
+function nvCampanaContactosFiltrados(){
+  var camp=nvCampanaActual();
+  if(!camp) return [];
+  var desde=(document.getElementById('nv-camp-desde')||{}).value||'';
+  var hasta=(document.getElementById('nv-camp-hasta')||{}).value||'';
+  var sexo=(document.getElementById('nv-camp-sexo')||{}).value||'';
+  var ocultarContactados=(document.getElementById('nv-camp-ocultar-contactados')||{}).checked||false;
+  var desdeD=desde?new Date(desde+'T00:00:00'):null;
+  var hastaD=hasta?new Date(hasta+'T23:59:59'):null;
+  return S.members.filter(function(m){
+    if(Number(m.campanaId)!==Number(camp.id)||m.condicion!=='Campaña') return false;
+    if(sexo&&m.genero!==sexo) return false;
+    if(ocultarContactados&&m.ultimoContactoWA&&esHoyMs(m.ultimoContactoWA)) return false;
+    if(desdeD||hastaD){
+      var f=nvParseFechaRegistro(m.fechaRegistro);
+      if(!f) return false;
+      if(desdeD&&f<desdeD) return false;
+      if(hastaD&&f>hastaD) return false;
+    }
+    return true;
+  }).sort(function(a,b){
+    var fa=nvParseFechaRegistro(a.fechaRegistro),fb=nvParseFechaRegistro(b.fechaRegistro);
+    if(fa&&fb&&fa.getTime()!==fb.getTime()) return fb-fa; // más reciente primero
+    return (b.id||0)-(a.id||0);
+  });
+}
+
+function nvFormatTelWA(tel){
+  var d=(tel||'').replace(/[^0-9]/g,'');
+  if(!d) return '';
+  if(d.startsWith('54')) return d; // ya tiene código de país
+  if(d.startsWith('0')) d=d.slice(1); // sacar el 0 de larga distancia
+  if(d.startsWith('15')) d=d.slice(2); // sacar el 15, lo reemplaza el 9 de WhatsApp
+  return '549'+d;
+}
+
+// Compara un timestamp (ms) contra el día calendario de hoy, en hora local
+function esHoyMs(ts){
+  if(!ts) return false;
+  var d=new Date(ts), h=new Date();
+  return d.getFullYear()===h.getFullYear()&&d.getMonth()===h.getMonth()&&d.getDate()===h.getDate();
+}
+
+async function nvAbrirWhatsapp(id){
+  var m=S.members.find(function(x){return x.id===id;});
+  if(!m) return;
+  if(!m.tel){ showToast('Esta persona no tiene celular cargado','#D97706'); return; }
+  if(m.ultimoContactoWA&&esHoyMs(m.ultimoContactoWA)){
+    if(!confirm('Ya lo seleccionaste hoy, a las '+new Date(m.ultimoContactoWA).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+'.\n¿Continuar de todos modos?')) return;
+  }
+  var camp=nvCampanaActual();
+  var msg=(camp&&camp.mensajeWhatsapp)?camp.mensajeWhatsapp.replace(/\{nombre\}/gi,m.nombre||''):'';
+  var telWA=nvFormatTelWA(m.tel);
+  var snapshot=m.ultimoContactoWA;
+  m.ultimoContactoWA=Date.now();
+  m._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    m.ultimoContactoWA=snapshot;
+    m._ts=Date.now();
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  window.open('https://wa.me/'+telWA+(msg?('?text='+encodeURIComponent(msg)):''),'_blank');
+  var c=document.getElementById('nv-campana-list');
+  if(c) nvRenderCampana();
+}
+
+async function nvGuardarMensajeWA(){
+  var camp=nvCampanaActual();
+  if(!camp){ showToast('Elegí una Campaña primero','#D97706'); return; }
+  var nuevoMsg=(document.getElementById('nv-camp-msg-wa')||{value:''}).value;
+  var snapshot=camp.mensajeWhatsapp;
+  camp.mensajeWhatsapp=nuevoMsg;
+  await saveK(SK.campanas,S.campanas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    camp.mensajeWhatsapp=snapshot;
+    await saveK(SK.campanas,S.campanas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Mensaje guardado','#16A34A');
+}
+
+function nvExportarCampanaExcel(){
+  var camp=nvCampanaActual();
+  if(!camp){ showToast('Elegí una Campaña primero','#D97706'); return; }
+  var contactos=nvCampanaContactosFiltrados();
+  if(!contactos.length){ showToast('No hay contactos para exportar con este filtro','#D97706'); return; }
+  var filas=[['Nombre','Apellido','Teléfono','Fecha Ingreso','Edad','Barrio','Contactado por WhatsApp']];
+  contactos.forEach(function(m){
+    var edad=nvEdad(m);
+    filas.push([m.nombre||'',m.apellido||'',m.tel||'',m.fechaRegistro||'',edad!==null?edad:'',m.dir||'',m.ultimoContactoWA?new Date(m.ultimoContactoWA).toLocaleString('es-AR'):'No']);
+  });
+  var csv=filas.map(function(row){
+    return row.map(function(cell){
+      var s=String(cell===null||cell===undefined?'':cell);
+      if(s.indexOf(',')>-1||s.indexOf('"')>-1||s.indexOf('\n')>-1) s='"'+s.replace(/"/g,'""')+'"';
+      return s;
+    }).join(',');
+  }).join('\r\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}); // \uFEFF = BOM, para que Excel abra los acentos bien
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='Campaña - '+camp.nombre.replace(/[^a-zA-Z0-9 ]/g,'')+' - '+todayAA().replace(/\//g,'-')+'.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📊 '+contactos.length+' contacto'+(contactos.length!==1?'s':'')+' exportado'+(contactos.length!==1?'s':''),'#16A34A');
+}
+
 function nvRenderCampana(){
   var camp=nvCampanaActual();
   var infoEl=document.getElementById('nv-camp-info');
   var listEl=document.getElementById('nv-campana-list');
+  var msgEl=document.getElementById('nv-camp-msg-wa');
   nvCampSeleccionados=[];
   nvCampActualizarToolbar();
+  if(msgEl) msgEl.value=camp?(camp.mensajeWhatsapp||''):'';
   if(!camp){
     if(infoEl) infoEl.innerHTML='';
     if(listEl) listEl.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">'+(S.campanas.length?'Elegí una Campaña arriba para ver sus contactos.':'Sin Campañas cargadas — creá una desde Configuración → Campañas.')+'</div>';
     return;
   }
-  var contactos=S.members.filter(function(m){return Number(m.campanaId)===Number(camp.id)&&m.condicion==='Campaña';});
+  var contactos=nvCampanaContactosFiltrados();
+  var totalSinFiltro=S.members.filter(function(m){return Number(m.campanaId)===Number(camp.id)&&m.condicion==='Campaña';}).length;
   if(infoEl){
     infoEl.innerHTML=(camp.fechaInicio?'📅 '+fmtAA(camp.fechaInicio)+(camp.fechaFin?' al '+fmtAA(camp.fechaFin):''):'Sin fechas definidas')
-      +' · '+contactos.length+' contacto'+(contactos.length!==1?'s':'')
+      +' · '+contactos.length+' contacto'+(contactos.length!==1?'s':'')+(contactos.length!==totalSinFiltro?' (de '+totalSinFiltro+' en total)':'')
       +(camp.activo===false?' · <span style="color:#D97706;font-weight:600">🚧 Campaña Inactiva — su QR ya no acepta cargas nuevas</span>':'');
   }
   if(!listEl) return;
   if(!contactos.length){
-    listEl.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">Sin contactos todavía en esta Campaña</div>';
+    listEl.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">Sin contactos que coincidan con el filtro</div>';
     return;
   }
   var puedeSeleccionar=hasRole('super_admin','pastor');
@@ -11387,7 +11541,11 @@ function nvRenderCampana(){
       +(edad!==null?' · '+edad+' años':'')
       +(m.dir?' · '+m.dir:'')
       +'</div>'
+      +'<div style="font-size:11px;color:#9CA3AF;margin-top:2px">Ingresó: '+(m.fechaRegistro||'—')
+      +(m.ultimoContactoWA&&esHoyMs(m.ultimoContactoWA)?' · <span style="color:#16A34A;font-weight:600">✅ Contactado hoy '+new Date(m.ultimoContactoWA).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+'</span>':'')
       +'</div>'
+      +'</div>'
+      +(m.tel?'<button class="btn btn-sm" onclick="event.stopPropagation();nvAbrirWhatsapp('+m.id+')" style="background:#DCFCE7;border-color:#86EFAC;color:#166534;font-weight:600;flex-shrink:0">💬 WhatsApp</button>':'')
       +'</div></div>';
   }).join('');
 }

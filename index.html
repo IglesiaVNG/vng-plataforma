@@ -13062,6 +13062,37 @@ function discCountPendientes(){
   return (S.discInscripciones||[]).filter(function(i){return i.estado==='pendiente';}).length;
 }
 
+// ── Matching de identificación para el formulario público (2-de-3 / 3-de-3) ──
+function discNorm4(s){ return normName(s).replace(/[^a-z]/g,'').slice(0,4); }
+function discNormCel4(s){ return (s||'').replace(/[^0-9]/g,'').slice(-4); }
+
+// Devuelve todos los miembros que coinciden en AL MENOS 1 de los 3 datos, con su cantidad de coincidencias
+function discBuscarMiembroCoincidencias(nombre, apellido, celular, members){
+  var n4=discNorm4(nombre), a4=discNorm4(apellido), c4=discNormCel4(celular);
+  var lista=members||S.members||[];
+  var candidatos=[];
+  lista.forEach(function(m){
+    var mn4=discNorm4(m.nombre), ma4=discNorm4(m.apellido), mc4=discNormCel4(m.tel);
+    var matches=0;
+    if(n4&&mn4===n4) matches++;
+    if(a4&&ma4===a4) matches++;
+    if(c4&&mc4===c4) matches++;
+    if(matches>0) candidatos.push({miembro:m,matches:matches});
+  });
+  return candidatos;
+}
+
+// coincidenciasRequeridas: 2 (si la Cursada requiere validación) o 3 (si auto-aprueba sin validación)
+// Retorna {status:'ok',miembro} | {status:'sin_match'} | {status:'ambiguo'}
+function discResolverMiembro(nombre, apellido, celular, coincidenciasRequeridas, members){
+  var candidatos=discBuscarMiembroCoincidencias(nombre, apellido, celular, members).filter(function(x){return x.matches>=coincidenciasRequeridas;});
+  if(!candidatos.length) return {status:'sin_match'};
+  var maxM=Math.max.apply(null,candidatos.map(function(x){return x.matches;}));
+  var mejores=candidatos.filter(function(x){return x.matches===maxM;});
+  if(mejores.length>1) return {status:'ambiguo'};
+  return {status:'ok',miembro:mejores[0].miembro};
+}
+
 let discInscFiltroEstado='pendiente';
 let discInscFiltroCursada='';
 
@@ -13087,7 +13118,10 @@ function discRenderInscripciones(c){
     return true;
   }).sort(function(a,b){return (b.fecha||0)-(a.fecha||0);});
 
-  var html='<div style="margin-bottom:1rem">'+chips+'</div>';
+  var html='<div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+  html+='<div>'+chips+'</div>';
+  if(canAdminDisc()) html+='<button class="btn btn-sm btn-primary" onclick="discShowInscripcionQR()">📱 Ver / Compartir QR</button>';
+  html+='</div>';
   html+='<select onchange="discInscFiltroCursada=this.value;discRenderInscripciones(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;margin-bottom:1rem"><option value="">Todas las cursadas</option>'+cursadaOpts+'</select>';
 
   if(!list.length){
@@ -13749,6 +13783,227 @@ async function fbSyncDown(){
 // ════════════════════════════════════════════════════════════
 // FORMULARIOS PÚBLICOS (sin login, acceso por QR)
 // ════════════════════════════════════════════════════════════
+function discShowInscripcionQR(){
+  var baseUrl=window.location.origin+window.location.pathname;
+  var url=baseUrl+'?form=disc-inscripcion';
+  var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent(url);
+  var overlay=document.getElementById('disc-qr-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='disc-qr-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(overlay);
+  }
+  var cursadasAbiertas=(S.discCursadas||[]).filter(function(cu){return cu.estado==='Activo'&&cu.qrAbierto;});
+  var waUrl='https://wa.me/?text='+encodeURIComponent('Hola! Te paso el link para anotarte al Discipulado: '+url);
+  overlay.style.display='flex';
+  overlay.innerHTML=`<div style="background:#fff;border-radius:16px;padding:2rem;max-width:420px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div style="font-size:15px;font-weight:700;color:#1F4E79">📱 Inscripción a Discipulado</div>
+      <button onclick="document.getElementById('disc-qr-overlay').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer">✕</button>
+    </div>
+    ${cursadasAbiertas.length===0?`<div style="background:#FEF3C7;color:#92400E;border-radius:10px;padding:12px;font-size:13px;margin-bottom:1rem">⚠️ Ninguna Cursada tiene el QR abierto ahora mismo — quien escanee este link no va a poder anotarse hasta que actives "📱 QR abierto" en alguna Cursada.</div>`
+      :`<div style="background:#D1FAE5;color:#065F46;border-radius:10px;padding:10px;font-size:12.5px;margin-bottom:1rem">Cursadas que aceptan inscripción ahora: <strong>${cursadasAbiertas.map(function(c){return c.label;}).join(', ')}</strong></div>`}
+    <div style="background:#F9FAFB;border-radius:12px;padding:1.5rem;margin-bottom:1rem">
+      <img src="${qrUrl}" style="width:200px;height:200px;border-radius:8px" alt="QR">
+    </div>
+    <div style="font-size:11px;color:#6B7280;word-break:break-all;margin-bottom:1rem">${url}</div>
+    <button onclick="navigator.clipboard.writeText('${url}');showToast('Link copiado','#16A34A')" style="width:100%;background:#F3F4F6;color:#374151;border:none;padding:11px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px">📋 Copiar link</button>
+    <a href="${waUrl}" target="_blank" style="display:block;width:100%;background:#25D366;color:#fff;border:none;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;box-sizing:border-box">💬 Compartir por WhatsApp</a>
+  </div>`;
+}
+
+// ── Formulario público de Inscripción (sin login, sin dropdown de miembros) ──
+function buildPublicDiscInscripcionForm(){
+  var cursadasJson=localStorage.getItem('gdv_disc_cursadas')||'[]';
+  var cursadas=[];
+  try{cursadas=JSON.parse(cursadasJson);}catch(e){}
+  var abiertas=cursadas.filter(function(cu){return cu.estado==='Activo'&&cu.qrAbierto;});
+
+  if(!abiertas.length){
+    return `<div style="background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:440px;box-shadow:0 4px 24px rgba(0,0,0,.1);text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">🔒</div>
+      <div style="font-size:18px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">Inscripciones cerradas por ahora</div>
+      <div style="font-size:13px;color:#6B7280">No hay ninguna cursada de Discipulado aceptando inscripciones en este momento. Hablá con el equipo para más info.</div>
+    </div>`;
+  }
+
+  window._pdiCursadas=abiertas;
+  var selectorHtml=abiertas.length===1
+    ? `<input type="hidden" id="pdi-cursada" value="${abiertas[0].id}"><div style="background:#F9FAFB;border-radius:8px;padding:10px 12px;font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:10px">📖 ${abiertas[0].label}</div>`
+    : `<label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Discipulado *</label>
+       <select id="pdi-cursada" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;margin-bottom:10px">
+         <option value="">— Seleccioná —</option>
+         ${abiertas.map(function(cu){return '<option value="'+cu.id+'">'+cu.label+'</option>';}).join('')}
+       </select>`;
+
+  return `<div style="background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:440px;box-shadow:0 4px 24px rgba(0,0,0,.1)">
+    <div id="pdi-form-wrap">
+      <div style="text-align:center;margin-bottom:1.5rem">
+        <div style="font-size:2.5rem;margin-bottom:.5rem">📖</div>
+        <div style="font-size:20px;font-weight:700;color:#1F4E79">Inscripción a Discipulado</div>
+        <div style="font-size:13px;color:#6B7280;margin-top:4px">Iglesia Vida Nueva · Gerli</div>
+      </div>
+      <div id="pdi-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px"></div>
+      ${selectorHtml}
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Nombre *</label>
+        <input type="text" id="pdi-nombre" placeholder="Tu nombre" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;box-sizing:border-box"></div>
+      <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Apellido *</label>
+        <input type="text" id="pdi-apellido" placeholder="Tu apellido" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;box-sizing:border-box"></div>
+      <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
+        <input type="tel" id="pdi-cel" placeholder="11 1234-5678" inputmode="numeric" maxlength="12" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,12)" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;box-sizing:border-box"></div>
+      <button id="pdi-submit-btn" onclick="pdiEnviar()" style="width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-top:1.25rem">
+        Anotarme →
+      </button>
+    </div>
+    <div id="pdi-success" style="display:none;text-align:center;padding:1.5rem 0">
+      <div style="font-size:3.5rem;margin-bottom:1rem">✅</div>
+      <div id="pdi-success-msg" style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">¡Listo!</div>
+      <div style="font-size:13px;color:#6B7280">Iglesia Vida Nueva · Gerli</div>
+    </div>
+    <div id="pdi-nomatch" style="display:none;text-align:center;padding:1.5rem 0">
+      <div style="font-size:3rem;margin-bottom:1rem">🤔</div>
+      <div style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">No te encontramos</div>
+      <div style="font-size:13px;color:#6B7280;margin-bottom:1.25rem">Revisá que los datos estén bien escritos, o hablá con el equipo para que te ayuden a anotarte.</div>
+      <button onclick="pdiReintentar()" style="width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">
+        🔁 Intentar de nuevo
+      </button>
+    </div>
+    <div id="pdi-fail" style="display:none;text-align:center;padding:1.5rem 0">
+      <div style="font-size:3rem;margin-bottom:1rem">📶</div>
+      <div style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">No pudimos confirmar la conexión</div>
+      <div style="font-size:13px;color:#6B7280;margin-bottom:1.25rem">Tus datos quedaron guardados en este celular e intentamos subirlos varias veces sin éxito. Probá de nuevo con mejor señal.</div>
+      <button onclick="pdiReintentar()" style="width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">
+        🔁 Intentar de nuevo
+      </button>
+    </div>
+  </div>`;
+}
+
+function pdiReintentar(){
+  var wrap=document.getElementById('pdi-form-wrap');
+  var success=document.getElementById('pdi-success');
+  var nomatch=document.getElementById('pdi-nomatch');
+  var fail=document.getElementById('pdi-fail');
+  if(success) success.style.display='none';
+  if(nomatch) nomatch.style.display='none';
+  if(fail) fail.style.display='none';
+  if(wrap) wrap.style.display='block';
+}
+
+async function pdiEnviar(){
+  var cursadaId=parseInt((document.getElementById('pdi-cursada')||{value:''}).value)||null;
+  var nombre=(document.getElementById('pdi-nombre')||{value:''}).value.trim();
+  var apellido=(document.getElementById('pdi-apellido')||{value:''}).value.trim();
+  var cel=(document.getElementById('pdi-cel')||{value:''}).value.trim();
+  var err=document.getElementById('pdi-error');
+
+  if(!cursadaId||!nombre||!apellido||!cel){
+    if(err){err.textContent='Por favor completá todos los campos obligatorios (*).';err.style.display='block';}
+    return;
+  }
+  if(cel.length<10||cel.length>12){
+    if(err){err.textContent='El celular debe tener entre 10 y 12 números (con característica, sin espacios ni guiones).';err.style.display='block';}
+    return;
+  }
+  if(err) err.style.display='none';
+
+  var cursadas=[];
+  try{cursadas=JSON.parse(localStorage.getItem('gdv_disc_cursadas')||'[]');}catch(e){}
+  var cursada=cursadas.find(function(cu){return cu.id===cursadaId;});
+  if(!cursada||cursada.estado!=='Activo'||!cursada.qrAbierto){
+    if(err){err.textContent='Esta cursada ya no está aceptando inscripciones. Recargá la página e intentá de nuevo.';err.style.display='block';}
+    return;
+  }
+
+  var members=[];
+  try{members=JSON.parse(localStorage.getItem('gdv_m5')||'[]');}catch(e){}
+
+  var btn=document.getElementById('pdi-submit-btn');
+  var textoOriginal=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.style.opacity='.6'; btn.style.cursor='default'; btn.textContent='Buscando...'; }
+
+  var coincidenciasRequeridas=cursada.requiereValidacion?2:3;
+  var resultado=discResolverMiembro(nombre,apellido,cel,coincidenciasRequeridas,members);
+
+  if(resultado.status!=='ok'){
+    if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent=textoOriginal; }
+    document.getElementById('pdi-form-wrap').style.display='none';
+    document.getElementById('pdi-nomatch').style.display='block';
+    return;
+  }
+
+  var miembro=resultado.miembro;
+
+  // Chequear si ya tiene una inscripción activa para ESTA cursada puntual (no el Paso en general)
+  var inscripciones=[];
+  try{inscripciones=JSON.parse(localStorage.getItem('gdv_disc_inscripciones')||'[]');}catch(e){}
+  var yaInscripto=inscripciones.find(function(i){
+    return i.cursadaId===cursadaId && i.miembroId===miembro.id && ['pendiente','aprobada','auto-aprobada'].includes(i.estado);
+  });
+  if(yaInscripto){
+    if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent=textoOriginal; }
+    document.getElementById('pdi-form-wrap').style.display='none';
+    document.getElementById('pdi-success').style.display='block';
+    document.getElementById('pdi-success-msg').textContent=yaInscripto.estado==='pendiente'
+      ? 'Ya estás anotado — tu inscripción está pendiente de validación.'
+      : 'Ya estabas anotado en esta cursada. ¡Te esperamos!';
+    return;
+  }
+
+  var nuevoId=Date.now();
+  var autoAprueba=!cursada.requiereValidacion;
+  var nuevaInsc={
+    id:nuevoId,cursadaId:cursadaId,miembroId:miembro.id,
+    nombreIngresado:nombre,apellidoIngresado:apellido,celularIngresado:cel,
+    estado:autoAprueba?'auto-aprobada':'pendiente',
+    fecha:Date.now(),aprobadoPor:null,fechaAprobacion:null
+  };
+
+  var guardadoLocal=false;
+  try{
+    inscripciones.push(nuevaInsc);
+    localStorage.setItem('gdv_disc_inscripciones',JSON.stringify(inscripciones));
+    if(autoAprueba){
+      if(!cursada.miembros) cursada.miembros=[];
+      if(!cursada.miembros.includes(miembro.id)) cursada.miembros.push(miembro.id);
+      localStorage.setItem('gdv_disc_cursadas',JSON.stringify(cursadas));
+    }
+    // Releer para confirmar que el guardado local realmente ocurrió (no asumirlo)
+    var verifInsc=JSON.parse(localStorage.getItem('gdv_disc_inscripciones')||'[]');
+    guardadoLocal=verifInsc.some(function(i){return i.id===nuevoId;});
+  }catch(e){
+    guardadoLocal=false;
+  }
+
+  if(!guardadoLocal){
+    if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent=textoOriginal; }
+    if(err){err.textContent='No pudimos guardar tus datos en este dispositivo. Por favor, intentá de nuevo.';err.style.display='block';}
+    return;
+  }
+
+  var subidoOk=false;
+  for(var intento=0; intento<8 && !subidoOk; intento++){
+    if(typeof window.fbUpload==='function'){
+      try{ subidoOk=await window.fbUpload(true); }catch(e){ subidoOk=false; }
+    }
+    if(!subidoOk) await new Promise(function(r){ setTimeout(r,1200); });
+  }
+
+  if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent=textoOriginal; }
+
+  if(subidoOk){
+    document.getElementById('pdi-form-wrap').style.display='none';
+    document.getElementById('pdi-success').style.display='block';
+    document.getElementById('pdi-success-msg').textContent=autoAprueba
+      ? '¡Listo! Ya estás anotado en la cursada. Te esperamos.'
+      : '¡Listo! Tu inscripción quedó pendiente de validación. Te vamos a confirmar pronto.';
+  } else {
+    document.getElementById('pdi-form-wrap').style.display='none';
+    document.getElementById('pdi-fail').style.display='block';
+  }
+}
+
 function showPublicForm(tipo, campanaId){
   // Hide login screen, show public form
   document.getElementById('screen-login').style.display='none';
@@ -13762,6 +14017,8 @@ function showPublicForm(tipo, campanaId){
     wrap.innerHTML=buildPublicNuevoForm(campanaId);
   } else if(tipo==='actualizar'){
     wrap.innerHTML=buildPublicActualizarForm();
+  } else if(tipo==='disc-inscripcion'){
+    wrap.innerHTML=buildPublicDiscInscripcionForm();
   }
 }
 
@@ -14439,6 +14696,7 @@ async function boot(){
     const campanaParam=params.get('campana');
     if(form==='nuevo'){ showPublicForm('nuevo', campanaParam); return; }
     if(form==='actualizar'){ showPublicForm('actualizar'); return; }
+    if(form==='disc-inscripcion'){ showPublicForm('disc-inscripcion'); return; }
     if(currentUser && currentUser.id){
       showHome();
     } else {

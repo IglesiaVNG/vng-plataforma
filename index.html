@@ -401,7 +401,7 @@ const KEY_GROUPS = {
   'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_qr_actualizar'], // gdv_permisos se maneja via fbSavePermisos con su propio timestamp
   'members': ['_tomb_gdv_m5','gdv_m5'],
   'records': ['_tomb_gdv_r5','gdv_r5'],
-  'disc':    ['gdv_disc_pasos','_tomb_gdv_disc_records','gdv_disc_records','_tomb_gdv_disc_cursadas','gdv_disc_cursadas'],
+  'disc':    ['gdv_disc_pasos','_tomb_gdv_disc_records','gdv_disc_records','_tomb_gdv_disc_cursadas','gdv_disc_cursadas','_tomb_gdv_disc_inscripciones','gdv_disc_inscripciones'],
   'ng':      ['gdv_ng5','_tomb_gdv_ng_records','gdv_ng_records'],
   'modules': ['gdv_modules5'],
   'agenda':  ['gdv_ministerios','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas','_tomb_gdv_checklist_secciones','gdv_checklist_secciones'],
@@ -433,8 +433,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -592,8 +592,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -711,9 +711,9 @@ window.fbDownload().then(function(hasData) {
         S.members     = _ld('gdv_m5',            S.members     ||[]);
         S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
         S.discPasos      = _ld('gdv_disc_pasos',    S.discPasos      ||[]);
-        S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);S.discCursadas=_ld('gdv_disc_cursadas',S.discCursadas||[]);
+        S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);S.discCursadas=_ld('gdv_disc_cursadas',S.discCursadas||[]);S.discInscripciones=_ld('gdv_disc_inscripciones',S.discInscripciones||[]);
         (S.discPasos||[]).forEach(function(p){ if(!p.discipuladorIds) p.discipuladorIds=p.discipuladorId?[p.discipuladorId]:[]; });
-        (S.discCursadas||[]).forEach(function(cu){ if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[]; });
+        (S.discCursadas||[]).forEach(function(cu){ if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[]; if(cu.qrAbierto===undefined) cu.qrAbierto=false; if(cu.requiereValidacion===undefined) cu.requiereValidacion=true; });
   S.ngComunidades  = _ld('gdv_ng5',           S.ngComunidades  ||[]);
   S.ngRecords      = _ld('gdv_ng_records',    S.ngRecords      ||[]);
   S.modulesConfig  = _ld('gdv_modules5',      S.modulesConfig  ||[]);
@@ -772,6 +772,7 @@ const MODULES_PERM=[
     {key:'disc_cargar',    label:'Cargar Asistencia'},
     {key:'disc_registros', label:'Ver registros'},
     {key:'disc_pasos',     label:'Configurar Pasos (Admin)'},
+    {key:'disc_inscripciones', label:'Inscripciones por QR (Admin)'},
   ]},
   {key:'config', label:'Configuración', icon:'⚙️', screens:[
     {key:'config', label:'Acceso completo al sistema'},
@@ -791,16 +792,16 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'}
+  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',disc_inscripciones:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
+  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'}
 };
 
 let PERMISOS={};
@@ -1020,7 +1021,7 @@ function recordInWeek(fechaStr, offsetWeeks=0){
 // STORAGE
 // ════════════════════════════════════════════════════════════
 const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles:'gdv_roles5',
-  discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records',discCursadas:'gdv_disc_cursadas',
+  discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records',discCursadas:'gdv_disc_cursadas',discInscripciones:'gdv_disc_inscripciones',
   ngComunidades:'gdv_ng5',ngRecords:'gdv_ng_records',
   modulesConfig:'gdv_modules5',
   ministerios:'gdv_ministerios',eventos:'gdv_eventos',
@@ -1258,7 +1259,7 @@ const DEFAULT_USERS=[
 // ════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════
-let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[],checklistSecciones:[]};
+let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],discInscripciones:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[],checklistSecciones:[]};
 let currentUser=null;
 let gdvCharts={};
 let ngCharts={};
@@ -1277,13 +1278,16 @@ async function initStorage(){
   S.members    =load(SK.members,    DEFAULT_MEMBERS);
   S.roles      =load(SK.roles,      DEFAULT_ROLES);
   S.discPasos  =load(SK.discPasos,  DEFAULT_DISC_PASOS);
-  S.discRecords=load(SK.discRecords,[]);S.discCursadas=load('gdv_disc_cursadas',[]);
+  S.discRecords=load(SK.discRecords,[]);S.discCursadas=load('gdv_disc_cursadas',[]);S.discInscripciones=load(SK.discInscripciones,[]);
   // Migración: discipuladorId (único) → discipuladorIds (varios), sin perder lo ya asignado
   S.discPasos.forEach(function(p){
     if(!p.discipuladorIds) p.discipuladorIds=p.discipuladorId?[p.discipuladorId]:[];
   });
   S.discCursadas.forEach(function(cu){
     if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[];
+    // Migración: interruptores de inscripción por QR (Cursadas creadas antes de esta feature)
+    if(cu.qrAbierto===undefined) cu.qrAbierto=false;
+    if(cu.requiereValidacion===undefined) cu.requiereValidacion=true;
   });
   S.ministerios=load(SK.ministerios,[]);
   S.eventos    =load(SK.eventos,    []);
@@ -10152,8 +10156,29 @@ function buildNuevosHTML(){
             </select></div>
           <button class="btn btn-sm" onclick="nvCampanaAbrirQR()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">📱 Generar QR Campaña</button>
           <button class="btn btn-sm" onclick="nvCampanaCopiarTelefonos()" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">📋 Copiar teléfonos</button>
+          <button class="btn btn-sm" onclick="nvExportarCampanaExcel()" style="background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600">📊 Exportar a Excel</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;padding-top:10px;border-top:1px solid #F3F4F6">
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Ingresó desde</label>
+            <input type="date" id="nv-camp-desde" onchange="nvRenderCampana()"></div>
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Ingresó hasta</label>
+            <input type="date" id="nv-camp-hasta" onchange="nvRenderCampana()"></div>
+          <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Sexo</label>
+            <select id="nv-camp-sexo" onchange="nvRenderCampana()">
+              <option value="">Todos</option><option value="H">Hombres</option><option value="M">Mujeres</option>
+            </select></div>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#6B7280;cursor:pointer;padding-bottom:7px">
+            <input type="checkbox" id="nv-camp-ocultar-contactados" onchange="nvRenderCampana()" style="cursor:pointer">Ocultar ya contactados</label>
+          <button class="btn btn-sm" onclick="document.getElementById('nv-camp-desde').value='';document.getElementById('nv-camp-hasta').value='';document.getElementById('nv-camp-sexo').value='';document.getElementById('nv-camp-ocultar-contactados').checked=false;nvRenderCampana()">↺ Ver todos</button>
         </div>
         <div id="nv-camp-info" style="font-size:12px;color:#6B7280"></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #F3F4F6">
+          <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">💬 Mensaje para WhatsApp (el material del día — usá <code>{nombre}</code> para personalizar)</label>
+          <textarea id="nv-camp-msg-wa" rows="2" placeholder="Ej: Hola {nombre}! Te comparto el material de hoy: ..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid #D1D5DB;resize:vertical"></textarea>
+          <div style="display:flex;justify-content:flex-end;margin-top:6px">
+            <button class="btn btn-sm btn-primary" onclick="nvGuardarMensajeWA()">Guardar mensaje</button>
+          </div>
+        </div>
       </div>
 
       <div id="nv-camp-toolbar" style="display:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px 14px;margin-bottom:1rem;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -11344,26 +11369,159 @@ function nvCampanaActual(){
   return id?S.campanas.find(function(c){return Number(c.id)===Number(id);}):null;
 }
 
+// Convierte "DD/MM/AA" (formato de fechaRegistro) a Date real, para poder ordenar/filtrar
+function nvParseFechaRegistro(s){
+  if(!s) return null;
+  var p=String(s).split('/');
+  if(p.length!==3) return null;
+  var dd=parseInt(p[0],10), mm=parseInt(p[1],10), yy=parseInt(p[2],10);
+  if(!dd||!mm||isNaN(yy)) return null;
+  var yyyy=yy<100?2000+yy:yy;
+  return new Date(yyyy,mm-1,dd);
+}
+
+// Lista de contactos de la campaña actual, filtrada por rango de fecha de ingreso y ordenada de más reciente a más antiguo
+function nvCampanaContactosFiltrados(){
+  var camp=nvCampanaActual();
+  if(!camp) return [];
+  var desde=(document.getElementById('nv-camp-desde')||{}).value||'';
+  var hasta=(document.getElementById('nv-camp-hasta')||{}).value||'';
+  var sexo=(document.getElementById('nv-camp-sexo')||{}).value||'';
+  var ocultarContactados=(document.getElementById('nv-camp-ocultar-contactados')||{}).checked||false;
+  var desdeD=desde?new Date(desde+'T00:00:00'):null;
+  var hastaD=hasta?new Date(hasta+'T23:59:59'):null;
+  return S.members.filter(function(m){
+    if(Number(m.campanaId)!==Number(camp.id)||m.condicion!=='Campaña') return false;
+    if(sexo&&m.genero!==sexo) return false;
+    if(ocultarContactados&&m.ultimoContactoWA&&esHoyMs(m.ultimoContactoWA)) return false;
+    if(desdeD||hastaD){
+      var f=nvParseFechaRegistro(m.fechaRegistro);
+      if(!f) return false;
+      if(desdeD&&f<desdeD) return false;
+      if(hastaD&&f>hastaD) return false;
+    }
+    return true;
+  }).sort(function(a,b){
+    var fa=nvParseFechaRegistro(a.fechaRegistro),fb=nvParseFechaRegistro(b.fechaRegistro);
+    if(fa&&fb&&fa.getTime()!==fb.getTime()) return fb-fa; // más reciente primero
+    return (b.id||0)-(a.id||0);
+  });
+}
+
+function nvFormatTelWA(tel){
+  var d=(tel||'').replace(/[^0-9]/g,'');
+  if(!d) return '';
+  if(d.startsWith('54')) return d; // ya tiene código de país
+  if(d.startsWith('0')) d=d.slice(1); // sacar el 0 de larga distancia
+  if(d.startsWith('15')) d=d.slice(2); // sacar el 15, lo reemplaza el 9 de WhatsApp
+  return '549'+d;
+}
+
+// Compara un timestamp (ms) contra el día calendario de hoy, en hora local
+function esHoyMs(ts){
+  if(!ts) return false;
+  var d=new Date(ts), h=new Date();
+  return d.getFullYear()===h.getFullYear()&&d.getMonth()===h.getMonth()&&d.getDate()===h.getDate();
+}
+
+async function nvAbrirWhatsapp(id){
+  var m=S.members.find(function(x){return x.id===id;});
+  if(!m) return;
+  if(!m.tel){ showToast('Esta persona no tiene celular cargado','#D97706'); return; }
+  if(m.ultimoContactoWA&&esHoyMs(m.ultimoContactoWA)){
+    if(!confirm('Ya lo seleccionaste hoy, a las '+new Date(m.ultimoContactoWA).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+'.\n¿Continuar de todos modos?')) return;
+  }
+  var camp=nvCampanaActual();
+  var msg=(camp&&camp.mensajeWhatsapp)?camp.mensajeWhatsapp.replace(/\{nombre\}/gi,m.nombre||''):'';
+  var telWA=nvFormatTelWA(m.tel);
+  var snapshot=m.ultimoContactoWA;
+  m.ultimoContactoWA=Date.now();
+  m._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    m.ultimoContactoWA=snapshot;
+    m._ts=Date.now();
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  window.open('https://wa.me/'+telWA+(msg?('?text='+encodeURIComponent(msg)):''),'_blank');
+  var c=document.getElementById('nv-campana-list');
+  if(c) nvRenderCampana();
+}
+
+async function nvGuardarMensajeWA(){
+  var camp=nvCampanaActual();
+  if(!camp){ showToast('Elegí una Campaña primero','#D97706'); return; }
+  var nuevoMsg=(document.getElementById('nv-camp-msg-wa')||{value:''}).value;
+  var snapshot=camp.mensajeWhatsapp;
+  camp.mensajeWhatsapp=nuevoMsg;
+  await saveK(SK.campanas,S.campanas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    camp.mensajeWhatsapp=snapshot;
+    await saveK(SK.campanas,S.campanas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Mensaje guardado','#16A34A');
+}
+
+function nvExportarCampanaExcel(){
+  var camp=nvCampanaActual();
+  if(!camp){ showToast('Elegí una Campaña primero','#D97706'); return; }
+  var contactos=nvCampanaContactosFiltrados();
+  if(!contactos.length){ showToast('No hay contactos para exportar con este filtro','#D97706'); return; }
+  var filas=[['Nombre','Apellido','Teléfono','Fecha Ingreso','Edad','Barrio','Contactado por WhatsApp']];
+  contactos.forEach(function(m){
+    var edad=nvEdad(m);
+    filas.push([m.nombre||'',m.apellido||'',m.tel||'',m.fechaRegistro||'',edad!==null?edad:'',m.dir||'',m.ultimoContactoWA?new Date(m.ultimoContactoWA).toLocaleString('es-AR'):'No']);
+  });
+  var csv=filas.map(function(row){
+    return row.map(function(cell){
+      var s=String(cell===null||cell===undefined?'':cell);
+      if(s.indexOf(',')>-1||s.indexOf('"')>-1||s.indexOf('\n')>-1) s='"'+s.replace(/"/g,'""')+'"';
+      return s;
+    }).join(',');
+  }).join('\r\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}); // \uFEFF = BOM, para que Excel abra los acentos bien
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='Campaña - '+camp.nombre.replace(/[^a-zA-Z0-9 ]/g,'')+' - '+todayAA().replace(/\//g,'-')+'.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📊 '+contactos.length+' contacto'+(contactos.length!==1?'s':'')+' exportado'+(contactos.length!==1?'s':''),'#16A34A');
+}
+
 function nvRenderCampana(){
   var camp=nvCampanaActual();
   var infoEl=document.getElementById('nv-camp-info');
   var listEl=document.getElementById('nv-campana-list');
+  var msgEl=document.getElementById('nv-camp-msg-wa');
   nvCampSeleccionados=[];
   nvCampActualizarToolbar();
+  if(msgEl) msgEl.value=camp?(camp.mensajeWhatsapp||''):'';
   if(!camp){
     if(infoEl) infoEl.innerHTML='';
     if(listEl) listEl.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">'+(S.campanas.length?'Elegí una Campaña arriba para ver sus contactos.':'Sin Campañas cargadas — creá una desde Configuración → Campañas.')+'</div>';
     return;
   }
-  var contactos=S.members.filter(function(m){return Number(m.campanaId)===Number(camp.id)&&m.condicion==='Campaña';});
+  var contactos=nvCampanaContactosFiltrados();
+  var totalSinFiltro=S.members.filter(function(m){return Number(m.campanaId)===Number(camp.id)&&m.condicion==='Campaña';}).length;
   if(infoEl){
     infoEl.innerHTML=(camp.fechaInicio?'📅 '+fmtAA(camp.fechaInicio)+(camp.fechaFin?' al '+fmtAA(camp.fechaFin):''):'Sin fechas definidas')
-      +' · '+contactos.length+' contacto'+(contactos.length!==1?'s':'')
+      +' · '+contactos.length+' contacto'+(contactos.length!==1?'s':'')+(contactos.length!==totalSinFiltro?' (de '+totalSinFiltro+' en total)':'')
       +(camp.activo===false?' · <span style="color:#D97706;font-weight:600">🚧 Campaña Inactiva — su QR ya no acepta cargas nuevas</span>':'');
   }
   if(!listEl) return;
   if(!contactos.length){
-    listEl.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">Sin contactos todavía en esta Campaña</div>';
+    listEl.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">Sin contactos que coincidan con el filtro</div>';
     return;
   }
   var puedeSeleccionar=hasRole('super_admin','pastor');
@@ -11383,7 +11541,11 @@ function nvRenderCampana(){
       +(edad!==null?' · '+edad+' años':'')
       +(m.dir?' · '+m.dir:'')
       +'</div>'
+      +'<div style="font-size:11px;color:#9CA3AF;margin-top:2px">Ingresó: '+(m.fechaRegistro||'—')
+      +(m.ultimoContactoWA&&esHoyMs(m.ultimoContactoWA)?' · <span style="color:#16A34A;font-weight:600">✅ Contactado hoy '+new Date(m.ultimoContactoWA).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+'</span>':'')
       +'</div>'
+      +'</div>'
+      +(m.tel?'<button class="btn btn-sm" onclick="event.stopPropagation();nvAbrirWhatsapp('+m.id+')" style="background:#DCFCE7;border-color:#86EFAC;color:#166534;font-weight:600;flex-shrink:0">💬 WhatsApp</button>':'')
       +'</div></div>';
   }).join('');
 }
@@ -12566,6 +12728,7 @@ function buildDiscipuladoHTML(){
       <button id="disc-tab-dashboard" class="btn btn-primary btn-sm" onclick="discTab('dashboard',this)">📊 Dashboard</button>
       ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-cursos" class="btn btn-sm" onclick="discTab('cursos',this)">🎓 Cursos</button>`:''}
       ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-pasos" class="btn btn-sm" onclick="discTab('cursada',this)">📋 Cursada</button>`:''}
+      ${(isSuperAdmin()||canEjecutar('disc_inscripciones'))?`<button id="disc-tab-inscripciones" class="btn btn-sm" onclick="discTab('inscripciones',this)">📝 Inscripciones${discCountPendientes()?` <span style="background:#DC2626;color:#fff;border-radius:999px;padding:1px 7px;font-size:10px;margin-left:2px">${discCountPendientes()}</span>`:''}</button>`:''}
       <button id="disc-tab-cargar" class="btn btn-sm" onclick="discTab('cargar',this)">✏️ Cargar</button>
       <button id="disc-tab-registros" class="btn btn-sm" onclick="discTab('registros',this)">📄 Registros</button><button id="disc-tab-historico" class="btn btn-sm" onclick="discTab('historico',this)">📁 Histórico</button>
     </div>
@@ -12606,6 +12769,7 @@ function buildDiscipuladoHTML(){
 
 let discEditingPasoId=null;
 let discAsignandoPasoId=null;
+let discAsignandoCursadaId=null;
 
 // Devuelve el/los nombres de Discipulador(es) de un Paso o Cursada, separados por coma
 function discDiscipuladoresLabel(obj){
@@ -12626,6 +12790,7 @@ function discTab(tab, btn){
   if(tab==='dashboard') discRenderDashboard(c);
   else if(tab==='cursos') discRenderCursos(c);
   else if(tab==='cursada'||tab==='pasos') discRenderCursada(c);
+  else if(tab==='inscripciones') discRenderInscripciones(c);
   else if(tab==='cargar') discRenderCargar(c);
   else if(tab==='registros') discRenderRegistros(c);else if(tab==='historico') discRenderHistorico(c);
 }
@@ -12798,16 +12963,17 @@ function discGenLabel(pasoId,anio){var ant=(S.discCursadas||[]).filter(function(
 async function discAbrirCursada(pasoId){
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   if(!paso) return;
+  if(paso.estado!=='Activo'){ showToast('Este Curso está deshabilitado — no admite nuevas cursadas','#D97706'); return; }
   var activa=(S.discCursadas||[]).find(function(c){return c.pasoId===pasoId&&c.estado==='Activo';});
   if(activa){ showToast('Ya hay una cursada activa para '+paso.nombre,'#D97706'); return; }
   var anio=new Date().getFullYear();
   if(!S.discCursadas) S.discCursadas=[];
   var recsPrev=S.discRecords.filter(function(r){return r.pasoId===pasoId&&!r.cursadaId&&r.asistencia;});
   var memPrev=[...new Set(recsPrev.flatMap(function(r){return Object.keys(r.asistencia).filter(function(id){return r.asistencia[id]&&r.asistencia[id].state==='presente';});}))].map(Number).filter(Boolean);
-  var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorIds:paso.discipuladorIds||[],miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:''};
+  var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorIds:paso.discipuladorIds||[],miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:'',_ts:Date.now()};
   S.discCursadas.push(nc);
   var recordsTocados=[];
-  S.discRecords.forEach(function(r){ if(r.pasoId===pasoId&&!r.cursadaId){ recordsTocados.push(r); r.cursadaId=nc.id; } });
+  S.discRecords.forEach(function(r){ if(r.pasoId===pasoId&&!r.cursadaId){ recordsTocados.push(r); r.cursadaId=nc.id; r._ts=Date.now(); } });
   await saveK('gdv_disc_cursadas',S.discCursadas);
   await saveK('gdv_disc_records',S.discRecords);
   try{
@@ -12855,6 +13021,8 @@ async function discCerrarCursada(cursadaId){
     cursada.anio=_a;
     cursada.label=cursada.pasoNombre+' — '+cursada.num+'/'+_a;
   }
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  snapshotFormaciones.forEach(function(s){ s.m._ts=Date.now(); });
   await saveK('gdv_disc_cursadas',S.discCursadas);
   await saveK('gdv_m5',S.members);
   try{
@@ -12888,6 +13056,8 @@ async function discRevertirCierre(cursadaId){
   });
   cursada.estado='Activo';
   cursada.fechaCierre='';
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  snapshotFormaciones.forEach(function(s){ s.m._ts=Date.now(); });
   await saveK('gdv_disc_cursadas',S.discCursadas);
   await saveK(SK.members,S.members);
   try{
@@ -12911,20 +13081,29 @@ async function discRevertirInicio(cursadaId){
   var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
   if(!cursada) return;
   if(cursada.estado!=='Activo'){ showToast('Esta cursada ya no está en curso','#D97706'); return; }
-  if(!confirm('¿Revertir el inicio de "'+cursada.label+'"?\nSe elimina esta cursada. Los encuentros ya cargados quedan sin cursada asociada y se podrán re-agrupar al iniciar una nueva.')) return;
+  var inscsAsociadas=(S.discInscripciones||[]).filter(function(i){return i.cursadaId===cursadaId;});
+  var msg='¿Revertir el inicio de "'+cursada.label+'"?\nSe elimina esta cursada. Los encuentros ya cargados quedan sin cursada asociada y se podrán re-agrupar al iniciar una nueva.';
+  if(inscsAsociadas.length) msg+='\n\nTambién se van a eliminar '+inscsAsociadas.length+' inscripción'+(inscsAsociadas.length!==1?'es':'')+' por QR asociada'+(inscsAsociadas.length!==1?'s':'')+' a esta cursada.';
+  if(!confirm(msg)) return;
   var recordsTocados=[];
-  S.discRecords.forEach(function(r){ if(r.cursadaId===cursadaId){ recordsTocados.push(r); r.cursadaId=null; } });
+  S.discRecords.forEach(function(r){ if(r.cursadaId===cursadaId){ recordsTocados.push(r); r.cursadaId=null; r._ts=Date.now(); } });
   S.discCursadas=(S.discCursadas||[]).filter(function(c){return c.id!==cursadaId;});
   addTombstone('gdv_disc_cursadas',cursadaId);
+  var snapshotInscripciones=S.discInscripciones.slice();
+  inscsAsociadas.forEach(function(i){ addTombstone(SK.discInscripciones,i.id); });
+  S.discInscripciones=(S.discInscripciones||[]).filter(function(i){return i.cursadaId!==cursadaId;});
   await saveK('gdv_disc_cursadas',S.discCursadas);
   await saveK('gdv_disc_records',S.discRecords);
+  await saveK(SK.discInscripciones,S.discInscripciones);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     S.discCursadas.push(cursada);
     recordsTocados.forEach(function(r){ r.cursadaId=cursadaId; });
+    S.discInscripciones=snapshotInscripciones;
     await saveK('gdv_disc_cursadas',S.discCursadas);
     await saveK('gdv_disc_records',S.discRecords);
+    await saveK(SK.discInscripciones,S.discInscripciones);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -12933,7 +13112,7 @@ async function discRevertirInicio(cursadaId){
   if(c) discRenderCursada(c);
 }
 
-function discRenderHistorico(c){var fP=document.getElementById('hist-fil-paso')?document.getElementById('hist-fil-paso').value:'';var fA=document.getElementById('hist-fil-anio')?document.getElementById('hist-fil-anio').value:'';var fI=document.getElementById('hist-fil-id')?document.getElementById('hist-fil-id').value.trim().toLowerCase():'';var done=(S.discCursadas||[]).filter(function(cu){if(cu.estado!=='Completado')return false;if(fP&&String(cu.pasoId)!==fP)return false;if(fA&&String(cu.anio)!==fA)return false;if(fI&&!(cu.label||'').toLowerCase().includes(fI))return false;return true;}).sort(function(a,b){return b.id-a.id;});var pOpts=S.discPasos.map(function(p){return '<option value="'+p.id+'"'+(fP===String(p.id)?' selected':'')+'>'+p.nombre+'</option>';}).join('');var anios=[...new Set((S.discCursadas||[]).filter(function(c){return c.estado==='Completado';}).map(function(c){return c.anio;}))].sort(function(a,b){return b-a;});var aOpts=anios.map(function(a){return '<option value="'+a+'"'+(fA===String(a)?' selected':'')+'>'+a+'</option>';}).join('');c.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center"><select id="hist-fil-paso" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los pasos</option>'+pOpts+'</select><select id="hist-fil-anio" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los años</option>'+aOpts+'</select><input id="hist-fil-id" oninput="discRenderHistorico(document.getElementById(\'disc-content\'))" placeholder="Buscar ID (ej: 1/2026)" value="'+fI+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;width:160px"><span style="font-size:12px;color:#6B7280">'+done.length+' resultado'+(done.length!==1?'s':'')+'</span></div><div id="hist-results"></div>';if(!done.length){document.getElementById('hist-results').innerHTML='<div class="empty" style="padding:2rem">No hay cursadas que coincidan.</div>';return;}var html='';done.forEach(function(cursada){var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&r.asistencia;});var total=recs.length;var stats=cursada.miembros.map(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return null;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;return {m:m,asist:asist,pct:pct,ok:pct>=75};}).filter(Boolean);var nOk=stats.filter(function(x){return x.ok;}).length;html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #9CA3AF"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+cursada.label+'</div><div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+discDiscipuladoresLabel(cursada)+'</strong> · Inicio: '+(cursada.fechaInicio||'—')+' · Cierre: '+(cursada.fechaCierre||'—')+'</div></div><span class="badge b-muted">Completada</span>'+(hasRole('super_admin')?'<button class="btn btn-sm" onclick="discRevertirCierre('+cursada.id+')" style="color:#D97706;margin-left:6px" title="Vuelve la cursada a Activo">↩️ Revertir</button>':'')+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+cursada.miembros.length+'</span><span class="stat-lbl">Alumnos</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+total+'</span><span class="stat-lbl">Encuentros</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem;color:#16A34A">'+nOk+'/'+cursada.miembros.length+'</span><span class="stat-lbl">Completados</span></div></div>';stats.forEach(function(s){var bc=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;flex:1">'+fullName(s.m)+'</span><div style="flex:2;min-width:120px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#6B7280">'+s.asist+'/'+total+' enc.</span><strong style="color:'+bc+'">'+s.pct+'%</strong></div><div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+bc+';width:'+s.pct+'%"></div></div></div><span style="font-size:11px;padding:3px 10px;border-radius:6px;'+(s.ok?'background:#D1FAE5;color:#065F46':'background:#FEE2E2;color:#991B1B')+'">'+( s.ok?'✅ Completado':'❌ No completó')+'</span></div>';});if(recs.length){html+='<details style="margin-top:1rem"><summary style="font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;padding:6px 0">Ver encuentros ('+recs.length+')</summary><div style="margin-top:8px">';recs.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(r){var pres=Object.values(r.asistencia||{}).filter(function(a){return a&&a.state==='presente';}).length;var editBtn=hasRole('super_admin')?'<button class="btn btn-sm" onclick="discEditRecord('+r.id+')" style="font-size:10px;padding:2px 8px">✏️</button>':'';html+='<div style="padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:12px;display:flex;justify-content:space-between;align-items:center"><span>'+(fmtAA(r.fecha)||r.fecha)+' — '+r.capitulo+'</span><div style="display:flex;align-items:center;gap:8px"><span style="color:#6B7280">'+pres+' presentes</span>'+editBtn+'</div></div>';});html+='</div></details>';}html+='</div>';});document.getElementById('hist-results').innerHTML=html;}
+function discRenderHistorico(c){var fP=document.getElementById('hist-fil-paso')?document.getElementById('hist-fil-paso').value:'';var fA=document.getElementById('hist-fil-anio')?document.getElementById('hist-fil-anio').value:'';var fI=document.getElementById('hist-fil-id')?document.getElementById('hist-fil-id').value.trim().toLowerCase():'';var done=(S.discCursadas||[]).filter(function(cu){if(cu.estado!=='Completado')return false;if(fP&&String(cu.pasoId)!==fP)return false;if(fA&&String(cu.anio)!==fA)return false;if(fI&&!(cu.label||'').toLowerCase().includes(fI))return false;return true;}).sort(function(a,b){return b.id-a.id;});var pOpts=S.discPasos.map(function(p){return '<option value="'+p.id+'"'+(fP===String(p.id)?' selected':'')+'>'+p.nombre+'</option>';}).join('');var anios=[...new Set((S.discCursadas||[]).filter(function(c){return c.estado==='Completado';}).map(function(c){return c.anio;}))].sort(function(a,b){return b-a;});var aOpts=anios.map(function(a){return '<option value="'+a+'"'+(fA===String(a)?' selected':'')+'>'+a+'</option>';}).join('');c.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center"><select id="hist-fil-paso" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los pasos</option>'+pOpts+'</select><select id="hist-fil-anio" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los años</option>'+aOpts+'</select><input id="hist-fil-id" oninput="discRenderHistorico(document.getElementById(\'disc-content\'))" placeholder="Buscar ID (ej: 1/2026)" value="'+fI+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;width:160px"><span style="font-size:12px;color:#6B7280">'+done.length+' resultado'+(done.length!==1?'s':'')+'</span></div><div id="hist-results"></div>';if(!done.length){document.getElementById('hist-results').innerHTML='<div class="empty" style="padding:2rem">No hay cursadas que coincidan.</div>';return;}var html='';done.forEach(function(cursada){var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&r.asistencia;});var total=recs.length;var stats=cursada.miembros.map(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return null;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;return {m:m,asist:asist,pct:pct,ok:pct>=75};}).filter(Boolean);var nOk=stats.filter(function(x){return x.ok;}).length;var origenH=discContarOrigenMiembros(cursada);html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #9CA3AF"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+cursada.label+'</div><div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+discDiscipuladoresLabel(cursada)+'</strong> · Inicio: '+(cursada.fechaInicio||'—')+' · Cierre: '+(cursada.fechaCierre||'—')+(cursada.miembros.length?' · '+origenH.qr+' por QR · '+origenH.manual+' manual'+(origenH.manual!==1?'es':''):'')+'</div></div><span class="badge b-muted">Completada</span>'+(hasRole('super_admin')?'<button class="btn btn-sm" onclick="discRevertirCierre('+cursada.id+')" style="color:#D97706;margin-left:6px" title="Vuelve la cursada a Activo">↩️ Revertir</button>':'')+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+cursada.miembros.length+'</span><span class="stat-lbl">Alumnos</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+total+'</span><span class="stat-lbl">Encuentros</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem;color:#16A34A">'+nOk+'/'+cursada.miembros.length+'</span><span class="stat-lbl">Completados</span></div></div>';stats.forEach(function(s){var bc=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;flex:1">'+fullName(s.m)+'</span><div style="flex:2;min-width:120px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#6B7280">'+s.asist+'/'+total+' enc.</span><strong style="color:'+bc+'">'+s.pct+'%</strong></div><div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+bc+';width:'+s.pct+'%"></div></div></div><span style="font-size:11px;padding:3px 10px;border-radius:6px;'+(s.ok?'background:#D1FAE5;color:#065F46':'background:#FEE2E2;color:#991B1B')+'">'+( s.ok?'✅ Completado':'❌ No completó')+'</span></div>';});if(recs.length){html+='<details style="margin-top:1rem"><summary style="font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;padding:6px 0">Ver encuentros ('+recs.length+')</summary><div style="margin-top:8px">';recs.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(r){var pres=Object.values(r.asistencia||{}).filter(function(a){return a&&a.state==='presente';}).length;var editBtn=hasRole('super_admin')?'<button class="btn btn-sm" onclick="discEditRecord('+r.id+')" style="font-size:10px;padding:2px 8px">✏️</button>':'';html+='<div style="padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:12px;display:flex;justify-content:space-between;align-items:center"><span>'+(fmtAA(r.fecha)||r.fecha)+' — '+r.capitulo+'</span><div style="display:flex;align-items:center;gap:8px"><span style="color:#6B7280">'+pres+' presentes</span>'+editBtn+'</div></div>';});html+='</div></details>';}html+='</div>';});document.getElementById('hist-results').innerHTML=html;}
 function discRenderCursos(c){
   var esSuper=hasRole('super_admin');
   var html='<div style="font-size:12px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#F9FAFB;border-radius:8px">'
@@ -12945,13 +13124,13 @@ function discRenderCursos(c){
   var nivelMap={Inicial:{icon:'🔵',color:'#0369A1'},Intermedio:{icon:'🟣',color:'#7C3AED'},Avanzado:{icon:'🩷',color:'#BE185D'}};
   S.discPasos.forEach(function(paso){
     var nv=nivelMap[paso.nivel]||{icon:'⚪',color:'#6B7280'};
-    html+='<div class="card" style="margin-bottom:1rem">'
+    html+='<div class="card" style="margin-bottom:1rem'+(paso.estado!=='Activo'?';opacity:.65':'')+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
       +'<div>'
-      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+paso.nombre+(paso.estado!=='Activo'?' <span class="badge b-muted" style="font-weight:600">Deshabilitado</span>':'')+'</div>'
       +'<div style="font-size:12px;color:'+nv.color+';margin-top:4px;font-weight:600">'+nv.icon+' '+paso.nivel+'</div>'
       +'</div>'
-      +(esSuper?'<button class="btn btn-sm" onclick="discOpenModal('+paso.id+')">✏️ Editar</button>':'')
+      +(esSuper?'<button class="btn btn-sm" onclick="discOpenModal('+paso.id+')">✏️ Editar</button> <button class="btn btn-sm" onclick="discToggleEstado('+paso.id+')" style="color:#D97706">'+(paso.estado==='Activo'?'🚫 Deshabilitar':'✅ Habilitar')+'</button> <button class="btn btn-sm btn-danger" onclick="discEliminarPaso('+paso.id+')">🗑 Eliminar</button>':'')
       +'</div>'
       +'<div style="margin-top:10px;font-size:12px;color:#6B7280">'+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'')+'</div>'
       +(paso.capitulos.length?'<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px">'+paso.capitulos.map(function(cap,i){return '<div style="font-size:12px;color:#374151">Semana '+(i+1)+' — '+cap+'</div>';}).join('')+'</div>':'')
@@ -12973,23 +13152,40 @@ function discRenderCursada(c){
     html+='<div style="font-size:15px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>';
     html+='<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+paso.nivel+' · '+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'')+'</div>';
     html+='<div style="font-size:12px;color:#6B7280;margin-top:4px">';
-    html+='Discipulador: <strong>'+discDiscipuladoresLabel(paso)+'</strong>';
-    html+=' · '+paso.miembros.length+' miembro'+(paso.miembros.length!==1?'s':'');
+    if(cursadaActiva){
+      html+='Discipulador: <strong>'+discDiscipuladoresLabel(cursadaActiva)+'</strong>';
+      html+=' · '+cursadaActiva.miembros.length+' miembro'+(cursadaActiva.miembros.length!==1?'s':'');
+      if(cursadaActiva.miembros.length){
+        var origen=discContarOrigenMiembros(cursadaActiva);
+        html+=' <span style="color:#9CA3AF">('+origen.qr+' por QR · '+origen.manual+' manual'+(origen.manual!==1?'es':'')+')</span>';
+      }
+    } else {
+      html+='<span style="color:#9CA3AF;font-style:italic">Sin cursada activa — sin discipulador ni integrantes por ahora</span>';
+    }
     html+='</div></div>';
     html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
     html+='<span class="badge '+(cursadaActiva?'b-ok':'b-muted')+'">'+(cursadaActiva?'Cursada Activa':'Sin cursada activa')+'</span>';
+    if(cursadaActiva&&canAdminDisc()){
+      html+='<label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:'+(cursadaActiva.qrAbierto?'#16A34A':'#9CA3AF')+';cursor:pointer;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:999px;padding:4px 10px" title="Acepta inscripciones por QR ahora mismo">'
+        +'<input type="checkbox" onchange="discToggleQrAbierto('+cursadaActiva.id+',this)" '+(cursadaActiva.qrAbierto?'checked':'')+' style="cursor:pointer">📱 QR abierto</label>';
+      html+='<label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:'+(cursadaActiva.requiereValidacion?'#D97706':'#9CA3AF')+';cursor:pointer;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:999px;padding:4px 10px" title="Las inscripciones quedan pendientes hasta que alguien las valide">'
+        +'<input type="checkbox" onchange="discToggleRequiereValidacion('+cursadaActiva.id+',this)" '+(cursadaActiva.requiereValidacion?'checked':'')+' style="cursor:pointer">✅ Requiere validación</label>';
+    }
     if(canAdminDisc()){
       html+='<button class="btn btn-sm btn-primary" onclick="discOpenAsignacion('+paso.id+')">👤 Asignar</button>';
-      if(!cursadaActiva){html+='<button class="btn btn-sm" onclick="discAbrirCursada('+paso.id+')" style="background:#7C3AED;color:#fff;border:none">▶ Iniciar Cursada</button>';}
+      if(!cursadaActiva){
+        if(isActivo) html+='<button class="btn btn-sm" onclick="discAbrirCursada('+paso.id+')" style="background:#7C3AED;color:#fff;border:none">▶ Iniciar Cursada</button>';
+        else html+='<span style="font-size:11px;color:#9CA3AF;font-style:italic">Curso deshabilitado — no admite nuevas cursadas</span>';
+      }
       else{
         html+='<button class="btn btn-sm" onclick="discCerrarCursada('+cursadaActiva.id+')" style="color:#DC2626">⏹ Cerrar Cursada</button>';
         if(esSuper) html+='<button class="btn btn-sm" onclick="discRevertirInicio('+cursadaActiva.id+')" style="color:#D97706" title="Deshace el inicio de esta cursada">↩️ Revertir inicio</button>';
       }
     }
     html+='</div></div>';
-    // Members list
-    if(paso.miembros.length){
-      var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+    // Members list — solo si hay cursada activa (si no, no hay a quién mostrar)
+    if(cursadaActiva&&cursadaActiva.miembros.length){
+      var mems=cursadaActiva.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
       html+='<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px">';
       mems.forEach(function(m){
         var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
@@ -13004,16 +13200,296 @@ function discRenderCursada(c){
   c.innerHTML=html;
 }
 
+// ── Inscripciones por QR (esqueleto: interruptores + modelo de datos + revisión) ──
+
+async function discToggleQrAbierto(cursadaId,checkboxEl){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
+  if(!cursada) return;
+  var nuevoValor=!cursada.qrAbierto;
+  var msg=nuevoValor
+    ?'¿Abrir el QR de inscripción para "'+cursada.label+'"?\nA partir de ahora, cualquiera que escanee el QR va a poder anotarse a esta cursada.'
+    :'¿Cerrar el QR de inscripción para "'+cursada.label+'"?\nNadie más va a poder anotarse por QR hasta que lo vuelvas a abrir de nuevo.';
+  if(!confirm(msg)){
+    if(checkboxEl) checkboxEl.checked=cursada.qrAbierto; // revertir visualmente, no se cambió nada
+    return;
+  }
+  var snapshot=cursada.qrAbierto;
+  cursada.qrAbierto=nuevoValor;
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    cursada.qrAbierto=snapshot;
+    cursada._ts=Date.now();
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    var c1=document.getElementById('disc-content'); if(c1) discRenderCursada(c1);
+    return;
+  }
+  showToast(cursada.qrAbierto?'📱 QR abierto — ya acepta inscripciones':'QR cerrado','#16A34A');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+}
+
+async function discToggleRequiereValidacion(cursadaId,checkboxEl){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
+  if(!cursada) return;
+  var nuevoValor=!cursada.requiereValidacion;
+  var msg=nuevoValor
+    ?'¿Activar "Requiere validación" para "'+cursada.label+'"?\nA partir de ahora, las inscripciones nuevas quedan pendientes hasta que alguien las apruebe manualmente.'
+    :'¿Desactivar "Requiere validación" para "'+cursada.label+'"?\nA partir de ahora, las inscripciones nuevas se auto-aprueban y se suman directo a la cursada, sin que nadie las revise.';
+  if(!confirm(msg)){
+    if(checkboxEl) checkboxEl.checked=cursada.requiereValidacion; // revertir visualmente, no se cambió nada
+    return;
+  }
+  var snapshot=cursada.requiereValidacion;
+  cursada.requiereValidacion=nuevoValor;
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    cursada.requiereValidacion=snapshot;
+    cursada._ts=Date.now();
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    var c1=document.getElementById('disc-content'); if(c1) discRenderCursada(c1);
+    return;
+  }
+  showToast(cursada.requiereValidacion?'Ahora requiere validación manual':'⚠️ Ahora auto-aprueba sin validación','#D97706');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+}
+
+function discCountPendientes(){
+  return (S.discInscripciones||[]).filter(function(i){return i.estado==='pendiente';}).length;
+}
+
+// ── Matching de identificación para el formulario público (2-de-3 / 3-de-3) ──
+function discNorm4(s){ return normName(s).replace(/[^a-z]/g,'').slice(0,4); }
+function discNormCel4(s){ return (s||'').replace(/[^0-9]/g,'').slice(-4); }
+
+// Devuelve todos los miembros que coinciden en AL MENOS 1 de los 3 datos, con su cantidad de coincidencias
+function discBuscarMiembroCoincidencias(nombre, apellido, celular, members){
+  var n4=discNorm4(nombre), a4=discNorm4(apellido), c4=discNormCel4(celular);
+  var lista=members||S.members||[];
+  var candidatos=[];
+  lista.forEach(function(m){
+    var mn4=discNorm4(m.nombre), ma4=discNorm4(m.apellido), mc4=discNormCel4(m.tel);
+    var matches=0;
+    if(n4&&mn4===n4) matches++;
+    if(a4&&ma4===a4) matches++;
+    if(c4&&mc4===c4) matches++;
+    if(matches>0) candidatos.push({miembro:m,matches:matches});
+  });
+  return candidatos;
+}
+
+// coincidenciasRequeridas: 2 (si la Cursada requiere validación) o 3 (si auto-aprueba sin validación)
+// Retorna {status:'ok',miembro} | {status:'sin_match'} | {status:'ambiguo'}
+function discResolverMiembro(nombre, apellido, celular, coincidenciasRequeridas, members){
+  var candidatos=discBuscarMiembroCoincidencias(nombre, apellido, celular, members).filter(function(x){return x.matches>=coincidenciasRequeridas;});
+  if(!candidatos.length) return {status:'sin_match'};
+  var maxM=Math.max.apply(null,candidatos.map(function(x){return x.matches;}));
+  var mejores=candidatos.filter(function(x){return x.matches===maxM;});
+  if(mejores.length>1) return {status:'ambiguo'};
+  return {status:'ok',miembro:mejores[0].miembro};
+}
+
+let discInscFiltroEstado='pendiente';
+let discInscFiltroCursada='';
+let discInscSoloActivas=true;
+
+// Cuántos de los miembros de una cursada llegaron por QR (inscripción aprobada/auto-aprobada) vs a mano (Asignar)
+function discContarOrigenMiembros(cursada){
+  var idsQr=new Set((S.discInscripciones||[])
+    .filter(function(i){return i.cursadaId===cursada.id&&(i.estado==='aprobada'||i.estado==='auto-aprobada');})
+    .map(function(i){return i.miembroId;}));
+  var qr=(cursada.miembros||[]).filter(function(mid){return idsQr.has(mid);}).length;
+  var manual=(cursada.miembros||[]).length-qr;
+  return {qr:qr,manual:manual};
+}
+
+function discRenderInscripciones(c){
+  var cursadaOpts=(S.discCursadas||[]).slice().sort(function(a,b){return b.id-a.id;}).map(function(cu){
+    return '<option value="'+cu.id+'"'+(discInscFiltroCursada===String(cu.id)?' selected':'')+'>'+cu.label+(cu.estado!=='Activo'?' (cerrada)':'')+'</option>';
+  }).join('');
+
+  var estados=[
+    {key:'pendiente',label:'⏳ Pendientes'},
+    {key:'aprobada',label:'✅ Aprobadas'},
+    {key:'auto-aprobada',label:'✅ Auto-aprobadas'},
+    {key:'rechazada',label:'❌ Rechazadas'},
+    {key:'',label:'Todas'},
+  ];
+  var chips=estados.map(function(e){
+    return '<div class="chip'+(discInscFiltroEstado===e.key?' active':'')+'" onclick="discInscFiltroEstado=\''+e.key+'\';discRenderInscripciones(document.getElementById(\'disc-content\'))" style="display:inline-block;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;margin-right:6px;margin-bottom:6px;'+(discInscFiltroEstado===e.key?'background:#1F4E79;color:#fff':'background:#F3F4F6;color:#6B7280')+'">'+e.label+'</div>';
+  }).join('');
+
+  // Por defecto, solo se ven inscripciones de cursadas todavía activas — evita que se acumule
+  // años de historial acá; una vez cerrada la cursada, su lista final ya está en 📁 Histórico.
+  // Se puede desactivar con el checkbox, o eligiendo una cursada puntual del desplegable (aunque esté cerrada).
+  var list=(S.discInscripciones||[]).filter(function(i){
+    if(discInscFiltroEstado&&i.estado!==discInscFiltroEstado) return false;
+    if(discInscFiltroCursada){
+      if(String(i.cursadaId)!==discInscFiltroCursada) return false;
+    } else if(discInscSoloActivas){
+      var cu=(S.discCursadas||[]).find(function(x){return x.id===i.cursadaId;});
+      if(!cu||cu.estado!=='Activo') return false;
+    }
+    return true;
+  }).sort(function(a,b){return (b.fecha||0)-(a.fecha||0);});
+
+  var html='<div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+  html+='<div>'+chips+'</div>';
+  if(canAdminDisc()) html+='<button class="btn btn-sm btn-primary" onclick="discShowInscripcionQR()">📱 Ver / Compartir QR</button>';
+  html+='</div>';
+  html+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">';
+  html+='<select onchange="discInscFiltroCursada=this.value;discRenderInscripciones(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todas las cursadas</option>'+cursadaOpts+'</select>';
+  html+='<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#6B7280;cursor:pointer'+(discInscFiltroCursada?';opacity:.5':'')+'"'+(discInscFiltroCursada?' title="No aplica: elegiste una cursada puntual"':'')+'>'
+    +'<input type="checkbox" '+(discInscFiltroCursada?'disabled':'')+' '+(discInscSoloActivas?'checked':'')+' onchange="discInscSoloActivas=this.checked;discRenderInscripciones(document.getElementById(\'disc-content\'))" style="cursor:pointer">Solo cursadas activas</label>';
+  html+='</div>';
+
+  if(!list.length){
+    html+='<div class="empty" style="padding:2rem">No hay inscripciones que coincidan con el filtro.</div>';
+    c.innerHTML=html;
+    return;
+  }
+
+  list.forEach(function(insc){
+    var cursada=(S.discCursadas||[]).find(function(cu){return cu.id===insc.cursadaId;});
+    var m=S.members.find(function(x){return x.id===insc.miembroId;});
+    var badgeClass=insc.estado==='pendiente'?'b-warn':(insc.estado==='rechazada'?'b-danger':'b-ok');
+    var badgeLabel=insc.estado==='pendiente'?'⏳ Pendiente':insc.estado==='rechazada'?'❌ Rechazada':insc.estado==='auto-aprobada'?'✅ Auto-aprobada':'✅ Aprobada';
+    var aprobador=insc.aprobadoPor?S.members.find(function(x){return x.id===insc.aprobadoPor;}):null;
+    html+='<div class="card" style="margin-bottom:10px">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">';
+    html+='<div>';
+    html+='<div style="font-size:14px;font-weight:700;color:#1F4E79">'+(m?fullName(m):'Miembro no encontrado (ID '+insc.miembroId+')')+'</div>';
+    html+='<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(cursada?cursada.label:'Cursada eliminada')+'</div>';
+    html+='<div style="font-size:11px;color:#9CA3AF;margin-top:4px">Ingresó: '+(insc.nombreIngresado||'—')+' '+(insc.apellidoIngresado||'')+' · Cel. terminado en '+(insc.celularIngresado||'—')+'</div>';
+    html+='<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+(insc.fecha?new Date(insc.fecha).toLocaleString('es-AR'):'')+'</div>';
+    if(insc.aprobadoPor&&(insc.estado==='aprobada'||insc.estado==='rechazada')){
+      html+='<div style="font-size:11px;color:#9CA3AF;margin-top:2px">Por: '+(aprobador?fullName(aprobador):'—')+' · '+(insc.fechaAprobacion?new Date(insc.fechaAprobacion).toLocaleString('es-AR'):'')+'</div>';
+    }
+    html+='</div>';
+    html+='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
+    html+='<span class="badge '+badgeClass+'">'+badgeLabel+'</span>';
+    html+='<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">';
+    if(insc.estado==='pendiente'){
+      html+='<button class="btn btn-sm" style="color:#16A34A" onclick="discAprobarInscripcion('+insc.id+')">✓ Aprobar</button>';
+      html+='<button class="btn btn-sm" style="color:#D97706" onclick="discRechazarInscripcion('+insc.id+')">✕ Rechazar</button>';
+    }
+    if(insc.estado==='pendiente'||insc.estado==='rechazada'){
+      html+='<button class="btn btn-sm btn-danger" onclick="discEliminarInscripcion('+insc.id+')">🗑 Eliminar</button>';
+    }
+    html+='</div></div></div></div>';
+  });
+
+  c.innerHTML=html;
+}
+
+async function discAprobarInscripcion(id){
+  var insc=(S.discInscripciones||[]).find(function(i){return i.id===id;});
+  if(!insc) return;
+  var cursada=(S.discCursadas||[]).find(function(cu){return cu.id===insc.cursadaId;});
+  if(!cursada){ alert('La cursada de esta inscripción ya no existe.'); return; }
+  var m=S.members.find(function(x){return x.id===insc.miembroId;});
+  if(!confirm('¿Aprobar la inscripción de '+(m?fullName(m):'esta persona')+' a "'+cursada.label+'"?\nSe va a sumar directo a la cursada activa.')) return;
+  var snapshotInsc={estado:insc.estado,aprobadoPor:insc.aprobadoPor,fechaAprobacion:insc.fechaAprobacion};
+  var snapshotMiembros=(cursada.miembros||[]).slice();
+  insc.estado='aprobada';
+  insc.aprobadoPor=(typeof currentUser!=='undefined'&&currentUser)?currentUser.id:null;
+  insc.fechaAprobacion=Date.now();
+  insc._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  if(!cursada.miembros) cursada.miembros=[];
+  if(!cursada.miembros.includes(insc.miembroId)) cursada.miembros.push(insc.miembroId);
+  cursada._ts=Date.now();
+  await saveK(SK.discInscripciones,S.discInscripciones);
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(insc,snapshotInsc);
+    insc._ts=Date.now();
+    cursada.miembros=snapshotMiembros;
+    cursada._ts=Date.now();
+    await saveK(SK.discInscripciones,S.discInscripciones);
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Inscripción aprobada — se sumó a la cursada','#16A34A');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderInscripciones(c);
+}
+
+async function discRechazarInscripcion(id){
+  var insc=(S.discInscripciones||[]).find(function(i){return i.id===id;});
+  if(!insc) return;
+  if(!confirm('¿Rechazar esta inscripción?\nQueda registrada como rechazada, no se suma a la cursada.')) return;
+  var snapshot={estado:insc.estado,aprobadoPor:insc.aprobadoPor,fechaAprobacion:insc.fechaAprobacion};
+  insc.estado='rechazada';
+  insc.aprobadoPor=(typeof currentUser!=='undefined'&&currentUser)?currentUser.id:null;
+  insc.fechaAprobacion=Date.now();
+  insc._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  await saveK(SK.discInscripciones,S.discInscripciones);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(insc,snapshot);
+    insc._ts=Date.now();
+    await saveK(SK.discInscripciones,S.discInscripciones);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('Inscripción rechazada','#D97706');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderInscripciones(c);
+}
+
+async function discEliminarInscripcion(id){
+  var insc=(S.discInscripciones||[]).find(function(i){return i.id===id;});
+  if(!insc) return;
+  if(insc.estado==='aprobada'||insc.estado==='auto-aprobada'){
+    showToast('Esta inscripción ya está aprobada — para sacarla de la cursada usá 👤 Asignar','#D97706');
+    return;
+  }
+  if(!confirm('¿Eliminar esta inscripción? Esta acción no se puede deshacer.')) return;
+  S.discInscripciones=(S.discInscripciones||[]).filter(function(i){return i.id!==id;});
+  addTombstone(SK.discInscripciones,id);
+  await saveK(SK.discInscripciones,S.discInscripciones);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.discInscripciones.push(insc);
+    await saveK(SK.discInscripciones,S.discInscripciones);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('🗑 Inscripción eliminada','#6B7280');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderInscripciones(c);
+}
+
 function discOpenAsignacion(pasoId){
   discAsignandoPasoId=pasoId;
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   if(!paso) return;
+  var cursadaActiva=(S.discCursadas||[]).find(function(cu){return cu.pasoId===pasoId&&cu.estado==='Activo';});
+  discAsignandoCursadaId=cursadaActiva?cursadaActiva.id:null;
+  var target=cursadaActiva||paso; // de dónde leer/guardar: la cursada en curso, o el paso como staging de la próxima
+
   document.getElementById('disc-asig-title').textContent='Asignar — '+paso.nombre;
   document.getElementById('disc-asig-curso-info').innerHTML=
     '<strong>'+paso.nombre+'</strong> · '+paso.nivel+' · '+paso.capitulos.length+' capítulo'+(paso.capitulos.length!==1?'s':'')
-    +'<div style="margin-top:2px;color:#9CA3AF">El Nombre, Nivel y Capítulos se editan desde 🎓 Cursos</div>';
+    +'<div style="margin-top:2px;color:#9CA3AF">El Nombre, Nivel y Capítulos se editan desde 🎓 Cursos</div>'
+    +(cursadaActiva
+      ?'<div style="margin-top:4px;color:#7C3AED;font-weight:600">✏️ Editando la cursada activa: '+cursadaActiva.label+'</div>'
+      :'<div style="margin-top:4px;color:#9CA3AF">Sin cursada activa: el Discipulador elegido acá sí se hereda al iniciar la próxima Cursada. Los Integrantes NO — cada Cursada nueva arranca sin integrantes y se arma con 👤 Asignar (una vez activa) o con Inscripciones por QR aprobadas.</div>');
 
-  var discIds=paso.discipuladorIds||[];
+  var discIds=target.discipuladorIds||[];
   var discChecks=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
     var checked=discIds.includes(m.id);
     var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
@@ -13026,7 +13502,7 @@ function discOpenAsignacion(pasoId){
   }).join('');
 
   var memberChecks=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
-    var checked=paso.miembros.includes(m.id);
+    var checked=(target.miembros||[]).includes(m.id);
     var g=S.groups.find(function(x){return x.id===m.grupoId;});
     var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
     var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
@@ -13052,20 +13528,27 @@ function discOpenAsignacion(pasoId){
 function discCloseAsignacion(){
   document.getElementById('disc-asig-modal').style.display='none';
   discAsignandoPasoId=null;
+  discAsignandoCursadaId=null;
 }
 
 async function discGuardarAsignacion(){
   var paso=S.discPasos.find(function(p){return p.id===discAsignandoPasoId;});
   if(!paso) return;
-  var snapshot={discipuladorIds:(paso.discipuladorIds||[]).slice(),miembros:(paso.miembros||[]).slice()};
-  paso.discipuladorIds=[...document.querySelectorAll('.disc-disc-cb:checked')].map(function(cb){return parseInt(cb.value);});
-  paso.miembros=[...document.querySelectorAll('.disc-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
-  await saveK(SK.discPasos,S.discPasos);
+  var cursadaActiva=discAsignandoCursadaId?(S.discCursadas||[]).find(function(cu){return cu.id===discAsignandoCursadaId;}):null;
+  var target=cursadaActiva||paso;
+  var snapshot={discipuladorIds:(target.discipuladorIds||[]).slice(),miembros:(target.miembros||[]).slice()};
+  target.discipuladorIds=[...document.querySelectorAll('.disc-disc-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  target.miembros=[...document.querySelectorAll('.disc-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  if(cursadaActiva) target._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente (el paso no es MERGE_KEY, no lo necesita)
+  var key=cursadaActiva?'gdv_disc_cursadas':SK.discPasos;
+  var arr=cursadaActiva?S.discCursadas:S.discPasos;
+  await saveK(key,arr);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    Object.assign(paso,snapshot);
-    await saveK(SK.discPasos,S.discPasos);
+    Object.assign(target,snapshot);
+    if(cursadaActiva) target._ts=Date.now();
+    await saveK(key,arr);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -13183,6 +13666,32 @@ async function discToggleEstado(pasoId){
   discTab('cursos', document.getElementById('disc-tab-cursos'));
 }
 
+async function discEliminarPaso(pasoId){
+  if(!hasRole('super_admin')) return;
+  var paso=(S.discPasos||[]).find(function(p){return p.id===pasoId;});
+  if(!paso) return;
+  var cursadasAsociadas=(S.discCursadas||[]).filter(function(cu){return cu.pasoId===pasoId;});
+  if(cursadasAsociadas.length){
+    alert('El Curso "'+paso.nombre+'" ya tiene '+cursadasAsociadas.length+' cursada'+(cursadasAsociadas.length!==1?'s':'')+' asociada'+(cursadasAsociadas.length!==1?'s':'')+' (activa o histórica). No se puede eliminar sin perder ese historial — si alguna es un duplicado, revertila/eliminala primero desde 📋 Cursada o 📁 Histórico.');
+    return;
+  }
+  if(!confirm('¿Eliminar el Curso "'+paso.nombre+'"?\nEsta acción no se puede deshacer.')) return;
+  var snapshot=S.discPasos.slice();
+  S.discPasos=(S.discPasos||[]).filter(function(p){return p.id!==pasoId;});
+  await saveK(SK.discPasos,S.discPasos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.discPasos=snapshot;
+    await saveK(SK.discPasos,S.discPasos);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('🗑 Curso eliminado','#6B7280');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursos(c);
+}
+
 // ── Cargar asistencia ──
 var discFacAtt={};
 var discSelectedPasoId=null;
@@ -13274,7 +13783,7 @@ function discLoadPasoForm(){
   }
 
   discFacAtt={};
-  var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+  var mems=cursada.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
   // Default: Ausente
   mems.forEach(function(m){discFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
 
@@ -13547,6 +14056,229 @@ async function fbSyncDown(){
 // ════════════════════════════════════════════════════════════
 // FORMULARIOS PÚBLICOS (sin login, acceso por QR)
 // ════════════════════════════════════════════════════════════
+function discShowInscripcionQR(){
+  var baseUrl=window.location.origin+window.location.pathname;
+  var url=baseUrl+'?form=disc-inscripcion';
+  var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent(url);
+  var overlay=document.getElementById('disc-qr-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='disc-qr-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(overlay);
+  }
+  var cursadasAbiertas=(S.discCursadas||[]).filter(function(cu){return cu.estado==='Activo'&&cu.qrAbierto;});
+  var waUrl='https://wa.me/?text='+encodeURIComponent('Hola! Te paso el link para anotarte al Discipulado: '+url);
+  overlay.style.display='flex';
+  overlay.innerHTML=`<div style="background:#fff;border-radius:16px;padding:2rem;max-width:420px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div style="font-size:15px;font-weight:700;color:#1F4E79">📱 Inscripción a Discipulado</div>
+      <button onclick="document.getElementById('disc-qr-overlay').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer">✕</button>
+    </div>
+    ${cursadasAbiertas.length===0?`<div style="background:#FEF3C7;color:#92400E;border-radius:10px;padding:12px;font-size:13px;margin-bottom:1rem">⚠️ Ninguna Cursada tiene el QR abierto ahora mismo — quien escanee este link no va a poder anotarse hasta que actives "📱 QR abierto" en alguna Cursada.</div>`
+      :`<div style="background:#D1FAE5;color:#065F46;border-radius:10px;padding:10px;font-size:12.5px;margin-bottom:1rem">Cursadas que aceptan inscripción ahora: <strong>${cursadasAbiertas.map(function(c){return c.label;}).join(', ')}</strong></div>`}
+    <div style="background:#F9FAFB;border-radius:12px;padding:1.5rem;margin-bottom:1rem">
+      <img src="${qrUrl}" style="width:200px;height:200px;border-radius:8px" alt="QR">
+    </div>
+    <div style="font-size:11px;color:#6B7280;word-break:break-all;margin-bottom:1rem">${url}</div>
+    <button onclick="navigator.clipboard.writeText('${url}');showToast('Link copiado','#16A34A')" style="width:100%;background:#F3F4F6;color:#374151;border:none;padding:11px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px">📋 Copiar link</button>
+    <a href="${waUrl}" target="_blank" style="display:block;width:100%;background:#25D366;color:#fff;border:none;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;box-sizing:border-box">💬 Compartir por WhatsApp</a>
+  </div>`;
+}
+
+// ── Formulario público de Inscripción (sin login, sin dropdown de miembros) ──
+function buildPublicDiscInscripcionForm(){
+  var cursadasJson=localStorage.getItem('gdv_disc_cursadas')||'[]';
+  var cursadas=[];
+  try{cursadas=JSON.parse(cursadasJson);}catch(e){}
+  var abiertas=cursadas.filter(function(cu){return cu.estado==='Activo'&&cu.qrAbierto;});
+
+  if(!abiertas.length){
+    return `<div style="background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:440px;box-shadow:0 4px 24px rgba(0,0,0,.1);text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">🔒</div>
+      <div style="font-size:18px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">Inscripciones cerradas por ahora</div>
+      <div style="font-size:13px;color:#6B7280">No hay ninguna cursada de Discipulado aceptando inscripciones en este momento. Hablá con el equipo para más info.</div>
+    </div>`;
+  }
+
+  window._pdiCursadas=abiertas;
+  var selectorHtml=abiertas.length===1
+    ? `<input type="hidden" id="pdi-cursada" value="${abiertas[0].id}"><div style="background:#F9FAFB;border-radius:8px;padding:10px 12px;font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:10px">📖 ${abiertas[0].label}</div>`
+    : `<label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Discipulado *</label>
+       <select id="pdi-cursada" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;margin-bottom:10px">
+         <option value="">— Seleccioná —</option>
+         ${abiertas.map(function(cu){return '<option value="'+cu.id+'">'+cu.label+'</option>';}).join('')}
+       </select>`;
+
+  return `<div style="background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:440px;box-shadow:0 4px 24px rgba(0,0,0,.1)">
+    <div id="pdi-form-wrap">
+      <div style="text-align:center;margin-bottom:1.5rem">
+        <div style="font-size:2.5rem;margin-bottom:.5rem">📖</div>
+        <div style="font-size:20px;font-weight:700;color:#1F4E79">Inscripción a Discipulado</div>
+        <div style="font-size:13px;color:#6B7280;margin-top:4px">Iglesia Vida Nueva · Gerli</div>
+      </div>
+      <div id="pdi-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px"></div>
+      ${selectorHtml}
+      <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Nombre *</label>
+        <input type="text" id="pdi-nombre" placeholder="Tu nombre" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;box-sizing:border-box"></div>
+      <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Apellido *</label>
+        <input type="text" id="pdi-apellido" placeholder="Tu apellido" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;box-sizing:border-box"></div>
+      <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
+        <input type="tel" id="pdi-cel" placeholder="11 1234-5678" inputmode="numeric" maxlength="12" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,12)" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;box-sizing:border-box"></div>
+      <button id="pdi-submit-btn" onclick="pdiEnviar()" style="width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-top:1.25rem">
+        Anotarme →
+      </button>
+    </div>
+    <div id="pdi-success" style="display:none;text-align:center;padding:1.5rem 0">
+      <div style="font-size:3.5rem;margin-bottom:1rem">✅</div>
+      <div id="pdi-success-msg" style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">¡Listo!</div>
+      <div style="font-size:13px;color:#6B7280">Iglesia Vida Nueva · Gerli</div>
+    </div>
+    <div id="pdi-nomatch" style="display:none;text-align:center;padding:1.5rem 0">
+      <div style="font-size:3rem;margin-bottom:1rem">🤔</div>
+      <div style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">No te encontramos</div>
+      <div style="font-size:13px;color:#6B7280;margin-bottom:1.25rem">Revisá que los datos estén bien escritos, o hablá con el equipo para que te ayuden a anotarte.</div>
+      <button onclick="pdiReintentar()" style="width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">
+        🔁 Intentar de nuevo
+      </button>
+    </div>
+    <div id="pdi-fail" style="display:none;text-align:center;padding:1.5rem 0">
+      <div style="font-size:3rem;margin-bottom:1rem">📶</div>
+      <div style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:.5rem">No pudimos confirmar la conexión</div>
+      <div style="font-size:13px;color:#6B7280;margin-bottom:1.25rem">Tus datos quedaron guardados en este celular e intentamos subirlos varias veces sin éxito. Probá de nuevo con mejor señal.</div>
+      <button onclick="pdiReintentar()" style="width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">
+        🔁 Intentar de nuevo
+      </button>
+    </div>
+  </div>`;
+}
+
+function pdiReintentar(){
+  var wrap=document.getElementById('pdi-form-wrap');
+  var success=document.getElementById('pdi-success');
+  var nomatch=document.getElementById('pdi-nomatch');
+  var fail=document.getElementById('pdi-fail');
+  if(success) success.style.display='none';
+  if(nomatch) nomatch.style.display='none';
+  if(fail) fail.style.display='none';
+  if(wrap) wrap.style.display='block';
+}
+
+async function pdiEnviar(){
+  var cursadaId=parseInt((document.getElementById('pdi-cursada')||{value:''}).value)||null;
+  var nombre=(document.getElementById('pdi-nombre')||{value:''}).value.trim();
+  var apellido=(document.getElementById('pdi-apellido')||{value:''}).value.trim();
+  var cel=(document.getElementById('pdi-cel')||{value:''}).value.trim();
+  var err=document.getElementById('pdi-error');
+
+  if(!cursadaId||!nombre||!apellido||!cel){
+    if(err){err.textContent='Por favor completá todos los campos obligatorios (*).';err.style.display='block';}
+    return;
+  }
+  if(cel.length<10||cel.length>12){
+    if(err){err.textContent='El celular debe tener entre 10 y 12 números (con característica, sin espacios ni guiones).';err.style.display='block';}
+    return;
+  }
+  if(err) err.style.display='none';
+
+  var cursadas=[];
+  try{cursadas=JSON.parse(localStorage.getItem('gdv_disc_cursadas')||'[]');}catch(e){}
+  var cursada=cursadas.find(function(cu){return cu.id===cursadaId;});
+  if(!cursada||cursada.estado!=='Activo'||!cursada.qrAbierto){
+    if(err){err.textContent='Esta cursada ya no está aceptando inscripciones. Recargá la página e intentá de nuevo.';err.style.display='block';}
+    return;
+  }
+
+  var members=[];
+  try{members=JSON.parse(localStorage.getItem('gdv_m5')||'[]');}catch(e){}
+
+  var btn=document.getElementById('pdi-submit-btn');
+  var textoOriginal=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.style.opacity='.6'; btn.style.cursor='default'; btn.textContent='Buscando...'; }
+
+  var coincidenciasRequeridas=cursada.requiereValidacion?2:3;
+  var resultado=discResolverMiembro(nombre,apellido,cel,coincidenciasRequeridas,members);
+
+  if(resultado.status!=='ok'){
+    if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent=textoOriginal; }
+    document.getElementById('pdi-form-wrap').style.display='none';
+    document.getElementById('pdi-nomatch').style.display='block';
+    return;
+  }
+
+  var miembro=resultado.miembro;
+
+  // Chequear si ya tiene una inscripción activa para ESTA cursada puntual (no el Paso en general)
+  var inscripciones=[];
+  try{inscripciones=JSON.parse(localStorage.getItem('gdv_disc_inscripciones')||'[]');}catch(e){}
+  var yaInscripto=inscripciones.find(function(i){
+    return i.cursadaId===cursadaId && i.miembroId===miembro.id && ['pendiente','aprobada','auto-aprobada'].includes(i.estado);
+  });
+  if(yaInscripto){
+    if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent=textoOriginal; }
+    document.getElementById('pdi-form-wrap').style.display='none';
+    document.getElementById('pdi-success').style.display='block';
+    document.getElementById('pdi-success-msg').textContent=yaInscripto.estado==='pendiente'
+      ? 'Ya estás anotado — tu inscripción está pendiente de validación.'
+      : 'Ya estabas anotado en esta cursada. ¡Te esperamos!';
+    return;
+  }
+
+  var nuevoId=Date.now();
+  var autoAprueba=!cursada.requiereValidacion;
+  var nuevaInsc={
+    id:nuevoId,cursadaId:cursadaId,miembroId:miembro.id,
+    nombreIngresado:nombre,apellidoIngresado:apellido,celularIngresado:cel,
+    estado:autoAprueba?'auto-aprobada':'pendiente',
+    fecha:Date.now(),aprobadoPor:null,fechaAprobacion:null,
+    _ts:Date.now() // Marcar edición para que mergeByTs sepa cuál es más reciente
+  };
+
+  var guardadoLocal=false;
+  try{
+    inscripciones.push(nuevaInsc);
+    localStorage.setItem('gdv_disc_inscripciones',JSON.stringify(inscripciones));
+    if(autoAprueba){
+      if(!cursada.miembros) cursada.miembros=[];
+      if(!cursada.miembros.includes(miembro.id)) cursada.miembros.push(miembro.id);
+      cursada._ts=Date.now();
+      localStorage.setItem('gdv_disc_cursadas',JSON.stringify(cursadas));
+    }
+    // Releer para confirmar que el guardado local realmente ocurrió (no asumirlo)
+    var verifInsc=JSON.parse(localStorage.getItem('gdv_disc_inscripciones')||'[]');
+    guardadoLocal=verifInsc.some(function(i){return i.id===nuevoId;});
+  }catch(e){
+    guardadoLocal=false;
+  }
+
+  if(!guardadoLocal){
+    if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent=textoOriginal; }
+    if(err){err.textContent='No pudimos guardar tus datos en este dispositivo. Por favor, intentá de nuevo.';err.style.display='block';}
+    return;
+  }
+
+  var subidoOk=false;
+  for(var intento=0; intento<8 && !subidoOk; intento++){
+    if(typeof window.fbUpload==='function'){
+      try{ subidoOk=await window.fbUpload(true); }catch(e){ subidoOk=false; }
+    }
+    if(!subidoOk) await new Promise(function(r){ setTimeout(r,1200); });
+  }
+
+  if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent=textoOriginal; }
+
+  if(subidoOk){
+    document.getElementById('pdi-form-wrap').style.display='none';
+    document.getElementById('pdi-success').style.display='block';
+    document.getElementById('pdi-success-msg').textContent=autoAprueba
+      ? '¡Listo! Ya estás anotado en la cursada. Te esperamos.'
+      : '¡Listo! Tu inscripción quedó pendiente de validación. Te vamos a confirmar pronto.';
+  } else {
+    document.getElementById('pdi-form-wrap').style.display='none';
+    document.getElementById('pdi-fail').style.display='block';
+  }
+}
+
 function showPublicForm(tipo, campanaId){
   // Hide login screen, show public form
   document.getElementById('screen-login').style.display='none';
@@ -13560,6 +14292,8 @@ function showPublicForm(tipo, campanaId){
     wrap.innerHTML=buildPublicNuevoForm(campanaId);
   } else if(tipo==='actualizar'){
     wrap.innerHTML=buildPublicActualizarForm();
+  } else if(tipo==='disc-inscripcion'){
+    wrap.innerHTML=buildPublicDiscInscripcionForm();
   }
 }
 
@@ -13886,6 +14620,7 @@ async function pauGuardar(){
       m.tel=document.getElementById('pau-cel').value.trim();
       m.fnac=document.getElementById('pau-fnac').value.trim();
       m.dir=document.getElementById('pau-barrio').value.trim();
+      m._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
       localStorage.setItem('gdv_m5',JSON.stringify(members));
       // Reintenta la subida a Firebase varias veces antes de darse por vencido —
       // esta persona probablemente no vuelva a abrir este link
@@ -14218,6 +14953,18 @@ async function importarTodo(event){
 // ════════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════════
+// Los formularios públicos (QR) dependen de datos compartidos (cursadas, campañas, config)
+// que en un dispositivo que recién abre el link (localStorage vacío o viejo) pueden no reflejar
+// lo último de la nube todavía, porque el módulo de Firebase carga en paralelo y puede no haber
+// terminado. Antes de decidir si un formulario está abierto/cerrado, hay que esperarlo y refrescar.
+async function esperarFirebaseListo(maxIntentos){
+  for(var i=0;i<(maxIntentos||15);i++){
+    if(window.fbReady && typeof window.fbDownload==='function') return true;
+    await new Promise(function(r){ setTimeout(r,300); });
+  }
+  return false;
+}
+
 async function boot(){
   try{
     // Show DEV badge if in development environment
@@ -14235,8 +14982,18 @@ async function boot(){
     const params=new URLSearchParams(window.location.search);
     const form=params.get('form');
     const campanaParam=params.get('campana');
+    if(form==='nuevo'||form==='actualizar'||form==='disc-inscripcion'){
+      var fbListo=await esperarFirebaseListo(15); // hasta ~4.5s
+      if(fbListo){
+        try{ await window.fbDownload(); }catch(e){ console.error('No se pudo refrescar desde Firebase antes del formulario público:',e); }
+        await initStorage();
+      } else {
+        console.warn('Firebase no estuvo listo a tiempo — el formulario público puede usar datos locales desactualizados.');
+      }
+    }
     if(form==='nuevo'){ showPublicForm('nuevo', campanaParam); return; }
     if(form==='actualizar'){ showPublicForm('actualizar'); return; }
+    if(form==='disc-inscripcion'){ showPublicForm('disc-inscripcion'); return; }
     if(currentUser && currentUser.id){
       showHome();
     } else {

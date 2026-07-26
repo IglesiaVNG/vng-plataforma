@@ -707,6 +707,7 @@ window.fbDownload().then(function(hasData) {
         function _ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
         S.users       = _ld('gdv_u5',            S.users       ||[]);
         S.groups      = _ld('gdv_g5',            S.groups      ||[]);
+        (S.groups||[]).forEach(function(g){ if(!g.estado) g.estado='Activo'; });
         S.records     = _ld('gdv_r5',            S.records     ||[]);
         S.members     = _ld('gdv_m5',            S.members     ||[]);
         S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
@@ -1283,6 +1284,7 @@ async function initStorage(){
   // NUNCA borrar gdv_permisos al iniciar — el Super Admin configura permisos que deben persistir
   S.users      =load(SK.users,      DEFAULT_USERS);
   S.groups     =load(SK.groups,     DEFAULT_GROUPS);
+  S.groups.forEach(function(g){ if(!g.estado) g.estado='Activo'; });
   S.records    =load(SK.records,    []);
   S.members    =load(SK.members,    DEFAULT_MEMBERS);
   S.roles      =load(SK.roles,      DEFAULT_ROLES);
@@ -4316,12 +4318,21 @@ async function ngToggleComunidadActiva(id){
   var prevEstado=ng.estado;
   var nuevoEstado=ng.estado==='Inactivo'?'Activo':'Inactivo';
   ng.estado=nuevoEstado;
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('ng',ng.id,{
+    nombre:ng.name,dia:ng.dia,horario:ng.horario,
+    responsablesIds:(ng.liderIds||[]).slice(),
+    activo:nuevoEstado!=='Inactivo'
+  });
   await saveK(SK.ngComunidades,S.ngComunidades);
+  if(tocoEventos) await saveK(SK.eventos,S.eventos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     ng.estado=prevEstado;
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades,S.ngComunidades);
+    if(tocoEventos) await saveK(SK.eventos,S.eventos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -4427,12 +4438,13 @@ async function ngSaveComunidad(){
   var snapshotNgComunidades=JSON.parse(JSON.stringify(S.ngComunidades));
   var snapshotRoles=S.members.map(function(m){return {m:m,roles:[...(m.roles||[])],_ts:m._ts};});
 
+  var ngRef;
   if(ngEditingId){
-    var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(ngEditingId);});
-    if(ng){ Object.assign(ng,{name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado}); }
+    ngRef=S.ngComunidades.find(function(x){return Number(x.id)===Number(ngEditingId);});
+    if(ngRef){ Object.assign(ngRef,{name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado}); }
   } else {
-    S.ngComunidades.push({id:Date.now(),name:nombre,tipo,dia,horario,
-      liderIds,colaboradorIds,estado:estado});
+    ngRef={id:Date.now(),name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado:estado};
+    S.ngComunidades.push(ngRef);
   }
   // Sincronizar funciones NG con S.members para que se vean en Rebaños
   console.log('[NG SYNC] Iniciando sincronización de funciones NG→Rebaños');
@@ -4465,15 +4477,26 @@ async function ngSaveComunidad(){
       if(!m.roles.includes(NG_ROL_COLAB)){ m.roles.push(NG_ROL_COLAB); m._ts=Date.now(); }
     }
   });
+  // Sincronizar con Agenda: esta Comunidad pasa a tener (o actualizar) su propia Actividad Habitual
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('ng',ngRef.id,{
+    nombre:ngRef.name,dia:ngRef.dia,horario:ngRef.horario,
+    responsablesIds:(ngRef.liderIds||[]).slice(),
+    activo:ngRef.estado!=='Inactivo'
+  });
+
   await saveK(SK.ngComunidades, S.ngComunidades);
   await saveK(SK.members, S.members);
+  if(tocoEventos) await saveK(SK.eventos, S.eventos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     S.ngComunidades=snapshotNgComunidades;
     snapshotRoles.forEach(function(s){ s.m.roles=s.roles; s.m._ts=s._ts; });
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades, S.ngComunidades);
     await saveK(SK.members, S.members);
+    if(tocoEventos) await saveK(SK.eventos, S.eventos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -4496,14 +4519,19 @@ async function ngDeleteComunidad(id){
   if(!confirm('¿Eliminar la comunidad "'+ng.name+'"? Esta acción no se puede deshacer.')) return;
   S.ngComunidades=S.ngComunidades.filter(function(x){return Number(x.id)!==Number(id);});
   addTombstone(SK.ngComunidades,id);
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('ng',id,{activo:false});
   try{
     await saveK(SK.ngComunidades,S.ngComunidades);
+    if(tocoEventos) await saveK(SK.eventos,S.eventos);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
     ngRenderList();
     showToast('✅ Comunidad eliminada','#16A34A');
   }catch(e){
     S.ngComunidades.push(ng);
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades,S.ngComunidades);
+    if(tocoEventos) await saveK(SK.eventos,S.eventos);
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
 }
@@ -5989,6 +6017,78 @@ function agendaRenderOcurrenciasList(ocs, wrapId, emptyMsg){
 }
 
 // Rango por defecto de Agenda: lunes de esta semana ISO hasta el domingo de la semana ISO siguiente
+// ── Sincronización automática: Grupos de Vida y Comunidades NG generan/actualizan su
+// propia Actividad Habitual en Agenda (título, día/horario, Responsables). Si el Grupo
+// se borra o desactiva, la actividad deja de repetirse hacia adelante (usando el mismo
+// mecanismo de "Repetir hasta" que ya existe), pero el historial ya generado no se toca.
+function agendaProximaFechaParaDia(diaNombre){
+  var idx=DIAS_SEMANA.indexOf(diaNombre);
+  if(idx<0) return today();
+  var hoy=new Date();
+  var diff=(idx-hoy.getDay()+7)%7;
+  var d=new Date(hoy); d.setDate(hoy.getDate()+diff);
+  return dateToStr(d);
+}
+function agendaConvertirHorario(horarioStr){
+  return (horarioStr||'').replace(/\s*hs\.?\s*$/i,'').trim();
+}
+// origenTipo: 'gdv' | 'ng' — origenId: id del Grupo o Comunidad
+// datos: {nombre, dia, horario, responsablesIds, activo}
+// Devuelve true si tocó S.eventos (para que quien llama sepa que tiene que guardar/subir también esa clave)
+function agendaSincronizarActividadOrigen(origenTipo, origenId, datos){
+  if(!S.eventos) S.eventos=[];
+  var ev=S.eventos.find(function(e){return e.origenTipo===origenTipo&&String(e.origenId)===String(origenId);});
+
+  if(!datos.activo||!datos.dia||!datos.horario){
+    // Desactivado/borrado, o sin día+horario definidos: si ya había una actividad, se corta
+    // hacia adelante (no se borra), para conservar el historial de cuando existía.
+    if(ev&&ev.recurrencia&&ev.recurrencia.tipo==='semanal'){
+      var ayer=new Date(); ayer.setDate(ayer.getDate()-1);
+      var ayerStr=dateToStr(ayer);
+      if(ev.recurrencia.hasta!==ayerStr){
+        ev.recurrencia.hasta=ayerStr;
+        ev._ts=Date.now();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  var horaConvertida=agendaConvertirHorario(datos.horario);
+  if(!ev){
+    S.eventos.push({
+      id:Date.now()+Math.floor(Math.random()*1000),
+      titulo:datos.nombre,descripcion:'',ministerioId:null,
+      fecha:agendaProximaFechaParaDia(datos.dia),hora:horaConvertida,lugar:'',
+      tipoActividad:'habitual',tipoFecha:'unica',fechaDesde:'',fechaHasta:'',
+      responsablesIds:(datos.responsablesIds||[]).slice(),mensajeAsignados:[],
+      personasAsignadas:[],recordatorio:{activo:false,diasAntes:3},
+      recurrencia:{tipo:'semanal',hasta:''},
+      estado:'Activo',creadoPor:'Sincronización automática',ts:Date.now(),_ts:Date.now(),
+      excepciones:[],reemplazos:[],
+      origenTipo:origenTipo,origenId:origenId
+    });
+    return true;
+  }
+
+  // Ya existía: actualizar solo lo que viene del origen — nunca tocar Descripción, Mensaje,
+  // Lugar, Recordatorio o Personas asignadas, que pueden haberse cargado a mano en Agenda.
+  var cambio=false;
+  if(ev.titulo!==datos.nombre){ ev.titulo=datos.nombre; cambio=true; }
+  if(ev.hora!==horaConvertida){ ev.hora=horaConvertida; cambio=true; }
+  var responsablesNuevos=(datos.responsablesIds||[]).slice();
+  if(JSON.stringify((ev.responsablesIds||[]).slice().sort())!==JSON.stringify(responsablesNuevos.slice().sort())){
+    ev.responsablesIds=responsablesNuevos; cambio=true;
+  }
+  var diaActualIdx=new Date(ev.fecha+'T00:00:00').getDay();
+  var diaNuevoIdx=DIAS_SEMANA.indexOf(datos.dia);
+  if(diaActualIdx!==diaNuevoIdx){ ev.fecha=agendaProximaFechaParaDia(datos.dia); cambio=true; }
+  if(ev.recurrencia&&ev.recurrencia.hasta){ ev.recurrencia.hasta=''; cambio=true; } // reabrir si venía cortada
+  if(!ev.tipoActividad){ ev.tipoActividad='habitual'; cambio=true; }
+  if(cambio) ev._ts=Date.now();
+  return cambio;
+}
+
 function agendaRangoDefault(){
   var hoy=new Date();
   var dow=hoy.getDay(); // 0=Dom..6=Sáb
@@ -6980,15 +7080,20 @@ async function cfgDeleteGroup(id){
   if(!confirm('¿Eliminár el Grupo "'+g.name+'"? Esta acción no se puede deshacer.')) return;
   // Delete
   S.groups=S.groups.filter(function(x){ return Number(x.id)!==Number(id); });
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('gdv',id,{activo:false});
   try{
     await saveK(SK.groups, S.groups);
+    if(tocoEventos) await saveK(SK.eventos, S.eventos);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
     cfgRenderGrupos();
     showToast('✅ Grupo "'+g.name+'" eliminado','#16A34A');
   }catch(e){
     // Revert on failure
     S.groups.push(g);
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.groups, S.groups);
+    if(tocoEventos) await saveK(SK.eventos, S.eventos);
     alert('No se pudo eliminar en la nube. Verificá tu conexión e intentá de nuevo.');
   }
 }
@@ -7021,10 +7126,11 @@ function cfgRenderGrupos(){
     const tot=members.length;
     const mH=members.filter(m=>m.genero==='H').length;
     const mM=members.filter(m=>m.genero==='M').length;
-    const st=tot>=10?'¡Multiplicar!':tot>=8?'Próx. multiplicar':'Activo';
-    const sc=tot>=10?'b-danger':tot>=8?'b-warn':'b-ok';
+    const inactivo=g.estado==='Inactivo';
+    const st=inactivo?'🚫 Deshabilitado':tot>=10?'¡Multiplicar!':tot>=8?'Próx. multiplicar':'Activo';
+    const sc=inactivo?'b-muted':tot>=10?'b-danger':tot>=8?'b-warn':'b-ok';
     const tc=g.type==='Mujeres'?'#C0006A':g.type==='Hombres'?'#1565C0':'#5B5EA6';
-    return `<div class="card" style="margin-bottom:.75rem">
+    return `<div class="card" style="margin-bottom:.75rem${inactivo?';opacity:.6':''}">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
         <div class="avatar" style="background:${tc}20;color:${tc}">${g.type==='Mujeres'?'M':g.type==='Hombres'?'H':'MX'}</div>
         <div style="flex:1">
@@ -7032,6 +7138,7 @@ function cfgRenderGrupos(){
           <div style="font-size:12px;color:#6B7280">${g.type} · ${facName}${g.dia?` · ${g.dia} ${g.horario||''}`:''}</div>
         </div>
         <span class="badge ${sc}">${st}</span>
+        <button class="btn btn-sm" onclick="cfgToggleGrupoActivo(${g.id})" style="color:${inactivo?'#16A34A':'#D97706'}" title="${inactivo?'Habilitar':'Deshabilitar'}">${inactivo?'▶️':'⏸'}</button>
         <button class="btn btn-sm" onclick="cfgEditGroup(${g.id})">✏️</button>
         <button onclick="cfgDeleteGroup(${g.id})" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:13px" title="Eliminar">🗑️</button>
       </div>
@@ -7042,6 +7149,35 @@ function cfgRenderGrupos(){
     </div>`;
   }).join('');
 }
+async function cfgToggleGrupoActivo(id){
+  var g=(S.groups||[]).find(function(x){return Number(x.id)===Number(id);});
+  if(!g) return;
+  var nuevoEstado=g.estado==='Inactivo'?'Activo':'Inactivo';
+  if(!confirm((nuevoEstado==='Inactivo'?'¿Deshabilitar':'¿Habilitar')+' el Grupo "'+g.name+'"?'+(nuevoEstado==='Inactivo'?'\nSu actividad en Agenda deja de repetirse hacia adelante (el historial no se toca).':'\nSu actividad en Agenda vuelve a repetirse en Agenda.'))) return;
+  var estadoAnterior=g.estado;
+  g.estado=nuevoEstado;
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('gdv',g.id,{
+    nombre:g.name,dia:g.dia,horario:g.horario,
+    responsablesIds:[g.facId,g.facId2].filter(Boolean),
+    activo:nuevoEstado!=='Inactivo'
+  });
+  await saveK(SK.groups,S.groups);
+  if(tocoEventos) await saveK(SK.eventos,S.eventos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    g.estado=estadoAnterior;
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
+    await saveK(SK.groups,S.groups);
+    if(tocoEventos) await saveK(SK.eventos,S.eventos);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  cfgRenderGrupos();
+  showToast(nuevoEstado==='Inactivo'?'⏸ Grupo deshabilitado':'▶️ Grupo habilitado','#16A34A');
+}
+
 function cfgPopulateGroupModal(){
   cfgPopulateFacSelects();
 }
@@ -7090,8 +7226,9 @@ async function cfgSaveGroup(){
   var esNuevoGrupo=false;
   var nuevoGrupoRef=null;
   var facAnteriorRoles=null;
+  var g;
   if(cfgEditingGroupId){
-    const g=S.groups.find(x=>x.id===cfgEditingGroupId);
+    g=S.groups.find(x=>x.id===cfgEditingGroupId);
     snapshotGrupo=Object.assign({},g);
     // If facilitador changed, remove 'facilitador' role from old one
     if(g.facId && g.facId!==facId){
@@ -7101,8 +7238,9 @@ async function cfgSaveGroup(){
     Object.assign(g,{name,type,facId,facId2,dia,horario});
   } else {
     esNuevoGrupo=true;
-    nuevoGrupoRef={id:Date.now(),name,type,facId,facId2,dia,horario,miembros:[]};
+    nuevoGrupoRef={id:Date.now(),name,type,facId,facId2,dia,horario,miembros:[],estado:'Activo'};
     S.groups.push(nuevoGrupoRef);
+    g=nuevoGrupoRef;
   }
 
   // Assign 'facilitador' role to selected member
@@ -7115,8 +7253,17 @@ async function cfgSaveGroup(){
     }
   }
 
+  // Sincronizar con Agenda: este Grupo pasa a tener (o actualizar) su propia Actividad Habitual
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('gdv',g.id,{
+    nombre:g.name,dia:g.dia,horario:g.horario,
+    responsablesIds:[g.facId,g.facId2].filter(Boolean),
+    activo:g.estado!=='Inactivo'
+  });
+
   await saveK(SK.groups,S.groups);
   await saveK(SK.members,S.members);
+  if(tocoEventos) await saveK(SK.eventos,S.eventos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
@@ -7124,13 +7271,15 @@ async function cfgSaveGroup(){
     if(esNuevoGrupo){
       S.groups=S.groups.filter(function(x){return x!==nuevoGrupoRef;});
     } else if(snapshotGrupo){
-      const g=S.groups.find(x=>x.id===cfgEditingGroupId);
-      if(g) Object.assign(g,snapshotGrupo);
+      const gr=S.groups.find(x=>x.id===cfgEditingGroupId);
+      if(gr) Object.assign(gr,snapshotGrupo);
     }
     if(facAnteriorRoles){ facAnteriorRoles.member.roles=facAnteriorRoles.roles; }
     if(facRolAgregado){ facRolAgregado.roles=(facRolAgregado.roles||[]).filter(r=>r!=='facilitador'); }
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.groups, S.groups);
     await saveK(SK.members, S.members);
+    if(tocoEventos) await saveK(SK.eventos, S.eventos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -14211,6 +14360,22 @@ async function discGuardarGrupoDetalle(){
 
   var nuevosDisc=[...document.querySelectorAll('.disc-grupo-detalle-disc-cb:checked')].map(function(cb){return parseInt(cb.value);});
   var nuevosMiembros=[...document.querySelectorAll('.disc-grupo-detalle-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
+
+  // Si alguno de los que quedaron tildados ya estaba en OTRO Grupo, pedir una única confirmación
+  // que liste a todos los reasignados, antes de aplicar ningún cambio
+  var reasignados=[];
+  nuevosMiembros.forEach(function(mid){
+    var otroGrupo=(cursada.grupos||[]).find(function(g){return g.id!==grupo.id&&(g.miembros||[]).includes(mid);});
+    if(otroGrupo){
+      var m=S.members.find(function(x){return x.id===mid;});
+      reasignados.push({nombre:m?fullName(m):('#'+mid),origen:otroGrupo.nombre});
+    }
+  });
+  if(reasignados.length){
+    var lista=reasignados.map(function(r){return '• '+r.nombre+' (viene de '+r.origen+')';}).join('\n');
+    var msg='Vas a reasignar a '+(reasignados.length>1?'estas personas':'esta persona')+', sacándola'+(reasignados.length>1?'s':'')+' de su Grupo actual:\n'+lista+'\n\n¿Confirmás?';
+    if(!confirm(msg)) return;
+  }
 
   // Los que se sumaron por búsqueda manual (aunque no hayan quedado tildados) pasan a integrar la Cursada en general
   discGrupoDetalleNuevosIntegrantes.forEach(function(mid){

@@ -4909,6 +4909,7 @@ function buildAgendaHTML(){
                 <option value="especial">⭐ Especiales</option>
               </select></div>
             <button class="btn btn-sm" onclick="agendaResetProximosFiltro()">↺ Esta semana + la próxima</button>
+            ${canCrearEventos()?'<button class="btn btn-sm" onclick="agendaSincronizarTodosLosOrigenes()" style="background:#EEF2FF;border-color:#C7D2FE;color:#4338CA">🔄 Sincronizar Grupos/Comunidades</button>':''}
             ${canCrearEventos()?'<button class="btn btn-primary btn-sm" onclick="agendaAbrirForm()">+ Nuevo evento</button>':''}
           </div>
         </div>
@@ -6087,6 +6088,46 @@ function agendaSincronizarActividadOrigen(origenTipo, origenId, datos){
   if(!ev.tipoActividad){ ev.tipoActividad='habitual'; cambio=true; }
   if(cambio) ev._ts=Date.now();
   return cambio;
+}
+
+// Sincronización masiva (de una sola vez): recorre TODOS los Grupos de Vida y Comunidades NG
+// existentes y crea/actualiza su Actividad Habitual en Agenda. Para los que se crearon antes
+// de que existiera esta función automática, o para forzar un refresco general si hiciera falta.
+async function agendaSincronizarTodosLosOrigenes(){
+  if(!confirm('¿Sincronizar todos los Grupos de Vida y Comunidades de Nuevas Generaciones con Agenda?\nSe crean o actualizan sus Actividades Habituales (título, día/horario, responsables). No se toca nada que hayas cargado a mano en Agenda (descripción, mensaje, lugar, recordatorio).')) return;
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var cambios=0;
+  (S.groups||[]).forEach(function(g){
+    var toco=agendaSincronizarActividadOrigen('gdv',g.id,{
+      nombre:g.name,dia:g.dia,horario:g.horario,
+      responsablesIds:[g.facId,g.facId2].filter(Boolean),
+      activo:g.estado!=='Inactivo'
+    });
+    if(toco) cambios++;
+  });
+  (S.ngComunidades||[]).forEach(function(ng){
+    var toco=agendaSincronizarActividadOrigen('ng',ng.id,{
+      nombre:ng.name,dia:ng.dia,horario:ng.horario,
+      responsablesIds:(ng.liderIds||[]).slice(),
+      activo:ng.estado!=='Inactivo'
+    });
+    if(toco) cambios++;
+  });
+  if(!cambios){ showToast('Ya estaba todo sincronizado — sin cambios','#6B7280'); return; }
+  await saveK(SK.eventos,S.eventos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.eventos=JSON.parse(snapshotEventosStr);
+    await saveK(SK.eventos,S.eventos);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ '+cambios+' actividad'+(cambios!==1?'es':'')+' sincronizada'+(cambios!==1?'s':'')+' con Agenda','#16A34A');
+  agendaRenderCalendario();
+  agendaRenderBanner();
+  var proxTab=document.getElementById('agenda-tab-proximos');
+  if(proxTab&&proxTab.style.display!=='none') agendaRenderProximos();
 }
 
 function agendaRangoDefault(){

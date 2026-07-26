@@ -4869,6 +4869,14 @@ function buildAgendaHTML(){
               <select id="agenda-prox-ministerio" onchange="agendaRenderProximos()">
                 <option value="">Todos</option>
               </select></div>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Responsable</label>
+              <input type="text" id="agenda-prox-resp-buscar" placeholder="Buscar..." oninput="agendaRenderProximos()"></div>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Tipo</label>
+              <select id="agenda-prox-tipo" onchange="agendaRenderProximos()">
+                <option value="">Todas</option>
+                <option value="habitual">🔁 Habituales</option>
+                <option value="especial">⭐ Especiales</option>
+              </select></div>
             <button class="btn btn-sm" onclick="agendaResetProximosFiltro()">↺ Esta semana + la próxima</button>
             ${canCrearEventos()?'<button class="btn btn-primary btn-sm" onclick="agendaAbrirForm()">+ Nuevo evento</button>':''}
           </div>
@@ -4881,9 +4889,19 @@ function buildAgendaHTML(){
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
             <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
               <input type="date" id="agenda-hist-desde" onchange="agendaRenderHistoricoEventos()"></div>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Hasta</label>
+              <input type="date" id="agenda-hist-hasta" onchange="agendaRenderHistoricoEventos()"></div>
             <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Propósito / Comunidades</label>
               <select id="agenda-hist-ministerio" onchange="agendaRenderHistoricoEventos()">
                 <option value="">Todos</option>
+              </select></div>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Responsable</label>
+              <input type="text" id="agenda-hist-resp-buscar" placeholder="Buscar..." oninput="agendaRenderHistoricoEventos()"></div>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Tipo</label>
+              <select id="agenda-hist-tipo" onchange="agendaRenderHistoricoEventos()">
+                <option value="">Todas</option>
+                <option value="habitual">🔁 Habituales</option>
+                <option value="especial">⭐ Especiales</option>
               </select></div>
           </div>
         </div>
@@ -5378,8 +5396,8 @@ function agendaOpenDia(fechaStr){
             '<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(o.hora?'🕐 '+o.hora+' · ':'')+(o.lugar?'📍 '+o.lugar:'')+'</div>'+
             (o.esPeriodo?'<div style="font-size:10px;color:#92400E;margin-top:2px">📆 Período: '+fmtAA(o.fechaDesde)+' al '+fmtAA(o.fechaHasta)+' — día '+o.diaDelPeriodo+' de '+o.totalDiasPeriodo+'</div>':'')+
             (minLabel?'<div style="font-size:11px;color:#7C3AED;margin-top:2px">🤝 '+minLabel+'</div>':'')+
-            (resps.length?'<div style="font-size:11px;color:#1E40AF;margin-top:2px">👤 '+resps.map(listName).join(', ')+'</div>':'')+
-            (mensajeLabels.length?'<div style="font-size:11px;color:#6D28D9;margin-top:2px">🎤 '+mensajeLabels.join(', ')+'</div>':'')+
+            (resps.length?'<div style="font-size:11px;color:#1E40AF;margin-top:2px"><strong>Responsables:</strong> 👤 '+resps.map(listName).join(', ')+'</div>':'')+
+            (mensajeLabels.length?'<div style="font-size:11px;color:#6D28D9;margin-top:2px"><strong>Mensaje:</strong> 🎤 '+mensajeLabels.join(', ')+'</div>':'')+
             (o.recurrencia&&o.recurrencia.tipo!=='ninguna'?'<div style="font-size:10px;color:#9CA3AF;margin-top:2px">🔁 Se repite '+(o.recurrencia.tipo==='semanal'?'cada semana':'cada mes')+'</div>':'')+
           '</div>'+
           (canCrearEventos()?'<div style="display:flex;gap:4px;flex-shrink:0">'+
@@ -5933,8 +5951,8 @@ function agendaRenderOcurrenciasCard(o){
         (o.esPeriodo?'<div style="font-size:10px;color:#92400E;margin-top:2px">📆 Período: '+fmtAA(o.fechaDesde)+' al '+fmtAA(o.fechaHasta)+' — día '+o.diaDelPeriodo+' de '+o.totalDiasPeriodo+'</div>':'')+
         ((o.reemplazos&&o.reemplazos.length)?'<div style="font-size:10.5px;font-weight:700;color:#fff;background:#DC2626;display:inline-block;padding:2px 8px;border-radius:6px;margin-top:4px">🔄 Reemplaza actividad habitual en '+o.reemplazos.length+' fecha'+(o.reemplazos.length!==1?'s':'')+'</div>':'')+
         (minLabel?'<div style="font-size:11px;color:#7C3AED;margin-top:2px">🤝 '+minLabel+'</div>':'')+
-        (resps.length?'<div style="font-size:11px;color:#1E40AF;margin-top:2px">👤 '+resps.map(listName).join(', ')+'</div>':'')+
-        (mensajeLabels.length?'<div style="font-size:11px;color:#6D28D9;margin-top:2px">🎤 '+mensajeLabels.join(', ')+'</div>':'')+
+        (resps.length?'<div style="font-size:11px;color:#1E40AF;margin-top:2px"><strong>Responsables:</strong> 👤 '+resps.map(listName).join(', ')+'</div>':'')+
+        (mensajeLabels.length?'<div style="font-size:11px;color:#6D28D9;margin-top:2px"><strong>Mensaje:</strong> 🎤 '+mensajeLabels.join(', ')+'</div>':'')+
         ((o.personasAsignadas||[]).length?'<div style="font-size:11px;color:#6B7280;margin-top:2px">👥 '+o.personasAsignadas.length+' asignado'+(o.personasAsignadas.length>1?'s':'')+'</div>':'')+
       '</div>'+
       '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:flex-end">'+
@@ -5978,6 +5996,18 @@ function agendaRangoDefault(){
   return {desde:dateToStr(lunesEstaSemana), hasta:dateToStr(domingoSemanaSiguiente)};
 }
 
+function agendaFiltrarPorResponsable(ocs,query){
+  var q=(query||'').trim().toLowerCase();
+  if(!q) return ocs;
+  return ocs.filter(function(o){
+    var resps=(o.responsablesIds||[]).map(function(id){
+      var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+      return m?listName(m):'';
+    });
+    return resps.some(function(n){return n.toLowerCase().indexOf(q)!==-1;});
+  });
+}
+
 function agendaRenderProximos(){
   var desdeEl=document.getElementById('agenda-prox-desde');
   var hastaEl=document.getElementById('agenda-prox-hasta');
@@ -5997,15 +6027,20 @@ function agendaRenderProximos(){
   var desde=new Date((desdeEl&&desdeEl.value?desdeEl.value:today())+'T00:00:00');
   var hasta=new Date((hastaEl&&hastaEl.value?hastaEl.value:today())+'T23:59:59');
   var fMinisterio=minSel?minSel.value:'';
+  var respQuery=(document.getElementById('agenda-prox-resp-buscar')||{}).value||'';
+  var fTipo=(document.getElementById('agenda-prox-tipo')||{}).value||'';
 
   var ocs=agendaGetOcurrencias(desde,hasta);
   if(fMinisterio) ocs=ocs.filter(function(o){return String(o.ministerioId)===String(fMinisterio);});
+  if(fTipo) ocs=ocs.filter(function(o){return o.tipoActividad===fTipo;});
+  ocs=agendaFiltrarPorResponsable(ocs,respQuery);
 
   agendaRenderOcurrenciasList(ocs,'agenda-proximos-list','Sin eventos en el período seleccionado');
 }
 
 function agendaRenderHistoricoEventos(){
   var desdeEl=document.getElementById('agenda-hist-desde');
+  var hastaEl=document.getElementById('agenda-hist-hasta');
   var minSel=document.getElementById('agenda-hist-ministerio');
   if(minSel&&minSel.options.length<=1){
     S.ministerios.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).forEach(function(m){
@@ -6013,13 +6048,20 @@ function agendaRenderHistoricoEventos(){
     });
   }
 
-  // Histórico: siempre termina ayer (hoy no incluido) — arranca donde el usuario elija, o sin límite
+  // Histórico: siempre termina ayer como máximo (hoy no incluido) — Hasta editable pero nunca futuro
   var ayer=new Date(today()+'T00:00:00'); ayer.setDate(ayer.getDate()-1); ayer.setHours(23,59,59,999);
+  if(hastaEl&&!hastaEl.value) hastaEl.value=dateToStr(ayer);
+  var hastaElegida=hastaEl&&hastaEl.value?new Date(hastaEl.value+'T23:59:59'):ayer;
+  var hasta=hastaElegida<ayer?hastaElegida:ayer;
   var desde=desdeEl&&desdeEl.value?new Date(desdeEl.value+'T00:00:00'):new Date(2000,0,1);
   var fMinisterio=minSel?minSel.value:'';
+  var respQuery=(document.getElementById('agenda-hist-resp-buscar')||{}).value||'';
+  var fTipo=(document.getElementById('agenda-hist-tipo')||{}).value||'';
 
-  var ocs=agendaGetOcurrencias(desde,ayer);
+  var ocs=agendaGetOcurrencias(desde,hasta);
   if(fMinisterio) ocs=ocs.filter(function(o){return String(o.ministerioId)===String(fMinisterio);});
+  if(fTipo) ocs=ocs.filter(function(o){return o.tipoActividad===fTipo;});
+  ocs=agendaFiltrarPorResponsable(ocs,respQuery);
   ocs.sort(function(a,b){return b.fechaOcurrencia.localeCompare(a.fechaOcurrencia);});
 
   agendaRenderOcurrenciasList(ocs,'agenda-historico-list','Sin eventos anteriores a hoy en el período seleccionado');
@@ -6029,10 +6071,14 @@ function agendaResetProximosFiltro(){
   var desdeEl=document.getElementById('agenda-prox-desde');
   var hastaEl=document.getElementById('agenda-prox-hasta');
   var minSel=document.getElementById('agenda-prox-ministerio');
+  var respEl=document.getElementById('agenda-prox-resp-buscar');
+  var tipoSel=document.getElementById('agenda-prox-tipo');
   var rango=agendaRangoDefault();
   if(desdeEl) desdeEl.value=rango.desde;
   if(hastaEl) hastaEl.value=rango.hasta;
   if(minSel) minSel.value='';
+  if(respEl) respEl.value='';
+  if(tipoSel) tipoSel.value='';
   agendaRenderProximos();
 }
 

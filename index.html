@@ -23,7 +23,7 @@ body{font-family:Arial,sans-serif;background:#F5F7FA;color:#1F2937;background-im
 .home-topbar{display:flex;align-items:center;gap:10px;margin-bottom:2rem;padding-bottom:1rem;border-bottom:1px solid #E5E7EB}
 .home-avatar{width:40px;height:40px;border-radius:50%;background:#1F4E79;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
 .home-greeting{flex:1}
-.home-greeting-name{font-weight:600;font-size:15px}
+.home-greeting-name{font-weight:600;font-size:15px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.5)}
 .home-greeting-role{font-size:12px;color:#6B7280;margin-top:2px}
 .home-section-title{font-size:13px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.6);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem}
 .home-menu-wrap{position:fixed;top:14px;left:14px;z-index:520}
@@ -713,7 +713,7 @@ window.fbDownload().then(function(hasData) {
         S.discPasos      = _ld('gdv_disc_pasos',    S.discPasos      ||[]);
         S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);S.discCursadas=_ld('gdv_disc_cursadas',S.discCursadas||[]);S.discInscripciones=_ld('gdv_disc_inscripciones',S.discInscripciones||[]);
         (S.discPasos||[]).forEach(function(p){ if(!p.discipuladorIds) p.discipuladorIds=p.discipuladorId?[p.discipuladorId]:[]; });
-        (S.discCursadas||[]).forEach(function(cu){ if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[]; if(cu.qrAbierto===undefined) cu.qrAbierto=false; if(cu.requiereValidacion===undefined) cu.requiereValidacion=true; });
+        (S.discCursadas||[]).forEach(function(cu){ if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[]; if(cu.qrAbierto===undefined) cu.qrAbierto=false; if(cu.requiereValidacion===undefined) cu.requiereValidacion=true; if(!cu.grupos) cu.grupos=[]; if(!cu.miembroGrupo) cu.miembroGrupo={}; });
   S.ngComunidades  = _ld('gdv_ng5',           S.ngComunidades  ||[]);
   S.ngRecords      = _ld('gdv_ng_records',    S.ngRecords      ||[]);
   S.modulesConfig  = _ld('gdv_modules5',      S.modulesConfig  ||[]);
@@ -747,6 +747,7 @@ window.fbDownload().then(function(hasData) {
 <script>
 // ── Global helpers (localStorage + date) ──────────────────
 const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS_SEMANA=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const HOY=new Date(), ANO=HOY.getFullYear();
 function gs(k,def){try{return JSON.parse(localStorage.getItem(k)||def);}catch(e){return JSON.parse(def);}}
 function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
@@ -1296,6 +1297,9 @@ async function initStorage(){
     // Migración: interruptores de inscripción por QR (Cursadas creadas antes de esta feature)
     if(cu.qrAbierto===undefined) cu.qrAbierto=false;
     if(cu.requiereValidacion===undefined) cu.requiereValidacion=true;
+    // Migración: Grupos paralelos dentro de una misma Cursada (organizativo, no afecta el % de asistencia)
+    if(!cu.grupos) cu.grupos=[];
+    if(!cu.miembroGrupo) cu.miembroGrupo={};
   });
   S.ministerios=load(SK.ministerios,[]);
   S.eventos    =load(SK.eventos,    []);
@@ -2739,7 +2743,7 @@ function showHome(){
   document.getElementById('home-name').textContent=`Bienvenido, ${currentUser.name.split(' ')[0]}!`;
   document.getElementById('home-roles').innerHTML=linked&&linked.roles.length
     ?roleChips(linked.roles,linked.id)
-    :`<span style="font-size:12px;color:#6B7280">${currentUser.role}</span>`;
+    :`<span style="font-size:12px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.5)">${currentUser.role}</span>`;
 
   renderModulesGrid();
 }
@@ -5977,8 +5981,9 @@ function agendaRenderOcurrenciasList(ocs, wrapId, emptyMsg){
   ocs.forEach(function(o){ if(!porFecha[o.fechaOcurrencia]) porFecha[o.fechaOcurrencia]=[]; porFecha[o.fechaOcurrencia].push(o); });
   wrap.innerHTML=Object.keys(porFecha).sort().map(function(fecha){
     var evs=porFecha[fecha];
+    var diaSemana=DIAS_SEMANA[new Date(fecha+'T00:00:00').getDay()];
     return '<div style="margin-bottom:1rem">'+
-      '<div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">'+fmt(fecha)+'</div>'+
+      '<div style="font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">'+diaSemana+' '+fmt(fecha)+'</div>'+
       evs.map(agendaRenderOcurrenciasCard).join('')+
     '</div>';
   }).join('');
@@ -13176,9 +13181,29 @@ function buildDiscipuladoHTML(){
         </div>
       </div>
     </div>
+
+    <div id="disc-grupos-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:15px;font-weight:700;color:#1F4E79">🧑‍🤝‍🧑 Grupos — <span id="disc-grupos-cursada-label"></span></div>
+          <button class="btn btn-sm" onclick="discCerrarGruposModal()">✕</button>
+        </div>
+        <div style="background:#F9FAFB;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:12px;color:#6B7280">
+          Los Grupos son solo organizativos (ej. distintos horarios de un mismo Curso). No afectan el % de asistencia — eso se sigue calculando siempre a nivel de toda la Cursada, sin importar en qué Grupo participó cada uno.
+        </div>
+        <div id="disc-grupos-lista" style="margin-bottom:1rem"></div>
+        <button class="btn btn-sm" onclick="discAgregarGrupo()" style="background:#EEF2FF;border-color:#C7D2FE;color:#4338CA;margin-bottom:1rem">+ Agregar Grupo</button>
+        <div id="disc-grupos-asignacion-wrap"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
+          <button class="btn" onclick="discCerrarGruposModal()">Cerrar</button>
+          <button class="btn btn-primary" onclick="discGuardarAsignacionGrupos()">Guardar asignación</button>
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 
+let discGruposCursadaId=null;
 let discEditingPasoId=null;
 let discAsignandoPasoId=null;
 let discAsignandoCursadaId=null;
@@ -13594,15 +13619,26 @@ function discRenderCursada(c){
         if(esSuper) html+='<button class="btn btn-sm" onclick="discRevertirInicio('+cursadaActiva.id+')" style="color:#D97706" title="Deshace el inicio de esta cursada">↩️ Revertir inicio</button>';
       }
     }
+    if(cursadaActiva&&canAdminDisc()){
+      html+='<button class="btn btn-sm" onclick="discAbrirGruposModal('+cursadaActiva.id+')" style="background:#EEF2FF;border-color:#C7D2FE;color:#4338CA">🧑‍🤝‍🧑 Grupos'+((cursadaActiva.grupos||[]).length?' ('+cursadaActiva.grupos.length+')':'')+'</button>';
+    }
     html+='</div></div>';
     // Members list — solo si hay cursada activa (si no, no hay a quién mostrar)
     if(cursadaActiva&&cursadaActiva.miembros.length){
       var mems=cursadaActiva.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+      var grupos=cursadaActiva.grupos||[];
+      var miembroGrupo=cursadaActiva.miembroGrupo||{};
       html+='<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px">';
       mems.forEach(function(m){
         var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
         var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
-        html+='<span style="background:'+genBg+';color:'+genColor+';font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600">'+fullName(m)+'</span>';
+        var grupoTag='';
+        if(grupos.length){
+          var gid=miembroGrupo[m.id];
+          var gr=gid?grupos.find(function(x){return String(x.id)===String(gid);}):null;
+          grupoTag=' <span style="opacity:.7">· '+(gr?gr.nombre:'Sin grupo')+'</span>';
+        }
+        html+='<span style="background:'+genBg+';color:'+genColor+';font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600">'+fullName(m)+grupoTag+'</span>';
       });
       html+='</div>';
     }
@@ -13970,6 +14006,131 @@ async function discGuardarAsignacion(){
   showToast('✅ Asignación guardada','#16A34A');
 }
 
+// ── Grupos paralelos dentro de una misma Cursada (ej. "Grupo 10:00 hs" / "Grupo 11:30 hs") ──
+// Puramente organizativos: NO afectan el % de asistencia, que siempre se calcula a nivel Cursada.
+
+function discAbrirGruposModal(cursadaId){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
+  if(!cursada) return;
+  discGruposCursadaId=cursadaId;
+  document.getElementById('disc-grupos-cursada-label').textContent=cursada.label;
+  discRenderGruposLista();
+  discRenderGruposAsignacion();
+  document.getElementById('disc-grupos-modal').style.display='flex';
+}
+
+function discCerrarGruposModal(){
+  document.getElementById('disc-grupos-modal').style.display='none';
+  discGruposCursadaId=null;
+}
+
+function discRenderGruposLista(){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  var wrap=document.getElementById('disc-grupos-lista');
+  if(!cursada||!wrap) return;
+  var grupos=cursada.grupos||[];
+  var miembroGrupo=cursada.miembroGrupo||{};
+  if(!grupos.length){
+    wrap.innerHTML='<div class="empty" style="padding:1rem;font-size:13px">Todavía no hay Grupos adicionales — toda la Cursada funciona como un solo grupo (como siempre).</div>';
+    return;
+  }
+  wrap.innerHTML=grupos.map(function(g){
+    var cant=Object.keys(miembroGrupo).filter(function(mid){return String(miembroGrupo[mid])===String(g.id);}).length;
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px">'
+      +'<span style="font-size:13px;font-weight:600;color:#374151">🧑‍🤝‍🧑 '+g.nombre+'</span>'
+      +'<span style="font-size:12px;color:#6B7280">'+cant+' integrante'+(cant!==1?'s':'')+'</span>'
+      +'</div>';
+  }).join('');
+}
+
+function discRenderGruposAsignacion(){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  var wrap=document.getElementById('disc-grupos-asignacion-wrap');
+  if(!cursada||!wrap) return;
+  var grupos=cursada.grupos||[];
+  if(!grupos.length||!cursada.miembros.length){ wrap.innerHTML=''; return; }
+  var miembroGrupo=cursada.miembroGrupo||{};
+  var mems=cursada.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+  wrap.innerHTML='<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Asignar cada integrante a un Grupo</label>'
+    +'<div style="max-height:240px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'
+    +mems.map(function(m){
+      var actual=miembroGrupo[m.id]||'';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-bottom:1px solid #F9FAFB">'
+        +'<span style="font-size:13px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+fullName(m)+'</span>'
+        +'<select class="disc-grupo-asig-sel" data-member-id="'+m.id+'" style="font-size:12px;padding:3px 6px;flex-shrink:0">'
+          +'<option value="">Sin grupo</option>'
+          +grupos.map(function(g){return '<option value="'+g.id+'"'+(String(actual)===String(g.id)?' selected':'')+'>'+g.nombre+'</option>';}).join('')
+        +'</select>'
+        +'</div>';
+    }).join('')
+    +'</div>';
+}
+
+function discAgregarGrupo(){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  if(!cursada) return;
+  if(!cursada.grupos) cursada.grupos=[];
+  var crear=function(){
+    var nombre=prompt('Nombre del nuevo Grupo (ej: "Grupo 10:00 hs"):');
+    if(!nombre||!nombre.trim()){ if(nombre!==null) alert('El nombre es obligatorio.'); return; }
+    discGuardarGrupoNuevo(cursada,nombre.trim());
+  };
+  if(cursada.grupos.length>=1){
+    if(confirm('Ya existe un Grupo para esta Cursada. ¿Generás uno Adicional?')) crear();
+  } else {
+    crear();
+  }
+}
+
+async function discGuardarGrupoNuevo(cursada,nombre){
+  var snapshot=(cursada.grupos||[]).slice();
+  if(!cursada.grupos) cursada.grupos=[];
+  cursada.grupos.push({id:Date.now(),nombre:nombre});
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    cursada.grupos=snapshot;
+    cursada._ts=Date.now();
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Grupo agregado','#16A34A');
+  discRenderGruposLista();
+  discRenderGruposAsignacion();
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+}
+
+async function discGuardarAsignacionGrupos(){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  if(!cursada) return;
+  var snapshot=JSON.parse(JSON.stringify(cursada.miembroGrupo||{}));
+  var nuevoMapa={};
+  document.querySelectorAll('.disc-grupo-asig-sel').forEach(function(sel){
+    var mid=sel.getAttribute('data-member-id');
+    if(sel.value) nuevoMapa[mid]=sel.value;
+  });
+  cursada.miembroGrupo=nuevoMapa;
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    cursada.miembroGrupo=snapshot;
+    cursada._ts=Date.now();
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Asignación de Grupos guardada','#16A34A');
+  discRenderGruposLista();
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+}
+
 function discOpenModal(pasoId){
   if(!hasRole('super_admin')){ alert('Solo Super Admin puede crear o editar Cursos.'); return; }
   discEditingPasoId=pasoId;
@@ -14107,6 +14268,7 @@ async function discEliminarPaso(pasoId){
 // ── Cargar asistencia ──
 var discFacAtt={};
 var discSelectedPasoId=null;
+var discSelectedGrupoId=null;
 
 function discRenderCargar(c){
   var cursadasActivas=(S.discCursadas||[]).filter(function(cu){return cu.estado==='Activo';});
@@ -14119,6 +14281,10 @@ function discRenderCargar(c){
     '<div class="card"><div class="card-title">✏️ Cargar asistencia</div>'
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Paso</label>'
     +'<select id="disc-sel-paso" onchange="discLoadPasoForm()" style="margin-bottom:12px"><option value="">— Seleccioná un paso —</option>'+pasoOpts+'</select>'
+    +'<div id="disc-sel-grupo-wrap" style="display:none">'
+      +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo <span style="font-weight:400;color:#9CA3AF">(esta Cursada tiene más de uno — elegí para cuál es esta carga)</span></label>'
+      +'<select id="disc-sel-grupo" onchange="discLoadPasoForm()" style="margin-bottom:12px"></select>'
+    +'</div>'
     +'<div id="disc-pending-alert" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:10px;font-size:13px;color:#991B1B;margin-bottom:12px"></div>'
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha</label>'
     +'<input type="date" id="disc-fecha" value="'+hoy+'" max="'+hoy+'" style="margin-bottom:12px" onchange="discCheckDuplicateWeek()">'
@@ -14153,11 +14319,12 @@ function discCheckDuplicateWeek(){
   var anio=parseLocalDate(fecha).getFullYear();
   var existe=S.discRecords.find(function(r){
     if((r.cursadaId||r.pasoId)!==cursadaId) return false;
+    if(discSelectedGrupoId&&String(r.grupoId||'')!==String(discSelectedGrupoId)) return false;
     return getISOWeek(r.fecha)===semana && parseLocalDate(r.fecha).getFullYear()===anio;
   });
   if(existe){
     alertEl.style.display='block';
-    alertEl.innerHTML='🚫 Ya existe un registro para la <strong>Semana '+semana+'</strong> en este Paso (fecha '+fmtAA(existe.fecha)+').';
+    alertEl.innerHTML='🚫 Ya existe un registro para la <strong>Semana '+semana+'</strong> en este Paso'+(discSelectedGrupoId?' / Grupo':'')+' (fecha '+fmtAA(existe.fecha)+').';
   } else {
     alertEl.style.display='none';
   }
@@ -14174,6 +14341,23 @@ function discLoadPasoForm(){
     fechaInput.max=lim.max;
     fechaInput.value=cursadaId?discFechaSugerida(cursadaId):lim.max;
   }
+
+  // Grupo — solo se muestra si la Cursada tiene más de uno (si no, sigue invisible como siempre)
+  var grupoWrap=document.getElementById('disc-sel-grupo-wrap');
+  var grupoSel=document.getElementById('disc-sel-grupo');
+  var grupos=(cursada&&cursada.grupos)||[];
+  if(grupos.length>=1&&grupoWrap&&grupoSel){
+    grupoWrap.style.display='block';
+    var valorPrevio=grupoSel.value;
+    grupoSel.innerHTML='<option value="">— Elegí un Grupo —</option>'+grupos.map(function(g){return '<option value="'+g.id+'">'+g.nombre+'</option>';}).join('');
+    // Mantener la selección si seguís en la misma cursada y ese grupo todavía existe
+    if(valorPrevio&&grupos.some(function(g){return String(g.id)===valorPrevio;})) grupoSel.value=valorPrevio;
+    discSelectedGrupoId=grupoSel.value||null;
+  } else {
+    if(grupoWrap) grupoWrap.style.display='none';
+    discSelectedGrupoId=null;
+  }
+
   discCheckDuplicateWeek();
 
   // Load chapters
@@ -14193,9 +14377,21 @@ function discLoadPasoForm(){
     discFacAtt={};
     return;
   }
+  if(grupos.length>=1&&!discSelectedGrupoId){
+    wrap.innerHTML='<div class="empty">Elegí para qué Grupo es esta carga</div>';
+    discFacAtt={};
+    return;
+  }
 
   discFacAtt={};
-  var mems=cursada.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+  var miembroGrupo=cursada.miembroGrupo||{};
+  var mems=cursada.miembros
+    .filter(function(id){ return grupos.length<1 || String(miembroGrupo[id]||'')===String(discSelectedGrupoId); })
+    .map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+  if(grupos.length>=1&&!mems.length){
+    wrap.innerHTML='<div class="empty">Todavía no hay integrantes asignados a este Grupo — asignalos desde 🧑‍🤝‍🧑 Grupos</div>';
+    return;
+  }
   // Default: Ausente
   mems.forEach(function(m){discFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
 
@@ -14236,16 +14432,23 @@ async function discGuardarAsistencia(){
   }
   if(!Object.keys(discFacAtt).length){alert('No hay miembros en este paso');return;}
 
+  var cursadaChk=(S.discCursadas||[]).find(function(cu){return cu.id===pasoId;});
+  if(cursadaChk&&(cursadaChk.grupos||[]).length>=1&&!discSelectedGrupoId){
+    alert('Esta Cursada tiene más de un Grupo — elegí para cuál es esta carga.');
+    return;
+  }
+
   // Ventana permitida — semana ISO en curso y la anterior como máximo, para TODAS las Funciones (incluye Super Admin)
   var lim=limiteFechaCarga();
   if(fecha>lim.max){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+fmtAA(lim.max)+').');return;}
   if(fecha<lim.min){alert('Solo se puede cargar la semana en curso o la anterior. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
 
-  // Check for duplicate week (same paso + same ISO week)
+  // Check for duplicate week (misma Cursada + mismo Grupo, si la Cursada tiene Grupos + misma semana ISO)
   var semana=getISOWeek(fecha);
   var anio=parseLocalDate(fecha).getFullYear();
   var yaExiste=S.discRecords.find(function(r){
     if((r.cursadaId||r.pasoId)!==pasoId) return false;
+    if(discSelectedGrupoId&&String(r.grupoId||'')!==String(discSelectedGrupoId)) return false;
     return getISOWeek(r.fecha)===semana && parseLocalDate(r.fecha).getFullYear()===anio;
   });
   if(yaExiste){
@@ -14261,7 +14464,7 @@ async function discGuardarAsistencia(){
       await saveK(SK.discRecords,S.discRecords);
       showToast('🔄 Se limpió un intento de carga anterior que nunca había llegado a la nube. Continuá cargando.','#1F4E79');
     } else {
-      alert('Ya existe un registro para la Semana '+semana+' en este Paso.');
+      alert('Ya existe un registro para la Semana '+semana+' en este Paso'+(discSelectedGrupoId?' / Grupo':'')+'.');
       return;
     }
   }
@@ -14269,6 +14472,7 @@ async function discGuardarAsistencia(){
   var cursada=(S.discCursadas||[]).find(function(cu){return cu.id===pasoId;});var paso=cursada?S.discPasos.find(function(p){return p.id===cursada.pasoId;}):null;var realPasoId=cursada?cursada.pasoId:pasoId;
   S.discRecords.push({
     id:Date.now(),pasoId:realPasoId,cursadaId:pasoId,pasoNombre:cursada?cursada.label:(paso?paso.nombre:''),
+    grupoId:discSelectedGrupoId||null,
     fecha,capitulo,asistencia:{...discFacAtt},ts:new Date().toISOString(),_ts:Date.now()
   });
   await saveK(SK.discRecords,S.discRecords);

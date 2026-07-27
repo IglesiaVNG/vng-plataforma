@@ -4882,6 +4882,8 @@ async function campanaDeleteCampana(id){
 // AGENDA MINISTERIAL
 // ══════════════════════════════════════════════════════════════════
 let agendaCalMonth=new Date().getMonth(), agendaCalYear=new Date().getFullYear();
+let agendaCalModoVista='mes'; // 'mes' | 'semana'
+let agendaCalSemanaAncla=null; // fecha (YYYY-MM-DD) de referencia dentro de la semana mostrada
 let agendaEditingId=null;
 let agendaSelectedTipoActividad='especial';
 let agendaSelectedResponsablesIds=[];
@@ -5004,8 +5006,8 @@ function buildAgendaHTML(){
         <div class="form-col-full">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Título *</label>
         <input type="text" id="agenda-f-titulo" placeholder="Ej: Ensayo de Alabanza" style="margin-bottom:10px">
-        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Descripción</label>
-        <textarea id="agenda-f-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;margin-bottom:10px;font-family:inherit"></textarea>
+        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Serie / Descripción</label>
+        <input type="text" id="agenda-f-desc" placeholder="Ej: Ensayo semanal del equipo de Alabanza" style="margin-bottom:10px">
         <div id="agenda-f-override-wrap" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:10px 12px;margin-bottom:10px">
           <label style="font-size:12.5px;font-weight:700;color:#92400E;display:block;margin-bottom:6px" id="agenda-f-override-label">✏️ Personalizar solo para esta fecha</label>
           <label style="font-size:11.5px;color:#92400E;display:block;margin-bottom:3px">Título para este día <span style="font-weight:400">(vacío = usa el título de arriba)</span></label>
@@ -5015,81 +5017,107 @@ function buildAgendaHTML(){
         </div>
         </div>
 
-        <div>
+        <div class="form-col-full">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Propósito / Comunidades</label>
         <select id="agenda-f-ministerio" style="margin-bottom:10px"><option value="">— Sin asignar —</option></select>
-        <div id="agenda-f-es-periodo-wrap" style="background:#F5F3FF;border-radius:10px;padding:10px 12px;margin-bottom:10px">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#4C1D95">
-            <input type="checkbox" id="agenda-f-es-periodo" onchange="agendaTogglePeriodo()" style="width:16px;height:16px"> 📆 Es un período de varios días <span style="font-weight:400;color:#6B21A8">(no una fecha única)</span>
-          </label>
         </div>
 
-        <div id="agenda-f-fecha-unica-wrap">
-          <div class="form-row">
-            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha *</label>
-              <input type="date" id="agenda-f-fecha"></div>
-            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hora</label>
-              ${agendaHoraSelectHtml('agenda-f-hora')}</div>
+        <div class="form-col-full">
+        <div class="form-row">
+          <div>
+            <label id="agenda-f-msg-label" style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Mensaje <span style="font-weight:400;color:#9CA3AF">(opcional, hasta 2)</span></label>
+            <div id="agenda-f-msg-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
+            <div style="position:relative;margin-bottom:6px">
+              <input type="text" id="agenda-f-msg-search" placeholder="Buscar en Rebaños..." oninput="agendaSearchMensaje(this.value)" autocomplete="off">
+              <div id="agenda-f-msg-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
+            </div>
+            <div id="agenda-f-msg-externo-wrap" style="display:none">
+              <span onclick="agendaAgregarMensajeExterno()" style="font-size:11px;color:#9CA3AF;cursor:pointer;text-decoration:underline dotted">+ agregar a alguien fuera de Rebaños</span>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Responsables <span style="font-weight:400;color:#9CA3AF">(opcional, hasta 3)</span></label>
+            <div id="agenda-f-resp-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
+            <div style="position:relative">
+              <input type="text" id="agenda-f-resp-search" placeholder="Buscar..." oninput="agendaSearchResponsable(this.value)" autocomplete="off">
+              <div id="agenda-f-resp-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
+            </div>
           </div>
         </div>
+        </div>
 
-        <div id="agenda-f-fecha-periodo-wrap" style="display:none">
-          <div class="form-row">
-            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Desde *</label>
-              <input type="date" id="agenda-f-fecha-desde"></div>
-            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hasta *</label>
-              <input type="date" id="agenda-f-fecha-hasta"></div>
+        <div class="form-col-full">
+        <div class="form-row">
+          <div>
+            <div id="agenda-f-es-periodo-wrap" style="background:#F5F3FF;border-radius:10px;padding:10px 12px;box-sizing:border-box">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#4C1D95">
+                <input type="checkbox" id="agenda-f-es-periodo" onchange="agendaTogglePeriodo()" style="width:16px;height:16px"> 📆 Es un período de varios días <span style="font-weight:400;color:#6B21A8">(no una fecha única)</span>
+              </label>
+            </div>
           </div>
-          <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Hora <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
-          <div style="margin-bottom:10px">${agendaHoraSelectHtml('agenda-f-hora-periodo')}</div>
-        </div>
-
-        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Lugar</label>
-        <input type="text" id="agenda-f-lugar" placeholder="Ej: Salón principal" style="margin-bottom:10px">
-        </div>
-
-        <div>
-        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Responsable <span style="font-weight:400;color:#9CA3AF">(opcional, hasta 3)</span></label>
-        <div id="agenda-f-resp-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
-        <div style="position:relative;margin-bottom:10px">
-          <input type="text" id="agenda-f-resp-search" placeholder="Buscar..." oninput="agendaSearchResponsable(this.value)" autocomplete="off">
-          <div id="agenda-f-resp-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
-        </div>
-
-        <label id="agenda-f-msg-label" style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Mensaje <span style="font-weight:400;color:#9CA3AF">(opcional, hasta 2)</span></label>
-        <div id="agenda-f-msg-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
-        <div style="position:relative;margin-bottom:6px">
-          <input type="text" id="agenda-f-msg-search" placeholder="Buscar en Rebaños..." oninput="agendaSearchMensaje(this.value)" autocomplete="off">
-          <div id="agenda-f-msg-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
-        </div>
-        <div id="agenda-f-msg-externo-wrap" style="display:none;margin-bottom:10px">
-          <span onclick="agendaAgregarMensajeExterno()" style="font-size:12px;color:#7C3AED;font-weight:600;cursor:pointer;text-decoration:underline dotted">+ Agregar persona fuera de Rebaños</span>
-        </div>
-
-        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Personas asignadas <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
-        <input type="text" placeholder="Buscar..." oninput="agendaFilterMiembros(this.value)" style="margin-bottom:6px">
-        <div id="agenda-f-personas-list" style="max-height:140px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:10px"></div>
-
-        <div style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:10px">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151;margin-bottom:6px">
-            <input type="checkbox" id="agenda-f-recordatorio" onchange="agendaToggleRecordatorio()" style="width:16px;height:16px"> 🔔 Recordatorio visual
-          </label>
-          <div id="agenda-f-record-dias-wrap" style="display:none">
-            <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Avisar con cuántos días de anticipación</label>
-            <input type="number" id="agenda-f-record-dias" min="1" max="30" value="3" style="width:70px">
+          <div>
+            <div id="agenda-f-fecha-unica-wrap">
+              <div class="form-row">
+                <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha *</label>
+                  <input type="date" id="agenda-f-fecha"></div>
+                <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hora</label>
+                  ${agendaHoraSelectHtml('agenda-f-hora')}</div>
+              </div>
+            </div>
+            <div id="agenda-f-fecha-periodo-wrap" style="display:none">
+              <div class="form-row">
+                <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Desde *</label>
+                  <input type="date" id="agenda-f-fecha-desde"></div>
+                <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hasta *</label>
+                  <input type="date" id="agenda-f-fecha-hasta"></div>
+              </div>
+              <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Hora <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+              <div>${agendaHoraSelectHtml('agenda-f-hora-periodo')}</div>
+            </div>
           </div>
         </div>
+        </div>
 
-        <div id="agenda-f-recur-wrap" style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:14px">
-          <label style="font-size:13px;font-weight:500;color:#374151;display:block;margin-bottom:6px">🔁 Recurrencia</label>
-          <select id="agenda-f-recur-tipo" onchange="agendaToggleRecurrencia()" style="margin-bottom:8px">
-            <option value="ninguna">No se repite</option>
-            <option value="semanal">Semanal</option>
-            <option value="mensual">Mensual</option>
-          </select>
-          <div id="agenda-f-recur-hasta-wrap" style="display:none">
+        <div class="form-col-full">
+        <div class="form-row">
+          <div>
+            <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Personas asignadas <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+            <div id="agenda-f-personas-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
+            <div style="position:relative">
+              <input type="text" id="agenda-f-personas-search" placeholder="Buscar..." oninput="agendaSearchPersona(this.value)" autocomplete="off">
+              <div id="agenda-f-personas-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Lugar</label>
+            <input type="text" id="agenda-f-lugar" placeholder="Ej: Auditorio Vida Nueva">
+          </div>
+        </div>
+        </div>
+
+        <div class="form-col-full">
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px">
+          <div id="agenda-f-recur-wrap" style="background:#F9FAFB;border-radius:10px;padding:10px 12px">
+            <label style="font-size:13px;font-weight:500;color:#374151;display:block;margin-bottom:6px">🔁 Recurrencia</label>
+            <select id="agenda-f-recur-tipo" onchange="agendaToggleRecurrencia()">
+              <option value="ninguna">No se repite</option>
+              <option value="semanal">Semanal</option>
+              <option value="mensual">Mensual</option>
+            </select>
+          </div>
+          <div id="agenda-f-recur-hasta-wrap" style="display:none;background:#F9FAFB;border-radius:10px;padding:10px 12px">
             <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Repetir hasta</label>
             <input type="date" id="agenda-f-recur-hasta">
+          </div>
+          <div style="background:#F9FAFB;border-radius:10px;padding:10px 12px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:500;color:#374151;margin-bottom:6px">
+              <input type="checkbox" id="agenda-f-recordatorio" onchange="agendaToggleRecordatorio()" style="width:16px;height:16px;flex-shrink:0"> 🔔 Recordatorio visual
+            </label>
+            <div style="font-size:10.5px;color:#9CA3AF;margin-bottom:2px">Destaca el evento en "Próximos Eventos" del Home. Es un aviso visual, no una notificación push.</div>
+            <div id="agenda-f-record-dias-wrap" style="display:none;margin-top:8px">
+              <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Días de anticipación</label>
+              <input type="number" id="agenda-f-record-dias" min="1" max="30" value="3" style="width:70px">
+            </div>
           </div>
         </div>
         </div>
@@ -6199,6 +6227,22 @@ function agendaChecklistTab(tab,btn){
 }
 
 // ── Ocurrencias: expande eventos recurrentes y de Período dentro de un rango de fechas ──
+// Orden visual dentro de un mismo día: 1° Especiales, 2° Habituales creadas directamente en
+// Agenda, 3° Habituales que vienen sincronizadas desde Configuración (Grupos de Vida, Nuevas
+// Generaciones y, cuando se sume, Discipulado — se detecta por el campo origenTipo).
+function agendaPrioridadOcurrencia(o){
+  if(o.tipoActividad==='especial') return 0;
+  if(!o.origenTipo) return 1;
+  return 2;
+}
+function agendaOrdenarOcurrencias(lista){
+  return lista.slice().sort(function(a,b){
+    var pa=agendaPrioridadOcurrencia(a), pb=agendaPrioridadOcurrencia(b);
+    if(pa!==pb) return pa-pb;
+    return (a.hora||'').localeCompare(b.hora||'');
+  });
+}
+
 function agendaGetOcurrencias(desde,hasta){
   var ocs=[];
   (S.eventos||[]).filter(function(e){return e.estado!=='Cancelado';}).forEach(function(e){
@@ -6249,10 +6293,33 @@ function agendaMinisterioLabel(id){
   return m?(m.nombre+(m.area?' / '+m.area:'')):'';
 }
 
-// ── Calendario mensual ──
+// ── Calendario: dispatcher Mes / Semana ──
+function agendaCalToggleHtml(){
+  return '<div style="display:flex;gap:6px;justify-content:center;margin-bottom:12px">'+
+    '<button class="btn btn-sm'+(agendaCalModoVista==='mes'?' btn-primary':'')+'" onclick="agendaSetCalModo(\'mes\')">📅 Mes</button>'+
+    '<button class="btn btn-sm'+(agendaCalModoVista==='semana'?' btn-primary':'')+'" onclick="agendaSetCalModo(\'semana\')">📆 Semana</button>'+
+  '</div>';
+}
+function agendaSetCalModo(modo){
+  agendaCalModoVista=modo;
+  if(modo==='semana'&&!agendaCalSemanaAncla) agendaCalSemanaAncla=today();
+  agendaRenderCalendario();
+}
+function agendaCambiarSemana(delta){
+  var d=new Date((agendaCalSemanaAncla||today())+'T00:00:00');
+  d.setDate(d.getDate()+delta*7);
+  agendaCalSemanaAncla=dateToStr(d);
+  agendaRenderCalendario();
+}
 function agendaRenderCalendario(){
   const wrap=document.getElementById('agenda-cal-wrap');
   if(!wrap) return;
+  if(agendaCalModoVista==='semana'){ agendaRenderCalendarioSemana(wrap); return; }
+  agendaRenderCalendarioMes(wrap);
+}
+
+// ── Vista Mes ──
+function agendaRenderCalendarioMes(wrap){
   const first=new Date(agendaCalYear,agendaCalMonth,1);
   const last=new Date(agendaCalYear,agendaCalMonth+1,0);
   const startWeekday=first.getDay();
@@ -6265,7 +6332,8 @@ function agendaRenderCalendario(){
   ocs.forEach(function(o){ if(!ocsPorDia[o.fechaOcurrencia]) ocsPorDia[o.fechaOcurrencia]=[]; ocsPorDia[o.fechaOcurrencia].push(o); });
   const hoyStr=today();
 
-  let html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+  let html=agendaCalToggleHtml();
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
     '<button class="btn btn-sm" onclick="agendaCambiarMes(-1)">←</button>'+
     '<div style="font-size:15px;font-weight:700;color:#1F4E79">'+MESES[agendaCalMonth]+' '+agendaCalYear+'</div>'+
     '<button class="btn btn-sm" onclick="agendaCambiarMes(1)">→</button>'+
@@ -6279,7 +6347,8 @@ function agendaRenderCalendario(){
     var key=cellDate.toISOString().slice(0,10);
     var enMes=cellDate.getMonth()===agendaCalMonth;
     var esHoy=key===hoyStr;
-    var evs=ocsPorDia[key]||[];
+    var esFinde=cellDate.getDay()===0||cellDate.getDay()===6;
+    var evs=agendaOrdenarOcurrencias(ocsPorDia[key]||[]);
     var evsUnicos=evs.filter(function(o){return !o.esPeriodo;});
     var evsPeriodo=evs.filter(function(o){return o.esPeriodo;});
     var maxMostrar=3;
@@ -6289,12 +6358,55 @@ function agendaRenderCalendario(){
       return '<div style="font-size:8.5px;line-height:1.3;color:'+color+';font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px" title="'+o.titulo.replace(/"/g,'&quot;')+'">● '+txt+'</div>';
     }).join('');
     var extraHtml=evsUnicos.length>maxMostrar?'<div style="font-size:8px;color:#9CA3AF;margin-top:1px">+'+(evsUnicos.length-maxMostrar)+' más</div>':'';
-    html+='<div onclick="agendaOpenDia(\''+key+'\')" style="min-height:64px;border-radius:8px;padding:3px 4px;cursor:pointer;background:'+(esHoy?'#DBEAFE':'#fff')+';border:1px solid '+(esHoy?'#93C5FD':'#F3F4F6')+';'+(evsPeriodo.length?'border-bottom:3px solid #C7A233;':'')+'opacity:'+(enMes?'1':'0.35')+'">'+
+    var bgCelda=esHoy?'#DBEAFE':(esFinde?'#FAFAFA':'#fff');
+    html+='<div onclick="agendaOpenDia(\''+key+'\')" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,.10)\'" onmouseout="this.style.boxShadow=\'none\'" style="min-height:66px;border-radius:9px;padding:3px 4px;cursor:pointer;background:'+bgCelda+';border:1px solid '+(esHoy?'#93C5FD':'#F3F4F6')+';transition:box-shadow .12s;'+(evsPeriodo.length?'border-bottom:3px solid #C7A233;':'')+'opacity:'+(enMes?'1':'0.35')+'">'+
       '<div style="font-size:11px;font-weight:'+(esHoy?'700':'500')+';color:'+(esHoy?'#1E40AF':'#374151')+'">'+cellDate.getDate()+'</div>'+
       itemsHtml+extraHtml+
     '</div>';
   }
   html+='</div>';
+  html+='<div style="display:flex;gap:14px;justify-content:center;margin-top:10px;font-size:10.5px;color:#6B7280;flex-wrap:wrap">'+
+    '<span>🔵 Habitual</span><span>🟣 Especial</span><span>🟡 Período de varios días</span>'+
+  '</div>';
+  wrap.innerHTML=html;
+}
+
+// ── Vista Semana — para revisar rápido sin navegar el mes entero ──
+function agendaRenderCalendarioSemana(wrap){
+  var ancla=agendaCalSemanaAncla||today();
+  var d=new Date(ancla+'T00:00:00');
+  var domingo=new Date(d); domingo.setDate(d.getDate()-d.getDay());
+  var sabado=new Date(domingo); sabado.setDate(domingo.getDate()+6);
+  var ocs=agendaGetOcurrencias(domingo,sabado);
+  var ocsPorDia={};
+  ocs.forEach(function(o){ if(!ocsPorDia[o.fechaOcurrencia]) ocsPorDia[o.fechaOcurrencia]=[]; ocsPorDia[o.fechaOcurrencia].push(o); });
+  var hoyStr=today();
+
+  var html=agendaCalToggleHtml();
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+    '<button class="btn btn-sm" onclick="agendaCambiarSemana(-1)">←</button>'+
+    '<div style="font-size:14px;font-weight:700;color:#1F4E79;text-align:center">'+fmtAA(dateToStr(domingo))+' al '+fmtAA(dateToStr(sabado))+'</div>'+
+    '<button class="btn btn-sm" onclick="agendaCambiarSemana(1)">→</button>'+
+  '</div>';
+
+  for(var i=0;i<7;i++){
+    var cur=new Date(domingo); cur.setDate(domingo.getDate()+i);
+    var key=dateToStr(cur);
+    var esHoy=key===hoyStr;
+    var evs=agendaOrdenarOcurrencias(ocsPorDia[key]||[]);
+    html+='<div onclick="agendaOpenDia(\''+key+'\')" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,.10)\'" onmouseout="this.style.boxShadow=\'none\'" style="cursor:pointer;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:'+(esHoy?'#DBEAFE':'#F9FAFB')+';border:1px solid '+(esHoy?'#93C5FD':'#F3F4F6')+';transition:box-shadow .12s">'+
+      '<div style="font-size:12px;font-weight:700;color:'+(esHoy?'#1E40AF':'#374151')+';margin-bottom:4px">'+DIAS_SEMANA[i]+' '+fmtAA(key)+'</div>';
+    if(!evs.length){
+      html+='<div style="font-size:11.5px;color:#9CA3AF">Sin actividades</div>';
+    } else {
+      html+=evs.map(function(o){
+        var color=o.tipoActividad==='habitual'?'#0891B2':'#7C3AED';
+        var txt=o.titulo.length>34?o.titulo.slice(0,34)+'…':o.titulo;
+        return '<div style="font-size:12px;color:'+color+';font-weight:600;margin-top:2px">● '+(o.hora?o.hora+' — ':'')+txt+'</div>';
+      }).join('');
+    }
+    html+='</div>';
+  }
   html+='<div style="display:flex;gap:14px;justify-content:center;margin-top:10px;font-size:10.5px;color:#6B7280;flex-wrap:wrap">'+
     '<span>🔵 Habitual</span><span>🟣 Especial</span><span>🟡 Período de varios días</span>'+
   '</div>';
@@ -6312,7 +6424,7 @@ function agendaCambiarMes(delta){
 function agendaOpenDia(fechaStr){
   agendaDiaActual=fechaStr;
   var d=new Date(fechaStr+'T00:00:00');
-  var ocs=agendaGetOcurrencias(d,d);
+  var ocs=agendaOrdenarOcurrencias(agendaGetOcurrencias(d,d));
   document.getElementById('agenda-dia-titulo').textContent=fmt(fechaStr);
   var lista=document.getElementById('agenda-dia-lista');
   if(!ocs.length){
@@ -6342,7 +6454,7 @@ function agendaOpenDia(fechaStr){
           '</div>'+
           (canCrearEventos()?'<div style="display:flex;gap:4px;flex-shrink:0">'+
             '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+',null,\''+o.fechaOcurrencia+'\')">✏️</button>'+
-            '<button onclick="agendaEliminarEvento('+o.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
+            '<button onclick="agendaEliminarEvento('+o.id+',\'' + o.fechaOcurrencia + '\')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
           '</div>':'')+
         '</div>'+
         (o.descripcion?'<div style="font-size:12px;color:#374151;margin-top:6px">'+o.descripcion+'</div>':'')+
@@ -6361,11 +6473,45 @@ function agendaAbrirFormDesdeDia(){
 }
 
 // ── Formulario crear/editar evento ──
-function agendaFilterMiembros(q){
-  q=(q||'').toLowerCase();
-  document.querySelectorAll('#agenda-f-personas-list label').forEach(function(lbl){
-    lbl.style.display=lbl.textContent.toLowerCase().includes(q)?'':'none';
-  });
+// ── Personas asignadas: multi-selección con buscador + chips (igual que Responsables/Mensaje) ──
+function agendaSearchPersona(query){
+  var box=document.getElementById('agenda-f-personas-results');
+  if(!box) return;
+  var q=(query||'').trim().toLowerCase();
+  if(q.length<2){ box.style.display='none'; return; }
+  var results=S.members.filter(function(m){
+    return m.estado!=='Baja' && !agendaSelectedPersonas.map(Number).includes(Number(m.id)) && listName(m).toLowerCase().includes(q);
+  }).slice(0,8);
+  if(!results.length){
+    box.innerHTML='<div style="padding:9px 12px;font-size:13px;color:#9CA3AF">Sin resultados</div>';
+    box.style.display='block';
+    return;
+  }
+  box.innerHTML=results.map(function(m){
+    return '<div data-id="'+m.id+'" onpointerdown="event.preventDefault();agendaPickPersonaEl(this)" ontouchstart="event.preventDefault();agendaPickPersonaEl(this)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px;font-weight:600">'+listName(m)+'</div>';
+  }).join('');
+  box.style.display='block';
+}
+function agendaPickPersonaEl(el){
+  var id=parseInt(el.getAttribute('data-id'))||null;
+  if(id&&!agendaSelectedPersonas.map(Number).includes(Number(id))) agendaSelectedPersonas.push(id);
+  agendaRenderPersonaChip();
+  var s=document.getElementById('agenda-f-personas-search'); if(s){s.value='';s.blur();}
+  var box=document.getElementById('agenda-f-personas-results'); if(box) box.style.display='none';
+}
+function agendaClearPersona(id){
+  agendaSelectedPersonas=agendaSelectedPersonas.filter(function(x){return Number(x)!==Number(id);});
+  agendaRenderPersonaChip();
+}
+function agendaRenderPersonaChip(){
+  var chip=document.getElementById('agenda-f-personas-chip');
+  if(!chip) return;
+  if(!agendaSelectedPersonas.length){ chip.style.display='none'; chip.innerHTML=''; return; }
+  chip.style.display='flex';
+  chip.innerHTML=agendaSelectedPersonas.map(function(id){
+    var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+    return '<span style="display:inline-flex;align-items:center;gap:6px;background:#F0FDF4;border:1px solid #86EFAC;color:#166534;font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px">👤 '+(m?listName(m):'—')+' <span onclick="agendaClearPersona('+id+')" style="cursor:pointer;font-weight:700">×</span></span>';
+  }).join('');
 }
 
 // ── Responsable de la Actividad: selección única con buscador ──
@@ -6571,7 +6717,7 @@ function agendaAbrirForm(eventoId, fechaPrefill, fechaOcurrencia){
   document.getElementById('agenda-f-fecha-hasta').value=(ev&&esPeriodo)?(ev.fechaHasta||''):'';
   agendaSetHoraCombinada('agenda-f-hora-periodo',(ev&&esPeriodo)?(ev.hora||''):'');
   agendaTogglePeriodo();
-  document.getElementById('agenda-f-lugar').value=ev?(ev.lugar||''):'';
+  document.getElementById('agenda-f-lugar').value=ev?(ev.lugar||''):'Auditorio Vida Nueva';
 
   // Personalizar Título/Descripción/Mensaje solo para esta fecha puntual — únicamente tiene
   // sentido editando (no creando) una Habitual, y llegando desde un día específico del calendario
@@ -6626,18 +6772,11 @@ function agendaAbrirForm(eventoId, fechaPrefill, fechaOcurrencia){
 
   // Personas asignadas
   agendaSelectedPersonas=ev&&ev.personasAsignadas?ev.personasAsignadas.slice():[];
-  var personasList=document.getElementById('agenda-f-personas-list');
-  if(personasList){
-    personasList.innerHTML=S.members.filter(function(m){return m.estado!=='Baja';})
-      .sort(function(a,b){return listName(a).localeCompare(listName(b));})
-      .map(function(m){
-        var checked=agendaSelectedPersonas.map(Number).includes(Number(m.id));
-        return '<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB">'+
-          '<input type="checkbox" class="agenda-persona-cb" value="'+m.id+'"'+(checked?' checked':'')+' style="width:15px;height:15px;flex-shrink:0;cursor:pointer">'+
-          '<span style="font-size:13px">'+listName(m)+'</span>'+
-        '</label>';
-      }).join('');
-  }
+  agendaRenderPersonaChip();
+  var personasSearch=document.getElementById('agenda-f-personas-search');
+  if(personasSearch) personasSearch.value='';
+  var personasResults=document.getElementById('agenda-f-personas-results');
+  if(personasResults) personasResults.style.display='none';
 
   // Recordatorio
   var recChk=document.getElementById('agenda-f-recordatorio');
@@ -6683,6 +6822,47 @@ function agendaHabitualesEnFecha(fechaStr,excluirId){
   });
 }
 
+// Diálogo de 3 opciones cuando una Especial coincide en fecha con una o más Habituales.
+// Reemplazar SOLO afecta a las que coinciden en horario (las de otro horario conviven igual,
+// se elija lo que se elija). Agregar no toca ninguna Habitual existente. Cancelar aborta el guardado.
+function agendaMostrarConflictoDialog(conflictos, nuevaHora){
+  return new Promise(function(resolve){
+    var lista=conflictos.map(function(c){
+      var mismoHorario=!!(nuevaHora&&c.hora&&c.hora===nuevaHora);
+      return '<div style="font-size:12.5px;margin-bottom:4px;color:#374151">• '+c.habitualTitulo+' el '+fmtAA(c.fecha)+(c.hora?' a las '+c.hora:'')
+        +(mismoHorario?' <span style="color:#DC2626;font-weight:600">(mismo horario)</span>':' <span style="color:#9CA3AF">(horario distinto)</span>')
+      +'</div>';
+    }).join('');
+    var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:460px;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:10px">Ya existe'+(conflictos.length>1?'n actividades habituales':' una actividad habitual')+' para '+(conflictos.length>1?'estas fechas':'esa fecha')+':</div>'
+      +lista
+      +'<div style="font-size:12.5px;color:#6B7280;margin:14px 0 10px">¿Qué querés hacer?</div>'
+      +'<div style="display:flex;flex-direction:column;gap:8px">'
+        +'<button class="btn btn-primary" id="agenda-conflicto-reemplazar" style="width:100%">🔄 Reemplazar (solo las del mismo horario)</button>'
+        +'<button class="btn" id="agenda-conflicto-agregar" style="width:100%">➕ Agregar de todas formas, sin tocar las existentes</button>'
+        +'<button class="btn" id="agenda-conflicto-cancelar" style="width:100%;color:#6B7280">Cancelar</button>'
+      +'</div>'
+    +'</div>';
+    var ov=document.getElementById('agenda-dialogo-overlay');
+    if(!ov){
+      ov=document.createElement('div');
+      ov.id='agenda-dialogo-overlay';
+      ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;align-items:center;justify-content:center;padding:1rem';
+      document.body.appendChild(ov);
+    }
+    ov.innerHTML=modalHtml;
+    ov.style.display='flex';
+    function cerrar(valor){
+      ov.style.display='none';
+      ov.innerHTML='';
+      resolve(valor);
+    }
+    document.getElementById('agenda-conflicto-reemplazar').onclick=function(){cerrar('reemplazar');};
+    document.getElementById('agenda-conflicto-agregar').onclick=function(){cerrar('agregar');};
+    document.getElementById('agenda-conflicto-cancelar').onclick=function(){cerrar('cancelar');};
+  });
+}
+
 async function agendaGuardarEvento(){
   var tipoActividad=agendaSelectedTipoActividad;
   var titulo=(document.getElementById('agenda-f-titulo')?.value||'').trim();
@@ -6703,7 +6883,7 @@ async function agendaGuardarEvento(){
   var descripcion=(document.getElementById('agenda-f-desc')?.value||'').trim();
   var ministerioId=parseInt(document.getElementById('agenda-f-ministerio')?.value)||null;
   var lugar=(document.getElementById('agenda-f-lugar')?.value||'').trim();
-  var personasAsignadas=[...document.querySelectorAll('.agenda-persona-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  var personasAsignadas=agendaSelectedPersonas.slice();
   var recordatorio={
     activo: !!document.getElementById('agenda-f-recordatorio')?.checked,
     diasAntes: parseInt(document.getElementById('agenda-f-record-dias')?.value)||3
@@ -6738,14 +6918,21 @@ async function agendaGuardarEvento(){
     var conflictos=[];
     fechasCubiertas.forEach(function(f){
       agendaHabitualesEnFecha(f,ev?ev.id:null).forEach(function(h){
-        conflictos.push({habitualId:h.id,habitualTitulo:h.titulo,fecha:f});
+        conflictos.push({habitualId:h.id,habitualTitulo:h.titulo,fecha:f,hora:h.hora||''});
       });
     });
     if(conflictos.length){
-      var lista=conflictos.map(function(c){return '• '+c.habitualTitulo+' el '+fmtAA(c.fecha);}).join('\n');
-      var msg='Ya existe una actividad habitual para '+(conflictos.length>1?'estas fechas':'esa fecha')+':\n'+lista+'\n\n¿Se reemplaza?';
-      if(!confirm(msg)) return;
-      nuevosReemplazos=conflictos.map(function(c){return {eventoHabitualId:c.habitualId,fecha:c.fecha};});
+      var eleccionConflicto=await agendaMostrarConflictoDialog(conflictos,hora);
+      if(eleccionConflicto==='cancelar') return;
+      if(eleccionConflicto==='reemplazar'){
+        // Solo se reemplazan las que coinciden en horario — las de otro horario conviven sin tocarse
+        nuevosReemplazos=conflictos.filter(function(c){return hora&&c.hora&&c.hora===hora;})
+          .map(function(c){return {eventoHabitualId:c.habitualId,fecha:c.fecha};});
+        if(!nuevosReemplazos.length){
+          showToast('Ninguna coincidía en el horario — se guardó sin reemplazar nada.','#D97706');
+        }
+      }
+      // eleccionConflicto==='agregar' → nuevosReemplazos queda vacío: no se toca ninguna Habitual existente
     }
   }
 
@@ -6822,14 +7009,76 @@ async function agendaGuardarEvento(){
   showToast('✅ Evento guardado'+(nuevosReemplazos.length?' — reemplazó '+nuevosReemplazos.length+' fecha'+(nuevosReemplazos.length!==1?'s':'')+' de actividad habitual':''),'#16A34A');
 }
 
-async function agendaEliminarEvento(id){
+// Diálogo de eliminación cuando la ocurrencia pertenece a una serie recurrente:
+// permite elegir entre quitar solo esa fecha puntual (la serie sigue) o borrar toda la serie.
+function agendaMostrarEliminarDialog(ev, fechaOcurrencia){
+  return new Promise(function(resolve){
+    var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:8px">Eliminar "'+ev.titulo+'"</div>'
+      +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:14px">Esta es una actividad recurrente. ¿Qué querés eliminar?</div>'
+      +'<div style="display:flex;flex-direction:column;gap:8px">'
+        +'<button class="btn btn-primary" id="agenda-elim-solo-fecha" style="width:100%">🗓 Solo el '+fmtAA(fechaOcurrencia)+' — la serie sigue</button>'
+        +'<button class="btn" id="agenda-elim-serie" style="width:100%;background:#FEE2E2;color:#DC2626">🗑 Toda la serie recurrente</button>'
+        +'<button class="btn" id="agenda-elim-cancelar" style="width:100%;color:#6B7280">Cancelar</button>'
+      +'</div>'
+    +'</div>';
+    var ov=document.getElementById('agenda-dialogo-overlay');
+    if(!ov){
+      ov=document.createElement('div');
+      ov.id='agenda-dialogo-overlay';
+      ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;align-items:center;justify-content:center;padding:1rem';
+      document.body.appendChild(ov);
+    }
+    ov.innerHTML=modalHtml;
+    ov.style.display='flex';
+    function cerrar(valor){ ov.style.display='none'; ov.innerHTML=''; resolve(valor); }
+    document.getElementById('agenda-elim-solo-fecha').onclick=function(){cerrar('soloFecha');};
+    document.getElementById('agenda-elim-serie').onclick=function(){cerrar('serie');};
+    document.getElementById('agenda-elim-cancelar').onclick=function(){cerrar('cancelar');};
+  });
+}
+
+async function agendaEliminarEvento(id, fechaOcurrencia){
   var ev=S.eventos.find(function(x){return Number(x.id)===Number(id);});
   if(!ev) return;
   var esRecurrente=ev.recurrencia&&ev.recurrencia.tipo&&ev.recurrencia.tipo!=='ninguna';
-  var msg=esRecurrente
-    ?'¿Eliminar "'+ev.titulo+'"? Esto borra TODA la serie recurrente, no solo esta fecha.'
-    :'¿Eliminar "'+ev.titulo+'"?'+((ev.reemplazos&&ev.reemplazos.length)?'\n\nLa(s) actividad(es) habitual(es) que había reemplazado vuelve(n) a mostrarse en su fecha original.':'');
-  if(!confirm(msg)) return;
+
+  // Serie recurrente + se conoce la fecha puntual clickeada → ofrecer las 3 opciones
+  if(esRecurrente&&fechaOcurrencia){
+    var eleccion=await agendaMostrarEliminarDialog(ev,fechaOcurrencia);
+    if(eleccion==='cancelar') return;
+
+    if(eleccion==='soloFecha'){
+      var snapshotExc=(ev.excepciones||[]).slice();
+      var snapshotOverridesStr=JSON.stringify(ev.overrides||{});
+      if(!ev.excepciones) ev.excepciones=[];
+      if(ev.excepciones.indexOf(fechaOcurrencia)===-1) ev.excepciones.push(fechaOcurrencia);
+      if(ev.overrides&&ev.overrides[fechaOcurrencia]) delete ev.overrides[fechaOcurrencia];
+      try{
+        await saveK(SK.eventos,S.eventos);
+        if(typeof window.fbUpload==='function') await window.fbUpload(true);
+        agendaCloseDia();
+        agendaRenderCalendario();
+        agendaRenderBanner();
+        var proxTab2=document.getElementById('agenda-tab-proximos');
+        if(proxTab2&&proxTab2.style.display!=='none') agendaRenderProximos();
+        showToast('🗓 Se quitó esa fecha — la serie sigue activa','#DC2626');
+      }catch(e){
+        ev.excepciones=snapshotExc;
+        ev.overrides=JSON.parse(snapshotOverridesStr);
+        await saveK(SK.eventos,S.eventos);
+        alert('No se pudo eliminar esa fecha. Verificá tu conexión.');
+      }
+      return;
+    }
+    // eleccion==='serie' → sigue el flujo normal de abajo, que borra todo el evento
+  } else {
+    var msg=esRecurrente
+      ?'¿Eliminar "'+ev.titulo+'"? Esto borra TODA la serie recurrente, no solo esta fecha.'
+      :'¿Eliminar "'+ev.titulo+'"?'+((ev.reemplazos&&ev.reemplazos.length)?'\n\nLa(s) actividad(es) habitual(es) que había reemplazado vuelve(n) a mostrarse en su fecha original.':'');
+    if(!confirm(msg)) return;
+  }
+
   S.eventos=S.eventos.filter(function(x){return Number(x.id)!==Number(id);});
   // Si esta Especial había reemplazado alguna Habitual, restaurarla en esa fecha
   var habitualesTocadas=[];
@@ -6898,7 +7147,7 @@ function agendaRenderOcurrenciasCard(o){
       '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:flex-end">'+
         (canCrearEventos()?'<div style="display:flex;gap:4px">'+
           '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+',null,\''+o.fechaOcurrencia+'\')">✏️</button>'+
-          '<button onclick="agendaEliminarEvento('+o.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
+          '<button onclick="agendaEliminarEvento('+o.id+',\''+o.fechaOcurrencia+'\')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
         '</div>':'')+
         btnChecklist+
       '</div>'+
@@ -6916,7 +7165,7 @@ function agendaRenderOcurrenciasList(ocs, wrapId, emptyMsg){
   var porFecha={};
   ocs.forEach(function(o){ if(!porFecha[o.fechaOcurrencia]) porFecha[o.fechaOcurrencia]=[]; porFecha[o.fechaOcurrencia].push(o); });
   wrap.innerHTML=Object.keys(porFecha).sort().map(function(fecha){
-    var evs=porFecha[fecha];
+    var evs=agendaOrdenarOcurrencias(porFecha[fecha]);
     var diaSemana=DIAS_SEMANA[new Date(fecha+'T00:00:00').getDay()];
     return '<div style="margin-bottom:1rem">'+
       '<div style="font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">'+diaSemana+' '+fmt(fecha)+'</div>'+

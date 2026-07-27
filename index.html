@@ -23,7 +23,7 @@ body{font-family:Arial,sans-serif;background:#F5F7FA;color:#1F2937;background-im
 .home-topbar{display:flex;align-items:center;gap:10px;margin-bottom:2rem;padding-bottom:1rem;border-bottom:1px solid #E5E7EB}
 .home-avatar{width:40px;height:40px;border-radius:50%;background:#1F4E79;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
 .home-greeting{flex:1}
-.home-greeting-name{font-weight:600;font-size:15px}
+.home-greeting-name{font-weight:600;font-size:15px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.5)}
 .home-greeting-role{font-size:12px;color:#6B7280;margin-top:2px}
 .home-section-title{font-size:13px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.6);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem}
 .home-menu-wrap{position:fixed;top:14px;left:14px;z-index:520}
@@ -707,13 +707,14 @@ window.fbDownload().then(function(hasData) {
         function _ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
         S.users       = _ld('gdv_u5',            S.users       ||[]);
         S.groups      = _ld('gdv_g5',            S.groups      ||[]);
+        (S.groups||[]).forEach(function(g){ if(!g.estado) g.estado='Activo'; });
         S.records     = _ld('gdv_r5',            S.records     ||[]);
         S.members     = _ld('gdv_m5',            S.members     ||[]);
         S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
         S.discPasos      = _ld('gdv_disc_pasos',    S.discPasos      ||[]);
         S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);S.discCursadas=_ld('gdv_disc_cursadas',S.discCursadas||[]);S.discInscripciones=_ld('gdv_disc_inscripciones',S.discInscripciones||[]);
         (S.discPasos||[]).forEach(function(p){ if(!p.discipuladorIds) p.discipuladorIds=p.discipuladorId?[p.discipuladorId]:[]; });
-        (S.discCursadas||[]).forEach(function(cu){ if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[]; if(cu.qrAbierto===undefined) cu.qrAbierto=false; if(cu.requiereValidacion===undefined) cu.requiereValidacion=true; });
+        (S.discCursadas||[]).forEach(function(cu){ if(!cu.discipuladorIds) cu.discipuladorIds=cu.discipuladorId?[cu.discipuladorId]:[]; if(cu.qrAbierto===undefined) cu.qrAbierto=false; if(cu.requiereValidacion===undefined) cu.requiereValidacion=true; if(!cu.grupos) cu.grupos=[]; });
   S.ngComunidades  = _ld('gdv_ng5',           S.ngComunidades  ||[]);
   S.ngRecords      = _ld('gdv_ng_records',    S.ngRecords      ||[]);
   S.modulesConfig  = _ld('gdv_modules5',      S.modulesConfig  ||[]);
@@ -722,6 +723,14 @@ window.fbDownload().then(function(hasData) {
         S.modulesConfig  = _ld('gdv_modules5',      S.modulesConfig  ||[]);
         S.ministerios    = _ld('gdv_ministerios',   S.ministerios    ||[]);
         S.eventos        = _ld('gdv_eventos',       S.eventos        ||[]);
+        (S.eventos||[]).forEach(function(e){
+          if(!e.tipoActividad) e.tipoActividad=(e.recurrencia&&e.recurrencia.tipo&&e.recurrencia.tipo!=='ninguna')?'habitual':'especial';
+          if(!e.excepciones) e.excepciones=[];
+          if(!e.reemplazos) e.reemplazos=[];
+          if(!e.responsablesIds) e.responsablesIds=e.responsableId?[e.responsableId]:[];
+          if(!e.mensajeAsignados) e.mensajeAsignados=[];
+          if(!e.overrides) e.overrides={};
+        });
         S.campanas       = _ld('gdv_campanas',      S.campanas       ||[]);
         S.checklists     = _ld('gdv_checklists',      S.checklists     ||[]);
         S.checklistTareas= _ld('gdv_checklist_tareas',S.checklistTareas||[]);
@@ -739,6 +748,7 @@ window.fbDownload().then(function(hasData) {
 <script>
 // ── Global helpers (localStorage + date) ──────────────────
 const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS_SEMANA=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const HOY=new Date(), ANO=HOY.getFullYear();
 function gs(k,def){try{return JSON.parse(localStorage.getItem(k)||def);}catch(e){return JSON.parse(def);}}
 function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
@@ -1274,6 +1284,7 @@ async function initStorage(){
   // NUNCA borrar gdv_permisos al iniciar — el Super Admin configura permisos que deben persistir
   S.users      =load(SK.users,      DEFAULT_USERS);
   S.groups     =load(SK.groups,     DEFAULT_GROUPS);
+  S.groups.forEach(function(g){ if(!g.estado) g.estado='Activo'; });
   S.records    =load(SK.records,    []);
   S.members    =load(SK.members,    DEFAULT_MEMBERS);
   S.roles      =load(SK.roles,      DEFAULT_ROLES);
@@ -1288,9 +1299,19 @@ async function initStorage(){
     // Migración: interruptores de inscripción por QR (Cursadas creadas antes de esta feature)
     if(cu.qrAbierto===undefined) cu.qrAbierto=false;
     if(cu.requiereValidacion===undefined) cu.requiereValidacion=true;
+    // Migración: Grupos paralelos dentro de una misma Cursada (organizativo, no afecta el % de asistencia)
+    if(!cu.grupos) cu.grupos=[];
   });
   S.ministerios=load(SK.ministerios,[]);
   S.eventos    =load(SK.eventos,    []);
+  S.eventos.forEach(function(e){
+    if(!e.tipoActividad) e.tipoActividad=(e.recurrencia&&e.recurrencia.tipo&&e.recurrencia.tipo!=='ninguna')?'habitual':'especial';
+    if(!e.excepciones) e.excepciones=[];
+    if(!e.reemplazos) e.reemplazos=[];
+    if(!e.responsablesIds) e.responsablesIds=e.responsableId?[e.responsableId]:[];
+    if(!e.mensajeAsignados) e.mensajeAsignados=[];
+    if(!e.overrides) e.overrides={};
+  });
   S.campanas   =load(SK.campanas,   []);
   S.checklists     =load(SK.checklists,     []);
   S.checklistTareas=load(SK.checklistTareas,[]);
@@ -2606,7 +2627,7 @@ function agendaEsResponsableDe(checklist){
   if(isSuperAdmin()) return true;
   var ev=S.eventos.find(function(e){return Number(e.id)===Number(checklist.eventoId);});
   var linked=getLinkedMember();
-  return !!(ev&&linked&&Number(ev.responsableId)===Number(linked.id));
+  return !!(ev&&linked&&(ev.responsablesIds||[]).map(Number).includes(Number(linked.id)));
 }
 // Crear/editar/eliminar tareas, y mover Completada <-> Finalizada/Pendiente
 function agendaPuedeAdminTareas(checklist){
@@ -2723,7 +2744,7 @@ function showHome(){
   document.getElementById('home-name').textContent=`Bienvenido, ${currentUser.name.split(' ')[0]}!`;
   document.getElementById('home-roles').innerHTML=linked&&linked.roles.length
     ?roleChips(linked.roles,linked.id)
-    :`<span style="font-size:12px;color:#6B7280">${currentUser.role}</span>`;
+    :`<span style="font-size:12px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.5)">${currentUser.role}</span>`;
 
   renderModulesGrid();
 }
@@ -4297,12 +4318,21 @@ async function ngToggleComunidadActiva(id){
   var prevEstado=ng.estado;
   var nuevoEstado=ng.estado==='Inactivo'?'Activo':'Inactivo';
   ng.estado=nuevoEstado;
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('ng',ng.id,{
+    nombre:ng.name,dia:ng.dia,horario:ng.horario,
+    responsablesIds:(ng.liderIds||[]).slice(),
+    activo:nuevoEstado!=='Inactivo'
+  });
   await saveK(SK.ngComunidades,S.ngComunidades);
+  if(tocoEventos) await saveK(SK.eventos,S.eventos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     ng.estado=prevEstado;
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades,S.ngComunidades);
+    if(tocoEventos) await saveK(SK.eventos,S.eventos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -4408,12 +4438,13 @@ async function ngSaveComunidad(){
   var snapshotNgComunidades=JSON.parse(JSON.stringify(S.ngComunidades));
   var snapshotRoles=S.members.map(function(m){return {m:m,roles:[...(m.roles||[])],_ts:m._ts};});
 
+  var ngRef;
   if(ngEditingId){
-    var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(ngEditingId);});
-    if(ng){ Object.assign(ng,{name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado}); }
+    ngRef=S.ngComunidades.find(function(x){return Number(x.id)===Number(ngEditingId);});
+    if(ngRef){ Object.assign(ngRef,{name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado}); }
   } else {
-    S.ngComunidades.push({id:Date.now(),name:nombre,tipo,dia,horario,
-      liderIds,colaboradorIds,estado:estado});
+    ngRef={id:Date.now(),name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado:estado};
+    S.ngComunidades.push(ngRef);
   }
   // Sincronizar funciones NG con S.members para que se vean en Rebaños
   console.log('[NG SYNC] Iniciando sincronización de funciones NG→Rebaños');
@@ -4446,15 +4477,26 @@ async function ngSaveComunidad(){
       if(!m.roles.includes(NG_ROL_COLAB)){ m.roles.push(NG_ROL_COLAB); m._ts=Date.now(); }
     }
   });
+  // Sincronizar con Agenda: esta Comunidad pasa a tener (o actualizar) su propia Actividad Habitual
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('ng',ngRef.id,{
+    nombre:ngRef.name,dia:ngRef.dia,horario:ngRef.horario,
+    responsablesIds:(ngRef.liderIds||[]).slice(),
+    activo:ngRef.estado!=='Inactivo'
+  });
+
   await saveK(SK.ngComunidades, S.ngComunidades);
   await saveK(SK.members, S.members);
+  if(tocoEventos) await saveK(SK.eventos, S.eventos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     S.ngComunidades=snapshotNgComunidades;
     snapshotRoles.forEach(function(s){ s.m.roles=s.roles; s.m._ts=s._ts; });
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades, S.ngComunidades);
     await saveK(SK.members, S.members);
+    if(tocoEventos) await saveK(SK.eventos, S.eventos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -4477,14 +4519,19 @@ async function ngDeleteComunidad(id){
   if(!confirm('¿Eliminar la comunidad "'+ng.name+'"? Esta acción no se puede deshacer.')) return;
   S.ngComunidades=S.ngComunidades.filter(function(x){return Number(x.id)!==Number(id);});
   addTombstone(SK.ngComunidades,id);
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('ng',id,{activo:false});
   try{
     await saveK(SK.ngComunidades,S.ngComunidades);
+    if(tocoEventos) await saveK(SK.eventos,S.eventos);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
     ngRenderList();
     showToast('✅ Comunidad eliminada','#16A34A');
   }catch(e){
     S.ngComunidades.push(ng);
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades,S.ngComunidades);
+    if(tocoEventos) await saveK(SK.eventos,S.eventos);
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
 }
@@ -4804,6 +4851,10 @@ async function campanaDeleteCampana(id){
 // ══════════════════════════════════════════════════════════════════
 let agendaCalMonth=new Date().getMonth(), agendaCalYear=new Date().getFullYear();
 let agendaEditingId=null;
+let agendaSelectedTipoActividad='especial';
+let agendaSelectedResponsablesIds=[];
+let agendaSelectedMensaje=[];
+let agendaEditingFechaOcurrencia=null;
 let agendaSelectedPersonas=[];
 let agendaSelectedResponsableId=null;
 let agendaDiaActual=null;
@@ -4841,13 +4892,24 @@ function buildAgendaHTML(){
       <div id="agenda-tab-activos">
         <div class="card" style="margin-bottom:1rem">
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde</label>
+              <input type="date" id="agenda-prox-desde" onchange="agendaRenderProximos()"></div>
             <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Hasta</label>
               <input type="date" id="agenda-prox-hasta" onchange="agendaRenderProximos()"></div>
-            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Ministerio</label>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Propósito / Comunidades</label>
               <select id="agenda-prox-ministerio" onchange="agendaRenderProximos()">
                 <option value="">Todos</option>
               </select></div>
-            <button class="btn btn-sm" onclick="agendaResetProximosFiltro()">↺ Reset (15 días)</button>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Responsable</label>
+              <input type="text" id="agenda-prox-resp-buscar" placeholder="Buscar..." oninput="agendaRenderProximos()"></div>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Tipo</label>
+              <select id="agenda-prox-tipo" onchange="agendaRenderProximos()">
+                <option value="">Todas</option>
+                <option value="habitual">🔁 Habituales</option>
+                <option value="especial">⭐ Especiales</option>
+              </select></div>
+            <button class="btn btn-sm" onclick="agendaResetProximosFiltro()">↺ Esta semana + la próxima</button>
+            ${canCrearEventos()?'<button class="btn btn-sm" onclick="agendaSincronizarTodosLosOrigenes()" style="background:#EEF2FF;border-color:#C7D2FE;color:#4338CA">🔄 Sincronizar Grupos/Comunidades</button>':''}
             ${canCrearEventos()?'<button class="btn btn-primary btn-sm" onclick="agendaAbrirForm()">+ Nuevo evento</button>':''}
           </div>
         </div>
@@ -4859,9 +4921,19 @@ function buildAgendaHTML(){
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
             <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
               <input type="date" id="agenda-hist-desde" onchange="agendaRenderHistoricoEventos()"></div>
-            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Ministerio</label>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Hasta</label>
+              <input type="date" id="agenda-hist-hasta" onchange="agendaRenderHistoricoEventos()"></div>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Propósito / Comunidades</label>
               <select id="agenda-hist-ministerio" onchange="agendaRenderHistoricoEventos()">
                 <option value="">Todos</option>
+              </select></div>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Responsable</label>
+              <input type="text" id="agenda-hist-resp-buscar" placeholder="Buscar..." oninput="agendaRenderHistoricoEventos()"></div>
+            <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Tipo</label>
+              <select id="agenda-hist-tipo" onchange="agendaRenderHistoricoEventos()">
+                <option value="">Todas</option>
+                <option value="habitual">🔁 Habituales</option>
+                <option value="especial">⭐ Especiales</option>
               </select></div>
           </div>
         </div>
@@ -4888,18 +4960,33 @@ function buildAgendaHTML(){
           <div style="font-size:15px;font-weight:700;color:#1F4E79" id="agenda-form-titulo">Nuevo evento</div>
           <button onclick="agendaCloseForm()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1" title="Cerrar">✕</button>
         </div>
+        <div class="form-col-full" style="margin-bottom:12px">
+          <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:6px">Tipo de Actividad *</label>
+          <div style="display:flex;gap:8px">
+            <button type="button" id="agenda-f-tipo-habitual" class="btn btn-sm" onclick="agendaSetTipoActividad('habitual')" style="flex:1">🔁 Habitual</button>
+            <button type="button" id="agenda-f-tipo-especial" class="btn btn-sm" onclick="agendaSetTipoActividad('especial')" style="flex:1">⭐ Especial</button>
+          </div>
+          <div id="agenda-f-tipo-ayuda" style="font-size:11.5px;color:#9CA3AF;margin-top:5px"></div>
+        </div>
         <div class="form-grid-2">
         <div class="form-col-full">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Título *</label>
         <input type="text" id="agenda-f-titulo" placeholder="Ej: Ensayo de Alabanza" style="margin-bottom:10px">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Descripción</label>
         <textarea id="agenda-f-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;margin-bottom:10px;font-family:inherit"></textarea>
+        <div id="agenda-f-override-wrap" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:10px 12px;margin-bottom:10px">
+          <label style="font-size:12.5px;font-weight:700;color:#92400E;display:block;margin-bottom:6px" id="agenda-f-override-label">✏️ Personalizar solo para esta fecha</label>
+          <label style="font-size:11.5px;color:#92400E;display:block;margin-bottom:3px">Título para este día <span style="font-weight:400">(vacío = usa el título de arriba)</span></label>
+          <input type="text" id="agenda-f-override-titulo" placeholder="Dejar vacío para usar el título general" style="margin-bottom:8px">
+          <label style="font-size:11.5px;color:#92400E;display:block;margin-bottom:3px">Descripción para este día <span style="font-weight:400">(vacío = usa la de arriba)</span></label>
+          <textarea id="agenda-f-override-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #FCD34D;border-radius:8px;font-size:13px;font-family:inherit"></textarea>
+        </div>
         </div>
 
         <div>
-        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Servicio/Ministerio</label>
+        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Propósito / Comunidades</label>
         <select id="agenda-f-ministerio" style="margin-bottom:10px"><option value="">— Sin asignar —</option></select>
-        <div style="background:#F5F3FF;border-radius:10px;padding:10px 12px;margin-bottom:10px">
+        <div id="agenda-f-es-periodo-wrap" style="background:#F5F3FF;border-radius:10px;padding:10px 12px;margin-bottom:10px">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#4C1D95">
             <input type="checkbox" id="agenda-f-es-periodo" onchange="agendaTogglePeriodo()" style="width:16px;height:16px"> 📆 Es un período de varios días <span style="font-weight:400;color:#6B21A8">(no una fecha única)</span>
           </label>
@@ -4910,7 +4997,7 @@ function buildAgendaHTML(){
             <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha *</label>
               <input type="date" id="agenda-f-fecha"></div>
             <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hora</label>
-              <input type="time" id="agenda-f-hora" step="900"></div>
+              ${agendaHoraSelectHtml('agenda-f-hora')}</div>
           </div>
         </div>
 
@@ -4922,7 +5009,7 @@ function buildAgendaHTML(){
               <input type="date" id="agenda-f-fecha-hasta"></div>
           </div>
           <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Hora <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
-          <input type="time" id="agenda-f-hora-periodo" step="900" style="margin-bottom:10px">
+          <div style="margin-bottom:10px">${agendaHoraSelectHtml('agenda-f-hora-periodo')}</div>
         </div>
 
         <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Lugar</label>
@@ -4930,11 +5017,21 @@ function buildAgendaHTML(){
         </div>
 
         <div>
-        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Responsable <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
-        <div id="agenda-f-resp-chip" style="display:none;margin-bottom:6px"></div>
+        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Responsable <span style="font-weight:400;color:#9CA3AF">(opcional, hasta 3)</span></label>
+        <div id="agenda-f-resp-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
         <div style="position:relative;margin-bottom:10px">
           <input type="text" id="agenda-f-resp-search" placeholder="Buscar..." oninput="agendaSearchResponsable(this.value)" autocomplete="off">
           <div id="agenda-f-resp-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
+        </div>
+
+        <label id="agenda-f-msg-label" style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Mensaje <span style="font-weight:400;color:#9CA3AF">(opcional, hasta 2)</span></label>
+        <div id="agenda-f-msg-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
+        <div style="position:relative;margin-bottom:6px">
+          <input type="text" id="agenda-f-msg-search" placeholder="Buscar en Rebaños..." oninput="agendaSearchMensaje(this.value)" autocomplete="off">
+          <div id="agenda-f-msg-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
+        </div>
+        <div id="agenda-f-msg-externo-wrap" style="display:none;margin-bottom:10px">
+          <span onclick="agendaAgregarMensajeExterno()" style="font-size:12px;color:#7C3AED;font-weight:600;cursor:pointer;text-decoration:underline dotted">+ Agregar persona fuera de Rebaños</span>
         </div>
 
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Personas asignadas <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
@@ -5216,7 +5313,7 @@ function agendaGetOcurrencias(desde,hasta){
     var fechaBase=new Date(e.fecha+'T00:00:00');
     var rec=e.recurrencia||{tipo:'ninguna'};
     if(!rec.tipo||rec.tipo==='ninguna'){
-      if(fechaBase>=desde&&fechaBase<=hasta) ocs.push(Object.assign({},e,{fechaOcurrencia:e.fecha}));
+      if(fechaBase>=desde&&fechaBase<=hasta&&(e.excepciones||[]).indexOf(e.fecha)===-1) ocs.push(Object.assign({},e,{fechaOcurrencia:e.fecha}));
       return;
     }
     var limite=rec.hasta?new Date(rec.hasta+'T23:59:59'):hasta;
@@ -5224,7 +5321,11 @@ function agendaGetOcurrencias(desde,hasta){
     var cur=new Date(fechaBase);
     var pasos=0;
     while(cur<=tope&&pasos<520){ // tope de seguridad
-      if(cur>=desde&&cur>=fechaBase) ocs.push(Object.assign({},e,{fechaOcurrencia:cur.toISOString().slice(0,10)}));
+      var fechaOc=cur.toISOString().slice(0,10);
+      if(cur>=desde&&cur>=fechaBase&&(e.excepciones||[]).indexOf(fechaOc)===-1){
+        var ov=(e.overrides||{})[fechaOc];
+        ocs.push(Object.assign({},e,{fechaOcurrencia:fechaOc},ov?{titulo:ov.titulo||e.titulo,descripcion:ov.descripcion||e.descripcion,mensajeAsignados:(ov.mensajeAsignados&&ov.mensajeAsignados.length)?ov.mensajeAsignados:e.mensajeAsignados,personalizadoEsteDia:true}:{}));
+      }
       if(rec.tipo==='semanal') cur.setDate(cur.getDate()+7);
       else if(rec.tipo==='mensual') cur.setMonth(cur.getMonth()+1);
       else break;
@@ -5273,14 +5374,21 @@ function agendaRenderCalendario(){
     var evs=ocsPorDia[key]||[];
     var evsUnicos=evs.filter(function(o){return !o.esPeriodo;});
     var evsPeriodo=evs.filter(function(o){return o.esPeriodo;});
-    html+='<div onclick="agendaOpenDia(\''+key+'\')" style="min-height:50px;border-radius:8px;padding:3px 4px;cursor:pointer;background:'+(esHoy?'#DBEAFE':'#fff')+';border:1px solid '+(esHoy?'#93C5FD':'#F3F4F6')+';'+(evsPeriodo.length?'border-bottom:3px solid #C7A233;':'')+'opacity:'+(enMes?'1':'0.35')+'">'+
+    var maxMostrar=3;
+    var itemsHtml=evsUnicos.slice(0,maxMostrar).map(function(o){
+      var txt=o.titulo.length>20?o.titulo.slice(0,20)+'…':o.titulo;
+      var color=o.tipoActividad==='habitual'?'#0891B2':'#7C3AED';
+      return '<div style="font-size:8.5px;line-height:1.3;color:'+color+';font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px" title="'+o.titulo.replace(/"/g,'&quot;')+'">● '+txt+'</div>';
+    }).join('');
+    var extraHtml=evsUnicos.length>maxMostrar?'<div style="font-size:8px;color:#9CA3AF;margin-top:1px">+'+(evsUnicos.length-maxMostrar)+' más</div>':'';
+    html+='<div onclick="agendaOpenDia(\''+key+'\')" style="min-height:64px;border-radius:8px;padding:3px 4px;cursor:pointer;background:'+(esHoy?'#DBEAFE':'#fff')+';border:1px solid '+(esHoy?'#93C5FD':'#F3F4F6')+';'+(evsPeriodo.length?'border-bottom:3px solid #C7A233;':'')+'opacity:'+(enMes?'1':'0.35')+'">'+
       '<div style="font-size:11px;font-weight:'+(esHoy?'700':'500')+';color:'+(esHoy?'#1E40AF':'#374151')+'">'+cellDate.getDate()+'</div>'+
-      (evsUnicos.length?'<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:3px">'+evsUnicos.slice(0,4).map(function(){return '<span style="width:5px;height:5px;border-radius:50%;background:#7C3AED;display:inline-block"></span>';}).join('')+(evsUnicos.length>4?'<span style="font-size:8px;color:#9CA3AF">+'+(evsUnicos.length-4)+'</span>':'')+'</div>':'')+
+      itemsHtml+extraHtml+
     '</div>';
   }
   html+='</div>';
-  html+='<div style="display:flex;gap:14px;justify-content:center;margin-top:10px;font-size:10.5px;color:#6B7280">'+
-    '<span>🟣 Evento de un día</span><span>🟡 Período de varios días</span>'+
+  html+='<div style="display:flex;gap:14px;justify-content:center;margin-top:10px;font-size:10.5px;color:#6B7280;flex-wrap:wrap">'+
+    '<span>🔵 Habitual</span><span>🟣 Especial</span><span>🟡 Período de varios días</span>'+
   '</div>';
   wrap.innerHTML=html;
 }
@@ -5304,17 +5412,28 @@ function agendaOpenDia(fechaStr){
   } else {
     lista.innerHTML=ocs.map(function(o){
       var minLabel=agendaMinisterioLabel(o.ministerioId);
-      return '<div class="card" style="margin-bottom:8px;padding:10px 12px;border-left:4px solid '+(o.esPeriodo?'#C7A233':'#7C3AED')+'">'+
+      var resps=(o.responsablesIds||[]).map(function(id){return S.members.find(function(m){return Number(m.id)===Number(id);});}).filter(Boolean);
+      var mensajeLabels=(o.mensajeAsignados||[]).map(function(p){
+        if(p.tipo==='miembro'){ var m=S.members.find(function(x){return Number(x.id)===Number(p.id);}); return m?listName(m):null; }
+        return p.nombre+' (externo)';
+      }).filter(Boolean);
+      return '<div class="card" style="margin-bottom:8px;padding:10px 12px;border-left:4px solid '+(o.esPeriodo?'#C7A233':(o.tipoActividad==='habitual'?'#0891B2':'#7C3AED'))+'">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
           '<div>'+
-            '<div style="font-weight:700;font-size:14px;color:#1F2937">'+o.titulo+'</div>'+
+            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+
+              '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;'+(o.tipoActividad==='habitual'?'background:#CFFAFE;color:#155E75':'background:#F5F3FF;color:#6D28D9')+'">'+(o.tipoActividad==='habitual'?'🔁 Habitual':'⭐ Especial')+'</span>'+
+              (o.personalizadoEsteDia?'<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;background:#FEF3C7;color:#92400E">✏️ Personalizado hoy</span>':'')+
+              '<div style="font-weight:700;font-size:14px;color:#1F2937">'+o.titulo+'</div>'+
+            '</div>'+
             '<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(o.hora?'🕐 '+o.hora+' · ':'')+(o.lugar?'📍 '+o.lugar:'')+'</div>'+
             (o.esPeriodo?'<div style="font-size:10px;color:#92400E;margin-top:2px">📆 Período: '+fmtAA(o.fechaDesde)+' al '+fmtAA(o.fechaHasta)+' — día '+o.diaDelPeriodo+' de '+o.totalDiasPeriodo+'</div>':'')+
             (minLabel?'<div style="font-size:11px;color:#7C3AED;margin-top:2px">🤝 '+minLabel+'</div>':'')+
+            (resps.length?'<div style="font-size:11px;color:#1E40AF;margin-top:2px"><strong>Responsables:</strong> 👤 '+resps.map(listName).join(', ')+'</div>':'')+
+            (mensajeLabels.length?'<div style="font-size:11px;color:#6D28D9;margin-top:2px"><strong>Mensaje:</strong> 🎤 '+mensajeLabels.join(', ')+'</div>':'')+
             (o.recurrencia&&o.recurrencia.tipo!=='ninguna'?'<div style="font-size:10px;color:#9CA3AF;margin-top:2px">🔁 Se repite '+(o.recurrencia.tipo==='semanal'?'cada semana':'cada mes')+'</div>':'')+
           '</div>'+
           (canCrearEventos()?'<div style="display:flex;gap:4px;flex-shrink:0">'+
-            '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+')">✏️</button>'+
+            '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+',null,\''+o.fechaOcurrencia+'\')">✏️</button>'+
             '<button onclick="agendaEliminarEvento('+o.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
           '</div>':'')+
         '</div>'+
@@ -5348,7 +5467,7 @@ function agendaSearchResponsable(query){
   var q=(query||'').trim().toLowerCase();
   if(q.length<2){ box.style.display='none'; return; }
   var results=S.members.filter(function(m){
-    return m.estado!=='Baja' && listName(m).toLowerCase().includes(q);
+    return m.estado!=='Baja' && !agendaSelectedResponsablesIds.map(Number).includes(Number(m.id)) && listName(m).toLowerCase().includes(q);
   }).slice(0,8);
   if(!results.length){
     box.innerHTML='<div style="padding:9px 12px;font-size:13px;color:#9CA3AF">Sin resultados</div>';
@@ -5361,22 +5480,110 @@ function agendaSearchResponsable(query){
   box.style.display='block';
 }
 function agendaPickResponsableEl(el){
-  agendaSelectedResponsableId=parseInt(el.getAttribute('data-id'))||null;
+  if(agendaSelectedResponsablesIds.length>=3){ showToast('Máximo 3 responsables','#D97706'); return; }
+  var id=parseInt(el.getAttribute('data-id'))||null;
+  if(id&&!agendaSelectedResponsablesIds.map(Number).includes(Number(id))) agendaSelectedResponsablesIds.push(id);
   agendaRenderResponsableChip();
   var s=document.getElementById('agenda-f-resp-search'); if(s){s.value='';s.blur();}
   var box=document.getElementById('agenda-f-resp-results'); if(box) box.style.display='none';
 }
-function agendaClearResponsable(){
-  agendaSelectedResponsableId=null;
+function agendaClearResponsable(id){
+  agendaSelectedResponsablesIds=agendaSelectedResponsablesIds.filter(function(x){return Number(x)!==Number(id);});
   agendaRenderResponsableChip();
 }
 function agendaRenderResponsableChip(){
   var chip=document.getElementById('agenda-f-resp-chip');
   if(!chip) return;
-  if(!agendaSelectedResponsableId){ chip.style.display='none'; chip.innerHTML=''; return; }
-  var m=S.members.find(function(x){return Number(x.id)===Number(agendaSelectedResponsableId);});
-  chip.style.display='block';
-  chip.innerHTML='<span style="display:inline-flex;align-items:center;gap:6px;background:#EFF6FF;border:1px solid #93C5FD;color:#1E40AF;font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px">👤 '+(m?listName(m):'—')+' <span onclick="agendaClearResponsable()" style="cursor:pointer;font-weight:700">×</span></span>';
+  if(!agendaSelectedResponsablesIds.length){ chip.style.display='none'; chip.innerHTML=''; return; }
+  chip.style.display='flex';
+  chip.innerHTML=agendaSelectedResponsablesIds.map(function(id){
+    var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+    return '<span style="display:inline-flex;align-items:center;gap:6px;background:#EFF6FF;border:1px solid #93C5FD;color:#1E40AF;font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px">👤 '+(m?listName(m):'—')+' <span onclick="agendaClearResponsable('+id+')" style="cursor:pointer;font-weight:700">×</span></span>';
+  }).join('');
+}
+
+// ── Mensaje (hasta 2, miembro de Rebaños o persona externa por única vez) ──
+function agendaSearchMensaje(query){
+  var box=document.getElementById('agenda-f-msg-results');
+  if(!box) return;
+  var q=(query||'').trim().toLowerCase();
+  if(q.length<2){ box.style.display='none'; return; }
+  var idsYaElegidos=agendaSelectedMensaje.filter(function(x){return x.tipo==='miembro';}).map(function(x){return Number(x.id);});
+  var results=S.members.filter(function(m){
+    return m.estado!=='Baja' && !idsYaElegidos.includes(Number(m.id)) && listName(m).toLowerCase().includes(q);
+  }).slice(0,8);
+  if(!results.length){
+    box.innerHTML='<div style="padding:9px 12px;font-size:13px;color:#9CA3AF">Sin resultados</div>';
+    box.style.display='block';
+    return;
+  }
+  box.innerHTML=results.map(function(m){
+    return '<div data-id="'+m.id+'" onpointerdown="event.preventDefault();agendaPickMensajeEl(this)" ontouchstart="event.preventDefault();agendaPickMensajeEl(this)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px;font-weight:600">'+listName(m)+'</div>';
+  }).join('');
+  box.style.display='block';
+}
+function agendaPickMensajeEl(el){
+  if(agendaSelectedMensaje.length>=2){ showToast('Máximo 2 personas en Mensaje','#D97706'); return; }
+  var id=parseInt(el.getAttribute('data-id'))||null;
+  if(id) agendaSelectedMensaje.push({tipo:'miembro',id:id});
+  agendaRenderMensajeChip();
+  var s=document.getElementById('agenda-f-msg-search'); if(s){s.value='';s.blur();}
+  var box=document.getElementById('agenda-f-msg-results'); if(box) box.style.display='none';
+}
+function agendaAgregarMensajeExterno(){
+  if(!(isSuperAdmin()||hasRole('pastor'))) return;
+  if(agendaSelectedMensaje.length>=2){ showToast('Máximo 2 personas en Mensaje','#D97706'); return; }
+  var nombre=prompt('Nombre de la persona (fuera de Rebaños):');
+  if(!nombre||!nombre.trim()) return;
+  nombre=nombre.trim();
+  if(!confirm('Estás cargando una persona fuera del listado de Rebaños: "'+nombre+'".\n¿Confirmás?')) return;
+  agendaSelectedMensaje.push({tipo:'externo',nombre:nombre});
+  agendaRenderMensajeChip();
+}
+function agendaClearMensajeIdx(idx){
+  agendaSelectedMensaje.splice(idx,1);
+  agendaRenderMensajeChip();
+}
+function agendaRenderMensajeChip(){
+  var chip=document.getElementById('agenda-f-msg-chip');
+  if(!chip) return;
+  if(!agendaSelectedMensaje.length){ chip.style.display='none'; chip.innerHTML=''; return; }
+  chip.style.display='flex';
+  chip.innerHTML=agendaSelectedMensaje.map(function(p,idx){
+    var label=p.tipo==='miembro'?(function(){var m=S.members.find(function(x){return Number(x.id)===Number(p.id);});return m?listName(m):'—';})():p.nombre+' (externo)';
+    var bg=p.tipo==='externo'?'#FEF3C7':'#F5F3FF', bd=p.tipo==='externo'?'#FCD34D':'#DDD6FE', col=p.tipo==='externo'?'#92400E':'#6D28D9';
+    return '<span style="display:inline-flex;align-items:center;gap:6px;background:'+bg+';border:1px solid '+bd+';color:'+col+';font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px">🎤 '+label+' <span onclick="agendaClearMensajeIdx('+idx+')" style="cursor:pointer;font-weight:700">×</span></span>';
+  }).join('');
+}
+
+function agendaSetTipoActividad(tipo){
+  agendaSelectedTipoActividad=tipo;
+  var btnHab=document.getElementById('agenda-f-tipo-habitual');
+  var btnEsp=document.getElementById('agenda-f-tipo-especial');
+  if(btnHab) btnHab.className='btn btn-sm'+(tipo==='habitual'?' btn-primary':'');
+  if(btnEsp) btnEsp.className='btn btn-sm'+(tipo==='especial'?' btn-primary':'');
+  var periodoWrap=document.getElementById('agenda-f-es-periodo-wrap');
+  var recurWrap=document.getElementById('agenda-f-recur-wrap');
+  var ayuda=document.getElementById('agenda-f-tipo-ayuda');
+  var overrideWrap=document.getElementById('agenda-f-override-wrap');
+  if(overrideWrap) overrideWrap.style.display=(tipo==='habitual'&&agendaEditingFechaOcurrencia)?'block':'none';
+  if(tipo==='habitual'){
+    if(periodoWrap) periodoWrap.style.display='none';
+    var chkPeriodo=document.getElementById('agenda-f-es-periodo');
+    if(chkPeriodo){ chkPeriodo.checked=false; agendaTogglePeriodo(); }
+    if(recurWrap) recurWrap.style.display='block';
+    var recurSel=document.getElementById('agenda-f-recur-tipo');
+    if(recurSel&&recurSel.value==='ninguna') recurSel.value='semanal';
+    agendaToggleRecurrencia();
+    if(ayuda) ayuda.textContent='Fija, se repite en el tiempo (semanal o mensual) — ej. el culto de todos los domingos.';
+  } else {
+    if(periodoWrap) periodoWrap.style.display='block';
+    if(recurWrap) recurWrap.style.display='none';
+    var recurSel2=document.getElementById('agenda-f-recur-tipo');
+    if(recurSel2) recurSel2.value='ninguna';
+    agendaToggleRecurrencia();
+    if(ayuda) ayuda.textContent='Única en el tiempo (un día o un rango de días). Si coincide con una fecha de una actividad Habitual, se ofrece reemplazarla ese día puntual.';
+  }
 }
 
 function agendaToggleRecurrencia(){
@@ -5391,7 +5598,8 @@ function agendaTogglePeriodo(){
   var wrapRecur=document.getElementById('agenda-f-recur-wrap');
   if(wrapUnica) wrapUnica.style.display=esPeriodo?'none':'block';
   if(wrapPeriodo) wrapPeriodo.style.display=esPeriodo?'block':'none';
-  if(wrapRecur) wrapRecur.style.display=esPeriodo?'none':'block';
+  // La recurrencia solo tiene sentido para Actividades Habituales (nunca en período, nunca en Especial)
+  if(wrapRecur) wrapRecur.style.display=(!esPeriodo&&agendaSelectedTipoActividad==='habitual')?'block':'none';
   if(esPeriodo){
     // Período y Recurrencia son excluyentes — resetear la recurrencia si estaba cargada
     var recurSel=document.getElementById('agenda-f-recur-tipo');
@@ -5405,30 +5613,98 @@ function agendaToggleRecordatorio(){
   if(wrap) wrap.style.display=chk&&chk.checked?'block':'none';
 }
 
-function agendaAbrirForm(eventoId, fechaPrefill){
+// Selector de Hora en pasos de 15 minutos (00/15/30/45) — reemplaza el <input type="time">
+// nativo, que en varios navegadores/celulares no respeta bien el step=900.
+function agendaHoraSelectHtml(baseId){
+  var horas='<option value="">-- : --</option>';
+  for(var i=0;i<24;i++){ var hh=(i<10?'0':'')+i; horas+='<option value="'+hh+'">'+hh+'</option>'; }
+  return '<div style="display:flex;gap:4px;align-items:center">'
+    +'<select id="'+baseId+'-h" style="width:64px">'+horas+'</select>'
+    +'<span style="font-weight:700;color:#6B7280">:</span>'
+    +'<select id="'+baseId+'-m" style="width:64px">'
+      +'<option value="00">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option>'
+    +'</select></div>';
+}
+function agendaGetHoraCombinada(baseId){
+  var h=document.getElementById(baseId+'-h');
+  var m=document.getElementById(baseId+'-m');
+  if(!h||!m||!h.value) return '';
+  return h.value+':'+(m.value||'00');
+}
+function agendaSetHoraCombinada(baseId,valor){
+  var h=document.getElementById(baseId+'-h');
+  var m=document.getElementById(baseId+'-m');
+  if(!h||!m) return;
+  if(!valor){ h.value=''; m.value='00'; return; }
+  var partes=String(valor).split(':');
+  var hh=partes[0]||'';
+  var mmNum=parseInt(partes[1],10)||0;
+  var mmRedondeado=Math.round(mmNum/15)*15; // redondea al múltiplo de 15 más cercano (carga vieja con minutos libres)
+  var hhNum=parseInt(hh,10)||0;
+  if(mmRedondeado>=60){ mmRedondeado=0; hhNum=(hhNum+1)%24; }
+  h.value=(hhNum<10?'0':'')+hhNum;
+  m.value=(mmRedondeado<10?'0':'')+mmRedondeado;
+}
+
+function agendaAbrirForm(eventoId, fechaPrefill, fechaOcurrencia){
   if(!canCrearEventos()){ alert('No tenés permiso para crear o editar eventos.'); return; }
   agendaEditingId=eventoId||null;
+  agendaEditingFechaOcurrencia=fechaOcurrencia||null;
   var ev=eventoId?S.eventos.find(function(x){return Number(x.id)===Number(eventoId);}):null;
   document.getElementById('agenda-form-titulo').textContent=eventoId?'Editar evento':'Nuevo evento';
   document.getElementById('agenda-f-titulo').value=ev?ev.titulo:'';
   document.getElementById('agenda-f-desc').value=ev?(ev.descripcion||''):'';
+  agendaSetTipoActividad(ev?(ev.tipoActividad||'especial'):'especial');
   var esPeriodo=!!(ev&&ev.tipoFecha==='periodo');
   document.getElementById('agenda-f-es-periodo').checked=esPeriodo;
   document.getElementById('agenda-f-fecha').value=(ev&&!esPeriodo)?ev.fecha:(fechaPrefill||today());
-  document.getElementById('agenda-f-hora').value=(ev&&!esPeriodo)?(ev.hora||''):'';
+  agendaSetHoraCombinada('agenda-f-hora',(ev&&!esPeriodo)?(ev.hora||''):'');
   document.getElementById('agenda-f-fecha-desde').value=(ev&&esPeriodo)?(ev.fechaDesde||''):(fechaPrefill||today());
   document.getElementById('agenda-f-fecha-hasta').value=(ev&&esPeriodo)?(ev.fechaHasta||''):'';
-  document.getElementById('agenda-f-hora-periodo').value=(ev&&esPeriodo)?(ev.hora||''):'';
+  agendaSetHoraCombinada('agenda-f-hora-periodo',(ev&&esPeriodo)?(ev.hora||''):'');
   agendaTogglePeriodo();
   document.getElementById('agenda-f-lugar').value=ev?(ev.lugar||''):'';
 
-  // Responsable
-  agendaSelectedResponsableId=ev&&ev.responsableId?ev.responsableId:null;
+  // Personalizar Título/Descripción/Mensaje solo para esta fecha puntual — únicamente tiene
+  // sentido editando (no creando) una Habitual, y llegando desde un día específico del calendario
+  var overrideWrap=document.getElementById('agenda-f-override-wrap');
+  var mostrarOverride=!!(ev&&ev.tipoActividad==='habitual'&&agendaEditingFechaOcurrencia);
+  var ovActual=mostrarOverride?((ev.overrides||{})[agendaEditingFechaOcurrencia]||{}):{};
+  if(overrideWrap) overrideWrap.style.display=mostrarOverride?'block':'none';
+  if(mostrarOverride){
+    document.getElementById('agenda-f-override-label').textContent='✏️ Personalizar solo para el '+fmtAA(agendaEditingFechaOcurrencia);
+    document.getElementById('agenda-f-override-titulo').value=ovActual.titulo||'';
+    document.getElementById('agenda-f-override-desc').value=ovActual.descripcion||'';
+  } else {
+    document.getElementById('agenda-f-override-titulo').value='';
+    document.getElementById('agenda-f-override-desc').value='';
+  }
+
+  // Responsables (hasta 3)
+  agendaSelectedResponsablesIds=ev&&ev.responsablesIds?ev.responsablesIds.slice():[];
   agendaRenderResponsableChip();
   var respSearch=document.getElementById('agenda-f-resp-search');
   if(respSearch) respSearch.value='';
   var respResults=document.getElementById('agenda-f-resp-results');
   if(respResults) respResults.style.display='none';
+
+  // Mensaje (hasta 2, miembro o persona externa) — si se está personalizando esta fecha
+  // puntual de una Habitual, Mensaje también es parte de esa personalización
+  var msgLabel=document.getElementById('agenda-f-msg-label');
+  if(mostrarOverride){
+    agendaSelectedMensaje=ovActual.mensajeAsignados?JSON.parse(JSON.stringify(ovActual.mensajeAsignados)):[];
+    if(msgLabel) msgLabel.innerHTML='Mensaje <span style="font-weight:400;color:#92400E">(hasta 2 — personalizado para el '+fmtAA(agendaEditingFechaOcurrencia)+', vacío = usa el de la serie)</span>';
+  } else {
+    agendaSelectedMensaje=ev&&ev.mensajeAsignados?JSON.parse(JSON.stringify(ev.mensajeAsignados)):[];
+    if(msgLabel) msgLabel.innerHTML='Mensaje <span style="font-weight:400;color:#9CA3AF">(opcional, hasta 2)</span>';
+  }
+  agendaRenderMensajeChip();
+  var msgSearch=document.getElementById('agenda-f-msg-search');
+  if(msgSearch) msgSearch.value='';
+  var msgResults=document.getElementById('agenda-f-msg-results');
+  if(msgResults) msgResults.style.display='none';
+  var msgExternoWrap=document.getElementById('agenda-f-msg-externo-wrap');
+  if(msgExternoWrap) msgExternoWrap.style.display=(isSuperAdmin()||hasRole('pastor'))?'block':'none';
 
   // Ministerio: cada opción es Nombre + Área
   var minSel=document.getElementById('agenda-f-ministerio');
@@ -5477,20 +5753,43 @@ function agendaCloseForm(){
   agendaEditingId=null;
 }
 
+// Todas las fechas (YYYY-MM-DD) entre desde y hasta, inclusive
+function agendaFechasEnRango(desde,hasta){
+  var out=[];
+  var cur=new Date(desde+'T00:00:00');
+  var fin=new Date(hasta+'T00:00:00');
+  var pasos=0;
+  while(cur<=fin&&pasos<400){
+    out.push(cur.toISOString().slice(0,10));
+    cur.setDate(cur.getDate()+1);
+    pasos++;
+  }
+  return out;
+}
+
+// Actividades Habituales que tienen una ocurrencia real en esa fecha puntual (excluyendo, si corresponde, el propio evento que se está editando)
+function agendaHabitualesEnFecha(fechaStr,excluirId){
+  var d=new Date(fechaStr+'T00:00:00');
+  return agendaGetOcurrencias(d,d).filter(function(o){
+    return o.tipoActividad==='habitual'&&Number(o.id)!==Number(excluirId||-1);
+  });
+}
+
 async function agendaGuardarEvento(){
+  var tipoActividad=agendaSelectedTipoActividad;
   var titulo=(document.getElementById('agenda-f-titulo')?.value||'').trim();
-  var esPeriodo=!!document.getElementById('agenda-f-es-periodo')?.checked;
+  var esPeriodo=tipoActividad==='habitual'?false:!!document.getElementById('agenda-f-es-periodo')?.checked;
   var fecha, hora, fechaDesde='', fechaHasta='';
   if(esPeriodo){
     fechaDesde=document.getElementById('agenda-f-fecha-desde')?.value||'';
     fechaHasta=document.getElementById('agenda-f-fecha-hasta')?.value||'';
-    hora=document.getElementById('agenda-f-hora-periodo')?.value||'';
+    hora=agendaGetHoraCombinada('agenda-f-hora-periodo');
     if(!titulo||!fechaDesde||!fechaHasta){ alert('Completá al menos Título, Desde y Hasta'); return; }
     if(fechaHasta<fechaDesde){ alert('La fecha "Hasta" no puede ser anterior a "Desde"'); return; }
     fecha=fechaDesde; // compatibilidad: fecha = primer día del período
   } else {
     fecha=document.getElementById('agenda-f-fecha')?.value||'';
-    hora=document.getElementById('agenda-f-hora')?.value||'';
+    hora=agendaGetHoraCombinada('agenda-f-hora');
     if(!titulo||!fecha){ alert('Completá al menos Título y Fecha'); return; }
   }
   var descripcion=(document.getElementById('agenda-f-desc')?.value||'').trim();
@@ -5501,28 +5800,95 @@ async function agendaGuardarEvento(){
     activo: !!document.getElementById('agenda-f-recordatorio')?.checked,
     diasAntes: parseInt(document.getElementById('agenda-f-record-dias')?.value)||3
   };
-  // Período y Recurrencia son excluyentes — si es período, la recurrencia queda vacía
-  var recurTipo=esPeriodo?'ninguna':(document.getElementById('agenda-f-recur-tipo')?.value||'ninguna');
+  // Recurrencia solo aplica a Habitual — Especial y Período siempre van sin recurrencia
+  var recurTipo=(tipoActividad==='especial'||esPeriodo)?'ninguna':(document.getElementById('agenda-f-recur-tipo')?.value||'ninguna');
+  if(tipoActividad==='habitual'&&recurTipo==='ninguna'){
+    alert('Una Actividad Habitual necesita elegir una recurrencia (Semanal o Mensual). Si es algo puntual, elegí "⭐ Especial" arriba.');
+    return;
+  }
   var recurrencia={
     tipo:recurTipo,
     hasta: recurTipo!=='ninguna' ? (document.getElementById('agenda-f-recur-hasta')?.value||'') : ''
   };
 
-  var data={titulo,descripcion,ministerioId,fecha,hora,lugar,
+  var ev=agendaEditingId?S.eventos.find(function(x){return Number(x.id)===Number(agendaEditingId);}):null;
+  // Si esto es una Habitual y se está editando una fecha puntual (llegó con fechaOcurrencia),
+  // Mensaje (igual que Título/Descripción) se guarda como personalización de ESA fecha,
+  // no como el default de toda la serie
+  var esOverrideDeFecha=!!(ev&&ev.tipoActividad==='habitual'&&agendaEditingFechaOcurrencia);
+
+  var data={titulo,descripcion,ministerioId,fecha,hora,lugar,tipoActividad,
     tipoFecha:esPeriodo?'periodo':'unica',fechaDesde:esPeriodo?fechaDesde:'',fechaHasta:esPeriodo?fechaHasta:'',
-    responsableId:agendaSelectedResponsableId,personasAsignadas,recordatorio,recurrencia};
+    responsablesIds:agendaSelectedResponsablesIds.slice(),
+    personasAsignadas,recordatorio,recurrencia};
+  if(!esOverrideDeFecha) data.mensajeAsignados=JSON.parse(JSON.stringify(agendaSelectedMensaje));
+
+  // Si es (o sigue siendo) una Especial, chequear conflicto con Habituales en las fechas que cubre
+  var nuevosReemplazos=[];
+  if(tipoActividad==='especial'){
+    var fechasCubiertas=esPeriodo?agendaFechasEnRango(fechaDesde,fechaHasta):[fecha];
+    var conflictos=[];
+    fechasCubiertas.forEach(function(f){
+      agendaHabitualesEnFecha(f,ev?ev.id:null).forEach(function(h){
+        conflictos.push({habitualId:h.id,habitualTitulo:h.titulo,fecha:f});
+      });
+    });
+    if(conflictos.length){
+      var lista=conflictos.map(function(c){return '• '+c.habitualTitulo+' el '+fmtAA(c.fecha);}).join('\n');
+      var msg='Ya existe una actividad habitual para '+(conflictos.length>1?'estas fechas':'esa fecha')+':\n'+lista+'\n\n¿Se reemplaza?';
+      if(!confirm(msg)) return;
+      nuevosReemplazos=conflictos.map(function(c){return {eventoHabitualId:c.habitualId,fecha:c.fecha};});
+    }
+  }
 
   var snapshotEvento=null;
+  var snapshotHabituales=[]; // para revertir excepciones si falla el guardado en la nube
   var esNuevoEvento=false;
   var nuevoEventoRef=null;
-  var ev;
+
+  function snapshotHabitual(hab){
+    if(!snapshotHabituales.some(function(s){return s.hab===hab;})) snapshotHabituales.push({hab:hab,excepciones:(hab.excepciones||[]).slice()});
+  }
+
+  // Si esto ya era una Especial con reemplazos previos, primero los revertimos (la Habitual
+  // "vuelve" a esas fechas) antes de aplicar los nuevos — cubre el caso de editar la fecha
+  if(ev&&ev.reemplazos&&ev.reemplazos.length){
+    ev.reemplazos.forEach(function(r){
+      var hab=S.eventos.find(function(x){return Number(x.id)===Number(r.eventoHabitualId);});
+      if(hab){ snapshotHabitual(hab); hab.excepciones=(hab.excepciones||[]).filter(function(f){return f!==r.fecha;}); }
+    });
+  }
+  // Aplicar los reemplazos nuevos
+  nuevosReemplazos.forEach(function(r){
+    var hab=S.eventos.find(function(x){return Number(x.id)===Number(r.eventoHabitualId);});
+    if(hab){
+      snapshotHabitual(hab);
+      if(!hab.excepciones) hab.excepciones=[];
+      if(hab.excepciones.indexOf(r.fecha)===-1) hab.excepciones.push(r.fecha);
+    }
+  });
+  data.reemplazos=nuevosReemplazos;
+
   if(agendaEditingId){
-    ev=S.eventos.find(function(x){return Number(x.id)===Number(agendaEditingId);});
     if(ev){ snapshotEvento=Object.assign({},ev); Object.assign(ev,data); }
   } else {
     esNuevoEvento=true;
-    nuevoEventoRef=Object.assign({id:Date.now(),estado:'Activo',creadoPor:currentUser?.name||'Sistema',ts:Date.now()},data);
+    nuevoEventoRef=Object.assign({id:Date.now(),estado:'Activo',creadoPor:currentUser?.name||'Sistema',ts:Date.now(),excepciones:[]},data);
     S.eventos.push(nuevoEventoRef);
+  }
+
+  // Personalización de Título/Descripción/Mensaje solo para esta fecha (Habitual editada desde un día puntual)
+  var overridesSnapshotStr=ev?JSON.stringify(ev.overrides||{}):null;
+  if(esOverrideDeFecha){
+    var ovTitulo=(document.getElementById('agenda-f-override-titulo')?.value||'').trim();
+    var ovDesc=(document.getElementById('agenda-f-override-desc')?.value||'').trim();
+    var ovMensaje=JSON.parse(JSON.stringify(agendaSelectedMensaje));
+    if(!ev.overrides) ev.overrides={};
+    if(ovTitulo||ovDesc||ovMensaje.length){
+      ev.overrides[agendaEditingFechaOcurrencia]={titulo:ovTitulo,descripcion:ovDesc,mensajeAsignados:ovMensaje};
+    } else {
+      delete ev.overrides[agendaEditingFechaOcurrencia];
+    }
   }
 
   await saveK(SK.eventos,S.eventos);
@@ -5534,6 +5900,8 @@ async function agendaGuardarEvento(){
     } else if(ev&&snapshotEvento){
       Object.assign(ev,snapshotEvento);
     }
+    if(ev&&overridesSnapshotStr!==null) ev.overrides=JSON.parse(overridesSnapshotStr);
+    snapshotHabituales.forEach(function(s){ s.hab.excepciones=s.excepciones; });
     await saveK(SK.eventos,S.eventos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -5543,7 +5911,7 @@ async function agendaGuardarEvento(){
   agendaRenderBanner();
   var proxTab=document.getElementById('agenda-tab-proximos');
   if(proxTab&&proxTab.style.display!=='none') agendaRenderProximos();
-  showToast('✅ Evento guardado','#16A34A');
+  showToast('✅ Evento guardado'+(nuevosReemplazos.length?' — reemplazó '+nuevosReemplazos.length+' fecha'+(nuevosReemplazos.length!==1?'s':'')+' de actividad habitual':''),'#16A34A');
 }
 
 async function agendaEliminarEvento(id){
@@ -5552,9 +5920,20 @@ async function agendaEliminarEvento(id){
   var esRecurrente=ev.recurrencia&&ev.recurrencia.tipo&&ev.recurrencia.tipo!=='ninguna';
   var msg=esRecurrente
     ?'¿Eliminar "'+ev.titulo+'"? Esto borra TODA la serie recurrente, no solo esta fecha.'
-    :'¿Eliminar "'+ev.titulo+'"?';
+    :'¿Eliminar "'+ev.titulo+'"?'+((ev.reemplazos&&ev.reemplazos.length)?'\n\nLa(s) actividad(es) habitual(es) que había reemplazado vuelve(n) a mostrarse en su fecha original.':'');
   if(!confirm(msg)) return;
   S.eventos=S.eventos.filter(function(x){return Number(x.id)!==Number(id);});
+  // Si esta Especial había reemplazado alguna Habitual, restaurarla en esa fecha
+  var habitualesTocadas=[];
+  if(ev.reemplazos&&ev.reemplazos.length){
+    ev.reemplazos.forEach(function(r){
+      var hab=S.eventos.find(function(x){return Number(x.id)===Number(r.eventoHabitualId);});
+      if(hab&&(hab.excepciones||[]).indexOf(r.fecha)!==-1){
+        habitualesTocadas.push({hab:hab,excepciones:hab.excepciones.slice()});
+        hab.excepciones=hab.excepciones.filter(function(f){return f!==r.fecha;});
+      }
+    });
+  }
   try{
     await saveK(SK.eventos,S.eventos);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -5566,6 +5945,7 @@ async function agendaEliminarEvento(id){
     showToast('🗑️ Evento eliminado','#DC2626');
   }catch(e){
     S.eventos.push(ev);
+    habitualesTocadas.forEach(function(s){ s.hab.excepciones=s.excepciones; });
     await saveK(SK.eventos,S.eventos);
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
@@ -5574,7 +5954,11 @@ async function agendaEliminarEvento(id){
 // ── Próximos eventos: lista con período ampliable ──
 function agendaRenderOcurrenciasCard(o){
   var minLabel=agendaMinisterioLabel(o.ministerioId);
-  var resp=o.responsableId?S.members.find(function(m){return Number(m.id)===Number(o.responsableId);}):null;
+  var resps=(o.responsablesIds||[]).map(function(id){return S.members.find(function(m){return Number(m.id)===Number(id);});}).filter(Boolean);
+  var mensajeLabels=(o.mensajeAsignados||[]).map(function(p){
+    if(p.tipo==='miembro'){ var m=S.members.find(function(x){return Number(x.id)===Number(p.id);}); return m?listName(m):null; }
+    return p.nombre+' (externo)';
+  }).filter(Boolean);
   var checklist=agendaGetChecklist(o.id);
   var mostrarBtnChecklist=checklist?agendaPuedeVerChecklist(checklist):canEjecutarEquipo();
   var btnChecklist='';
@@ -5587,19 +5971,25 @@ function agendaRenderOcurrenciasCard(o){
       btnChecklist='<button class="btn btn-sm" onclick="agendaAbrirChecklist('+o.id+')" style="background:#F5F3FF;border-color:#DDD6FE;color:#6D28D9;font-weight:600">📋 + Checklist</button>';
     }
   }
-  return '<div class="card" style="margin-bottom:6px;padding:10px 12px;border-left:4px solid '+(o.esPeriodo?'#C7A233':'#7C3AED')+'">'+
+  return '<div class="card" style="margin-bottom:6px;padding:10px 12px;border-left:4px solid '+(o.esPeriodo?'#C7A233':(o.tipoActividad==='habitual'?'#0891B2':'#7C3AED'))+'">'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
       '<div>'+
-        '<div style="font-weight:700;font-size:14px;color:#1F2937">'+o.titulo+'</div>'+
+        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+
+          '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;'+(o.tipoActividad==='habitual'?'background:#CFFAFE;color:#155E75':'background:#F5F3FF;color:#6D28D9')+'">'+(o.tipoActividad==='habitual'?'🔁 Habitual':'⭐ Especial')+'</span>'+
+          (o.personalizadoEsteDia?'<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;background:#FEF3C7;color:#92400E">✏️ Personalizado hoy</span>':'')+
+          '<div style="font-weight:700;font-size:14px;color:#1F2937">'+o.titulo+'</div>'+
+        '</div>'+
         '<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(o.hora?'🕐 '+o.hora+' · ':'')+(o.lugar?'📍 '+o.lugar:'')+'</div>'+
         (o.esPeriodo?'<div style="font-size:10px;color:#92400E;margin-top:2px">📆 Período: '+fmtAA(o.fechaDesde)+' al '+fmtAA(o.fechaHasta)+' — día '+o.diaDelPeriodo+' de '+o.totalDiasPeriodo+'</div>':'')+
+        ((o.reemplazos&&o.reemplazos.length)?'<div style="font-size:10.5px;font-weight:700;color:#fff;background:#DC2626;display:inline-block;padding:2px 8px;border-radius:6px;margin-top:4px">🔄 Reemplaza actividad habitual en '+o.reemplazos.length+' fecha'+(o.reemplazos.length!==1?'s':'')+'</div>':'')+
         (minLabel?'<div style="font-size:11px;color:#7C3AED;margin-top:2px">🤝 '+minLabel+'</div>':'')+
-        (resp?'<div style="font-size:11px;color:#1E40AF;margin-top:2px">👤 '+listName(resp)+'</div>':'')+
+        (resps.length?'<div style="font-size:11px;color:#1E40AF;margin-top:2px"><strong>Responsables:</strong> 👤 '+resps.map(listName).join(', ')+'</div>':'')+
+        (mensajeLabels.length?'<div style="font-size:11px;color:#6D28D9;margin-top:2px"><strong>Mensaje:</strong> 🎤 '+mensajeLabels.join(', ')+'</div>':'')+
         ((o.personasAsignadas||[]).length?'<div style="font-size:11px;color:#6B7280;margin-top:2px">👥 '+o.personasAsignadas.length+' asignado'+(o.personasAsignadas.length>1?'s':'')+'</div>':'')+
       '</div>'+
       '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:flex-end">'+
         (canCrearEventos()?'<div style="display:flex;gap:4px">'+
-          '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+')">✏️</button>'+
+          '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+',null,\''+o.fechaOcurrencia+'\')">✏️</button>'+
           '<button onclick="agendaEliminarEvento('+o.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
         '</div>':'')+
         btnChecklist+
@@ -5619,16 +6009,158 @@ function agendaRenderOcurrenciasList(ocs, wrapId, emptyMsg){
   ocs.forEach(function(o){ if(!porFecha[o.fechaOcurrencia]) porFecha[o.fechaOcurrencia]=[]; porFecha[o.fechaOcurrencia].push(o); });
   wrap.innerHTML=Object.keys(porFecha).sort().map(function(fecha){
     var evs=porFecha[fecha];
+    var diaSemana=DIAS_SEMANA[new Date(fecha+'T00:00:00').getDay()];
     return '<div style="margin-bottom:1rem">'+
-      '<div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">'+fmt(fecha)+'</div>'+
+      '<div style="font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">'+diaSemana+' '+fmt(fecha)+'</div>'+
       evs.map(agendaRenderOcurrenciasCard).join('')+
     '</div>';
   }).join('');
 }
 
+// Rango por defecto de Agenda: lunes de esta semana ISO hasta el domingo de la semana ISO siguiente
+// ── Sincronización automática: Grupos de Vida y Comunidades NG generan/actualizan su
+// propia Actividad Habitual en Agenda (título, día/horario, Responsables). Si el Grupo
+// se borra o desactiva, la actividad deja de repetirse hacia adelante (usando el mismo
+// mecanismo de "Repetir hasta" que ya existe), pero el historial ya generado no se toca.
+function agendaProximaFechaParaDia(diaNombre){
+  var idx=DIAS_SEMANA.indexOf(diaNombre);
+  if(idx<0) return today();
+  var hoy=new Date();
+  var diff=(idx-hoy.getDay()+7)%7;
+  var d=new Date(hoy); d.setDate(hoy.getDate()+diff);
+  return dateToStr(d);
+}
+function agendaConvertirHorario(horarioStr){
+  return (horarioStr||'').replace(/\s*hs\.?\s*$/i,'').trim();
+}
+// origenTipo: 'gdv' | 'ng' — origenId: id del Grupo o Comunidad
+// datos: {nombre, dia, horario, responsablesIds, activo}
+// Devuelve true si tocó S.eventos (para que quien llama sepa que tiene que guardar/subir también esa clave)
+function agendaSincronizarActividadOrigen(origenTipo, origenId, datos){
+  if(!S.eventos) S.eventos=[];
+  var ev=S.eventos.find(function(e){return e.origenTipo===origenTipo&&String(e.origenId)===String(origenId);});
+
+  if(!datos.activo||!datos.dia||!datos.horario){
+    // Desactivado/borrado, o sin día+horario definidos: si ya había una actividad, se corta
+    // hacia adelante (no se borra), para conservar el historial de cuando existía.
+    if(ev&&ev.recurrencia&&ev.recurrencia.tipo==='semanal'){
+      var ayer=new Date(); ayer.setDate(ayer.getDate()-1);
+      var ayerStr=dateToStr(ayer);
+      if(ev.recurrencia.hasta!==ayerStr){
+        ev.recurrencia.hasta=ayerStr;
+        ev._ts=Date.now();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  var horaConvertida=agendaConvertirHorario(datos.horario);
+  if(!ev){
+    S.eventos.push({
+      id:Date.now()+Math.floor(Math.random()*1000),
+      titulo:datos.nombre,descripcion:'',ministerioId:null,
+      fecha:agendaProximaFechaParaDia(datos.dia),hora:horaConvertida,lugar:'',
+      tipoActividad:'habitual',tipoFecha:'unica',fechaDesde:'',fechaHasta:'',
+      responsablesIds:(datos.responsablesIds||[]).slice(),mensajeAsignados:[],
+      personasAsignadas:[],recordatorio:{activo:false,diasAntes:3},
+      recurrencia:{tipo:'semanal',hasta:''},
+      estado:'Activo',creadoPor:'Sincronización automática',ts:Date.now(),_ts:Date.now(),
+      excepciones:[],reemplazos:[],
+      origenTipo:origenTipo,origenId:origenId
+    });
+    return true;
+  }
+
+  // Ya existía: actualizar solo lo que viene del origen — nunca tocar Descripción, Mensaje,
+  // Lugar, Recordatorio o Personas asignadas, que pueden haberse cargado a mano en Agenda.
+  var cambio=false;
+  if(ev.titulo!==datos.nombre){ ev.titulo=datos.nombre; cambio=true; }
+  if(ev.hora!==horaConvertida){ ev.hora=horaConvertida; cambio=true; }
+  var responsablesNuevos=(datos.responsablesIds||[]).slice();
+  if(JSON.stringify((ev.responsablesIds||[]).slice().sort())!==JSON.stringify(responsablesNuevos.slice().sort())){
+    ev.responsablesIds=responsablesNuevos; cambio=true;
+  }
+  var diaActualIdx=new Date(ev.fecha+'T00:00:00').getDay();
+  var diaNuevoIdx=DIAS_SEMANA.indexOf(datos.dia);
+  if(diaActualIdx!==diaNuevoIdx){ ev.fecha=agendaProximaFechaParaDia(datos.dia); cambio=true; }
+  if(ev.recurrencia&&ev.recurrencia.hasta){ ev.recurrencia.hasta=''; cambio=true; } // reabrir si venía cortada
+  if(!ev.tipoActividad){ ev.tipoActividad='habitual'; cambio=true; }
+  if(cambio) ev._ts=Date.now();
+  return cambio;
+}
+
+// Sincronización masiva (de una sola vez): recorre TODOS los Grupos de Vida y Comunidades NG
+// existentes y crea/actualiza su Actividad Habitual en Agenda. Para los que se crearon antes
+// de que existiera esta función automática, o para forzar un refresco general si hiciera falta.
+async function agendaSincronizarTodosLosOrigenes(){
+  if(!confirm('¿Sincronizar todos los Grupos de Vida y Comunidades de Nuevas Generaciones con Agenda?\nSe crean o actualizan sus Actividades Habituales (título, día/horario, responsables). No se toca nada que hayas cargado a mano en Agenda (descripción, mensaje, lugar, recordatorio).')) return;
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var cambios=0;
+  (S.groups||[]).forEach(function(g){
+    var toco=agendaSincronizarActividadOrigen('gdv',g.id,{
+      nombre:g.name,dia:g.dia,horario:g.horario,
+      responsablesIds:[g.facId,g.facId2].filter(Boolean),
+      activo:g.estado!=='Inactivo'
+    });
+    if(toco) cambios++;
+  });
+  (S.ngComunidades||[]).forEach(function(ng){
+    var toco=agendaSincronizarActividadOrigen('ng',ng.id,{
+      nombre:ng.name,dia:ng.dia,horario:ng.horario,
+      responsablesIds:(ng.liderIds||[]).slice(),
+      activo:ng.estado!=='Inactivo'
+    });
+    if(toco) cambios++;
+  });
+  if(!cambios){ showToast('Ya estaba todo sincronizado — sin cambios','#6B7280'); return; }
+  await saveK(SK.eventos,S.eventos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.eventos=JSON.parse(snapshotEventosStr);
+    await saveK(SK.eventos,S.eventos);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ '+cambios+' actividad'+(cambios!==1?'es':'')+' sincronizada'+(cambios!==1?'s':'')+' con Agenda','#16A34A');
+  agendaRenderCalendario();
+  agendaRenderBanner();
+  var proxTab=document.getElementById('agenda-tab-proximos');
+  if(proxTab&&proxTab.style.display!=='none') agendaRenderProximos();
+}
+
+function agendaRangoDefault(){
+  var hoy=new Date();
+  var dow=hoy.getDay(); // 0=Dom..6=Sáb
+  var diffALunes=(dow===0?-6:1-dow);
+  var lunesEstaSemana=new Date(hoy);
+  lunesEstaSemana.setDate(hoy.getDate()+diffALunes);
+  var domingoSemanaSiguiente=new Date(lunesEstaSemana);
+  domingoSemanaSiguiente.setDate(lunesEstaSemana.getDate()+13); // lunes + 13 días = domingo de la semana siguiente
+  return {desde:dateToStr(lunesEstaSemana), hasta:dateToStr(domingoSemanaSiguiente)};
+}
+
+function agendaFiltrarPorResponsable(ocs,query){
+  var q=(query||'').trim().toLowerCase();
+  if(!q) return ocs;
+  return ocs.filter(function(o){
+    var resps=(o.responsablesIds||[]).map(function(id){
+      var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+      return m?listName(m):'';
+    });
+    return resps.some(function(n){return n.toLowerCase().indexOf(q)!==-1;});
+  });
+}
+
 function agendaRenderProximos(){
+  var desdeEl=document.getElementById('agenda-prox-desde');
   var hastaEl=document.getElementById('agenda-prox-hasta');
-  if(hastaEl&&!hastaEl.value){ var d=new Date(); d.setDate(d.getDate()+15); hastaEl.value=dateToStr(d); }
+  if((desdeEl&&!desdeEl.value)||(hastaEl&&!hastaEl.value)){
+    var rango=agendaRangoDefault();
+    if(desdeEl&&!desdeEl.value) desdeEl.value=rango.desde;
+    if(hastaEl&&!hastaEl.value) hastaEl.value=rango.hasta;
+  }
 
   var minSel=document.getElementById('agenda-prox-ministerio');
   if(minSel&&minSel.options.length<=1){
@@ -5637,19 +6169,23 @@ function agendaRenderProximos(){
     });
   }
 
-  // Activos: siempre arranca hoy (incluido) — no editable
-  var desde=new Date(today()+'T00:00:00');
+  var desde=new Date((desdeEl&&desdeEl.value?desdeEl.value:today())+'T00:00:00');
   var hasta=new Date((hastaEl&&hastaEl.value?hastaEl.value:today())+'T23:59:59');
   var fMinisterio=minSel?minSel.value:'';
+  var respQuery=(document.getElementById('agenda-prox-resp-buscar')||{}).value||'';
+  var fTipo=(document.getElementById('agenda-prox-tipo')||{}).value||'';
 
   var ocs=agendaGetOcurrencias(desde,hasta);
   if(fMinisterio) ocs=ocs.filter(function(o){return String(o.ministerioId)===String(fMinisterio);});
+  if(fTipo) ocs=ocs.filter(function(o){return o.tipoActividad===fTipo;});
+  ocs=agendaFiltrarPorResponsable(ocs,respQuery);
 
   agendaRenderOcurrenciasList(ocs,'agenda-proximos-list','Sin eventos en el período seleccionado');
 }
 
 function agendaRenderHistoricoEventos(){
   var desdeEl=document.getElementById('agenda-hist-desde');
+  var hastaEl=document.getElementById('agenda-hist-hasta');
   var minSel=document.getElementById('agenda-hist-ministerio');
   if(minSel&&minSel.options.length<=1){
     S.ministerios.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).forEach(function(m){
@@ -5657,23 +6193,37 @@ function agendaRenderHistoricoEventos(){
     });
   }
 
-  // Histórico: siempre termina ayer (hoy no incluido) — arranca donde el usuario elija, o sin límite
+  // Histórico: siempre termina ayer como máximo (hoy no incluido) — Hasta editable pero nunca futuro
   var ayer=new Date(today()+'T00:00:00'); ayer.setDate(ayer.getDate()-1); ayer.setHours(23,59,59,999);
+  if(hastaEl&&!hastaEl.value) hastaEl.value=dateToStr(ayer);
+  var hastaElegida=hastaEl&&hastaEl.value?new Date(hastaEl.value+'T23:59:59'):ayer;
+  var hasta=hastaElegida<ayer?hastaElegida:ayer;
   var desde=desdeEl&&desdeEl.value?new Date(desdeEl.value+'T00:00:00'):new Date(2000,0,1);
   var fMinisterio=minSel?minSel.value:'';
+  var respQuery=(document.getElementById('agenda-hist-resp-buscar')||{}).value||'';
+  var fTipo=(document.getElementById('agenda-hist-tipo')||{}).value||'';
 
-  var ocs=agendaGetOcurrencias(desde,ayer);
+  var ocs=agendaGetOcurrencias(desde,hasta);
   if(fMinisterio) ocs=ocs.filter(function(o){return String(o.ministerioId)===String(fMinisterio);});
+  if(fTipo) ocs=ocs.filter(function(o){return o.tipoActividad===fTipo;});
+  ocs=agendaFiltrarPorResponsable(ocs,respQuery);
   ocs.sort(function(a,b){return b.fechaOcurrencia.localeCompare(a.fechaOcurrencia);});
 
   agendaRenderOcurrenciasList(ocs,'agenda-historico-list','Sin eventos anteriores a hoy en el período seleccionado');
 }
 
 function agendaResetProximosFiltro(){
+  var desdeEl=document.getElementById('agenda-prox-desde');
   var hastaEl=document.getElementById('agenda-prox-hasta');
   var minSel=document.getElementById('agenda-prox-ministerio');
-  if(hastaEl){ var d=new Date(); d.setDate(d.getDate()+15); hastaEl.value=dateToStr(d); }
+  var respEl=document.getElementById('agenda-prox-resp-buscar');
+  var tipoSel=document.getElementById('agenda-prox-tipo');
+  var rango=agendaRangoDefault();
+  if(desdeEl) desdeEl.value=rango.desde;
+  if(hastaEl) hastaEl.value=rango.hasta;
   if(minSel) minSel.value='';
+  if(respEl) respEl.value='';
+  if(tipoSel) tipoSel.value='';
   agendaRenderProximos();
 }
 
@@ -5727,7 +6277,7 @@ function agendaAbrirModalCrearChecklist(eventoId){
   var ev=S.eventos.find(function(e){return Number(e.id)===Number(eventoId);});
   if(!ev) return;
   document.getElementById('agenda-cl-crear-titulo').textContent=ev.titulo;
-  var coordDefault=ev.responsableId?[ev.responsableId]:[];
+  var coordDefault=(ev.responsablesIds||[]).slice();
   document.getElementById('agenda-cl-coord-list').innerHTML=agendaMembersChecklistPoolHtml('agenda-cl-coord',coordDefault);
   document.getElementById('agenda-cl-colab-list').innerHTML=agendaMembersChecklistPoolHtml('agenda-cl-colab',[]);
   document.getElementById('agenda-cl-crear-overlay').style.display='flex';
@@ -6516,12 +7066,12 @@ function agendaRenderChecklistList(){
     var ev=S.eventos.find(function(e){return Number(e.id)===Number(c.eventoId);});
     var tareas=(S.checklistTareas||[]).filter(function(t){return Number(t.checklistId)===Number(c.id);});
     var fin=tareas.filter(function(t){return t.estado==='Finalizada';}).length;
-    var resp=ev&&ev.responsableId?S.members.find(function(m){return Number(m.id)===Number(ev.responsableId);}):null;
+    var resps=(ev&&ev.responsablesIds||[]).map(function(id){return S.members.find(function(m){return Number(m.id)===Number(id);});}).filter(Boolean);
     return '<div class="card" style="margin-bottom:.6rem;padding:12px;cursor:pointer" onclick="agendaAbrirChecklistDetalle('+c.id+')">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
       +'<div>'
       +'<div style="font-weight:700;font-size:14px;color:#1F2937">'+(ev?ev.titulo:'Actividad')+'</div>'
-      +'<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(ev?fmt(ev.fecha):'')+(resp?' · 👤 '+listName(resp):'')+'</div>'
+      +'<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(ev?fmt(ev.fecha):'')+(resps.length?' · 👤 '+resps.map(listName).join(', '):'')+'</div>'
       +'</div>'
       +'<span class="badge '+(fin===tareas.length&&tareas.length>0?'b-ok':'b-muted')+'">'+fin+'/'+tareas.length+' finalizadas</span>'
       +'</div></div>';
@@ -6571,15 +7121,20 @@ async function cfgDeleteGroup(id){
   if(!confirm('¿Eliminár el Grupo "'+g.name+'"? Esta acción no se puede deshacer.')) return;
   // Delete
   S.groups=S.groups.filter(function(x){ return Number(x.id)!==Number(id); });
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('gdv',id,{activo:false});
   try{
     await saveK(SK.groups, S.groups);
+    if(tocoEventos) await saveK(SK.eventos, S.eventos);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
     cfgRenderGrupos();
     showToast('✅ Grupo "'+g.name+'" eliminado','#16A34A');
   }catch(e){
     // Revert on failure
     S.groups.push(g);
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.groups, S.groups);
+    if(tocoEventos) await saveK(SK.eventos, S.eventos);
     alert('No se pudo eliminar en la nube. Verificá tu conexión e intentá de nuevo.');
   }
 }
@@ -6612,10 +7167,11 @@ function cfgRenderGrupos(){
     const tot=members.length;
     const mH=members.filter(m=>m.genero==='H').length;
     const mM=members.filter(m=>m.genero==='M').length;
-    const st=tot>=10?'¡Multiplicar!':tot>=8?'Próx. multiplicar':'Activo';
-    const sc=tot>=10?'b-danger':tot>=8?'b-warn':'b-ok';
+    const inactivo=g.estado==='Inactivo';
+    const st=inactivo?'🚫 Deshabilitado':tot>=10?'¡Multiplicar!':tot>=8?'Próx. multiplicar':'Activo';
+    const sc=inactivo?'b-muted':tot>=10?'b-danger':tot>=8?'b-warn':'b-ok';
     const tc=g.type==='Mujeres'?'#C0006A':g.type==='Hombres'?'#1565C0':'#5B5EA6';
-    return `<div class="card" style="margin-bottom:.75rem">
+    return `<div class="card" style="margin-bottom:.75rem${inactivo?';opacity:.6':''}">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
         <div class="avatar" style="background:${tc}20;color:${tc}">${g.type==='Mujeres'?'M':g.type==='Hombres'?'H':'MX'}</div>
         <div style="flex:1">
@@ -6623,6 +7179,7 @@ function cfgRenderGrupos(){
           <div style="font-size:12px;color:#6B7280">${g.type} · ${facName}${g.dia?` · ${g.dia} ${g.horario||''}`:''}</div>
         </div>
         <span class="badge ${sc}">${st}</span>
+        <button class="btn btn-sm" onclick="cfgToggleGrupoActivo(${g.id})" style="color:${inactivo?'#16A34A':'#D97706'}" title="${inactivo?'Habilitar':'Deshabilitar'}">${inactivo?'▶️':'⏸'}</button>
         <button class="btn btn-sm" onclick="cfgEditGroup(${g.id})">✏️</button>
         <button onclick="cfgDeleteGroup(${g.id})" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:13px" title="Eliminar">🗑️</button>
       </div>
@@ -6633,6 +7190,35 @@ function cfgRenderGrupos(){
     </div>`;
   }).join('');
 }
+async function cfgToggleGrupoActivo(id){
+  var g=(S.groups||[]).find(function(x){return Number(x.id)===Number(id);});
+  if(!g) return;
+  var nuevoEstado=g.estado==='Inactivo'?'Activo':'Inactivo';
+  if(!confirm((nuevoEstado==='Inactivo'?'¿Deshabilitar':'¿Habilitar')+' el Grupo "'+g.name+'"?'+(nuevoEstado==='Inactivo'?'\nSu actividad en Agenda deja de repetirse hacia adelante (el historial no se toca).':'\nSu actividad en Agenda vuelve a repetirse en Agenda.'))) return;
+  var estadoAnterior=g.estado;
+  g.estado=nuevoEstado;
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('gdv',g.id,{
+    nombre:g.name,dia:g.dia,horario:g.horario,
+    responsablesIds:[g.facId,g.facId2].filter(Boolean),
+    activo:nuevoEstado!=='Inactivo'
+  });
+  await saveK(SK.groups,S.groups);
+  if(tocoEventos) await saveK(SK.eventos,S.eventos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    g.estado=estadoAnterior;
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
+    await saveK(SK.groups,S.groups);
+    if(tocoEventos) await saveK(SK.eventos,S.eventos);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  cfgRenderGrupos();
+  showToast(nuevoEstado==='Inactivo'?'⏸ Grupo deshabilitado':'▶️ Grupo habilitado','#16A34A');
+}
+
 function cfgPopulateGroupModal(){
   cfgPopulateFacSelects();
 }
@@ -6681,8 +7267,9 @@ async function cfgSaveGroup(){
   var esNuevoGrupo=false;
   var nuevoGrupoRef=null;
   var facAnteriorRoles=null;
+  var g;
   if(cfgEditingGroupId){
-    const g=S.groups.find(x=>x.id===cfgEditingGroupId);
+    g=S.groups.find(x=>x.id===cfgEditingGroupId);
     snapshotGrupo=Object.assign({},g);
     // If facilitador changed, remove 'facilitador' role from old one
     if(g.facId && g.facId!==facId){
@@ -6692,8 +7279,9 @@ async function cfgSaveGroup(){
     Object.assign(g,{name,type,facId,facId2,dia,horario});
   } else {
     esNuevoGrupo=true;
-    nuevoGrupoRef={id:Date.now(),name,type,facId,facId2,dia,horario,miembros:[]};
+    nuevoGrupoRef={id:Date.now(),name,type,facId,facId2,dia,horario,miembros:[],estado:'Activo'};
     S.groups.push(nuevoGrupoRef);
+    g=nuevoGrupoRef;
   }
 
   // Assign 'facilitador' role to selected member
@@ -6706,8 +7294,17 @@ async function cfgSaveGroup(){
     }
   }
 
+  // Sincronizar con Agenda: este Grupo pasa a tener (o actualizar) su propia Actividad Habitual
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var tocoEventos=agendaSincronizarActividadOrigen('gdv',g.id,{
+    nombre:g.name,dia:g.dia,horario:g.horario,
+    responsablesIds:[g.facId,g.facId2].filter(Boolean),
+    activo:g.estado!=='Inactivo'
+  });
+
   await saveK(SK.groups,S.groups);
   await saveK(SK.members,S.members);
+  if(tocoEventos) await saveK(SK.eventos,S.eventos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
@@ -6715,13 +7312,15 @@ async function cfgSaveGroup(){
     if(esNuevoGrupo){
       S.groups=S.groups.filter(function(x){return x!==nuevoGrupoRef;});
     } else if(snapshotGrupo){
-      const g=S.groups.find(x=>x.id===cfgEditingGroupId);
-      if(g) Object.assign(g,snapshotGrupo);
+      const gr=S.groups.find(x=>x.id===cfgEditingGroupId);
+      if(gr) Object.assign(gr,snapshotGrupo);
     }
     if(facAnteriorRoles){ facAnteriorRoles.member.roles=facAnteriorRoles.roles; }
     if(facRolAgregado){ facRolAgregado.roles=(facRolAgregado.roles||[]).filter(r=>r!=='facilitador'); }
+    if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.groups, S.groups);
     await saveK(SK.members, S.members);
+    if(tocoEventos) await saveK(SK.eventos, S.eventos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -7963,6 +8562,20 @@ document.addEventListener('click', function(e){
     const respDd=document.getElementById('agenda-f-resp-results');
     if(respDd&&respInp&&!respInp.contains(e.target)&&!respDd.contains(e.target)){
       respDd.style.display='none';
+    }
+  }
+  {
+    const msgInp=document.getElementById('agenda-f-msg-search');
+    const msgDd=document.getElementById('agenda-f-msg-results');
+    if(msgDd&&msgInp&&!msgInp.contains(e.target)&&!msgDd.contains(e.target)){
+      msgDd.style.display='none';
+    }
+  }
+  {
+    const discGrupoInp=document.getElementById('disc-grupo-detalle-mem-buscar-nuevo');
+    const discGrupoDd=document.getElementById('disc-grupo-detalle-mem-buscar-results');
+    if(discGrupoDd&&discGrupoInp&&!discGrupoInp.contains(e.target)&&!discGrupoDd.contains(e.target)){
+      discGrupoDd.style.display='none';
     }
   }
   {
@@ -12764,9 +13377,52 @@ function buildDiscipuladoHTML(){
         </div>
       </div>
     </div>
+
+    <div id="disc-grupos-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:15px;font-weight:700;color:#1F4E79">🧑‍🤝‍🧑 Grupos — <span id="disc-grupos-cursada-label"></span></div>
+          <button class="btn btn-sm" onclick="discCerrarGruposModal()">✕</button>
+        </div>
+        <div style="background:#F9FAFB;border-radius:8px;padding:10px 12px;margin-bottom:1rem;font-size:12px;color:#6B7280">
+          Los Grupos son solo organizativos (ej. distintos horarios de un mismo Curso). No afectan el % de asistencia — eso se sigue calculando siempre a nivel de toda la Cursada, sin importar en qué Grupo participó cada uno. Tocá un Grupo para asignarle Discipulador(es) e Integrantes.
+        </div>
+        <div id="disc-grupos-lista" style="margin-bottom:1rem"></div>
+        <button class="btn btn-sm" onclick="discAgregarGrupo()" style="background:#EEF2FF;border-color:#C7D2FE;color:#4338CA">+ Agregar Grupo</button>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
+          <button class="btn" onclick="discCerrarGruposModal()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="disc-grupo-detalle-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:310;align-items:center;justify-content:center;padding:1rem">
+      <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:15px;font-weight:700;color:#1F4E79">🧑‍🤝‍🧑 <span id="disc-grupo-detalle-nombre"></span></div>
+          <button class="btn btn-sm" onclick="discCerrarGrupoDetalle()">✕</button>
+        </div>
+        <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Discipulador(es) de este Grupo</label>
+        <input type="text" placeholder="Buscar..." oninput="discFilterList(this.value,'disc-grupo-detalle-disc-list')" style="width:100%;margin-bottom:8px">
+        <div id="disc-grupo-detalle-disc-list" style="max-height:140px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:1rem"></div>
+        <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Integrantes de este Grupo <span style="font-weight:400;color:#9CA3AF">(de los ya asignados a la Cursada)</span></label>
+        <input type="text" placeholder="Filtrar esta lista..." oninput="discFilterList(this.value,'disc-grupo-detalle-mem-list')" style="width:100%;margin-bottom:8px">
+        <div id="disc-grupo-detalle-mem-list" style="max-height:220px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:10px"></div>
+        <label style="font-size:12.5px;font-weight:600;color:#4338CA;display:block;margin-bottom:4px">¿No está en la lista? Buscalo en toda Rebaños</label>
+        <div style="position:relative;margin-bottom:1rem">
+          <input type="text" id="disc-grupo-detalle-mem-buscar-nuevo" placeholder="Buscar en Rebaños para sumar a alguien nuevo..." oninput="discGrupoBuscarNuevoIntegrante(this.value)" autocomplete="off">
+          <div id="disc-grupo-detalle-mem-buscar-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
+          <button class="btn" onclick="discCerrarGrupoDetalle()">Cancelar</button>
+          <button class="btn btn-primary" onclick="discGuardarGrupoDetalle()">Guardar</button>
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 
+let discGruposCursadaId=null;
+let discGrupoDetalleId=null;
 let discEditingPasoId=null;
 let discAsignandoPasoId=null;
 let discAsignandoCursadaId=null;
@@ -12970,7 +13626,7 @@ async function discAbrirCursada(pasoId){
   if(!S.discCursadas) S.discCursadas=[];
   var recsPrev=S.discRecords.filter(function(r){return r.pasoId===pasoId&&!r.cursadaId&&r.asistencia;});
   var memPrev=[...new Set(recsPrev.flatMap(function(r){return Object.keys(r.asistencia).filter(function(id){return r.asistencia[id]&&r.asistencia[id].state==='presente';});}))].map(Number).filter(Boolean);
-  var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorIds:paso.discipuladorIds||[],miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:'',_ts:Date.now()};
+  var nc={id:Date.now(),pasoId:pasoId,pasoNombre:paso.nombre,anio:anio,label:discGenLabel(pasoId,anio),discipuladorIds:paso.discipuladorIds||[],miembros:memPrev.length?memPrev:[],estado:'Activo',fechaInicio:todayAA(),fechaCierre:'',grupos:[],_ts:Date.now()};
   S.discCursadas.push(nc);
   var recordsTocados=[];
   S.discRecords.forEach(function(r){ if(r.pasoId===pasoId&&!r.cursadaId){ recordsTocados.push(r); r.cursadaId=nc.id; r._ts=Date.now(); } });
@@ -13182,15 +13838,24 @@ function discRenderCursada(c){
         if(esSuper) html+='<button class="btn btn-sm" onclick="discRevertirInicio('+cursadaActiva.id+')" style="color:#D97706" title="Deshace el inicio de esta cursada">↩️ Revertir inicio</button>';
       }
     }
+    if(cursadaActiva&&canAdminDisc()){
+      html+='<button class="btn btn-sm" onclick="discAbrirGruposModal('+cursadaActiva.id+')" style="background:#EEF2FF;border-color:#C7D2FE;color:#4338CA">🧑‍🤝‍🧑 Grupos'+((cursadaActiva.grupos||[]).length?' ('+cursadaActiva.grupos.length+')':'')+'</button>';
+    }
     html+='</div></div>';
     // Members list — solo si hay cursada activa (si no, no hay a quién mostrar)
     if(cursadaActiva&&cursadaActiva.miembros.length){
       var mems=cursadaActiva.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+      var grupos=cursadaActiva.grupos||[];
       html+='<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px">';
       mems.forEach(function(m){
         var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
         var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
-        html+='<span style="background:'+genBg+';color:'+genColor+';font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600">'+fullName(m)+'</span>';
+        var grupoTag='';
+        if(grupos.length){
+          var gr=grupos.find(function(x){return (x.miembros||[]).includes(m.id);});
+          grupoTag=' <span style="opacity:.7">· '+(gr?gr.nombre:'Sin grupo')+'</span>';
+        }
+        html+='<span style="background:'+genBg+';color:'+genColor+';font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600">'+fullName(m)+grupoTag+'</span>';
       });
       html+='</div>';
     }
@@ -13558,6 +14223,233 @@ async function discGuardarAsignacion(){
   showToast('✅ Asignación guardada','#16A34A');
 }
 
+// ── Grupos paralelos dentro de una misma Cursada (ej. "Grupo 10:00 hs" / "Grupo 11:30 hs") ──
+// Puramente organizativos: NO afectan el % de asistencia, que siempre se calcula a nivel Cursada.
+
+function discAbrirGruposModal(cursadaId){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
+  if(!cursada) return;
+  discGruposCursadaId=cursadaId;
+  document.getElementById('disc-grupos-cursada-label').textContent=cursada.label;
+  discRenderGruposLista();
+  document.getElementById('disc-grupos-modal').style.display='flex';
+}
+
+function discCerrarGruposModal(){
+  document.getElementById('disc-grupos-modal').style.display='none';
+  discGruposCursadaId=null;
+}
+
+function discRenderGruposLista(){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  var wrap=document.getElementById('disc-grupos-lista');
+  if(!cursada||!wrap) return;
+  var grupos=cursada.grupos||[];
+  if(!grupos.length){
+    wrap.innerHTML='<div class="empty" style="padding:1rem;font-size:13px">Todavía no hay Grupos adicionales — toda la Cursada funciona como un solo grupo (como siempre).</div>';
+    return;
+  }
+  wrap.innerHTML=grupos.map(function(g){
+    var cant=(g.miembros||[]).length;
+    var discs=(g.discipuladorIds||[]).map(function(id){var m=S.members.find(function(x){return x.id===id;});return m?listName(m):null;}).filter(Boolean);
+    return '<div onclick="discAbrirGrupoDetalle('+g.id+')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;margin-bottom:6px">'
+      +'<div><div style="font-size:13px;font-weight:600;color:#374151">🧑‍🤝‍🧑 '+g.nombre+'</div>'
+      +(discs.length?'<div style="font-size:11px;color:#6D28D9;margin-top:2px">👤 '+discs.join(', ')+'</div>':'<div style="font-size:11px;color:#9CA3AF;margin-top:2px">Sin discipulador asignado</div>')
+      +'</div>'
+      +'<span style="font-size:12px;color:#6B7280;flex-shrink:0">'+cant+' integrante'+(cant!==1?'s':'')+' ›</span>'
+      +'</div>';
+  }).join('');
+}
+
+function discAgregarGrupo(){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  if(!cursada) return;
+  if(!cursada.grupos) cursada.grupos=[];
+  var crear=function(){
+    var nombre=prompt('Nombre del nuevo Grupo (ej: "Grupo 10:00 hs"):');
+    if(!nombre||!nombre.trim()){ if(nombre!==null) alert('El nombre es obligatorio.'); return; }
+    discGuardarGrupoNuevo(cursada,nombre.trim());
+  };
+  if(cursada.grupos.length>=1){
+    if(confirm('Ya existe un Grupo para esta Cursada. ¿Generás uno Adicional?')) crear();
+  } else {
+    crear();
+  }
+}
+
+async function discGuardarGrupoNuevo(cursada,nombre){
+  var snapshot=JSON.parse(JSON.stringify(cursada.grupos||[]));
+  if(!cursada.grupos) cursada.grupos=[];
+  cursada.grupos.push({id:Date.now(),nombre:nombre,discipuladorIds:[],miembros:[]});
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    cursada.grupos=snapshot;
+    cursada._ts=Date.now();
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Grupo agregado','#16A34A');
+  discRenderGruposLista();
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+}
+
+let discGrupoDetalleNuevosIntegrantes=[]; // ids agregados por búsqueda manual en este modal, recién se persisten al Guardar
+
+function discAbrirGrupoDetalle(grupoId){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  if(!cursada) return;
+  var grupo=(cursada.grupos||[]).find(function(g){return g.id===grupoId;});
+  if(!grupo) return;
+  discGrupoDetalleId=grupoId;
+  discGrupoDetalleNuevosIntegrantes=[];
+  document.getElementById('disc-grupo-detalle-nombre').textContent=grupo.nombre;
+  var buscarNuevo=document.getElementById('disc-grupo-detalle-mem-buscar-nuevo');
+  if(buscarNuevo) buscarNuevo.value='';
+  var buscarResults=document.getElementById('disc-grupo-detalle-mem-buscar-results');
+  if(buscarResults) buscarResults.style.display='none';
+
+  var discIds=grupo.discipuladorIds||[];
+  document.getElementById('disc-grupo-detalle-disc-list').innerHTML=S.members.filter(function(m){return m.estado!=='Baja';}).map(function(m){
+    var checked=discIds.includes(m.id);
+    var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+    var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB;min-width:0">'
+      +'<input type="checkbox" class="disc-grupo-detalle-disc-cb" value="'+m.id+'"'+(checked?' checked':'')+' style="width:16px;height:16px;flex-shrink:0;cursor:pointer">'
+      +'<span style="background:'+genBg+';color:'+genColor+';font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;flex-shrink:0">'+m.genero+'</span>'
+      +'<span style="font-size:13px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fullName(m)+'</span>'
+      +'</label>';
+  }).join('');
+
+  discRenderGrupoDetalleMemList();
+  document.getElementById('disc-grupo-detalle-modal').style.display='flex';
+}
+
+// Integrantes: los ya asignados a la Cursada + los que se hayan sumado por búsqueda manual en este modal
+// (todavía no persistidos — recién se guardan al presionar "Guardar"), marcando en qué otro Grupo está cada uno
+function discRenderGrupoDetalleMemList(){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  var grupo=cursada?(cursada.grupos||[]).find(function(g){return g.id===discGrupoDetalleId;}):null;
+  if(!cursada||!grupo) return;
+  var grupoActualMiembros=grupo.miembros||[];
+  var idsBase=cursada.miembros.concat(discGrupoDetalleNuevosIntegrantes);
+  document.getElementById('disc-grupo-detalle-mem-list').innerHTML=idsBase.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean).map(function(m){
+    var checked=grupoActualMiembros.includes(m.id)||discGrupoDetalleNuevosIntegrantes.includes(m.id);
+    var esNuevo=discGrupoDetalleNuevosIntegrantes.includes(m.id);
+    var otroGrupo=(cursada.grupos||[]).find(function(g){return g.id!==discGrupoDetalleId&&(g.miembros||[]).includes(m.id);});
+    var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+    var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB;min-width:0">'
+      +'<input type="checkbox" class="disc-grupo-detalle-mem-cb" value="'+m.id+'"'+(checked?' checked':'')+' style="width:16px;height:16px;flex-shrink:0;cursor:pointer">'
+      +'<span style="background:'+genBg+';color:'+genColor+';font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;flex-shrink:0">'+m.genero+'</span>'
+      +'<span style="font-size:13px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fullName(m)+'</span>'
+      +(esNuevo?'<span style="font-size:10px;color:#16A34A;font-weight:700;flex-shrink:0;white-space:nowrap">🆕 nuevo en la Cursada</span>':'')
+      +(otroGrupo?'<span style="font-size:10px;color:#D97706;flex-shrink:0;white-space:nowrap">en '+otroGrupo.nombre+'</span>':'')
+      +'</label>';
+  }).join('');
+}
+
+function discGrupoBuscarNuevoIntegrante(query){
+  var box=document.getElementById('disc-grupo-detalle-mem-buscar-results');
+  if(!box) return;
+  var q=(query||'').trim().toLowerCase();
+  if(q.length<2){ box.style.display='none'; return; }
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  if(!cursada) return;
+  var yaDisponibles=cursada.miembros.concat(discGrupoDetalleNuevosIntegrantes);
+  var results=S.members.filter(function(m){
+    return m.estado!=='Baja' && !yaDisponibles.includes(m.id) && listName(m).toLowerCase().indexOf(q)!==-1;
+  }).slice(0,8);
+  if(!results.length){
+    box.innerHTML='<div style="padding:8px 12px;font-size:13px;color:#9CA3AF">Sin resultados</div>';
+    box.style.display='block';
+    return;
+  }
+  box.innerHTML=results.map(function(m){
+    return '<div data-id="'+m.id+'" onpointerdown="event.preventDefault();discGrupoAgregarNuevoIntegrante('+m.id+')" ontouchstart="event.preventDefault();discGrupoAgregarNuevoIntegrante('+m.id+')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px;font-weight:600">'+listName(m)+'</div>';
+  }).join('');
+  box.style.display='block';
+}
+
+function discGrupoAgregarNuevoIntegrante(memberId){
+  if(!discGrupoDetalleNuevosIntegrantes.includes(memberId)) discGrupoDetalleNuevosIntegrantes.push(memberId);
+  var s=document.getElementById('disc-grupo-detalle-mem-buscar-nuevo'); if(s){s.value='';s.blur();}
+  var box=document.getElementById('disc-grupo-detalle-mem-buscar-results'); if(box) box.style.display='none';
+  discRenderGrupoDetalleMemList();
+  // Tildar automáticamente al recién agregado, ya que buscarlo implica querer sumarlo a este Grupo
+  var cb=document.querySelector('.disc-grupo-detalle-mem-cb[value="'+memberId+'"]');
+  if(cb) cb.checked=true;
+}
+
+function discCerrarGrupoDetalle(){
+  document.getElementById('disc-grupo-detalle-modal').style.display='none';
+  discGrupoDetalleId=null;
+  discGrupoDetalleNuevosIntegrantes=[];
+}
+
+async function discGuardarGrupoDetalle(){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  if(!cursada) return;
+  var grupo=(cursada.grupos||[]).find(function(g){return g.id===discGrupoDetalleId;});
+  if(!grupo) return;
+  var snapshotGrupos=JSON.parse(JSON.stringify(cursada.grupos));
+  var snapshotMiembros=cursada.miembros.slice();
+
+  var nuevosDisc=[...document.querySelectorAll('.disc-grupo-detalle-disc-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  var nuevosMiembros=[...document.querySelectorAll('.disc-grupo-detalle-mem-cb:checked')].map(function(cb){return parseInt(cb.value);});
+
+  // Si alguno de los que quedaron tildados ya estaba en OTRO Grupo, pedir una única confirmación
+  // que liste a todos los reasignados, antes de aplicar ningún cambio
+  var reasignados=[];
+  nuevosMiembros.forEach(function(mid){
+    var otroGrupo=(cursada.grupos||[]).find(function(g){return g.id!==grupo.id&&(g.miembros||[]).includes(mid);});
+    if(otroGrupo){
+      var m=S.members.find(function(x){return x.id===mid;});
+      reasignados.push({nombre:m?fullName(m):('#'+mid),origen:otroGrupo.nombre});
+    }
+  });
+  if(reasignados.length){
+    var lista=reasignados.map(function(r){return '• '+r.nombre+' (viene de '+r.origen+')';}).join('\n');
+    var msg='Vas a reasignar a '+(reasignados.length>1?'estas personas':'esta persona')+', sacándola'+(reasignados.length>1?'s':'')+' de su Grupo actual:\n'+lista+'\n\n¿Confirmás?';
+    if(!confirm(msg)) return;
+  }
+
+  // Los que se sumaron por búsqueda manual (aunque no hayan quedado tildados) pasan a integrar la Cursada en general
+  discGrupoDetalleNuevosIntegrantes.forEach(function(mid){
+    if(!cursada.miembros.includes(mid)) cursada.miembros.push(mid);
+  });
+
+  grupo.discipuladorIds=nuevosDisc;
+  grupo.miembros=nuevosMiembros;
+  // Un integrante pertenece a un solo Grupo a la vez — sacarlo de cualquier otro Grupo si lo sumamos acá
+  (cursada.grupos||[]).forEach(function(g){
+    if(g.id===grupo.id) return;
+    g.miembros=(g.miembros||[]).filter(function(mid){return !nuevosMiembros.includes(mid);});
+  });
+
+  cursada._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    cursada.grupos=snapshotGrupos;
+    cursada.miembros=snapshotMiembros;
+    cursada._ts=Date.now();
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Grupo actualizado','#16A34A');
+  discCerrarGrupoDetalle();
+  discRenderGruposLista();
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+}
+
 function discOpenModal(pasoId){
   if(!hasRole('super_admin')){ alert('Solo Super Admin puede crear o editar Cursos.'); return; }
   discEditingPasoId=pasoId;
@@ -13695,6 +14587,7 @@ async function discEliminarPaso(pasoId){
 // ── Cargar asistencia ──
 var discFacAtt={};
 var discSelectedPasoId=null;
+var discSelectedGrupoId=null;
 
 function discRenderCargar(c){
   var cursadasActivas=(S.discCursadas||[]).filter(function(cu){return cu.estado==='Activo';});
@@ -13707,6 +14600,10 @@ function discRenderCargar(c){
     '<div class="card"><div class="card-title">✏️ Cargar asistencia</div>'
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Paso</label>'
     +'<select id="disc-sel-paso" onchange="discLoadPasoForm()" style="margin-bottom:12px"><option value="">— Seleccioná un paso —</option>'+pasoOpts+'</select>'
+    +'<div id="disc-sel-grupo-wrap" style="display:none">'
+      +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo <span style="font-weight:400;color:#9CA3AF">(esta Cursada tiene más de uno — elegí para cuál es esta carga)</span></label>'
+      +'<select id="disc-sel-grupo" onchange="discLoadPasoForm()" style="margin-bottom:12px"></select>'
+    +'</div>'
     +'<div id="disc-pending-alert" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:10px;font-size:13px;color:#991B1B;margin-bottom:12px"></div>'
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha</label>'
     +'<input type="date" id="disc-fecha" value="'+hoy+'" max="'+hoy+'" style="margin-bottom:12px" onchange="discCheckDuplicateWeek()">'
@@ -13741,11 +14638,12 @@ function discCheckDuplicateWeek(){
   var anio=parseLocalDate(fecha).getFullYear();
   var existe=S.discRecords.find(function(r){
     if((r.cursadaId||r.pasoId)!==cursadaId) return false;
+    if(discSelectedGrupoId&&String(r.grupoId||'')!==String(discSelectedGrupoId)) return false;
     return getISOWeek(r.fecha)===semana && parseLocalDate(r.fecha).getFullYear()===anio;
   });
   if(existe){
     alertEl.style.display='block';
-    alertEl.innerHTML='🚫 Ya existe un registro para la <strong>Semana '+semana+'</strong> en este Paso (fecha '+fmtAA(existe.fecha)+').';
+    alertEl.innerHTML='🚫 Ya existe un registro para la <strong>Semana '+semana+'</strong> en este Paso'+(discSelectedGrupoId?' / Grupo':'')+' (fecha '+fmtAA(existe.fecha)+').';
   } else {
     alertEl.style.display='none';
   }
@@ -13762,6 +14660,23 @@ function discLoadPasoForm(){
     fechaInput.max=lim.max;
     fechaInput.value=cursadaId?discFechaSugerida(cursadaId):lim.max;
   }
+
+  // Grupo — solo se muestra si la Cursada tiene más de uno (si no, sigue invisible como siempre)
+  var grupoWrap=document.getElementById('disc-sel-grupo-wrap');
+  var grupoSel=document.getElementById('disc-sel-grupo');
+  var grupos=(cursada&&cursada.grupos)||[];
+  if(grupos.length>=1&&grupoWrap&&grupoSel){
+    grupoWrap.style.display='block';
+    var valorPrevio=grupoSel.value;
+    grupoSel.innerHTML='<option value="">— Elegí un Grupo —</option>'+grupos.map(function(g){return '<option value="'+g.id+'">'+g.nombre+'</option>';}).join('');
+    // Mantener la selección si seguís en la misma cursada y ese grupo todavía existe
+    if(valorPrevio&&grupos.some(function(g){return String(g.id)===valorPrevio;})) grupoSel.value=valorPrevio;
+    discSelectedGrupoId=grupoSel.value||null;
+  } else {
+    if(grupoWrap) grupoWrap.style.display='none';
+    discSelectedGrupoId=null;
+  }
+
   discCheckDuplicateWeek();
 
   // Load chapters
@@ -13781,9 +14696,21 @@ function discLoadPasoForm(){
     discFacAtt={};
     return;
   }
+  if(grupos.length>=1&&!discSelectedGrupoId){
+    wrap.innerHTML='<div class="empty">Elegí para qué Grupo es esta carga</div>';
+    discFacAtt={};
+    return;
+  }
 
   discFacAtt={};
-  var mems=cursada.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+  var grupoSeleccionado=grupos.length>=1?grupos.find(function(g){return String(g.id)===String(discSelectedGrupoId);}):null;
+  var mems=cursada.miembros
+    .filter(function(id){ return grupos.length<1 || (grupoSeleccionado&&(grupoSeleccionado.miembros||[]).includes(id)); })
+    .map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+  if(grupos.length>=1&&!mems.length){
+    wrap.innerHTML='<div class="empty">Todavía no hay integrantes asignados a este Grupo — asignalos desde 🧑‍🤝‍🧑 Grupos</div>';
+    return;
+  }
   // Default: Ausente
   mems.forEach(function(m){discFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
 
@@ -13824,16 +14751,23 @@ async function discGuardarAsistencia(){
   }
   if(!Object.keys(discFacAtt).length){alert('No hay miembros en este paso');return;}
 
+  var cursadaChk=(S.discCursadas||[]).find(function(cu){return cu.id===pasoId;});
+  if(cursadaChk&&(cursadaChk.grupos||[]).length>=1&&!discSelectedGrupoId){
+    alert('Esta Cursada tiene más de un Grupo — elegí para cuál es esta carga.');
+    return;
+  }
+
   // Ventana permitida — semana ISO en curso y la anterior como máximo, para TODAS las Funciones (incluye Super Admin)
   var lim=limiteFechaCarga();
   if(fecha>lim.max){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+fmtAA(lim.max)+').');return;}
   if(fecha<lim.min){alert('Solo se puede cargar la semana en curso o la anterior. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
 
-  // Check for duplicate week (same paso + same ISO week)
+  // Check for duplicate week (misma Cursada + mismo Grupo, si la Cursada tiene Grupos + misma semana ISO)
   var semana=getISOWeek(fecha);
   var anio=parseLocalDate(fecha).getFullYear();
   var yaExiste=S.discRecords.find(function(r){
     if((r.cursadaId||r.pasoId)!==pasoId) return false;
+    if(discSelectedGrupoId&&String(r.grupoId||'')!==String(discSelectedGrupoId)) return false;
     return getISOWeek(r.fecha)===semana && parseLocalDate(r.fecha).getFullYear()===anio;
   });
   if(yaExiste){
@@ -13849,7 +14783,7 @@ async function discGuardarAsistencia(){
       await saveK(SK.discRecords,S.discRecords);
       showToast('🔄 Se limpió un intento de carga anterior que nunca había llegado a la nube. Continuá cargando.','#1F4E79');
     } else {
-      alert('Ya existe un registro para la Semana '+semana+' en este Paso.');
+      alert('Ya existe un registro para la Semana '+semana+' en este Paso'+(discSelectedGrupoId?' / Grupo':'')+'.');
       return;
     }
   }
@@ -13857,6 +14791,7 @@ async function discGuardarAsistencia(){
   var cursada=(S.discCursadas||[]).find(function(cu){return cu.id===pasoId;});var paso=cursada?S.discPasos.find(function(p){return p.id===cursada.pasoId;}):null;var realPasoId=cursada?cursada.pasoId:pasoId;
   S.discRecords.push({
     id:Date.now(),pasoId:realPasoId,cursadaId:pasoId,pasoNombre:cursada?cursada.label:(paso?paso.nombre:''),
+    grupoId:discSelectedGrupoId||null,
     fecha,capitulo,asistencia:{...discFacAtt},ts:new Date().toISOString(),_ts:Date.now()
   });
   await saveK(SK.discRecords,S.discRecords);

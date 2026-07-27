@@ -406,6 +406,7 @@ const KEY_GROUPS = {
   'modules': ['gdv_modules5'],
   'agenda':  ['gdv_ministerios','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas','_tomb_gdv_checklist_secciones','gdv_checklist_secciones'],
   'campanas':['gdv_campanas'],
+  'formularios': ['_tomb_gdv_formularios','gdv_formularios','_tomb_gdv_form_respuestas','gdv_form_respuestas','_tomb_gdv_form_analisis','gdv_form_analisis'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
                'of5_part','of5_obspart','of5_obspago','of5_materias'],
 };
@@ -433,8 +434,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -592,8 +593,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -735,6 +736,9 @@ window.fbDownload().then(function(hasData) {
         S.checklists     = _ld('gdv_checklists',      S.checklists     ||[]);
         S.checklistTareas= _ld('gdv_checklist_tareas',S.checklistTareas||[]);
         S.checklistSecciones= _ld('gdv_checklist_secciones',S.checklistSecciones||[]);
+        S.formularios    = _ld('gdv_formularios',     S.formularios    ||[]);
+        S.formRespuestas = _ld('gdv_form_respuestas', S.formRespuestas ||[]);
+        S.formAnalisis   = _ld('gdv_form_analisis',   S.formAnalisis   ||[]);
       }
       // Load permisos from Firebase if this device has none configured
       // Reload permisos from localStorage (now updated from Firebase if it was empty)
@@ -795,6 +799,10 @@ const MODULES_PERM=[
     {key:'equipo_ver',   label:'Ver checklists (los propios: coordinador/colaborador/asignado)'},
     {key:'equipo_crear', label:'Ver todos los checklists y crear checklists nuevos desde un evento'},
   ]},
+  {key:'formularios', label:'Formularios de Trabajo', icon:'📝', screens:[
+    {key:'formularios_ver',   label:'Ver Activos e Histórico'},
+    {key:'formularios_crear', label:'Crear formularios, revisar respuestas y Análisis App (Super Admin)'},
+  ]},
 ];
 
 // Flat SCREENS list for backward compatibility
@@ -802,16 +810,16 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',disc_inscripciones:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'},
-  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno'}
+  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',disc_inscripciones:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'}
 };
 
 let PERMISOS={};
@@ -1036,7 +1044,8 @@ const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles
   modulesConfig:'gdv_modules5',
   ministerios:'gdv_ministerios',eventos:'gdv_eventos',
   campanas:'gdv_campanas',
-  checklists:'gdv_checklists',checklistTareas:'gdv_checklist_tareas',checklistSecciones:'gdv_checklist_secciones'};
+  checklists:'gdv_checklists',checklistTareas:'gdv_checklist_tareas',checklistSecciones:'gdv_checklist_secciones',
+  formularios:'gdv_formularios',formRespuestas:'gdv_form_respuestas',formAnalisis:'gdv_form_analisis'};
 
 const DEFAULT_DISC_PASOS=[
   {id:1,nombre:'Discipulado N1',nivel:'Inicial',roleId:'disc_n1',estado:'Activo',discipuladorId:null,miembros:[],completados:{},
@@ -1269,7 +1278,7 @@ const DEFAULT_USERS=[
 // ════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════
-let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],discInscripciones:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[],checklistSecciones:[]};
+let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],discInscripciones:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[],checklistSecciones:[],formularios:[],formRespuestas:[],formAnalisis:[]};
 let currentUser=null;
 let gdvCharts={};
 let ngCharts={};
@@ -1316,6 +1325,9 @@ async function initStorage(){
   S.checklists     =load(SK.checklists,     []);
   S.checklistTareas=load(SK.checklistTareas,[]);
   S.checklistSecciones=load(SK.checklistSecciones,[]);
+  S.formularios    =load(SK.formularios,    []);
+  S.formRespuestas =load(SK.formRespuestas, []);
+  S.formAnalisis   =load(SK.formAnalisis,   []);
   await cleanMembers();
   loadPermisos();
   // ── Migrar roles nuevos si no existen ──
@@ -1996,6 +2008,7 @@ function ngRenderCargar(c){
           '<input type="checkbox" id="ng-sin-enc" onchange="ngToggleSinEnc(this.checked)"> Sin encuentro esta semana'+
         '</label>'+
       '</div>'+
+      '<div id="ng-form-wrap"></div>'+
       '<div id="ng-form-asist">'+
         '<div id="ng-asist-list"></div>'+
         '<div id="ng-nuevos-section" style="margin-top:12px">'+
@@ -2059,6 +2072,19 @@ function ngCargarComChanged(){
   ngBuildAsistList(cid);
 }
 
+function ngToggleSinEnc(checked){
+  var asist=document.getElementById('ng-form-asist');
+  var formWrap=document.getElementById('ng-form-wrap');
+  if(asist){asist.style.opacity=checked?'0.35':'1';asist.style.pointerEvents=checked?'none':'auto';}
+  if(formWrap){formWrap.style.opacity=checked?'0.35':'1';formWrap.style.pointerEvents=checked?'none':'auto';}
+}
+
+function ngSyncFormularioUI(){
+  var cid=ngCurrentComunidadId;
+  var fecha=document.getElementById('ng-fecha')?.value;
+  if(typeof formRenderRespuestaUI==='function') formRenderRespuestaUI('ng-form-wrap','ng',cid,fecha);
+}
+
 function ngCheckExistingRecord(){
   var fecha=document.getElementById('ng-fecha')?.value;
   var cid=ngCurrentComunidadId;
@@ -2076,6 +2102,7 @@ function ngCheckExistingRecord(){
   } else {
     if(alert2) alert2.style.display='none';
   }
+  ngSyncFormularioUI();
 }
 
 function ngBuildAsistList(cid){
@@ -2230,6 +2257,10 @@ async function ngSaveRecord(){
       });
       if(!existeAnterior){
         alert('⚠️ Todavía no cargaste la semana anterior para esta comunidad. Cargala primero — como mínimo marcá "Sin Encuentro" — antes de cargar la semana actual.');
+        return;
+      }
+      if(typeof formSemanaAnteriorCompleta==='function'&&!formSemanaAnteriorCompleta('ng',cid,lim.min)){
+        alert('⚠️ Todavía falta completar el Formulario de la semana anterior para esta comunidad. Completalo antes de cargar la semana actual.');
         return;
       }
     }
@@ -2776,6 +2807,7 @@ const DEFAULT_MODULES = [
   {key:'of',         icon:'👨‍👩‍👧',  name:'Orientación Familiar', desc:'Gestión de alumnos, asistencia, pagos y participación del curso.',                 tag:'Módulo activo', tagClass:'tag-purple', action:'openOF', activo:true},
   {key:'agenda',     icon:'📅',  name:'Agenda Ministerial',   desc:'Calendario de eventos y actividades por Servicio/Ministerio, con recurrencia semanal o mensual.', tag:'Módulo activo', tagClass:'tag-blue', action:'openAgenda', activo:false},
   {key:'equipo',     icon:'🤝',  name:'Trabajo en Equipo',    desc:'Checklists colaborativos para organizar actividades: coordinadores, colaboradores y tareas asignadas.', tag:'Módulo activo', tagClass:'tag-purple', action:'openEquipo', activo:false},
+  {key:'formularios',icon:'📝',  name:'Formularios de Trabajo',desc:'Formularios semanales para Grupos de Vida, Nuevas Generaciones y Discipulado, con seguimiento por unidad y análisis.', tag:'Módulo activo', tagClass:'tag-purple', action:'openFormularios', activo:false},
   {key:'config',     icon:'⚙️',  name:'Configuración',         desc:'Gestión de grupos, usuarios del sistema y roles. Solo accesible para Super Admin.',   tag:'Solo Super Admin', tagClass:'tag-green', action:'openConfig', activo:true},
 ];
 
@@ -2814,7 +2846,7 @@ function renderModulesGrid(){
     miembros:canAccessMiembros(), nuevos:canAccessNuevos(),
     gdv:canAccessGdV(), ng:canAccessNG(),
     disc:canAccessDisc(), of:canAccessOF(), config:canAccessConfig(),
-    agenda:canAccessAgenda(), equipo:canAccessEquipo()
+    agenda:canAccessAgenda(), equipo:canAccessEquipo(), formularios:canAccessFormularios()
   };
   allMods.forEach(function(mod){
     var tienePermiso=accessMap[mod.key];
@@ -4850,6 +4882,8 @@ async function campanaDeleteCampana(id){
 // AGENDA MINISTERIAL
 // ══════════════════════════════════════════════════════════════════
 let agendaCalMonth=new Date().getMonth(), agendaCalYear=new Date().getFullYear();
+let agendaCalModoVista='mes'; // 'mes' | 'semana'
+let agendaCalSemanaAncla=null; // fecha (YYYY-MM-DD) de referencia dentro de la semana mostrada
 let agendaEditingId=null;
 let agendaSelectedTipoActividad='especial';
 let agendaSelectedResponsablesIds=[];
@@ -4972,8 +5006,8 @@ function buildAgendaHTML(){
         <div class="form-col-full">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Título *</label>
         <input type="text" id="agenda-f-titulo" placeholder="Ej: Ensayo de Alabanza" style="margin-bottom:10px">
-        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Descripción</label>
-        <textarea id="agenda-f-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;margin-bottom:10px;font-family:inherit"></textarea>
+        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Serie / Descripción</label>
+        <input type="text" id="agenda-f-desc" placeholder="Ej: Ensayo semanal del equipo de Alabanza" style="margin-bottom:10px">
         <div id="agenda-f-override-wrap" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:10px 12px;margin-bottom:10px">
           <label style="font-size:12.5px;font-weight:700;color:#92400E;display:block;margin-bottom:6px" id="agenda-f-override-label">✏️ Personalizar solo para esta fecha</label>
           <label style="font-size:11.5px;color:#92400E;display:block;margin-bottom:3px">Título para este día <span style="font-weight:400">(vacío = usa el título de arriba)</span></label>
@@ -4983,81 +5017,107 @@ function buildAgendaHTML(){
         </div>
         </div>
 
-        <div>
+        <div class="form-col-full">
         <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Propósito / Comunidades</label>
         <select id="agenda-f-ministerio" style="margin-bottom:10px"><option value="">— Sin asignar —</option></select>
-        <div id="agenda-f-es-periodo-wrap" style="background:#F5F3FF;border-radius:10px;padding:10px 12px;margin-bottom:10px">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#4C1D95">
-            <input type="checkbox" id="agenda-f-es-periodo" onchange="agendaTogglePeriodo()" style="width:16px;height:16px"> 📆 Es un período de varios días <span style="font-weight:400;color:#6B21A8">(no una fecha única)</span>
-          </label>
         </div>
 
-        <div id="agenda-f-fecha-unica-wrap">
-          <div class="form-row">
-            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha *</label>
-              <input type="date" id="agenda-f-fecha"></div>
-            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hora</label>
-              ${agendaHoraSelectHtml('agenda-f-hora')}</div>
+        <div class="form-col-full">
+        <div class="form-row">
+          <div>
+            <label id="agenda-f-msg-label" style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Mensaje <span style="font-weight:400;color:#9CA3AF">(opcional, hasta 2)</span></label>
+            <div id="agenda-f-msg-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
+            <div style="position:relative;margin-bottom:6px">
+              <input type="text" id="agenda-f-msg-search" placeholder="Buscar en Rebaños..." oninput="agendaSearchMensaje(this.value)" autocomplete="off">
+              <div id="agenda-f-msg-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
+            </div>
+            <div id="agenda-f-msg-externo-wrap" style="display:none">
+              <span onclick="agendaAgregarMensajeExterno()" style="font-size:11px;color:#9CA3AF;cursor:pointer;text-decoration:underline dotted">+ agregar a alguien fuera de Rebaños</span>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Responsables <span style="font-weight:400;color:#9CA3AF">(opcional, hasta 3)</span></label>
+            <div id="agenda-f-resp-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
+            <div style="position:relative">
+              <input type="text" id="agenda-f-resp-search" placeholder="Buscar..." oninput="agendaSearchResponsable(this.value)" autocomplete="off">
+              <div id="agenda-f-resp-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
+            </div>
           </div>
         </div>
+        </div>
 
-        <div id="agenda-f-fecha-periodo-wrap" style="display:none">
-          <div class="form-row">
-            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Desde *</label>
-              <input type="date" id="agenda-f-fecha-desde"></div>
-            <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hasta *</label>
-              <input type="date" id="agenda-f-fecha-hasta"></div>
+        <div class="form-col-full">
+        <div class="form-row">
+          <div>
+            <div id="agenda-f-es-periodo-wrap" style="background:#F5F3FF;border-radius:10px;padding:10px 12px;box-sizing:border-box">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#4C1D95">
+                <input type="checkbox" id="agenda-f-es-periodo" onchange="agendaTogglePeriodo()" style="width:16px;height:16px"> 📆 Es un período de varios días <span style="font-weight:400;color:#6B21A8">(no una fecha única)</span>
+              </label>
+            </div>
           </div>
-          <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Hora <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
-          <div style="margin-bottom:10px">${agendaHoraSelectHtml('agenda-f-hora-periodo')}</div>
-        </div>
-
-        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Lugar</label>
-        <input type="text" id="agenda-f-lugar" placeholder="Ej: Salón principal" style="margin-bottom:10px">
-        </div>
-
-        <div>
-        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Responsable <span style="font-weight:400;color:#9CA3AF">(opcional, hasta 3)</span></label>
-        <div id="agenda-f-resp-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
-        <div style="position:relative;margin-bottom:10px">
-          <input type="text" id="agenda-f-resp-search" placeholder="Buscar..." oninput="agendaSearchResponsable(this.value)" autocomplete="off">
-          <div id="agenda-f-resp-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
-        </div>
-
-        <label id="agenda-f-msg-label" style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Mensaje <span style="font-weight:400;color:#9CA3AF">(opcional, hasta 2)</span></label>
-        <div id="agenda-f-msg-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
-        <div style="position:relative;margin-bottom:6px">
-          <input type="text" id="agenda-f-msg-search" placeholder="Buscar en Rebaños..." oninput="agendaSearchMensaje(this.value)" autocomplete="off">
-          <div id="agenda-f-msg-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
-        </div>
-        <div id="agenda-f-msg-externo-wrap" style="display:none;margin-bottom:10px">
-          <span onclick="agendaAgregarMensajeExterno()" style="font-size:12px;color:#7C3AED;font-weight:600;cursor:pointer;text-decoration:underline dotted">+ Agregar persona fuera de Rebaños</span>
-        </div>
-
-        <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Personas asignadas <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
-        <input type="text" placeholder="Buscar..." oninput="agendaFilterMiembros(this.value)" style="margin-bottom:6px">
-        <div id="agenda-f-personas-list" style="max-height:140px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:10px"></div>
-
-        <div style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:10px">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151;margin-bottom:6px">
-            <input type="checkbox" id="agenda-f-recordatorio" onchange="agendaToggleRecordatorio()" style="width:16px;height:16px"> 🔔 Recordatorio visual
-          </label>
-          <div id="agenda-f-record-dias-wrap" style="display:none">
-            <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Avisar con cuántos días de anticipación</label>
-            <input type="number" id="agenda-f-record-dias" min="1" max="30" value="3" style="width:70px">
+          <div>
+            <div id="agenda-f-fecha-unica-wrap">
+              <div class="form-row">
+                <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha *</label>
+                  <input type="date" id="agenda-f-fecha"></div>
+                <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hora</label>
+                  ${agendaHoraSelectHtml('agenda-f-hora')}</div>
+              </div>
+            </div>
+            <div id="agenda-f-fecha-periodo-wrap" style="display:none">
+              <div class="form-row">
+                <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Desde *</label>
+                  <input type="date" id="agenda-f-fecha-desde"></div>
+                <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hasta *</label>
+                  <input type="date" id="agenda-f-fecha-hasta"></div>
+              </div>
+              <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Hora <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+              <div>${agendaHoraSelectHtml('agenda-f-hora-periodo')}</div>
+            </div>
           </div>
         </div>
+        </div>
 
-        <div id="agenda-f-recur-wrap" style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:14px">
-          <label style="font-size:13px;font-weight:500;color:#374151;display:block;margin-bottom:6px">🔁 Recurrencia</label>
-          <select id="agenda-f-recur-tipo" onchange="agendaToggleRecurrencia()" style="margin-bottom:8px">
-            <option value="ninguna">No se repite</option>
-            <option value="semanal">Semanal</option>
-            <option value="mensual">Mensual</option>
-          </select>
-          <div id="agenda-f-recur-hasta-wrap" style="display:none">
+        <div class="form-col-full">
+        <div class="form-row">
+          <div>
+            <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Personas asignadas <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
+            <div id="agenda-f-personas-chip" style="display:none;margin-bottom:6px;flex-wrap:wrap;gap:6px"></div>
+            <div style="position:relative">
+              <input type="text" id="agenda-f-personas-search" placeholder="Buscar..." oninput="agendaSearchPersona(this.value)" autocomplete="off">
+              <div id="agenda-f-personas-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Lugar</label>
+            <input type="text" id="agenda-f-lugar" placeholder="Ej: Auditorio Vida Nueva">
+          </div>
+        </div>
+        </div>
+
+        <div class="form-col-full">
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px">
+          <div id="agenda-f-recur-wrap" style="background:#F9FAFB;border-radius:10px;padding:10px 12px">
+            <label style="font-size:13px;font-weight:500;color:#374151;display:block;margin-bottom:6px">🔁 Recurrencia</label>
+            <select id="agenda-f-recur-tipo" onchange="agendaToggleRecurrencia()">
+              <option value="ninguna">No se repite</option>
+              <option value="semanal">Semanal</option>
+              <option value="mensual">Mensual</option>
+            </select>
+          </div>
+          <div id="agenda-f-recur-hasta-wrap" style="display:none;background:#F9FAFB;border-radius:10px;padding:10px 12px">
             <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Repetir hasta</label>
             <input type="date" id="agenda-f-recur-hasta">
+          </div>
+          <div style="background:#F9FAFB;border-radius:10px;padding:10px 12px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:500;color:#374151;margin-bottom:6px">
+              <input type="checkbox" id="agenda-f-recordatorio" onchange="agendaToggleRecordatorio()" style="width:16px;height:16px;flex-shrink:0"> 🔔 Recordatorio visual
+            </label>
+            <div style="font-size:10.5px;color:#9CA3AF;margin-bottom:2px">Destaca el evento en "Próximos Eventos" del Home. Es un aviso visual, no una notificación push.</div>
+            <div id="agenda-f-record-dias-wrap" style="display:none;margin-top:8px">
+              <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Días de anticipación</label>
+              <input type="number" id="agenda-f-record-dias" min="1" max="30" value="3" style="width:70px">
+            </div>
           </div>
         </div>
         </div>
@@ -5161,6 +5221,13 @@ function canEjecutarEquipo(){
   return isSuperAdmin() || canEjecutar('equipo_crear');
 }
 
+// ══════════════════════════════════════════════════════════════════
+// FORMULARIOS DE TRABAJO — acceso al módulo desde el menú Home
+// ══════════════════════════════════════════════════════════════════
+function canAccessFormularios(){
+  return isSuperAdmin() || canScreen('formularios_ver') || canEjecutar('formularios_crear');
+}
+
 function openEquipo(){
   document.getElementById('screen-home').classList.add('hidden');
   document.getElementById('screen-app').classList.add('show');
@@ -5168,6 +5235,875 @@ function openEquipo(){
   document.getElementById('app-topbar-user').textContent=currentUser.name;
   document.getElementById('app-content').innerHTML=buildEquipoHTML();
   agendaChecklistTab('activos', document.getElementById('agenda-cl-btn-activos'));
+}
+
+// ════════════════════════════════════════════════════════════
+// FORMULARIOS DE TRABAJO
+// ════════════════════════════════════════════════════════════
+var formActiveTab='creacion';
+var formEditingId=null;
+var _formWorking=null;
+var _formPregSeq=0;
+
+function openFormularios(){
+  document.getElementById('screen-home').classList.add('hidden');
+  document.getElementById('screen-app').classList.add('show');
+  document.getElementById('app-topbar-title').textContent='📝 Formularios de Trabajo';
+  document.getElementById('app-topbar-user').textContent=currentUser.name;
+  document.getElementById('app-content').innerHTML=buildFormulariosHTML();
+  var startTab=isSuperAdmin()?'creacion':'activos';
+  formTab(startTab, document.getElementById('form-tab-'+startTab));
+}
+
+function buildFormulariosHTML(){
+  var esSuper=isSuperAdmin();
+  return '<div class="gdv-app">'
+    +'<div class="nav" style="margin-bottom:1rem">'
+      +(esSuper?'<button class="nav-btn" id="form-tab-creacion" onclick="formTab(\'creacion\',this)">🛠 Creación</button>':'')
+      +'<button class="nav-btn" id="form-tab-activos" onclick="formTab(\'activos\',this)">🟢 Activos</button>'
+      +'<button class="nav-btn" id="form-tab-historico" onclick="formTab(\'historico\',this)">📁 Histórico</button>'
+    +'</div>'
+    +'<div id="form-content"></div>'
+    +'<div id="form-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem"></div>'
+  +'</div>';
+}
+
+function formTab(tab, btn){
+  if(tab==='creacion'&&!isSuperAdmin()){ tab='activos'; btn=document.getElementById('form-tab-activos'); }
+  formActiveTab=tab;
+  ['form-tab-creacion','form-tab-activos','form-tab-historico'].forEach(function(id){
+    var b=document.getElementById(id);
+    if(b) b.classList.remove('active');
+  });
+  if(btn) btn.classList.add('active');
+  var c=document.getElementById('form-content');
+  if(!c) return;
+  if(tab==='creacion') formRenderCreacion(c);
+  else if(tab==='activos') formRenderActivos(c);
+  else if(tab==='historico') formRenderHistorico(c);
+}
+
+// ── Creación (CRUD de Formularios — solo Super Admin) ──
+function formRenderCreacion(c){
+  if(!isSuperAdmin()){ c.innerHTML='<div class="empty" style="padding:2rem">No tenés acceso a esta sección.</div>'; return; }
+  var list=(S.formularios||[]).slice().sort(function(a,b){return (b._ts||0)-(a._ts||0);});
+  var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">'
+    +'<div style="font-size:14px;font-weight:600;color:#1F4E79">'+list.length+' formulario'+(list.length!==1?'s':'')+'</div>'
+    +'<button class="btn btn-primary" onclick="formOpenModal()">+ Nuevo Formulario</button>'
+  +'</div>';
+  if(!list.length){
+    html+='<div class="empty" style="padding:2rem">Todavía no creaste ningún Formulario de Trabajo.</div>';
+    c.innerHTML=html;
+    return;
+  }
+  list.forEach(function(f){
+    var prop=(S.ministerios||[]).find(function(m){return Number(m.id)===Number(f.propositoId);});
+    var nPreg=(f.preguntas||[]).length;
+    var tipos=[];
+    if(f.destinatarios&&f.destinatarios.gdv) tipos.push('🏘 GdV');
+    if(f.destinatarios&&f.destinatarios.ng) tipos.push('🌱 NG');
+    if(f.destinatarios&&f.destinatarios.discipulado) tipos.push('📖 Discipulado');
+    html+='<div class="card" style="margin-bottom:.75rem;padding:14px;border-left:4px solid '+(f.estado==='Activo'?'#16A34A':'#9CA3AF')+'">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">'
+        +'<div>'
+          +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+f.titulo+'</div>'
+          +'<div style="font-size:12px;color:#6B7280;margin-top:3px">'+(prop?prop.nombre:'— sin Propósito —')+' · '+nPreg+' pregunta'+(nPreg!==1?'s':'')+' · '+(tipos.length?tipos.join(' · '):'sin destinatarios')+'</div>'
+          +'<div style="font-size:11px;color:#9CA3AF;margin-top:3px">'+(f.fechaDesde?fmtAA(f.fechaDesde):'—')+' al '+(f.fechaHasta?fmtAA(f.fechaHasta):'—')+'</div>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+          +'<span class="badge '+(f.estado==='Activo'?'b-ok':'b-muted')+'">'+f.estado+'</span>'
+          +'<button class="btn btn-sm" onclick="formToggleEstado('+f.id+')">'+(f.estado==='Activo'?'⏸ Desactivar':'▶ Activar')+'</button>'
+          +'<button class="btn btn-sm" onclick="formOpenModal('+f.id+')">✏️ Editar</button>'
+          +'<button class="btn btn-sm btn-danger" onclick="formDeleteFormulario('+f.id+')">🗑</button>'
+        +'</div>'
+      +'</div>'
+    +'</div>';
+  });
+  c.innerHTML=html;
+}
+
+function formOpenModal(id){
+  if(!isSuperAdmin()) return;
+  formEditingId=id||null;
+  var f=id?(S.formularios||[]).find(function(x){return Number(x.id)===Number(id);}):null;
+  _formPregSeq=0;
+  _formWorking={
+    preguntas:(f&&f.preguntas?f.preguntas:[]).map(function(p){
+      _formPregSeq++;
+      return {_uid:'p'+_formPregSeq,tipo:p.tipo,texto:p.texto,opciones:(p.opciones||[]).slice()};
+    }),
+    destinatarios:{
+      gdv:(f&&f.destinatarios&&f.destinatarios.gdv)?{excluidos:(f.destinatarios.gdv.excluidos||[]).slice()}:null,
+      ng:(f&&f.destinatarios&&f.destinatarios.ng)?{excluidos:(f.destinatarios.ng.excluidos||[]).slice()}:null,
+      discipulado:(f&&f.destinatarios&&f.destinatarios.discipulado)?{excluidos:(f.destinatarios.discipulado.excluidos||[]).slice()}:null
+    }
+  };
+  var propOpts='<option value="">— Sin Propósito —</option>'+(S.ministerios||[]).slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).map(function(m){
+    return '<option value="'+m.id+'"'+(f&&Number(f.propositoId)===Number(m.id)?' selected':'')+'>'+m.nombre+'</option>';
+  }).join('');
+
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+(id?'Editar':'Nuevo')+' Formulario de Trabajo</div>'
+      +'<button class="btn btn-sm" onclick="formCloseModal()">✕</button>'
+    +'</div>'
+    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Título *</label>'
+    +'<input id="form-f-titulo" type="text" maxlength="80" value="'+(f?String(f.titulo||'').replace(/"/g,'&quot;'):'')+'" placeholder="Ej: Formulario semanal — 40 días" style="width:100%;margin-bottom:12px">'
+
+    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Propósito <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'
+    +'<select id="form-f-proposito" style="width:100%;margin-bottom:12px">'+propOpts+'</select>'
+
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'
+      +'<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Desde *</label>'
+        +'<input id="form-f-desde" type="date" value="'+(f&&f.fechaDesde?f.fechaDesde:'')+'" style="width:100%"></div>'
+      +'<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hasta *</label>'
+        +'<input id="form-f-hasta" type="date" value="'+(f&&f.fechaHasta?f.fechaHasta:'')+'" style="width:100%"></div>'
+    +'</div>'
+
+    +'<div style="margin-bottom:14px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+        +'<label style="font-size:13px;font-weight:600;color:#374151">Preguntas</label>'
+        +'<button class="btn btn-sm" onclick="formAddPregunta()">+ Agregar</button>'
+      +'</div>'
+      +'<div id="form-preguntas-list"></div>'
+    +'</div>'
+
+    +'<div style="margin-bottom:14px">'
+      +'<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Destinatarios <span style="font-weight:400;color:#9CA3AF">— se guardan las exclusiones; lo nuevo que se cree después queda incluido salvo que lo destildes</span></label>'
+      +'<div id="form-destinatarios-wrap"></div>'
+    +'</div>'
+
+    +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151;margin-bottom:16px">'
+      +'<input type="checkbox" id="form-f-activo" '+(!f||f.estado==='Activo'?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
+      +'Formulario Activo'
+    +'</label>'
+
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px">'
+      +'<button class="btn" onclick="formCloseModal()">Cancelar</button>'
+      +'<button class="btn btn-primary" onclick="formSaveFormulario()">Confirmar</button>'
+    +'</div>'
+  +'</div>';
+
+  document.getElementById('form-modal-overlay').innerHTML=modalHtml;
+  document.getElementById('form-modal-overlay').style.display='flex';
+  formRenderPreguntas();
+  formRenderDestinatarios();
+}
+
+function formCloseModal(){
+  var ov=document.getElementById('form-modal-overlay');
+  if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+  formEditingId=null;
+  _formWorking=null;
+}
+
+// ── Preguntas (working array en memoria mientras el modal está abierto) ──
+function formRenderPreguntas(){
+  var wrap=document.getElementById('form-preguntas-list');
+  if(!wrap||!_formWorking) return;
+  if(!_formWorking.preguntas.length){
+    wrap.innerHTML='<div style="font-size:12px;color:#9CA3AF;font-style:italic;padding:6px 0">Sin preguntas todavía.</div>';
+    return;
+  }
+  wrap.innerHTML=_formWorking.preguntas.map(function(p,idx){
+    return '<div style="border:1px solid #E5E7EB;border-radius:8px;padding:10px;margin-bottom:8px;background:#FAFAFA">'
+      +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
+        +'<span style="font-size:11px;color:#9CA3AF;font-weight:600">#'+(idx+1)+'</span>'
+        +'<select id="form-preg-tipo-'+p._uid+'" onchange="formPreguntaTipoChanged(\''+p._uid+'\')" style="font-size:12px;padding:4px 8px;flex:0 0 auto">'
+          +'<option value="texto_largo"'+(p.tipo==='texto_largo'?' selected':'')+'>Texto largo</option>'
+          +'<option value="opcion_multiple"'+(p.tipo==='opcion_multiple'?' selected':'')+'>Opción múltiple</option>'
+        +'</select>'
+        +'<button class="btn btn-sm btn-danger" style="margin-left:auto" onclick="formRemovePregunta(\''+p._uid+'\')">🗑</button>'
+      +'</div>'
+      +'<input id="form-preg-texto-'+p._uid+'" type="text" value="'+(p.texto||'').replace(/"/g,'&quot;')+'" placeholder="Texto de la pregunta" style="width:100%'+(p.tipo==='opcion_multiple'?';margin-bottom:6px':'')+'">'
+      +(p.tipo==='opcion_multiple'
+        ?'<input id="form-preg-opciones-'+p._uid+'" type="text" value="'+(p.opciones||[]).join(', ').replace(/"/g,'&quot;')+'" placeholder="Opciones separadas por coma" style="width:100%">'
+        :'')
+    +'</div>';
+  }).join('');
+}
+
+function formAddPregunta(){
+  if(!_formWorking) return;
+  formSyncPreguntasFromDom();
+  _formPregSeq++;
+  _formWorking.preguntas.push({_uid:'p'+_formPregSeq,tipo:'texto_largo',texto:'',opciones:[]});
+  formRenderPreguntas();
+}
+
+function formRemovePregunta(uid){
+  if(!_formWorking) return;
+  formSyncPreguntasFromDom();
+  _formWorking.preguntas=_formWorking.preguntas.filter(function(p){return p._uid!==uid;});
+  formRenderPreguntas();
+}
+
+function formPreguntaTipoChanged(uid){
+  if(!_formWorking) return;
+  formSyncPreguntasFromDom();
+  var p=_formWorking.preguntas.find(function(x){return x._uid===uid;});
+  if(p){
+    var sel=document.getElementById('form-preg-tipo-'+uid);
+    if(sel) p.tipo=sel.value;
+  }
+  formRenderPreguntas();
+}
+
+function formSyncPreguntasFromDom(){
+  if(!_formWorking) return;
+  _formWorking.preguntas.forEach(function(p){
+    var t=document.getElementById('form-preg-texto-'+p._uid);
+    if(t) p.texto=t.value;
+    if(p.tipo==='opcion_multiple'){
+      var o=document.getElementById('form-preg-opciones-'+p._uid);
+      if(o) p.opciones=o.value.split(',').map(function(x){return x.trim();}).filter(Boolean);
+    }
+  });
+}
+
+// ── Destinatarios (se guardan exclusiones, no inclusiones) ──
+function formRenderDestinatarios(){
+  var wrap=document.getElementById('form-destinatarios-wrap');
+  if(!wrap||!_formWorking) return;
+  var gruposActivos=(S.groups||[]).filter(function(g){return g.estado!=='Baja'&&g.estado!=='Historico';});
+  var comsActivas=(S.ngComunidades||[]).filter(function(cm){return cm.estado!=='Inactivo';});
+  var cursadasActivas=(S.discCursadas||[]).filter(function(cu){return cu.estado==='Activo';});
+
+  function seccion(tipo,label,icon,unidades,nombreFn){
+    var dest=_formWorking.destinatarios[tipo];
+    var activo=!!dest;
+    var html='<div style="border:1px solid #E5E7EB;border-radius:8px;padding:10px;margin-bottom:8px">'
+      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#374151">'
+        +'<input type="checkbox" id="form-dest-'+tipo+'-toggle" onchange="formToggleDestTipo(\''+tipo+'\')" '+(activo?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
+        +icon+' '+label+' <span style="font-weight:400;color:#9CA3AF">('+unidades.length+' activ'+(unidades.length===1?'a':'as')+')</span>'
+      +'</label>';
+    if(activo){
+      if(!unidades.length){
+        html+='<div style="font-size:12px;color:#9CA3AF;font-style:italic;margin-top:6px">No hay ninguna activa por ahora.</div>';
+      } else {
+        html+='<div style="max-height:140px;overflow-y:auto;margin-top:8px;border-top:1px solid #F3F4F6;padding-top:6px">'
+          +unidades.map(function(u){
+            var excluido=(dest.excluidos||[]).map(String).includes(String(u.id));
+            return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:12px">'
+              +'<input type="checkbox" class="form-dest-'+tipo+'-cb" value="'+u.id+'" '+(!excluido?'checked':'')+' style="width:14px;height:14px;cursor:pointer">'
+              +nombreFn(u)
+            +'</label>';
+          }).join('')
+        +'</div>';
+      }
+    }
+    html+='</div>';
+    return html;
+  }
+
+  wrap.innerHTML=
+    seccion('gdv','Grupos de Vida','🏘',gruposActivos,function(g){return g.name;})
+    +seccion('ng','Nuevas Generaciones','🌱',comsActivas,function(cm){return cm.name;})
+    +seccion('discipulado','Discipulado','📖',cursadasActivas,function(cu){return cu.label;});
+}
+
+function formToggleDestTipo(tipo){
+  if(!_formWorking) return;
+  formSyncDestinatariosFromDom();
+  var el=document.getElementById('form-dest-'+tipo+'-toggle');
+  var checked=el?el.checked:false;
+  _formWorking.destinatarios[tipo]=checked?{excluidos:[]}:null;
+  formRenderDestinatarios();
+}
+
+function formSyncDestinatariosFromDom(){
+  if(!_formWorking) return;
+  ['gdv','ng','discipulado'].forEach(function(tipo){
+    if(!_formWorking.destinatarios[tipo]) return;
+    var boxes=document.querySelectorAll('.form-dest-'+tipo+'-cb');
+    if(!boxes.length) return; // sección tildada pero sin unidades activas: nada que leer todavía
+    var excluidos=[];
+    boxes.forEach(function(cb){ if(!cb.checked) excluidos.push(parseInt(cb.value)); });
+    _formWorking.destinatarios[tipo].excluidos=excluidos;
+  });
+}
+
+async function formSaveFormulario(){
+  if(!isSuperAdmin()||!_formWorking) return;
+  var titulo=(document.getElementById('form-f-titulo')?.value||'').trim();
+  var propositoId=document.getElementById('form-f-proposito')?.value||'';
+  var fechaDesde=document.getElementById('form-f-desde')?.value||'';
+  var fechaHasta=document.getElementById('form-f-hasta')?.value||'';
+  var activo=document.getElementById('form-f-activo')?.checked;
+
+  if(!titulo){ alert('Ingresá el Título del Formulario'); return; }
+  if(!fechaDesde||!fechaHasta){ alert('Completá el rango de fechas (Desde / Hasta)'); return; }
+  if(fechaHasta<fechaDesde){ alert('La fecha Hasta no puede ser anterior a la fecha Desde.'); return; }
+
+  formSyncPreguntasFromDom();
+  formSyncDestinatariosFromDom();
+
+  var preguntasFinal=_formWorking.preguntas.map(function(p){
+    return {id:p._uid,tipo:p.tipo,texto:(p.texto||'').trim(),opciones:p.tipo==='opcion_multiple'?(p.opciones||[]):[]};
+  }).filter(function(p){return p.texto;});
+
+  var destinatariosFinal={
+    gdv:_formWorking.destinatarios.gdv?{excluidos:(_formWorking.destinatarios.gdv.excluidos||[])}:null,
+    ng:_formWorking.destinatarios.ng?{excluidos:(_formWorking.destinatarios.ng.excluidos||[])}:null,
+    discipulado:_formWorking.destinatarios.discipulado?{excluidos:(_formWorking.destinatarios.discipulado.excluidos||[])}:null
+  };
+
+  var snapshotForm=null, esNuevo=false, nuevoRef=null, fRef;
+  if(formEditingId){
+    fRef=(S.formularios||[]).find(function(x){return Number(x.id)===Number(formEditingId);});
+    if(fRef){
+      snapshotForm=JSON.parse(JSON.stringify(fRef));
+      Object.assign(fRef,{
+        titulo:titulo,propositoId:propositoId?parseInt(propositoId):null,fechaDesde:fechaDesde,fechaHasta:fechaHasta,
+        preguntas:preguntasFinal,destinatarios:destinatariosFinal,
+        estado:activo?'Activo':'Inactivo',_ts:Date.now()
+      });
+    }
+  } else {
+    esNuevo=true;
+    nuevoRef={
+      id:Date.now(),titulo:titulo,propositoId:propositoId?parseInt(propositoId):null,fechaDesde:fechaDesde,fechaHasta:fechaHasta,
+      preguntas:preguntasFinal,destinatarios:destinatariosFinal,
+      estado:activo?'Activo':'Inactivo',
+      creadoPor:currentUser.id,ts:new Date().toISOString(),_ts:Date.now()
+    };
+    S.formularios.push(nuevoRef);
+  }
+  await saveK(SK.formularios,S.formularios);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    if(esNuevo){
+      S.formularios=S.formularios.filter(function(x){return x!==nuevoRef;});
+    } else if(fRef&&snapshotForm){
+      Object.assign(fRef,snapshotForm);
+    }
+    await saveK(SK.formularios,S.formularios);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  formCloseModal();
+  var c=document.getElementById('form-content');
+  if(c) formRenderCreacion(c);
+  showToast('✅ Formulario guardado','#16A34A');
+}
+
+async function formToggleEstado(id){
+  if(!isSuperAdmin()) return;
+  var f=(S.formularios||[]).find(function(x){return Number(x.id)===Number(id);});
+  if(!f) return;
+  var snapshotEstado=f.estado;
+  f.estado=f.estado==='Activo'?'Inactivo':'Activo';
+  f._ts=Date.now();
+  await saveK(SK.formularios,S.formularios);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    f.estado=snapshotEstado;
+    await saveK(SK.formularios,S.formularios);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  var c=document.getElementById('form-content');
+  if(c) formRenderCreacion(c);
+}
+
+async function formDeleteFormulario(id){
+  if(!isSuperAdmin()) return;
+  var f=(S.formularios||[]).find(function(x){return Number(x.id)===Number(id);});
+  if(!f) return;
+  if(!confirm('¿Eliminar el Formulario "'+f.titulo+'"?\nEsta acción no se puede deshacer.')) return;
+  S.formularios=(S.formularios||[]).filter(function(x){return Number(x.id)!==Number(id);});
+  addTombstone(SK.formularios,id);
+  await saveK(SK.formularios,S.formularios);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.formularios.push(f);
+    await saveK(SK.formularios,S.formularios);
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  var c=document.getElementById('form-content');
+  if(c) formRenderCreacion(c);
+  showToast('🗑 Formulario eliminado','#6B7280');
+}
+
+// ── Respuestas — se completan desde Cargar Asistencia de cada módulo (GdV/NG/Discipulado) ──
+function formFormulariosAplicables(tipoOrigen, unidadId, fecha){
+  if(!fecha||!unidadId) return [];
+  return (S.formularios||[]).filter(function(f){
+    if(f.estado!=='Activo') return false;
+    if(!f.destinatarios||!f.destinatarios[tipoOrigen]) return false;
+    if(f.fechaDesde&&fecha<f.fechaDesde) return false;
+    if(f.fechaHasta&&fecha>f.fechaHasta) return false;
+    var excl=(f.destinatarios[tipoOrigen].excluidos||[]).map(String);
+    if(excl.includes(String(unidadId))) return false;
+    return true;
+  });
+}
+
+function formGetRespuesta(formularioId, tipoOrigen, unidadId, semanaISO, anio){
+  return (S.formRespuestas||[]).find(function(r){
+    return Number(r.formularioId)===Number(formularioId)&&r.tipoOrigen===tipoOrigen
+      &&String(r.unidadId)===String(unidadId)&&r.semanaISO===semanaISO&&r.anio===anio;
+  });
+}
+
+// Renderiza (o limpia) el bloque de Formularios aplicables dentro de la pantalla de Cargar
+// Asistencia de un módulo. wrapId es el contenedor propio de cada módulo (gdv-form-wrap,
+// ng-form-wrap, disc-form-wrap); se llama cada vez que cambia unidad o fecha.
+function formRenderRespuestaUI(wrapId, tipoOrigen, unidadId, fecha){
+  var wrap=document.getElementById(wrapId);
+  if(!wrap) return;
+  if(!unidadId||!fecha){ wrap.innerHTML=''; return; }
+  var aplicables=formFormulariosAplicables(tipoOrigen,unidadId,fecha);
+  if(!aplicables.length){ wrap.innerHTML=''; return; }
+  var semanaISO=getISOWeek(fecha);
+  var anio=parseLocalDate(fecha).getFullYear();
+  wrap.innerHTML=aplicables.map(function(f){
+    var existing=formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio);
+    var preguntasHtml=(f.preguntas||[]).map(function(p){
+      var valorPrevio=existing?existing.respuestas[p.id]:null;
+      if(p.tipo==='texto_largo'){
+        return '<div style="margin-bottom:10px">'
+          +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+p.texto+'</label>'
+          +'<textarea id="form-resp-'+f.id+'-'+p.id+'" style="width:100%;min-height:60px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box">'+(valorPrevio||'')+'</textarea>'
+        +'</div>';
+      }
+      var opcionesHtml=(p.opciones||[]).map(function(op){
+        var checked=Array.isArray(valorPrevio)&&valorPrevio.includes(op);
+        return '<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12.5px;cursor:pointer">'
+          +'<input type="checkbox" class="form-resp-'+f.id+'-'+p.id+'-cb" value="'+op.replace(/"/g,'&quot;')+'" '+(checked?'checked':'')+' style="cursor:pointer">'+op
+        +'</label>';
+      }).join('');
+      return '<div style="margin-bottom:10px">'
+        +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+p.texto+'</label>'
+        +opcionesHtml
+      +'</div>';
+    }).join('');
+    return '<div class="card" style="margin-top:12px;border-left:4px solid #7C3AED">'
+      +'<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'
+        +'<span>📋 '+f.titulo+'</span>'
+        +(existing?'<span class="badge b-ok" style="font-size:10px">Respondido</span>':'<span class="badge b-muted" style="font-size:10px">Pendiente</span>')
+      +'</div>'
+      +(preguntasHtml||'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Este Formulario todavía no tiene preguntas cargadas.</div>')
+      +'<button class="btn btn-primary btn-sm" onclick="formGuardarRespuesta('+f.id+',\''+tipoOrigen+'\',\''+unidadId+'\',\''+fecha+'\')" style="margin-top:4px">💾 Guardar Formulario</button>'
+    +'</div>';
+  }).join('');
+}
+
+async function formGuardarRespuesta(formularioId, tipoOrigen, unidadId, fecha){
+  var f=(S.formularios||[]).find(function(x){return Number(x.id)===Number(formularioId);});
+  if(!f) return;
+  var semanaISO=getISOWeek(fecha);
+  var anio=parseLocalDate(fecha).getFullYear();
+  var respuestasObj={};
+  (f.preguntas||[]).forEach(function(p){
+    if(p.tipo==='texto_largo'){
+      var ta=document.getElementById('form-resp-'+f.id+'-'+p.id);
+      respuestasObj[p.id]=ta?ta.value.trim():'';
+    } else {
+      var boxes=document.querySelectorAll('.form-resp-'+f.id+'-'+p.id+'-cb:checked');
+      respuestasObj[p.id]=Array.from(boxes).map(function(cb){return cb.value;});
+    }
+  });
+
+  var existing=formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio);
+  var snapshot=null, esNuevo=false, nuevoRef=null, rRef;
+  if(existing){
+    rRef=existing;
+    snapshot=JSON.parse(JSON.stringify(existing));
+    Object.assign(rRef,{respuestas:respuestasObj,completadoPor:currentUser.id,fecha:fecha,_ts:Date.now()});
+  } else {
+    esNuevo=true;
+    nuevoRef={
+      id:Date.now(),formularioId:f.id,tipoOrigen:tipoOrigen,unidadId:unidadId,
+      semanaISO:semanaISO,anio:anio,respuestas:respuestasObj,
+      completadoPor:currentUser.id,fecha:fecha,
+      revisado:false,revisadoPor:null,fechaRevision:null,
+      ts:new Date().toISOString(),_ts:Date.now()
+    };
+    S.formRespuestas.push(nuevoRef);
+  }
+  await saveK(SK.formRespuestas,S.formRespuestas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    if(esNuevo){
+      S.formRespuestas=S.formRespuestas.filter(function(x){return x!==nuevoRef;});
+    } else if(rRef&&snapshot){
+      Object.assign(rRef,snapshot);
+    }
+    await saveK(SK.formRespuestas,S.formRespuestas);
+    alert('No se pudo guardar el Formulario en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Formulario guardado','#16A34A');
+  // Re-renderizar para mostrar el tag "Respondido" actualizado
+  if(tipoOrigen==='gdv'&&typeof gdvSyncFormularioUI==='function') gdvSyncFormularioUI();
+  else if(tipoOrigen==='ng'&&typeof ngSyncFormularioUI==='function') ngSyncFormularioUI();
+  else if(tipoOrigen==='discipulado'&&typeof discSyncFormularioUI==='function') discSyncFormularioUI();
+}
+
+// ── Estados (Pendiente/Parcial/Completo por unidad-semana; Pendiente/En Curso/Completado agregado) ──
+// Busca si la unidad tiene un registro de Asistencia (del módulo que corresponda) para esa semana ISO,
+// y si ese registro es Sin Encuentro (que cubre Asistencia y Formulario juntos).
+function formModuloAsistenciaInfo(tipoOrigen, unidadId, semanaISO, anio){
+  var rec=null;
+  if(tipoOrigen==='gdv'){
+    rec=(S.records||[]).find(function(r){return String(r.grupoId)===String(unidadId)&&getISOWeek(r.fecha)===semanaISO&&parseLocalDate(r.fecha).getFullYear()===anio;});
+  } else if(tipoOrigen==='ng'){
+    rec=(S.ngRecords||[]).find(function(r){return String(r.comunidadId)===String(unidadId)&&getISOWeek(r.fecha)===semanaISO&&parseLocalDate(r.fecha).getFullYear()===anio;});
+  } else if(tipoOrigen==='discipulado'){
+    rec=(S.discRecords||[]).find(function(r){return String(r.cursadaId||r.pasoId)===String(unidadId)&&getISOWeek(r.fecha)===semanaISO&&parseLocalDate(r.fecha).getFullYear()===anio;});
+  }
+  return {existe:!!rec, sinEncuentro:rec?!!rec.sinEncuentro:false};
+}
+
+// Estado de una unidad para una semana puntual: 'completo' | 'parcial' | 'pendiente'
+function formEstadoUnidadSemana(formularioId, tipoOrigen, unidadId, semanaISO, anio){
+  var asistInfo=formModuloAsistenciaInfo(tipoOrigen,unidadId,semanaISO,anio);
+  if(asistInfo.sinEncuentro) return 'completo'; // Sin Encuentro cubre Asistencia y Formulario juntos
+  var tieneAsist=asistInfo.existe;
+  var tieneForm=!!formGetRespuesta(formularioId,tipoOrigen,unidadId,semanaISO,anio);
+  if(tieneAsist&&tieneForm) return 'completo';
+  if(tieneAsist||tieneForm) return 'parcial';
+  return 'pendiente';
+}
+
+// ¿La semana anterior a fechaAnteriorRef está Completa para esta unidad? Considera TODOS los
+// Formularios que aplicaban esa semana (puede haber más de uno a la vez). Se usa para el bloqueo
+// secuencial: además de la Asistencia (que ya se validaba), ahora también hace falta el/los Formulario/s.
+function formSemanaAnteriorCompleta(tipoOrigen, unidadId, fechaAnteriorRef){
+  var semanaISO=getISOWeek(fechaAnteriorRef), anio=parseLocalDate(fechaAnteriorRef).getFullYear();
+  var asistInfo=formModuloAsistenciaInfo(tipoOrigen,unidadId,semanaISO,anio);
+  if(!asistInfo.existe) return true; // la falta de Asistencia ya la bloquea el chequeo existente — no duplicar el error acá
+  if(asistInfo.sinEncuentro) return true;
+  var aplicables=formFormulariosAplicables(tipoOrigen,unidadId,fechaAnteriorRef);
+  if(!aplicables.length) return true; // no había ningún Formulario esa semana — depende solo de Asistencia
+  return aplicables.every(function(f){ return !!formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio); });
+}
+
+// Unidades activas incluidas en un Formulario para un tipoOrigen (todo lo activo salvo exclusión explícita)
+function formUnidadesIncluidas(formulario, tipoOrigen){
+  var dest=formulario.destinatarios&&formulario.destinatarios[tipoOrigen];
+  if(!dest) return [];
+  var excl=(dest.excluidos||[]).map(String);
+  var todas = tipoOrigen==='gdv' ? (S.groups||[]).filter(function(g){return g.estado!=='Baja'&&g.estado!=='Historico';})
+    : tipoOrigen==='ng' ? (S.ngComunidades||[]).filter(function(cm){return cm.estado!=='Inactivo';})
+    : (S.discCursadas||[]).filter(function(cu){return cu.estado==='Activo';});
+  return todas.filter(function(u){return !excl.includes(String(u.id));});
+}
+
+function formTodasUnidadesIncluidas(formulario){
+  return []
+    .concat(formUnidadesIncluidas(formulario,'gdv').map(function(u){return {tipoOrigen:'gdv',id:u.id,nombre:u.name};}))
+    .concat(formUnidadesIncluidas(formulario,'ng').map(function(u){return {tipoOrigen:'ng',id:u.id,nombre:u.name};}))
+    .concat(formUnidadesIncluidas(formulario,'discipulado').map(function(u){return {tipoOrigen:'discipulado',id:u.id,nombre:u.label};}));
+}
+
+// Estado agregado de una semana de un Formulario: 'pendiente' | 'en_curso' | 'completado'
+function formEstadoAgregadoSemana(formulario, semanaISO, anio){
+  var unidades=formTodasUnidadesIncluidas(formulario);
+  if(!unidades.length) return {estado:'pendiente',respondieron:0,total:0};
+  var respondieron=0;
+  unidades.forEach(function(u){
+    if(formEstadoUnidadSemana(formulario.id,u.tipoOrigen,u.id,semanaISO,anio)==='completo') respondieron++;
+  });
+  var estado = respondieron===0 ? 'pendiente' : (respondieron<unidades.length ? 'en_curso' : 'completado');
+  return {estado:estado,respondieron:respondieron,total:unidades.length};
+}
+
+// Lista de semanas ISO (lunes a domingo) entre fechaDesde y fechaHasta, nunca más allá de la
+// última semana permitida de carga (misma ventana que limiteFechaCarga().max).
+function formSemanasDelRango(fechaDesde, fechaHasta){
+  var out=[];
+  var lim=limiteFechaCarga();
+  var hastaEfectiva=(fechaHasta&&fechaHasta<lim.max)?fechaHasta:lim.max;
+  if(!fechaDesde||fechaDesde>hastaEfectiva) return out;
+  var d=parseLocalDate(fechaDesde);
+  var wd=d.getDay(); var diffALunes=(wd===0?-6:1-wd);
+  d.setDate(d.getDate()+diffALunes); // alinear al lunes de la primera semana
+  var fin=parseLocalDate(hastaEfectiva);
+  var guard=0;
+  while(d<=fin&&guard<520){
+    var lunes=new Date(d);
+    var domingo=new Date(d); domingo.setDate(domingo.getDate()+6);
+    out.push({semanaISO:getISOWeek(lunes),anio:lunes.getFullYear(),lunes:dateToStr(lunes),domingo:dateToStr(domingo)});
+    d.setDate(d.getDate()+7);
+    guard++;
+  }
+  return out;
+}
+
+// ── Tab Activos ──
+// ── Permisos finos: Líder de Propósito ve solo lo asignado a su Propósito ──
+// Pastor y Super Admin ven todo. El resto de los roles con formularios_ver otorgado
+// pero que no lideran ningún Propósito no ven ningún Formulario (aunque tengan la pantalla habilitada).
+function formPuedeVerTodos(){
+  return isSuperAdmin()||hasRole('pastor');
+}
+
+function formPropositosLiderados(){
+  var linked=getLinkedMember();
+  if(!linked) return [];
+  return (S.ministerios||[]).filter(function(m){
+    return (m.liderIds||[]).map(Number).includes(Number(linked.id));
+  }).map(function(m){return m.id;});
+}
+
+function formFormulariosVisibles(){
+  var todos=(S.formularios||[]).slice();
+  if(formPuedeVerTodos()) return todos;
+  var propios=formPropositosLiderados().map(Number);
+  if(!propios.length) return [];
+  return todos.filter(function(f){return f.propositoId&&propios.includes(Number(f.propositoId));});
+}
+
+function formRenderActivos(c){
+  var activos=formFormulariosVisibles().filter(function(f){return f.estado==='Activo';});
+  if(!activos.length){
+    c.innerHTML='<div class="empty" style="padding:2rem">No hay Formularios Activos por ahora.</div>';
+    return;
+  }
+  var colorMap={pendiente:'#9CA3AF',en_curso:'#D97706',completado:'#16A34A'};
+  var labelMap={pendiente:'Pendiente',en_curso:'En Curso',completado:'Completado'};
+  var html='';
+  activos.forEach(function(f){
+    var semanas=formSemanasDelRango(f.fechaDesde,f.fechaHasta).sort(function(a,b){return b.lunes.localeCompare(a.lunes);});
+    html+='<div style="margin-bottom:1.5rem">'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:8px">📋 '+f.titulo+'</div>';
+    if(!semanas.length){
+      html+='<div class="empty" style="padding:1rem">Todavía no arrancó ninguna semana de este Formulario.</div>';
+    } else {
+      semanas.forEach(function(w){
+        var agg=formEstadoAgregadoSemana(f,w.semanaISO,w.anio);
+        html+='<div class="card" style="margin-bottom:.6rem;padding:12px;border-left:4px solid '+colorMap[agg.estado]+';cursor:pointer" onclick="formOpenSemanaDetalle('+f.id+','+w.semanaISO+','+w.anio+')">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
+            +'<span style="font-size:13px;font-weight:600">Semana '+w.semanaISO+' ('+fmtAA(w.lunes)+' al '+fmtAA(w.domingo)+')</span>'
+            +'<span class="badge" style="background:'+colorMap[agg.estado]+'22;color:'+colorMap[agg.estado]+'">'+labelMap[agg.estado]+' — '+agg.respondieron+'/'+agg.total+'</span>'
+          +'</div>'
+        +'</div>';
+      });
+    }
+    html+='</div>';
+  });
+  c.innerHTML=html;
+}
+
+// ── Tab Histórico — archivo completo, incluye Formularios Inactivos y todas sus semanas ──
+var formHistSelectedId=null;
+
+function formRenderHistorico(c){
+  var todos=formFormulariosVisibles().slice().sort(function(a,b){return (b._ts||0)-(a._ts||0);});
+  if(!todos.length){
+    c.innerHTML='<div class="empty" style="padding:2rem">Todavía no hay ningún Formulario para consultar.</div>';
+    return;
+  }
+  if(!formHistSelectedId||!todos.some(function(f){return Number(f.id)===Number(formHistSelectedId);})){
+    formHistSelectedId=todos[0].id;
+  }
+  var opts=todos.map(function(f){
+    return '<option value="'+f.id+'"'+(Number(f.id)===Number(formHistSelectedId)?' selected':'')+'>'+f.titulo+(f.estado==='Inactivo'?' (Inactivo)':'')+'</option>';
+  }).join('');
+  c.innerHTML='<div style="margin-bottom:1rem"><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Formulario</label>'
+    +'<select id="form-hist-sel" onchange="formHistCambiarSeleccion(this.value)" style="width:100%;max-width:360px">'+opts+'</select></div>'
+    +'<div id="form-hist-detalle"></div>';
+  formRenderHistoricoDetalle(formHistSelectedId);
+}
+
+function formHistCambiarSeleccion(id){
+  formHistSelectedId=parseInt(id)||null;
+  formRenderHistoricoDetalle(formHistSelectedId);
+}
+
+function formRenderHistoricoDetalle(formularioId){
+  var wrap=document.getElementById('form-hist-detalle');
+  if(!wrap) return;
+  var f=(S.formularios||[]).find(function(x){return Number(x.id)===Number(formularioId);});
+  if(!f){ wrap.innerHTML=''; return; }
+  var semanas=formSemanasDelRango(f.fechaDesde,f.fechaHasta).sort(function(a,b){return b.lunes.localeCompare(a.lunes);});
+  if(!semanas.length){
+    wrap.innerHTML='<div class="empty" style="padding:1rem">Este Formulario todavía no tuvo ninguna semana.</div>';
+    return;
+  }
+  var colorMap={pendiente:'#9CA3AF',en_curso:'#D97706',completado:'#16A34A'};
+  var labelMap={pendiente:'Pendiente',en_curso:'En Curso',completado:'Completado'};
+  var html='';
+  semanas.forEach(function(w){
+    var agg=formEstadoAgregadoSemana(f,w.semanaISO,w.anio);
+    html+='<div class="card" style="margin-bottom:.6rem;padding:12px;border-left:4px solid '+colorMap[agg.estado]+';cursor:pointer" onclick="formOpenSemanaDetalle('+f.id+','+w.semanaISO+','+w.anio+')">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
+        +'<span style="font-size:13px;font-weight:600">Semana '+w.semanaISO+' ('+fmtAA(w.lunes)+' al '+fmtAA(w.domingo)+')</span>'
+        +'<span class="badge" style="background:'+colorMap[agg.estado]+'22;color:'+colorMap[agg.estado]+'">'+labelMap[agg.estado]+' — '+agg.respondieron+'/'+agg.total+'</span>'
+      +'</div>'
+    +'</div>';
+  });
+  wrap.innerHTML=html;
+}
+
+function formOpenSemanaDetalle(formularioId, semanaISO, anio){
+  var f=(S.formularios||[]).find(function(x){return Number(x.id)===Number(formularioId);});
+  if(!f) return;
+  var unidades=formTodasUnidadesIncluidas(f);
+  var esSuper=isSuperAdmin();
+  var iconMap={gdv:'🏘',ng:'🌱',discipulado:'📖'};
+  var colorMap={completo:'#16A34A',parcial:'#D97706',pendiente:'#9CA3AF'};
+  var rowsHtml=unidades.map(function(u){
+    var asistInfo=formModuloAsistenciaInfo(u.tipoOrigen,u.id,semanaISO,anio);
+    var resp=formGetRespuesta(f.id,u.tipoOrigen,u.id,semanaISO,anio);
+    var est=formEstadoUnidadSemana(f.id,u.tipoOrigen,u.id,semanaISO,anio);
+    var labelMap={completo:asistInfo.sinEncuentro?'⏸ Sin Encuentro':'✅ Completo',parcial:'◐ Parcial',pendiente:'○ Pendiente'};
+    var detalleHtml='';
+    if(resp){
+      detalleHtml='<div style="margin-top:6px;padding-left:8px;border-left:2px solid #E5E7EB">'
+        +(f.preguntas||[]).map(function(p){
+          var val=resp.respuestas?resp.respuestas[p.id]:null;
+          var valStr=Array.isArray(val)?(val.join(', ')||'—'):(val||'—');
+          return '<div style="font-size:11.5px;margin-bottom:4px"><strong style="color:#4B5563">'+p.texto+':</strong> <span style="color:#6B7280">'+valStr+'</span></div>';
+        }).join('');
+      if(esSuper){
+        detalleHtml+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6B7280;margin-top:4px;cursor:pointer">'
+          +'<input type="checkbox" '+(resp.revisado?'checked':'')+' onchange="formToggleRevisado('+resp.id+',this)">Revisado'
+        +'</label>';
+      } else if(resp.revisado){
+        detalleHtml+='<div style="font-size:10.5px;color:#16A34A;margin-top:4px">✓ Revisado</div>';
+      }
+      detalleHtml+='</div>';
+    }
+    return '<div style="border:1px solid #E5E7EB;border-radius:8px;padding:10px;margin-bottom:8px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
+        +'<span style="font-size:13px;font-weight:600">'+iconMap[u.tipoOrigen]+' '+u.nombre+'</span>'
+        +'<span style="font-size:11px;font-weight:700;color:'+colorMap[est]+'">'+labelMap[est]+'</span>'
+      +'</div>'
+      +detalleHtml
+    +'</div>';
+  }).join('');
+
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;gap:8px;flex-wrap:wrap">'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+f.titulo+' — Semana '+semanaISO+'</div>'
+      +'<div style="display:flex;gap:6px;align-items:center">'
+        +'<button class="btn btn-sm" onclick="formExportarSemana('+f.id+','+semanaISO+','+anio+')">📋 Exportar</button>'
+        +'<button class="btn btn-sm" onclick="formCloseModal()">✕</button>'
+      +'</div>'
+    +'</div>'
+    +(rowsHtml||'<div class="empty">No hay unidades incluidas.</div>')
+    +formAnalisisSectionHtml(f.id,semanaISO,anio)
+  +'</div>';
+  document.getElementById('form-modal-overlay').innerHTML=modalHtml;
+  document.getElementById('form-modal-overlay').style.display='flex';
+}
+
+function formAnalisisSectionHtml(formularioId, semanaISO, anio){
+  var esSuper=isSuperAdmin();
+  var an=formGetAnalisis(formularioId,semanaISO,anio);
+  var texto=an?an.texto:'';
+  return '<div style="margin-top:16px;border-top:1px solid #E5E7EB;padding-top:12px">'
+    +'<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">🧠 Análisis App'
+      +(an&&an.estado==='Completado'?' <span class="badge b-ok" style="font-size:10px">Completado</span>':' <span class="badge b-muted" style="font-size:10px">Pendiente</span>')
+    +'</div>'
+    +(esSuper
+      ?'<textarea id="form-analisis-texto" style="width:100%;min-height:90px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:12.5px;font-family:inherit;box-sizing:border-box" placeholder="Pegá acá el análisis generado en el chat con Claude sobre los Formularios de esta semana...">'+(texto||'')+'</textarea>'
+        +'<button class="btn btn-primary btn-sm" onclick="formGuardarAnalisis('+formularioId+','+semanaISO+','+anio+')" style="margin-top:6px">💾 Guardar Análisis</button>'
+      :(texto?'<div style="font-size:12.5px;color:#4B5563;white-space:pre-wrap">'+texto+'</div>':'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Todavía no hay Análisis cargado para esta semana.</div>'))
+  +'</div>';
+}
+
+function formGetAnalisis(formularioId, semanaISO, anio){
+  return (S.formAnalisis||[]).find(function(a){
+    return Number(a.formularioId)===Number(formularioId)&&a.semanaISO===semanaISO&&a.anio===anio;
+  });
+}
+
+async function formGuardarAnalisis(formularioId, semanaISO, anio){
+  if(!isSuperAdmin()) return;
+  var ta=document.getElementById('form-analisis-texto');
+  var texto=(ta?ta.value:'').trim();
+  var existing=formGetAnalisis(formularioId,semanaISO,anio);
+  var snapshot=null, esNuevo=false, nuevoRef=null, aRef;
+  if(existing){
+    aRef=existing;
+    snapshot=JSON.parse(JSON.stringify(existing));
+    Object.assign(aRef,{texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.id,ts:new Date().toISOString()});
+  } else {
+    esNuevo=true;
+    nuevoRef={id:Date.now(),formularioId:formularioId,semanaISO:semanaISO,anio:anio,texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.id,ts:new Date().toISOString()};
+    S.formAnalisis.push(nuevoRef);
+  }
+  await saveK(SK.formAnalisis,S.formAnalisis);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    if(esNuevo){
+      S.formAnalisis=S.formAnalisis.filter(function(x){return x!==nuevoRef;});
+    } else if(aRef&&snapshot){
+      Object.assign(aRef,snapshot);
+    }
+    await saveK(SK.formAnalisis,S.formAnalisis);
+    alert('No se pudo guardar el Análisis en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Análisis guardado','#16A34A');
+}
+
+function formExportarSemana(formularioId, semanaISO, anio){
+  var f=(S.formularios||[]).find(function(x){return Number(x.id)===Number(formularioId);});
+  if(!f) return;
+  var unidades=formTodasUnidadesIncluidas(f);
+  var tipoLabel={gdv:'Grupo de Vida',ng:'Comunidad NG',discipulado:'Cursada'};
+  var lineas=[f.titulo+' — Semana '+semanaISO,''];
+  unidades.forEach(function(u){
+    var asistInfo=formModuloAsistenciaInfo(u.tipoOrigen,u.id,semanaISO,anio);
+    var resp=formGetRespuesta(f.id,u.tipoOrigen,u.id,semanaISO,anio);
+    lineas.push('— '+tipoLabel[u.tipoOrigen]+': '+u.nombre);
+    if(asistInfo.sinEncuentro){
+      lineas.push('  ⏸ Sin Encuentro');
+    } else if(resp){
+      (f.preguntas||[]).forEach(function(p){
+        var val=resp.respuestas?resp.respuestas[p.id]:null;
+        var valStr=Array.isArray(val)?(val.join(', ')||'—'):(val||'—');
+        lineas.push('  '+p.texto+': '+valStr);
+      });
+    } else {
+      lineas.push('  (sin respuesta)');
+    }
+    lineas.push('');
+  });
+  var texto=lineas.join('\n');
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(texto).then(function(){
+      showToast('📋 Resumen de la semana copiado','#16A34A');
+    }).catch(function(){
+      prompt('Copiá manualmente:', texto);
+    });
+  } else {
+    prompt('Copiá manualmente:', texto);
+  }
+}
+
+async function formToggleRevisado(respuestaId, checkboxEl){
+  if(!isSuperAdmin()) return;
+  var r=(S.formRespuestas||[]).find(function(x){return Number(x.id)===Number(respuestaId);});
+  if(!r) return;
+  var snapshot={revisado:r.revisado,revisadoPor:r.revisadoPor,fechaRevision:r.fechaRevision};
+  var nuevoValor=!r.revisado;
+  r.revisado=nuevoValor;
+  r.revisadoPor=nuevoValor?currentUser.id:null;
+  r.fechaRevision=nuevoValor?today():null;
+  r._ts=Date.now();
+  await saveK(SK.formRespuestas,S.formRespuestas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(r,snapshot);
+    if(checkboxEl) checkboxEl.checked=snapshot.revisado;
+    await saveK(SK.formRespuestas,S.formRespuestas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast(nuevoValor?'✓ Marcado como Revisado':'Revisión deshecha','#16A34A');
 }
 
 function buildEquipoHTML(){
@@ -5291,6 +6227,22 @@ function agendaChecklistTab(tab,btn){
 }
 
 // ── Ocurrencias: expande eventos recurrentes y de Período dentro de un rango de fechas ──
+// Orden visual dentro de un mismo día: 1° Especiales, 2° Habituales creadas directamente en
+// Agenda, 3° Habituales que vienen sincronizadas desde Configuración (Grupos de Vida, Nuevas
+// Generaciones y, cuando se sume, Discipulado — se detecta por el campo origenTipo).
+function agendaPrioridadOcurrencia(o){
+  if(o.tipoActividad==='especial') return 0;
+  if(!o.origenTipo) return 1;
+  return 2;
+}
+function agendaOrdenarOcurrencias(lista){
+  return lista.slice().sort(function(a,b){
+    var pa=agendaPrioridadOcurrencia(a), pb=agendaPrioridadOcurrencia(b);
+    if(pa!==pb) return pa-pb;
+    return (a.hora||'').localeCompare(b.hora||'');
+  });
+}
+
 function agendaGetOcurrencias(desde,hasta){
   var ocs=[];
   (S.eventos||[]).filter(function(e){return e.estado!=='Cancelado';}).forEach(function(e){
@@ -5341,10 +6293,33 @@ function agendaMinisterioLabel(id){
   return m?(m.nombre+(m.area?' / '+m.area:'')):'';
 }
 
-// ── Calendario mensual ──
+// ── Calendario: dispatcher Mes / Semana ──
+function agendaCalToggleHtml(){
+  return '<div style="display:flex;gap:6px;justify-content:center;margin-bottom:12px">'+
+    '<button class="btn btn-sm'+(agendaCalModoVista==='mes'?' btn-primary':'')+'" onclick="agendaSetCalModo(\'mes\')">📅 Mes</button>'+
+    '<button class="btn btn-sm'+(agendaCalModoVista==='semana'?' btn-primary':'')+'" onclick="agendaSetCalModo(\'semana\')">📆 Semana</button>'+
+  '</div>';
+}
+function agendaSetCalModo(modo){
+  agendaCalModoVista=modo;
+  if(modo==='semana'&&!agendaCalSemanaAncla) agendaCalSemanaAncla=today();
+  agendaRenderCalendario();
+}
+function agendaCambiarSemana(delta){
+  var d=new Date((agendaCalSemanaAncla||today())+'T00:00:00');
+  d.setDate(d.getDate()+delta*7);
+  agendaCalSemanaAncla=dateToStr(d);
+  agendaRenderCalendario();
+}
 function agendaRenderCalendario(){
   const wrap=document.getElementById('agenda-cal-wrap');
   if(!wrap) return;
+  if(agendaCalModoVista==='semana'){ agendaRenderCalendarioSemana(wrap); return; }
+  agendaRenderCalendarioMes(wrap);
+}
+
+// ── Vista Mes ──
+function agendaRenderCalendarioMes(wrap){
   const first=new Date(agendaCalYear,agendaCalMonth,1);
   const last=new Date(agendaCalYear,agendaCalMonth+1,0);
   const startWeekday=first.getDay();
@@ -5357,7 +6332,8 @@ function agendaRenderCalendario(){
   ocs.forEach(function(o){ if(!ocsPorDia[o.fechaOcurrencia]) ocsPorDia[o.fechaOcurrencia]=[]; ocsPorDia[o.fechaOcurrencia].push(o); });
   const hoyStr=today();
 
-  let html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+  let html=agendaCalToggleHtml();
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
     '<button class="btn btn-sm" onclick="agendaCambiarMes(-1)">←</button>'+
     '<div style="font-size:15px;font-weight:700;color:#1F4E79">'+MESES[agendaCalMonth]+' '+agendaCalYear+'</div>'+
     '<button class="btn btn-sm" onclick="agendaCambiarMes(1)">→</button>'+
@@ -5371,7 +6347,8 @@ function agendaRenderCalendario(){
     var key=cellDate.toISOString().slice(0,10);
     var enMes=cellDate.getMonth()===agendaCalMonth;
     var esHoy=key===hoyStr;
-    var evs=ocsPorDia[key]||[];
+    var esFinde=cellDate.getDay()===0||cellDate.getDay()===6;
+    var evs=agendaOrdenarOcurrencias(ocsPorDia[key]||[]);
     var evsUnicos=evs.filter(function(o){return !o.esPeriodo;});
     var evsPeriodo=evs.filter(function(o){return o.esPeriodo;});
     var maxMostrar=3;
@@ -5381,12 +6358,55 @@ function agendaRenderCalendario(){
       return '<div style="font-size:8.5px;line-height:1.3;color:'+color+';font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px" title="'+o.titulo.replace(/"/g,'&quot;')+'">● '+txt+'</div>';
     }).join('');
     var extraHtml=evsUnicos.length>maxMostrar?'<div style="font-size:8px;color:#9CA3AF;margin-top:1px">+'+(evsUnicos.length-maxMostrar)+' más</div>':'';
-    html+='<div onclick="agendaOpenDia(\''+key+'\')" style="min-height:64px;border-radius:8px;padding:3px 4px;cursor:pointer;background:'+(esHoy?'#DBEAFE':'#fff')+';border:1px solid '+(esHoy?'#93C5FD':'#F3F4F6')+';'+(evsPeriodo.length?'border-bottom:3px solid #C7A233;':'')+'opacity:'+(enMes?'1':'0.35')+'">'+
+    var bgCelda=esHoy?'#DBEAFE':(esFinde?'#FAFAFA':'#fff');
+    html+='<div onclick="agendaOpenDia(\''+key+'\')" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,.10)\'" onmouseout="this.style.boxShadow=\'none\'" style="min-height:66px;border-radius:9px;padding:3px 4px;cursor:pointer;background:'+bgCelda+';border:1px solid '+(esHoy?'#93C5FD':'#F3F4F6')+';transition:box-shadow .12s;'+(evsPeriodo.length?'border-bottom:3px solid #C7A233;':'')+'opacity:'+(enMes?'1':'0.35')+'">'+
       '<div style="font-size:11px;font-weight:'+(esHoy?'700':'500')+';color:'+(esHoy?'#1E40AF':'#374151')+'">'+cellDate.getDate()+'</div>'+
       itemsHtml+extraHtml+
     '</div>';
   }
   html+='</div>';
+  html+='<div style="display:flex;gap:14px;justify-content:center;margin-top:10px;font-size:10.5px;color:#6B7280;flex-wrap:wrap">'+
+    '<span>🔵 Habitual</span><span>🟣 Especial</span><span>🟡 Período de varios días</span>'+
+  '</div>';
+  wrap.innerHTML=html;
+}
+
+// ── Vista Semana — para revisar rápido sin navegar el mes entero ──
+function agendaRenderCalendarioSemana(wrap){
+  var ancla=agendaCalSemanaAncla||today();
+  var d=new Date(ancla+'T00:00:00');
+  var domingo=new Date(d); domingo.setDate(d.getDate()-d.getDay());
+  var sabado=new Date(domingo); sabado.setDate(domingo.getDate()+6);
+  var ocs=agendaGetOcurrencias(domingo,sabado);
+  var ocsPorDia={};
+  ocs.forEach(function(o){ if(!ocsPorDia[o.fechaOcurrencia]) ocsPorDia[o.fechaOcurrencia]=[]; ocsPorDia[o.fechaOcurrencia].push(o); });
+  var hoyStr=today();
+
+  var html=agendaCalToggleHtml();
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+    '<button class="btn btn-sm" onclick="agendaCambiarSemana(-1)">←</button>'+
+    '<div style="font-size:14px;font-weight:700;color:#1F4E79;text-align:center">'+fmtAA(dateToStr(domingo))+' al '+fmtAA(dateToStr(sabado))+'</div>'+
+    '<button class="btn btn-sm" onclick="agendaCambiarSemana(1)">→</button>'+
+  '</div>';
+
+  for(var i=0;i<7;i++){
+    var cur=new Date(domingo); cur.setDate(domingo.getDate()+i);
+    var key=dateToStr(cur);
+    var esHoy=key===hoyStr;
+    var evs=agendaOrdenarOcurrencias(ocsPorDia[key]||[]);
+    html+='<div onclick="agendaOpenDia(\''+key+'\')" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,.10)\'" onmouseout="this.style.boxShadow=\'none\'" style="cursor:pointer;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:'+(esHoy?'#DBEAFE':'#F9FAFB')+';border:1px solid '+(esHoy?'#93C5FD':'#F3F4F6')+';transition:box-shadow .12s">'+
+      '<div style="font-size:12px;font-weight:700;color:'+(esHoy?'#1E40AF':'#374151')+';margin-bottom:4px">'+DIAS_SEMANA[i]+' '+fmtAA(key)+'</div>';
+    if(!evs.length){
+      html+='<div style="font-size:11.5px;color:#9CA3AF">Sin actividades</div>';
+    } else {
+      html+=evs.map(function(o){
+        var color=o.tipoActividad==='habitual'?'#0891B2':'#7C3AED';
+        var txt=o.titulo.length>34?o.titulo.slice(0,34)+'…':o.titulo;
+        return '<div style="font-size:12px;color:'+color+';font-weight:600;margin-top:2px">● '+(o.hora?o.hora+' — ':'')+txt+'</div>';
+      }).join('');
+    }
+    html+='</div>';
+  }
   html+='<div style="display:flex;gap:14px;justify-content:center;margin-top:10px;font-size:10.5px;color:#6B7280;flex-wrap:wrap">'+
     '<span>🔵 Habitual</span><span>🟣 Especial</span><span>🟡 Período de varios días</span>'+
   '</div>';
@@ -5404,7 +6424,7 @@ function agendaCambiarMes(delta){
 function agendaOpenDia(fechaStr){
   agendaDiaActual=fechaStr;
   var d=new Date(fechaStr+'T00:00:00');
-  var ocs=agendaGetOcurrencias(d,d);
+  var ocs=agendaOrdenarOcurrencias(agendaGetOcurrencias(d,d));
   document.getElementById('agenda-dia-titulo').textContent=fmt(fechaStr);
   var lista=document.getElementById('agenda-dia-lista');
   if(!ocs.length){
@@ -5434,7 +6454,7 @@ function agendaOpenDia(fechaStr){
           '</div>'+
           (canCrearEventos()?'<div style="display:flex;gap:4px;flex-shrink:0">'+
             '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+',null,\''+o.fechaOcurrencia+'\')">✏️</button>'+
-            '<button onclick="agendaEliminarEvento('+o.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
+            '<button onclick="agendaEliminarEvento('+o.id+',\'' + o.fechaOcurrencia + '\')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
           '</div>':'')+
         '</div>'+
         (o.descripcion?'<div style="font-size:12px;color:#374151;margin-top:6px">'+o.descripcion+'</div>':'')+
@@ -5453,11 +6473,45 @@ function agendaAbrirFormDesdeDia(){
 }
 
 // ── Formulario crear/editar evento ──
-function agendaFilterMiembros(q){
-  q=(q||'').toLowerCase();
-  document.querySelectorAll('#agenda-f-personas-list label').forEach(function(lbl){
-    lbl.style.display=lbl.textContent.toLowerCase().includes(q)?'':'none';
-  });
+// ── Personas asignadas: multi-selección con buscador + chips (igual que Responsables/Mensaje) ──
+function agendaSearchPersona(query){
+  var box=document.getElementById('agenda-f-personas-results');
+  if(!box) return;
+  var q=(query||'').trim().toLowerCase();
+  if(q.length<2){ box.style.display='none'; return; }
+  var results=S.members.filter(function(m){
+    return m.estado!=='Baja' && !agendaSelectedPersonas.map(Number).includes(Number(m.id)) && listName(m).toLowerCase().includes(q);
+  }).slice(0,8);
+  if(!results.length){
+    box.innerHTML='<div style="padding:9px 12px;font-size:13px;color:#9CA3AF">Sin resultados</div>';
+    box.style.display='block';
+    return;
+  }
+  box.innerHTML=results.map(function(m){
+    return '<div data-id="'+m.id+'" onpointerdown="event.preventDefault();agendaPickPersonaEl(this)" ontouchstart="event.preventDefault();agendaPickPersonaEl(this)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px;font-weight:600">'+listName(m)+'</div>';
+  }).join('');
+  box.style.display='block';
+}
+function agendaPickPersonaEl(el){
+  var id=parseInt(el.getAttribute('data-id'))||null;
+  if(id&&!agendaSelectedPersonas.map(Number).includes(Number(id))) agendaSelectedPersonas.push(id);
+  agendaRenderPersonaChip();
+  var s=document.getElementById('agenda-f-personas-search'); if(s){s.value='';s.blur();}
+  var box=document.getElementById('agenda-f-personas-results'); if(box) box.style.display='none';
+}
+function agendaClearPersona(id){
+  agendaSelectedPersonas=agendaSelectedPersonas.filter(function(x){return Number(x)!==Number(id);});
+  agendaRenderPersonaChip();
+}
+function agendaRenderPersonaChip(){
+  var chip=document.getElementById('agenda-f-personas-chip');
+  if(!chip) return;
+  if(!agendaSelectedPersonas.length){ chip.style.display='none'; chip.innerHTML=''; return; }
+  chip.style.display='flex';
+  chip.innerHTML=agendaSelectedPersonas.map(function(id){
+    var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+    return '<span style="display:inline-flex;align-items:center;gap:6px;background:#F0FDF4;border:1px solid #86EFAC;color:#166534;font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px">👤 '+(m?listName(m):'—')+' <span onclick="agendaClearPersona('+id+')" style="cursor:pointer;font-weight:700">×</span></span>';
+  }).join('');
 }
 
 // ── Responsable de la Actividad: selección única con buscador ──
@@ -5663,7 +6717,7 @@ function agendaAbrirForm(eventoId, fechaPrefill, fechaOcurrencia){
   document.getElementById('agenda-f-fecha-hasta').value=(ev&&esPeriodo)?(ev.fechaHasta||''):'';
   agendaSetHoraCombinada('agenda-f-hora-periodo',(ev&&esPeriodo)?(ev.hora||''):'');
   agendaTogglePeriodo();
-  document.getElementById('agenda-f-lugar').value=ev?(ev.lugar||''):'';
+  document.getElementById('agenda-f-lugar').value=ev?(ev.lugar||''):'Auditorio Vida Nueva';
 
   // Personalizar Título/Descripción/Mensaje solo para esta fecha puntual — únicamente tiene
   // sentido editando (no creando) una Habitual, y llegando desde un día específico del calendario
@@ -5718,18 +6772,11 @@ function agendaAbrirForm(eventoId, fechaPrefill, fechaOcurrencia){
 
   // Personas asignadas
   agendaSelectedPersonas=ev&&ev.personasAsignadas?ev.personasAsignadas.slice():[];
-  var personasList=document.getElementById('agenda-f-personas-list');
-  if(personasList){
-    personasList.innerHTML=S.members.filter(function(m){return m.estado!=='Baja';})
-      .sort(function(a,b){return listName(a).localeCompare(listName(b));})
-      .map(function(m){
-        var checked=agendaSelectedPersonas.map(Number).includes(Number(m.id));
-        return '<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB">'+
-          '<input type="checkbox" class="agenda-persona-cb" value="'+m.id+'"'+(checked?' checked':'')+' style="width:15px;height:15px;flex-shrink:0;cursor:pointer">'+
-          '<span style="font-size:13px">'+listName(m)+'</span>'+
-        '</label>';
-      }).join('');
-  }
+  agendaRenderPersonaChip();
+  var personasSearch=document.getElementById('agenda-f-personas-search');
+  if(personasSearch) personasSearch.value='';
+  var personasResults=document.getElementById('agenda-f-personas-results');
+  if(personasResults) personasResults.style.display='none';
 
   // Recordatorio
   var recChk=document.getElementById('agenda-f-recordatorio');
@@ -5775,6 +6822,47 @@ function agendaHabitualesEnFecha(fechaStr,excluirId){
   });
 }
 
+// Diálogo de 3 opciones cuando una Especial coincide en fecha con una o más Habituales.
+// Reemplazar SOLO afecta a las que coinciden en horario (las de otro horario conviven igual,
+// se elija lo que se elija). Agregar no toca ninguna Habitual existente. Cancelar aborta el guardado.
+function agendaMostrarConflictoDialog(conflictos, nuevaHora){
+  return new Promise(function(resolve){
+    var lista=conflictos.map(function(c){
+      var mismoHorario=!!(nuevaHora&&c.hora&&c.hora===nuevaHora);
+      return '<div style="font-size:12.5px;margin-bottom:4px;color:#374151">• '+c.habitualTitulo+' el '+fmtAA(c.fecha)+(c.hora?' a las '+c.hora:'')
+        +(mismoHorario?' <span style="color:#DC2626;font-weight:600">(mismo horario)</span>':' <span style="color:#9CA3AF">(horario distinto)</span>')
+      +'</div>';
+    }).join('');
+    var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:460px;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:10px">Ya existe'+(conflictos.length>1?'n actividades habituales':' una actividad habitual')+' para '+(conflictos.length>1?'estas fechas':'esa fecha')+':</div>'
+      +lista
+      +'<div style="font-size:12.5px;color:#6B7280;margin:14px 0 10px">¿Qué querés hacer?</div>'
+      +'<div style="display:flex;flex-direction:column;gap:8px">'
+        +'<button class="btn btn-primary" id="agenda-conflicto-reemplazar" style="width:100%">🔄 Reemplazar (solo las del mismo horario)</button>'
+        +'<button class="btn" id="agenda-conflicto-agregar" style="width:100%">➕ Agregar de todas formas, sin tocar las existentes</button>'
+        +'<button class="btn" id="agenda-conflicto-cancelar" style="width:100%;color:#6B7280">Cancelar</button>'
+      +'</div>'
+    +'</div>';
+    var ov=document.getElementById('agenda-dialogo-overlay');
+    if(!ov){
+      ov=document.createElement('div');
+      ov.id='agenda-dialogo-overlay';
+      ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;align-items:center;justify-content:center;padding:1rem';
+      document.body.appendChild(ov);
+    }
+    ov.innerHTML=modalHtml;
+    ov.style.display='flex';
+    function cerrar(valor){
+      ov.style.display='none';
+      ov.innerHTML='';
+      resolve(valor);
+    }
+    document.getElementById('agenda-conflicto-reemplazar').onclick=function(){cerrar('reemplazar');};
+    document.getElementById('agenda-conflicto-agregar').onclick=function(){cerrar('agregar');};
+    document.getElementById('agenda-conflicto-cancelar').onclick=function(){cerrar('cancelar');};
+  });
+}
+
 async function agendaGuardarEvento(){
   var tipoActividad=agendaSelectedTipoActividad;
   var titulo=(document.getElementById('agenda-f-titulo')?.value||'').trim();
@@ -5795,7 +6883,7 @@ async function agendaGuardarEvento(){
   var descripcion=(document.getElementById('agenda-f-desc')?.value||'').trim();
   var ministerioId=parseInt(document.getElementById('agenda-f-ministerio')?.value)||null;
   var lugar=(document.getElementById('agenda-f-lugar')?.value||'').trim();
-  var personasAsignadas=[...document.querySelectorAll('.agenda-persona-cb:checked')].map(function(cb){return parseInt(cb.value);});
+  var personasAsignadas=agendaSelectedPersonas.slice();
   var recordatorio={
     activo: !!document.getElementById('agenda-f-recordatorio')?.checked,
     diasAntes: parseInt(document.getElementById('agenda-f-record-dias')?.value)||3
@@ -5830,14 +6918,21 @@ async function agendaGuardarEvento(){
     var conflictos=[];
     fechasCubiertas.forEach(function(f){
       agendaHabitualesEnFecha(f,ev?ev.id:null).forEach(function(h){
-        conflictos.push({habitualId:h.id,habitualTitulo:h.titulo,fecha:f});
+        conflictos.push({habitualId:h.id,habitualTitulo:h.titulo,fecha:f,hora:h.hora||''});
       });
     });
     if(conflictos.length){
-      var lista=conflictos.map(function(c){return '• '+c.habitualTitulo+' el '+fmtAA(c.fecha);}).join('\n');
-      var msg='Ya existe una actividad habitual para '+(conflictos.length>1?'estas fechas':'esa fecha')+':\n'+lista+'\n\n¿Se reemplaza?';
-      if(!confirm(msg)) return;
-      nuevosReemplazos=conflictos.map(function(c){return {eventoHabitualId:c.habitualId,fecha:c.fecha};});
+      var eleccionConflicto=await agendaMostrarConflictoDialog(conflictos,hora);
+      if(eleccionConflicto==='cancelar') return;
+      if(eleccionConflicto==='reemplazar'){
+        // Solo se reemplazan las que coinciden en horario — las de otro horario conviven sin tocarse
+        nuevosReemplazos=conflictos.filter(function(c){return hora&&c.hora&&c.hora===hora;})
+          .map(function(c){return {eventoHabitualId:c.habitualId,fecha:c.fecha};});
+        if(!nuevosReemplazos.length){
+          showToast('Ninguna coincidía en el horario — se guardó sin reemplazar nada.','#D97706');
+        }
+      }
+      // eleccionConflicto==='agregar' → nuevosReemplazos queda vacío: no se toca ninguna Habitual existente
     }
   }
 
@@ -5914,14 +7009,76 @@ async function agendaGuardarEvento(){
   showToast('✅ Evento guardado'+(nuevosReemplazos.length?' — reemplazó '+nuevosReemplazos.length+' fecha'+(nuevosReemplazos.length!==1?'s':'')+' de actividad habitual':''),'#16A34A');
 }
 
-async function agendaEliminarEvento(id){
+// Diálogo de eliminación cuando la ocurrencia pertenece a una serie recurrente:
+// permite elegir entre quitar solo esa fecha puntual (la serie sigue) o borrar toda la serie.
+function agendaMostrarEliminarDialog(ev, fechaOcurrencia){
+  return new Promise(function(resolve){
+    var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:8px">Eliminar "'+ev.titulo+'"</div>'
+      +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:14px">Esta es una actividad recurrente. ¿Qué querés eliminar?</div>'
+      +'<div style="display:flex;flex-direction:column;gap:8px">'
+        +'<button class="btn btn-primary" id="agenda-elim-solo-fecha" style="width:100%">🗓 Solo el '+fmtAA(fechaOcurrencia)+' — la serie sigue</button>'
+        +'<button class="btn" id="agenda-elim-serie" style="width:100%;background:#FEE2E2;color:#DC2626">🗑 Toda la serie recurrente</button>'
+        +'<button class="btn" id="agenda-elim-cancelar" style="width:100%;color:#6B7280">Cancelar</button>'
+      +'</div>'
+    +'</div>';
+    var ov=document.getElementById('agenda-dialogo-overlay');
+    if(!ov){
+      ov=document.createElement('div');
+      ov.id='agenda-dialogo-overlay';
+      ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;align-items:center;justify-content:center;padding:1rem';
+      document.body.appendChild(ov);
+    }
+    ov.innerHTML=modalHtml;
+    ov.style.display='flex';
+    function cerrar(valor){ ov.style.display='none'; ov.innerHTML=''; resolve(valor); }
+    document.getElementById('agenda-elim-solo-fecha').onclick=function(){cerrar('soloFecha');};
+    document.getElementById('agenda-elim-serie').onclick=function(){cerrar('serie');};
+    document.getElementById('agenda-elim-cancelar').onclick=function(){cerrar('cancelar');};
+  });
+}
+
+async function agendaEliminarEvento(id, fechaOcurrencia){
   var ev=S.eventos.find(function(x){return Number(x.id)===Number(id);});
   if(!ev) return;
   var esRecurrente=ev.recurrencia&&ev.recurrencia.tipo&&ev.recurrencia.tipo!=='ninguna';
-  var msg=esRecurrente
-    ?'¿Eliminar "'+ev.titulo+'"? Esto borra TODA la serie recurrente, no solo esta fecha.'
-    :'¿Eliminar "'+ev.titulo+'"?'+((ev.reemplazos&&ev.reemplazos.length)?'\n\nLa(s) actividad(es) habitual(es) que había reemplazado vuelve(n) a mostrarse en su fecha original.':'');
-  if(!confirm(msg)) return;
+
+  // Serie recurrente + se conoce la fecha puntual clickeada → ofrecer las 3 opciones
+  if(esRecurrente&&fechaOcurrencia){
+    var eleccion=await agendaMostrarEliminarDialog(ev,fechaOcurrencia);
+    if(eleccion==='cancelar') return;
+
+    if(eleccion==='soloFecha'){
+      var snapshotExc=(ev.excepciones||[]).slice();
+      var snapshotOverridesStr=JSON.stringify(ev.overrides||{});
+      if(!ev.excepciones) ev.excepciones=[];
+      if(ev.excepciones.indexOf(fechaOcurrencia)===-1) ev.excepciones.push(fechaOcurrencia);
+      if(ev.overrides&&ev.overrides[fechaOcurrencia]) delete ev.overrides[fechaOcurrencia];
+      try{
+        await saveK(SK.eventos,S.eventos);
+        if(typeof window.fbUpload==='function') await window.fbUpload(true);
+        agendaCloseDia();
+        agendaRenderCalendario();
+        agendaRenderBanner();
+        var proxTab2=document.getElementById('agenda-tab-proximos');
+        if(proxTab2&&proxTab2.style.display!=='none') agendaRenderProximos();
+        showToast('🗓 Se quitó esa fecha — la serie sigue activa','#DC2626');
+      }catch(e){
+        ev.excepciones=snapshotExc;
+        ev.overrides=JSON.parse(snapshotOverridesStr);
+        await saveK(SK.eventos,S.eventos);
+        alert('No se pudo eliminar esa fecha. Verificá tu conexión.');
+      }
+      return;
+    }
+    // eleccion==='serie' → sigue el flujo normal de abajo, que borra todo el evento
+  } else {
+    var msg=esRecurrente
+      ?'¿Eliminar "'+ev.titulo+'"? Esto borra TODA la serie recurrente, no solo esta fecha.'
+      :'¿Eliminar "'+ev.titulo+'"?'+((ev.reemplazos&&ev.reemplazos.length)?'\n\nLa(s) actividad(es) habitual(es) que había reemplazado vuelve(n) a mostrarse en su fecha original.':'');
+    if(!confirm(msg)) return;
+  }
+
   S.eventos=S.eventos.filter(function(x){return Number(x.id)!==Number(id);});
   // Si esta Especial había reemplazado alguna Habitual, restaurarla en esa fecha
   var habitualesTocadas=[];
@@ -5990,7 +7147,7 @@ function agendaRenderOcurrenciasCard(o){
       '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:flex-end">'+
         (canCrearEventos()?'<div style="display:flex;gap:4px">'+
           '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+',null,\''+o.fechaOcurrencia+'\')">✏️</button>'+
-          '<button onclick="agendaEliminarEvento('+o.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
+          '<button onclick="agendaEliminarEvento('+o.id+',\''+o.fechaOcurrencia+'\')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>'+
         '</div>':'')+
         btnChecklist+
       '</div>'+
@@ -6008,7 +7165,7 @@ function agendaRenderOcurrenciasList(ocs, wrapId, emptyMsg){
   var porFecha={};
   ocs.forEach(function(o){ if(!porFecha[o.fechaOcurrencia]) porFecha[o.fechaOcurrencia]=[]; porFecha[o.fechaOcurrencia].push(o); });
   wrap.innerHTML=Object.keys(porFecha).sort().map(function(fecha){
-    var evs=porFecha[fecha];
+    var evs=agendaOrdenarOcurrencias(porFecha[fecha]);
     var diaSemana=DIAS_SEMANA[new Date(fecha+'T00:00:00').getDay()];
     return '<div style="margin-bottom:1rem">'+
       '<div style="font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">'+diaSemana+' '+fmt(fecha)+'</div>'+
@@ -7764,6 +8921,7 @@ function buildGdVHTML(){
           </div>
         </div>
       </div>
+      <div id="gdv-form-wrap"></div>
       <div class="card" id="gdv-asistencia-card"><div class="card-title">✅ Asistencia</div><div style="font-size:12px;color:#6B7280;margin-bottom:10px">Tocá para cambiar estado</div><div id="gdv-members"></div></div>
       <div class="card gdv-visit-card">
         <div class="card-title">👥 Visitas de otro grupo</div>
@@ -8073,6 +9231,15 @@ function gdvCheckDuplicateWeekOnDateChange(){
   var gid=parseInt(sel?.value)||null;
   if(!gid) gid=currentUser.groupId;
   if(gid) gdvCheckDuplicateWeek(gid);
+  gdvSyncFormularioUI();
+}
+
+function gdvSyncFormularioUI(){
+  var facGids=isGdVFacilitador()?getFacilitadorGroupIds():[];
+  var gid=facGids.length===1?facGids[0]:currentUser.groupId;
+  if(isGdVAdmin()||facGids.length>1){var sel=document.getElementById('gdv-grupo-sel');if(sel)gid=parseInt(sel.value)||null;}
+  var fecha=document.getElementById('gdv-fecha')?.value;
+  if(typeof formRenderRespuestaUI==='function') formRenderRespuestaUI('gdv-form-wrap','gdv',gid,fecha);
 }
 
 function gdvToggleSinEncuentro(){
@@ -8080,8 +9247,11 @@ function gdvToggleSinEncuentro(){
   document.getElementById('gdv-motivo-wrap').style.display=checked?'block':'none';
   const asistCard=document.getElementById('gdv-asistencia-card');
   const visitCards=document.querySelectorAll('.gdv-visit-card');
+  const formWrap=document.getElementById('gdv-form-wrap');
   if(asistCard) asistCard.style.opacity=checked?'0.35':'1';
   if(asistCard) asistCard.style.pointerEvents=checked?'none':'auto';
+  if(formWrap) formWrap.style.opacity=checked?'0.35':'1';
+  if(formWrap) formWrap.style.pointerEvents=checked?'none':'auto';
   visitCards.forEach(c=>{c.style.opacity=checked?'0.35':'1';c.style.pointerEvents=checked?'none':'auto';});
 }
 
@@ -8140,6 +9310,7 @@ function gdvInitFacForm(){
       if(facGid) gdvCheckPendingWeeks(facGid);
     }
   }
+  gdvSyncFormularioUI();
   }catch(err){
     var tab=document.getElementById('gdv-tab-cargar');
     if(tab) tab.innerHTML='<div class="card" style="background:#FEF2F2;padding:1rem;color:#DC2626"><b>Error en Cargar:</b> '+err.message+'<br><small>'+err.stack+'</small></div>';
@@ -8179,6 +9350,7 @@ function gdvAdminGroupChanged(){
   }
   gdvCheckPendingWeeks(gid);
   gdvCheckDuplicateWeek(gid);
+  gdvSyncFormularioUI();
 }
 
 function gdvRenderFacMembers(members){
@@ -8330,6 +9502,10 @@ async function gdvSaveRecord(){
       });
       if(!existeAnterior){
         alert('⚠️ Todavía no cargaste la semana anterior para este grupo. Cargala primero — como mínimo marcá "Sin Encuentro" — antes de cargar la semana actual.');
+        return;
+      }
+      if(typeof formSemanaAnteriorCompleta==='function'&&!formSemanaAnteriorCompleta('gdv',gid,lim.min)){
+        alert('⚠️ Todavía falta completar el Formulario de la semana anterior para este grupo. Completalo antes de cargar la semana actual.');
         return;
       }
     }
@@ -13473,7 +14649,7 @@ function discRenderDashboard(c){
   var html='';
   pasosToShow.forEach(function(paso){
     var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
-    var recs=S.discRecords.filter(function(r){return r.pasoId===paso.id;});
+    var recs=S.discRecords.filter(function(r){return r.pasoId===paso.id&&!r.sinEncuentro;});
 
     // Stats
     var totalEnc=recs.length;
@@ -13579,7 +14755,7 @@ async function discToggleCompletado(pasoId, memberId){
     paso.completados[memberId]=true;
     // Guardar fecha de completado (último encuentro de este paso)
     if(!paso.fechasCompletado) paso.fechasCompletado={};
-    var records=S.discRecords.filter(function(r){return r.pasoId===pasoId;});
+    var records=S.discRecords.filter(function(r){return r.pasoId===pasoId&&!r.sinEncuentro;});
     var ultFecha=records.length?records.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0].fecha:todayAA();
     paso.fechasCompletado[memberId]=ultFecha;
     // Auto-alimentar Formación del miembro
@@ -13650,7 +14826,7 @@ async function discCerrarCursada(cursadaId){
   var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
   if(!cursada) return;
   if(!confirm('¿Cerrar la cursada "'+cursada.label+'"?\nLos miembros con ≥75% serán marcados Completado.')) return;
-  var recs=S.discRecords.filter(function(r){return (r.cursadaId===cursadaId||(r.pasoId===cursada.pasoId&&!r.cursadaId))&&r.asistencia;});
+  var recs=S.discRecords.filter(function(r){return (r.cursadaId===cursadaId||(r.pasoId===cursada.pasoId&&!r.cursadaId))&&r.asistencia&&!r.sinEncuentro;});
   var total=recs.length;
   var completados=0;
   var snapshotCursada={estado:cursada.estado,fechaCierre:cursada.fechaCierre,num:cursada.num,anio:cursada.anio,label:cursada.label};
@@ -13768,7 +14944,7 @@ async function discRevertirInicio(cursadaId){
   if(c) discRenderCursada(c);
 }
 
-function discRenderHistorico(c){var fP=document.getElementById('hist-fil-paso')?document.getElementById('hist-fil-paso').value:'';var fA=document.getElementById('hist-fil-anio')?document.getElementById('hist-fil-anio').value:'';var fI=document.getElementById('hist-fil-id')?document.getElementById('hist-fil-id').value.trim().toLowerCase():'';var done=(S.discCursadas||[]).filter(function(cu){if(cu.estado!=='Completado')return false;if(fP&&String(cu.pasoId)!==fP)return false;if(fA&&String(cu.anio)!==fA)return false;if(fI&&!(cu.label||'').toLowerCase().includes(fI))return false;return true;}).sort(function(a,b){return b.id-a.id;});var pOpts=S.discPasos.map(function(p){return '<option value="'+p.id+'"'+(fP===String(p.id)?' selected':'')+'>'+p.nombre+'</option>';}).join('');var anios=[...new Set((S.discCursadas||[]).filter(function(c){return c.estado==='Completado';}).map(function(c){return c.anio;}))].sort(function(a,b){return b-a;});var aOpts=anios.map(function(a){return '<option value="'+a+'"'+(fA===String(a)?' selected':'')+'>'+a+'</option>';}).join('');c.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center"><select id="hist-fil-paso" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los pasos</option>'+pOpts+'</select><select id="hist-fil-anio" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los años</option>'+aOpts+'</select><input id="hist-fil-id" oninput="discRenderHistorico(document.getElementById(\'disc-content\'))" placeholder="Buscar ID (ej: 1/2026)" value="'+fI+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;width:160px"><span style="font-size:12px;color:#6B7280">'+done.length+' resultado'+(done.length!==1?'s':'')+'</span></div><div id="hist-results"></div>';if(!done.length){document.getElementById('hist-results').innerHTML='<div class="empty" style="padding:2rem">No hay cursadas que coincidan.</div>';return;}var html='';done.forEach(function(cursada){var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&r.asistencia;});var total=recs.length;var stats=cursada.miembros.map(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return null;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;return {m:m,asist:asist,pct:pct,ok:pct>=75};}).filter(Boolean);var nOk=stats.filter(function(x){return x.ok;}).length;var origenH=discContarOrigenMiembros(cursada);html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #9CA3AF"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+cursada.label+'</div><div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+discDiscipuladoresLabel(cursada)+'</strong> · Inicio: '+(cursada.fechaInicio||'—')+' · Cierre: '+(cursada.fechaCierre||'—')+(cursada.miembros.length?' · '+origenH.qr+' por QR · '+origenH.manual+' manual'+(origenH.manual!==1?'es':''):'')+'</div></div><span class="badge b-muted">Completada</span>'+(hasRole('super_admin')?'<button class="btn btn-sm" onclick="discRevertirCierre('+cursada.id+')" style="color:#D97706;margin-left:6px" title="Vuelve la cursada a Activo">↩️ Revertir</button>':'')+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+cursada.miembros.length+'</span><span class="stat-lbl">Alumnos</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+total+'</span><span class="stat-lbl">Encuentros</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem;color:#16A34A">'+nOk+'/'+cursada.miembros.length+'</span><span class="stat-lbl">Completados</span></div></div>';stats.forEach(function(s){var bc=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;flex:1">'+fullName(s.m)+'</span><div style="flex:2;min-width:120px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#6B7280">'+s.asist+'/'+total+' enc.</span><strong style="color:'+bc+'">'+s.pct+'%</strong></div><div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+bc+';width:'+s.pct+'%"></div></div></div><span style="font-size:11px;padding:3px 10px;border-radius:6px;'+(s.ok?'background:#D1FAE5;color:#065F46':'background:#FEE2E2;color:#991B1B')+'">'+( s.ok?'✅ Completado':'❌ No completó')+'</span></div>';});if(recs.length){html+='<details style="margin-top:1rem"><summary style="font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;padding:6px 0">Ver encuentros ('+recs.length+')</summary><div style="margin-top:8px">';recs.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(r){var pres=Object.values(r.asistencia||{}).filter(function(a){return a&&a.state==='presente';}).length;var editBtn=hasRole('super_admin')?'<button class="btn btn-sm" onclick="discEditRecord('+r.id+')" style="font-size:10px;padding:2px 8px">✏️</button>':'';html+='<div style="padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:12px;display:flex;justify-content:space-between;align-items:center"><span>'+(fmtAA(r.fecha)||r.fecha)+' — '+r.capitulo+'</span><div style="display:flex;align-items:center;gap:8px"><span style="color:#6B7280">'+pres+' presentes</span>'+editBtn+'</div></div>';});html+='</div></details>';}html+='</div>';});document.getElementById('hist-results').innerHTML=html;}
+function discRenderHistorico(c){var fP=document.getElementById('hist-fil-paso')?document.getElementById('hist-fil-paso').value:'';var fA=document.getElementById('hist-fil-anio')?document.getElementById('hist-fil-anio').value:'';var fI=document.getElementById('hist-fil-id')?document.getElementById('hist-fil-id').value.trim().toLowerCase():'';var done=(S.discCursadas||[]).filter(function(cu){if(cu.estado!=='Completado')return false;if(fP&&String(cu.pasoId)!==fP)return false;if(fA&&String(cu.anio)!==fA)return false;if(fI&&!(cu.label||'').toLowerCase().includes(fI))return false;return true;}).sort(function(a,b){return b.id-a.id;});var pOpts=S.discPasos.map(function(p){return '<option value="'+p.id+'"'+(fP===String(p.id)?' selected':'')+'>'+p.nombre+'</option>';}).join('');var anios=[...new Set((S.discCursadas||[]).filter(function(c){return c.estado==='Completado';}).map(function(c){return c.anio;}))].sort(function(a,b){return b-a;});var aOpts=anios.map(function(a){return '<option value="'+a+'"'+(fA===String(a)?' selected':'')+'>'+a+'</option>';}).join('');c.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center"><select id="hist-fil-paso" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los pasos</option>'+pOpts+'</select><select id="hist-fil-anio" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los años</option>'+aOpts+'</select><input id="hist-fil-id" oninput="discRenderHistorico(document.getElementById(\'disc-content\'))" placeholder="Buscar ID (ej: 1/2026)" value="'+fI+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;width:160px"><span style="font-size:12px;color:#6B7280">'+done.length+' resultado'+(done.length!==1?'s':'')+'</span></div><div id="hist-results"></div>';if(!done.length){document.getElementById('hist-results').innerHTML='<div class="empty" style="padding:2rem">No hay cursadas que coincidan.</div>';return;}var html='';done.forEach(function(cursada){var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&r.asistencia&&!r.sinEncuentro;});var total=recs.length;var stats=cursada.miembros.map(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return null;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;return {m:m,asist:asist,pct:pct,ok:pct>=75};}).filter(Boolean);var nOk=stats.filter(function(x){return x.ok;}).length;var origenH=discContarOrigenMiembros(cursada);html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #9CA3AF"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+cursada.label+'</div><div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+discDiscipuladoresLabel(cursada)+'</strong> · Inicio: '+(cursada.fechaInicio||'—')+' · Cierre: '+(cursada.fechaCierre||'—')+(cursada.miembros.length?' · '+origenH.qr+' por QR · '+origenH.manual+' manual'+(origenH.manual!==1?'es':''):'')+'</div></div><span class="badge b-muted">Completada</span>'+(hasRole('super_admin')?'<button class="btn btn-sm" onclick="discRevertirCierre('+cursada.id+')" style="color:#D97706;margin-left:6px" title="Vuelve la cursada a Activo">↩️ Revertir</button>':'')+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+cursada.miembros.length+'</span><span class="stat-lbl">Alumnos</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+total+'</span><span class="stat-lbl">Encuentros</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem;color:#16A34A">'+nOk+'/'+cursada.miembros.length+'</span><span class="stat-lbl">Completados</span></div></div>';stats.forEach(function(s){var bc=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;flex:1">'+fullName(s.m)+'</span><div style="flex:2;min-width:120px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#6B7280">'+s.asist+'/'+total+' enc.</span><strong style="color:'+bc+'">'+s.pct+'%</strong></div><div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+bc+';width:'+s.pct+'%"></div></div></div><span style="font-size:11px;padding:3px 10px;border-radius:6px;'+(s.ok?'background:#D1FAE5;color:#065F46':'background:#FEE2E2;color:#991B1B')+'">'+( s.ok?'✅ Completado':'❌ No completó')+'</span></div>';});if(recs.length){html+='<details style="margin-top:1rem"><summary style="font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;padding:6px 0">Ver encuentros ('+recs.length+')</summary><div style="margin-top:8px">';recs.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(r){var pres=Object.values(r.asistencia||{}).filter(function(a){return a&&a.state==='presente';}).length;var editBtn=hasRole('super_admin')?'<button class="btn btn-sm" onclick="discEditRecord('+r.id+')" style="font-size:10px;padding:2px 8px">✏️</button>':'';html+='<div style="padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:12px;display:flex;justify-content:space-between;align-items:center"><span>'+(fmtAA(r.fecha)||r.fecha)+' — '+r.capitulo+'</span><div style="display:flex;align-items:center;gap:8px"><span style="color:#6B7280">'+pres+' presentes</span>'+editBtn+'</div></div>';});html+='</div></details>';}html+='</div>';});document.getElementById('hist-results').innerHTML=html;}
 function discRenderCursos(c){
   var esSuper=hasRole('super_admin');
   var html='<div style="font-size:12px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#F9FAFB;border-radius:8px">'
@@ -14607,8 +15783,21 @@ function discRenderCargar(c){
     +'<div id="disc-pending-alert" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:10px;font-size:13px;color:#991B1B;margin-bottom:12px"></div>'
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha</label>'
     +'<input type="date" id="disc-fecha" value="'+hoy+'" max="'+hoy+'" style="margin-bottom:12px" onchange="discCheckDuplicateWeek()">'
-    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Capítulo</label>'
-    +'<select id="disc-sel-cap" style="margin-bottom:12px"><option value="">— Primero seleccioná un paso —</option></select>'
+    +'<div style="margin-top:2px;margin-bottom:14px;padding:12px;background:#FFF9C4;border:1px solid #FCD34D;border-radius:10px">'
+      +'<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:500;color:#92400E">'
+        +'<input type="checkbox" id="disc-sin-encuentro" onchange="discToggleSinEncuentro()" style="width:18px;height:18px;cursor:pointer">'
+        +'⏸ La Cursada NO se reunió esta semana'
+      +'</label>'
+      +'<div id="disc-motivo-wrap" style="display:none;margin-top:10px">'
+        +'<label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Motivo (opcional)</label>'
+        +'<input type="text" id="disc-motivo" placeholder="Ej: Feriado, sin discipulador esa semana, etc.">'
+      +'</div>'
+    +'</div>'
+    +'<div id="disc-cap-wrap">'
+      +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Capítulo</label>'
+      +'<select id="disc-sel-cap" style="margin-bottom:12px"><option value="">— Primero seleccioná un paso —</option></select>'
+    +'</div>'
+    +'<div id="disc-form-wrap"></div>'
     +'<div id="disc-asistencia-wrap"></div>'
     +'<button class="btn btn-primary" onclick="discGuardarAsistencia()" style="width:100%;margin-top:1rem">💾 Guardar asistencia</button>'
     +'<div id="disc-alert" class="hidden" style="margin-top:8px;padding:10px;border-radius:8px;background:#D1FAE5;color:#065F46;font-size:13px"></div>'
@@ -14633,7 +15822,7 @@ function discCheckDuplicateWeek(){
   if(!alertEl) return;
   var cursadaId=discSelectedPasoId;
   var fecha=document.getElementById('disc-fecha')?.value;
-  if(!cursadaId||!fecha){alertEl.style.display='none';return;}
+  if(!cursadaId||!fecha){alertEl.style.display='none';discSyncFormularioUI();return;}
   var semana=getISOWeek(fecha);
   var anio=parseLocalDate(fecha).getFullYear();
   var existe=S.discRecords.find(function(r){
@@ -14647,11 +15836,25 @@ function discCheckDuplicateWeek(){
   } else {
     alertEl.style.display='none';
   }
+  discSyncFormularioUI();
+}
+
+function discSyncFormularioUI(){
+  var cursadaId=discSelectedPasoId;
+  var fecha=document.getElementById('disc-fecha')?.value;
+  if(typeof formRenderRespuestaUI==='function') formRenderRespuestaUI('disc-form-wrap','discipulado',cursadaId,fecha);
 }
 
 function discLoadPasoForm(){
   var cursadaId=parseInt(document.getElementById('disc-sel-paso').value)||null;
   discSelectedPasoId=cursadaId;
+  var soEl=document.getElementById('disc-sin-encuentro');
+  if(soEl) soEl.checked=false;
+  var moEl=document.getElementById('disc-motivo');
+  if(moEl) moEl.value='';
+  var mwEl=document.getElementById('disc-motivo-wrap');
+  if(mwEl) mwEl.style.display='none';
+  discToggleSinEncuentro();
   var cursada=cursadaId?(S.discCursadas||[]).find(function(cu){return cu.id===cursadaId;}):null;var paso=cursada?S.discPasos.find(function(p){return p.id===cursada.pasoId;}):null;
   var fechaInput=document.getElementById('disc-fecha');
   if(fechaInput){
@@ -14729,6 +15932,18 @@ function discLoadPasoForm(){
     }).join('');
 }
 
+function discToggleSinEncuentro(){
+  var checked=document.getElementById('disc-sin-encuentro').checked;
+  var motivoWrap=document.getElementById('disc-motivo-wrap');
+  if(motivoWrap) motivoWrap.style.display=checked?'block':'none';
+  var capWrap=document.getElementById('disc-cap-wrap');
+  var asistWrap=document.getElementById('disc-asistencia-wrap');
+  var formWrap=document.getElementById('disc-form-wrap');
+  if(capWrap){capWrap.style.opacity=checked?'0.35':'1';capWrap.style.pointerEvents=checked?'none':'auto';}
+  if(asistWrap){asistWrap.style.opacity=checked?'0.35':'1';asistWrap.style.pointerEvents=checked?'none':'auto';}
+  if(formWrap){formWrap.style.opacity=checked?'0.35':'1';formWrap.style.pointerEvents=checked?'none':'auto';}
+}
+
 function discToggleAtt(memberId){
   if(!discFacAtt[memberId]) return;
   var cur=discFacAtt[memberId].state;
@@ -14746,10 +15961,12 @@ async function discGuardarAsistencia(){
   var pasoId=discSelectedPasoId;
   var fecha=document.getElementById('disc-fecha').value;
   var capitulo=document.getElementById('disc-sel-cap').value;
-  if(!pasoId||!fecha||!capitulo){
-    alert('Completá Paso, Fecha y Capítulo');return;
+  var sinEncuentro=document.getElementById('disc-sin-encuentro')?.checked||false;
+  var motivo=document.getElementById('disc-motivo')?.value.trim()||'';
+  if(!pasoId||!fecha||(!sinEncuentro&&!capitulo)){
+    alert(sinEncuentro?'Completá Paso y Fecha':'Completá Paso, Fecha y Capítulo');return;
   }
-  if(!Object.keys(discFacAtt).length){alert('No hay miembros en este paso');return;}
+  if(!sinEncuentro&&!Object.keys(discFacAtt).length){alert('No hay miembros en este paso');return;}
 
   var cursadaChk=(S.discCursadas||[]).find(function(cu){return cu.id===pasoId;});
   if(cursadaChk&&(cursadaChk.grupos||[]).length>=1&&!discSelectedGrupoId){
@@ -14761,6 +15978,31 @@ async function discGuardarAsistencia(){
   var lim=limiteFechaCarga();
   if(fecha>lim.max){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+fmtAA(lim.max)+').');return;}
   if(fecha<lim.min){alert('Solo se puede cargar la semana en curso o la anterior. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
+
+  // ── No se puede cargar la semana en curso si la anterior está pendiente ──
+  // (sin excepciones — al menos hay que marcarla como "Sin Encuentro")
+  {
+    var semanaActualNum=getISOWeek(lim.max);
+    var anioActualNum=parseLocalDate(lim.max).getFullYear();
+    var esSemanaActual=getISOWeek(fecha)===semanaActualNum && parseLocalDate(fecha).getFullYear()===anioActualNum;
+    if(esSemanaActual){
+      var semanaAntNum=getISOWeek(lim.min);
+      var anioAntNum=parseLocalDate(lim.min).getFullYear();
+      var existeAnterior=S.discRecords.some(function(r){
+        if((r.cursadaId||r.pasoId)!==pasoId) return false;
+        if(discSelectedGrupoId&&String(r.grupoId||'')!==String(discSelectedGrupoId)) return false;
+        return getISOWeek(r.fecha)===semanaAntNum && parseLocalDate(r.fecha).getFullYear()===anioAntNum;
+      });
+      if(!existeAnterior){
+        alert('⚠️ Todavía no cargaste la semana anterior para esta Cursada. Cargala primero — como mínimo marcá "Sin Encuentro" — antes de cargar la semana actual.');
+        return;
+      }
+      if(typeof formSemanaAnteriorCompleta==='function'&&!formSemanaAnteriorCompleta('discipulado',pasoId,lim.min)){
+        alert('⚠️ Todavía falta completar el Formulario de la semana anterior para esta Cursada. Completalo antes de cargar la semana actual.');
+        return;
+      }
+    }
+  }
 
   // Check for duplicate week (misma Cursada + mismo Grupo, si la Cursada tiene Grupos + misma semana ISO)
   var semana=getISOWeek(fecha);
@@ -14789,27 +16031,32 @@ async function discGuardarAsistencia(){
   }
 
   var cursada=(S.discCursadas||[]).find(function(cu){return cu.id===pasoId;});var paso=cursada?S.discPasos.find(function(p){return p.id===cursada.pasoId;}):null;var realPasoId=cursada?cursada.pasoId:pasoId;
-  S.discRecords.push({
+  var nuevoDiscRec={
     id:Date.now(),pasoId:realPasoId,cursadaId:pasoId,pasoNombre:cursada?cursada.label:(paso?paso.nombre:''),
     grupoId:discSelectedGrupoId||null,
-    fecha,capitulo,asistencia:{...discFacAtt},ts:new Date().toISOString(),_ts:Date.now()
-  });
+    fecha,sinEncuentro:sinEncuentro,motivo:motivo,
+    capitulo:sinEncuentro?'':capitulo,
+    asistencia:sinEncuentro?{}:{...discFacAtt},
+    ts:new Date().toISOString(),_ts:Date.now()
+  };
+  S.discRecords.push(nuevoDiscRec);
   await saveK(SK.discRecords,S.discRecords);
   let dCloudOk=false;
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
     dCloudOk=true;
   }catch(e){
-    S.discRecords.pop();
+    S.discRecords=S.discRecords.filter(function(r){return r.id!==nuevoDiscRec.id;});
     await saveK(SK.discRecords,S.discRecords);
     var alErr=document.getElementById('disc-alert');
     if(alErr){alErr.textContent='❌ Error al guardar en la nube. Verificá tu conexión e intentá de nuevo.';alErr.classList.remove('hidden');}
     return;
   }
   var al=document.getElementById('disc-alert');
-  al.textContent=dCloudOk?'✅ Asistencia guardada ☁️':'⚠️ Guardada sin sincronizar — reintentá';
+  al.textContent=sinEncuentro?'⏸ Cursada del '+fmtAA(fecha)+' registrada como Sin encuentro.':'✅ Asistencia guardada ☁️';
   al.classList.remove('hidden');
   setTimeout(function(){al.classList.add('hidden');},4000);
+  discLoadPasoForm();
 }
 
 // ── Registros ──
@@ -14934,6 +16181,17 @@ function discRenderRegistros(c){
   }
   var html='<div style="font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:1rem">'+recs.length+' registros</div>';
   recs.forEach(function(r){
+    if(r.sinEncuentro){
+      html+='<div class="card" style="margin-bottom:.75rem;padding:12px;opacity:.7">';
+      html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+      html+='<span style="font-weight:600">'+(r.fecha?fmt(r.fecha):'—')+'</span>';
+      html+='<span class="badge b-muted">'+r.pasoNombre+'</span>';
+      html+='<span style="flex:1;font-size:13px;color:#92400E">⏸ Sin encuentro'+(r.motivo?' — '+r.motivo:'')+'</span>';
+      html+='<button class="btn btn-sm" onclick="discEditRecord('+r.id+')">✏️</button>';
+      html+='<button class="btn btn-sm btn-danger" onclick="discDeleteRecord('+r.id+')">🗑</button>';
+      html+='</div></div>';
+      return;
+    }
     var att=Object.values(r.asistencia||{});
     var presentes=att.filter(function(v){return v.state==='presente';}).length;
     html+='<div class="card" style="margin-bottom:.75rem;padding:12px">';

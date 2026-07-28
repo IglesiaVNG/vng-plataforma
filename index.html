@@ -5382,6 +5382,7 @@ function formRenderCreacion(c){
           +'<span class="badge '+(f.estado==='Activo'?'b-ok':'b-muted')+'">'+f.estado+'</span>'
           +'<button class="btn btn-sm" onclick="formToggleEstado('+f.id+')">'+(f.estado==='Activo'?'⏸ Desactivar':'▶ Activar')+'</button>'
           +'<button class="btn btn-sm" onclick="formOpenModal('+f.id+')">✏️ Editar</button>'
+          +'<button class="btn btn-sm" onclick="formOpenModal(null,'+f.id+')" title="Crea uno nuevo con el mismo diseño">📋 Duplicar</button>'
           +'<button class="btn btn-sm btn-danger" onclick="formDeleteFormulario('+f.id+')">🗑</button>'
         +'</div>'
       +'</div>'
@@ -5390,42 +5391,46 @@ function formRenderCreacion(c){
   c.innerHTML=html;
 }
 
-function formOpenModal(id){
+function formOpenModal(id, duplicarDeId){
   if(!isSuperAdmin()) return;
   formEditingId=id||null;
   var f=id?(S.formularios||[]).find(function(x){return Number(x.id)===Number(id);}):null;
+  var fuente=f||(duplicarDeId?(S.formularios||[]).find(function(x){return Number(x.id)===Number(duplicarDeId);}):null);
+  var esDuplicado=!id&&!!duplicarDeId&&!!fuente;
   _formPregSeq=0;
   _formWorking={
-    preguntas:(f&&f.preguntas?f.preguntas:[]).map(function(p){
+    preguntas:(fuente&&fuente.preguntas?fuente.preguntas:[]).map(function(p){
       _formPregSeq++;
       return {_uid:'p'+_formPregSeq,tipo:p.tipo,texto:p.texto,opciones:(p.opciones||[]).slice()};
     }),
     destinatarios:{
-      gdv:(f&&f.destinatarios&&f.destinatarios.gdv)?{excluidos:(f.destinatarios.gdv.excluidos||[]).slice()}:null,
-      ng:(f&&f.destinatarios&&f.destinatarios.ng)?{excluidos:(f.destinatarios.ng.excluidos||[]).slice()}:null,
-      discipulado:(f&&f.destinatarios&&f.destinatarios.discipulado)?{excluidos:(f.destinatarios.discipulado.excluidos||[]).slice()}:null
+      gdv:(fuente&&fuente.destinatarios&&fuente.destinatarios.gdv)?{excluidos:(fuente.destinatarios.gdv.excluidos||[]).slice()}:null,
+      ng:(fuente&&fuente.destinatarios&&fuente.destinatarios.ng)?{excluidos:(fuente.destinatarios.ng.excluidos||[]).slice()}:null,
+      discipulado:(fuente&&fuente.destinatarios&&fuente.destinatarios.discipulado)?{excluidos:(fuente.destinatarios.discipulado.excluidos||[]).slice()}:null
     }
   };
   var propOpts='<option value="">— Sin Propósito —</option>'+(S.ministerios||[]).slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).map(function(m){
-    return '<option value="'+m.id+'"'+(f&&Number(f.propositoId)===Number(m.id)?' selected':'')+'>'+m.nombre+'</option>';
+    return '<option value="'+m.id+'"'+(fuente&&Number(fuente.propositoId)===Number(m.id)?' selected':'')+'>'+m.nombre+'</option>';
   }).join('');
+
+  var tituloInicial=esDuplicado?(String(fuente.titulo||'')+' (copia)'):(f?String(f.titulo||''):'');
 
   var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">'
-      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+(id?'Editar':'Nuevo')+' Formulario de Trabajo</div>'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+(id?'Editar':esDuplicado?'Duplicar Formulario de Trabajo':'Nuevo Formulario de Trabajo')+'</div>'
       +'<button class="btn btn-sm" onclick="formCloseModal()">✕</button>'
     +'</div>'
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Título *</label>'
-    +'<input id="form-f-titulo" type="text" maxlength="80" value="'+(f?String(f.titulo||'').replace(/"/g,'&quot;'):'')+'" placeholder="Ej: Formulario semanal — 40 días" style="width:100%;margin-bottom:12px">'
+    +'<input id="form-f-titulo" type="text" maxlength="80" value="'+tituloInicial.replace(/"/g,'&quot;')+'" placeholder="Ej: Formulario semanal — 40 días" style="width:100%;margin-bottom:12px">'
 
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Propósito <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'
     +'<select id="form-f-proposito" style="width:100%;margin-bottom:12px">'+propOpts+'</select>'
 
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'
       +'<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Desde *</label>'
-        +'<input id="form-f-desde" type="date" value="'+(f&&f.fechaDesde?f.fechaDesde:'')+'" style="width:100%"></div>'
+        +'<input id="form-f-desde" type="date" value="'+(fuente&&fuente.fechaDesde?fuente.fechaDesde:'')+'" style="width:100%"></div>'
       +'<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hasta *</label>'
-        +'<input id="form-f-hasta" type="date" value="'+(f&&f.fechaHasta?f.fechaHasta:'')+'" style="width:100%"></div>'
+        +'<input id="form-f-hasta" type="date" value="'+(fuente&&fuente.fechaHasta?fuente.fechaHasta:'')+'" style="width:100%"></div>'
     +'</div>'
 
     +'<div style="margin-bottom:14px">'
@@ -5433,6 +5438,7 @@ function formOpenModal(id){
         +'<label style="font-size:13px;font-weight:600;color:#374151">Preguntas</label>'
         +'<button class="btn btn-sm" onclick="formAddPregunta()">+ Agregar</button>'
       +'</div>'
+      +'<div style="font-size:11px;color:#9CA3AF;margin-bottom:8px">Tip: Enter dentro del texto arranca un renglón nuevo. Poné **así** algo entre doble asterisco para que se vea en <strong>negrita</strong>.</div>'
       +'<div id="form-preguntas-list"></div>'
     +'</div>'
 
@@ -5446,9 +5452,12 @@ function formOpenModal(id){
       +'Formulario Activo'
     +'</label>'
 
-    +'<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px">'
-      +'<button class="btn" onclick="formCloseModal()">Cancelar</button>'
-      +'<button class="btn btn-primary" onclick="formSaveFormulario()">Confirmar</button>'
+    +'<div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;padding-top:4px">'
+      +'<button class="btn btn-sm" onclick="formMostrarVistaPrevia()">👁 Vista previa</button>'
+      +'<div style="display:flex;gap:8px">'
+        +'<button class="btn" onclick="formCloseModal()">Cancelar</button>'
+        +'<button class="btn btn-primary" onclick="formSaveFormulario()">Confirmar</button>'
+      +'</div>'
     +'</div>'
   +'</div>';
 
@@ -5458,11 +5467,72 @@ function formOpenModal(id){
   formRenderDestinatarios();
 }
 
+// ── Vista previa: cómo se ve el Formulario para quien lo completa (Cargar Asistencia) ──
+function formMostrarVistaPrevia(){
+  if(!_formWorking) return;
+  formSyncPreguntasFromDom();
+  var titulo=(document.getElementById('form-f-titulo')?.value||'').trim()||'(sin título)';
+  var preguntasHtml=(_formWorking.preguntas||[]).map(function(p){
+    var textoHtml=formFormatTexto(p.texto||'(pregunta sin texto)');
+    if(p.tipo==='texto_largo'){
+      return '<div style="margin-bottom:14px">'
+        +'<label style="font-size:13px;color:#374151;font-weight:600;display:block;margin-bottom:6px">'+textoHtml+'</label>'
+        +'<textarea disabled placeholder="Acá la persona escribe su respuesta..." style="width:100%;min-height:60px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;background:#F9FAFB;color:#9CA3AF;box-sizing:border-box;font-family:inherit"></textarea>'
+      +'</div>';
+    }
+    var opcionesHtml=(p.opciones||[]).map(function(op){
+      return '<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12.5px;color:#4B5563"><input type="checkbox" disabled>'+op.replace(/</g,'&lt;')+'</label>';
+    }).join('');
+    return '<div style="margin-bottom:14px">'
+      +'<label style="font-size:13px;color:#374151;font-weight:600;display:block;margin-bottom:6px">'+textoHtml+'</label>'
+      +(opcionesHtml||'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Sin opciones cargadas</div>')
+    +'</div>';
+  }).join('');
+
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">'
+      +'<div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em">👁 Así lo va a ver quien completa el Formulario</div>'
+      +'<button class="btn btn-sm" onclick="formCerrarVistaPrevia()">✕</button>'
+    +'</div>'
+    +'<div class="card" style="border-left:4px solid #7C3AED;padding:14px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
+        +'<span style="font-weight:700;font-size:15px;color:#1F4E79">📋 '+formFormatTexto(titulo)+'</span>'
+        +'<span class="badge b-muted" style="font-size:10px">Pendiente</span>'
+      +'</div>'
+      +(preguntasHtml||'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Todavía no agregaste preguntas.</div>')
+      +'<button class="btn btn-primary btn-sm" disabled style="margin-top:4px;opacity:.55;cursor:default">💾 Guardar Formulario</button>'
+    +'</div>'
+  +'</div>';
+
+  var ov=document.getElementById('form-preview-overlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='form-preview-overlay';
+    ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10500;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML=modalHtml;
+  ov.style.display='flex';
+}
+function formCerrarVistaPrevia(){
+  var ov=document.getElementById('form-preview-overlay');
+  if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+}
+
 function formCloseModal(){
   var ov=document.getElementById('form-modal-overlay');
   if(ov){ ov.style.display='none'; ov.innerHTML=''; }
   formEditingId=null;
   _formWorking=null;
+}
+
+// Formatea texto de pregunta/título para mostrar: escapa HTML primero, luego permite
+// **negrita** (doble asterisco) y respeta saltos de línea (Enter → nueva línea).
+function formFormatTexto(txt){
+  var esc=String(txt||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  esc=esc.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  esc=esc.replace(/\n/g,'<br>');
+  return esc;
 }
 
 // ── Preguntas (working array en memoria mientras el modal está abierto) ──
@@ -5483,7 +5553,7 @@ function formRenderPreguntas(){
         +'</select>'
         +'<button class="btn btn-sm btn-danger" style="margin-left:auto" onclick="formRemovePregunta(\''+p._uid+'\')">🗑</button>'
       +'</div>'
-      +'<input id="form-preg-texto-'+p._uid+'" type="text" value="'+(p.texto||'').replace(/"/g,'&quot;')+'" placeholder="Texto de la pregunta" style="width:100%'+(p.tipo==='opcion_multiple'?';margin-bottom:6px':'')+'">'
+      +'<textarea id="form-preg-texto-'+p._uid+'" rows="2" placeholder="Texto de la pregunta — Enter para bajar de renglón" style="width:100%;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box'+(p.tipo==='opcion_multiple'?';margin-bottom:6px':'')+'">'+(p.texto||'').replace(/</g,'&lt;')+'</textarea>'
       +(p.tipo==='opcion_multiple'
         ?'<input id="form-preg-opciones-'+p._uid+'" type="text" value="'+(p.opciones||[]).join(', ').replace(/"/g,'&quot;')+'" placeholder="Opciones separadas por coma" style="width:100%">'
         :'')
@@ -5735,7 +5805,7 @@ function formRenderRespuestaUI(wrapId, tipoOrigen, unidadId, fecha){
       var valorPrevio=existing?existing.respuestas[p.id]:null;
       if(p.tipo==='texto_largo'){
         return '<div style="margin-bottom:10px">'
-          +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+p.texto+'</label>'
+          +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+formFormatTexto(p.texto)+'</label>'
           +'<textarea id="form-resp-'+f.id+'-'+p.id+'" style="width:100%;min-height:60px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box">'+(valorPrevio||'')+'</textarea>'
         +'</div>';
       }
@@ -5746,13 +5816,13 @@ function formRenderRespuestaUI(wrapId, tipoOrigen, unidadId, fecha){
         +'</label>';
       }).join('');
       return '<div style="margin-bottom:10px">'
-        +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+p.texto+'</label>'
+        +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+formFormatTexto(p.texto)+'</label>'
         +opcionesHtml
       +'</div>';
     }).join('');
     return '<div class="card" style="margin-top:12px;border-left:4px solid #7C3AED">'
       +'<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'
-        +'<span>📋 '+f.titulo+'</span>'
+        +'<span>📋 '+formFormatTexto(f.titulo)+'</span>'
         +(existing?'<span class="badge b-ok" style="font-size:10px">Respondido</span>':'<span class="badge b-muted" style="font-size:10px">Pendiente</span>')
       +'</div>'
       +(preguntasHtml||'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Este Formulario todavía no tiene preguntas cargadas.</div>')
@@ -6029,7 +6099,7 @@ function formOpenSemanaDetalle(formularioId, semanaISO, anio){
         +(f.preguntas||[]).map(function(p){
           var val=resp.respuestas?resp.respuestas[p.id]:null;
           var valStr=Array.isArray(val)?(val.join(', ')||'—'):(val||'—');
-          return '<div style="font-size:11.5px;margin-bottom:4px"><strong style="color:#4B5563">'+p.texto+':</strong> <span style="color:#6B7280">'+valStr+'</span></div>';
+          return '<div style="font-size:11.5px;margin-bottom:4px"><strong style="color:#4B5563">'+formFormatTexto(p.texto)+':</strong> <span style="color:#6B7280">'+formFormatTexto(valStr)+'</span></div>';
         }).join('');
       if(esSuper){
         detalleHtml+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6B7280;margin-top:4px;cursor:pointer">'
@@ -6139,7 +6209,7 @@ function formExportarSemana(formularioId, semanaISO, anio){
     }
     lineas.push('');
   });
-  var texto=lineas.join('\n');
+  var texto=lineas.join('\n').replace(/\*\*(.+?)\*\*/g,'*$1*');
   if(navigator.clipboard&&navigator.clipboard.writeText){
     navigator.clipboard.writeText(texto).then(function(){
       showToast('📋 Resumen de la semana copiado','#16A34A');

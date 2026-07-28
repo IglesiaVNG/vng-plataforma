@@ -285,8 +285,10 @@ window.markFieldError = function(el, msg){
     </div>
     <!-- PRÓXIMOS CUMPLEAÑOS -->
     <div id="home-cumple-wrap" style="margin-bottom:1.25rem"></div>
-    <!-- PRÓXIMOS EVENTOS -->
+    <!-- PRÓXIMOS EVENTOS ESPECIALES -->
     <div id="home-eventos-wrap" style="margin-bottom:1.25rem"></div>
+    <!-- PRÓXIMAS ACTIVIDADES HABITUALES -->
+    <div id="home-habituales-wrap" style="margin-bottom:1.25rem"></div>
     <div class="home-menu-wrap">
       <button class="home-menu-btn" id="home-menu-btn" onclick="toggleHomeMenu()">☰ Menú</button>
       <div id="home-menu-dropdown" class="home-menu-dropdown hidden">
@@ -404,6 +406,7 @@ const KEY_GROUPS = {
   'disc':    ['gdv_disc_pasos','_tomb_gdv_disc_records','gdv_disc_records','_tomb_gdv_disc_cursadas','gdv_disc_cursadas','_tomb_gdv_disc_inscripciones','gdv_disc_inscripciones'],
   'ng':      ['gdv_ng5','_tomb_gdv_ng_records','gdv_ng_records'],
   'modules': ['gdv_modules5'],
+  'homeConfig': ['gdv_home_config'],
   'agenda':  ['gdv_ministerios','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas','_tomb_gdv_checklist_secciones','gdv_checklist_secciones'],
   'campanas':['gdv_campanas'],
   'formularios': ['_tomb_gdv_formularios','gdv_formularios','_tomb_gdv_form_respuestas','gdv_form_respuestas','_tomb_gdv_form_analisis','gdv_form_analisis'],
@@ -739,6 +742,7 @@ window.fbDownload().then(function(hasData) {
         S.formularios    = _ld('gdv_formularios',     S.formularios    ||[]);
         S.formRespuestas = _ld('gdv_form_respuestas', S.formRespuestas ||[]);
         S.formAnalisis   = _ld('gdv_form_analisis',   S.formAnalisis   ||[]);
+        S.homeConfig     = _ld('gdv_home_config',     S.homeConfig     ||{});
       }
       // Load permisos from Firebase if this device has none configured
       // Reload permisos from localStorage (now updated from Firebase if it was empty)
@@ -1045,7 +1049,8 @@ const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles
   ministerios:'gdv_ministerios',eventos:'gdv_eventos',
   campanas:'gdv_campanas',
   checklists:'gdv_checklists',checklistTareas:'gdv_checklist_tareas',checklistSecciones:'gdv_checklist_secciones',
-  formularios:'gdv_formularios',formRespuestas:'gdv_form_respuestas',formAnalisis:'gdv_form_analisis'};
+  formularios:'gdv_formularios',formRespuestas:'gdv_form_respuestas',formAnalisis:'gdv_form_analisis',
+  homeConfig:'gdv_home_config'};
 
 const DEFAULT_DISC_PASOS=[
   {id:1,nombre:'Discipulado N1',nivel:'Inicial',roleId:'disc_n1',estado:'Activo',discipuladorId:null,miembros:[],completados:{},
@@ -1278,7 +1283,7 @@ const DEFAULT_USERS=[
 // ════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════
-let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],discInscripciones:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[],checklistSecciones:[],formularios:[],formRespuestas:[],formAnalisis:[]};
+let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],discInscripciones:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[],checklistSecciones:[],formularios:[],formRespuestas:[],formAnalisis:[],homeConfig:{}};
 let currentUser=null;
 let gdvCharts={};
 let ngCharts={};
@@ -1328,6 +1333,7 @@ async function initStorage(){
   S.formularios    =load(SK.formularios,    []);
   S.formRespuestas =load(SK.formRespuestas, []);
   S.formAnalisis   =load(SK.formAnalisis,   []);
+  S.homeConfig     =load(SK.homeConfig,     {});
   await cleanMembers();
   loadPermisos();
   // ── Migrar roles nuevos si no existen ──
@@ -2864,7 +2870,8 @@ function renderModulesGrid(){
   }).join('');
   // Render upcoming birthdays and events
   setTimeout(renderHomeCumples, 50);
-  setTimeout(renderHomeEventos, 50);
+  setTimeout(renderHomeEventosEspeciales, 50);
+  setTimeout(renderHomeActividadesHabituales, 50);
 }
 
 function goHome(){
@@ -3985,6 +3992,7 @@ function buildConfigHTML(){
       <button class="btn btn-sm" id="cfg-tab-ministerios" onclick="configTab('ministerios',this)">🤝 Servicios/Ministerios</button>
       <button class="btn btn-sm" id="cfg-tab-campanas" onclick="configTab('campanas',this)">🌳 Campañas</button>
       <button class="btn btn-sm" id="cfg-tab-modulos" onclick="configTab('modulos',this)">📱 Módulos</button>
+      <button class="btn btn-sm" id="cfg-tab-home" onclick="configTab('home',this)">🏠 Home</button>
       <button class="btn btn-sm" id="cfg-tab-usuarios" onclick="configTab('usuarios',this)">👤 Usuarios</button>
       <button class="btn btn-sm" id="cfg-tab-roles" onclick="configTab('roles',this)">🎭 Funciones</button>
       <button class="btn btn-sm" id="cfg-tab-permisos" onclick="configTab('permisos',this)">🔐 Permisos</button>
@@ -4046,6 +4054,8 @@ function configTab(sub, btn){
     campanaRenderList();
   } else if(sub==='modulos'){
     cfgRenderModulos(wrap);
+  } else if(sub==='home'){
+    cfgRenderHomeConfig(wrap);
   } else if(sub==='usuarios'){
     wrap.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
@@ -4197,6 +4207,52 @@ async function cfgToggleQrActualizar(enabled){
 // CONFIG: MÓDULOS
 // ══════════════════════════════════════════════════════════════════
 let cfgEditingModuloKey=null;
+
+// Días hacia adelante configurables para cada sección del Home (con default de fábrica si aún no se configuró nada)
+function homeConfigDias(clave, def){
+  var v=S.homeConfig&&S.homeConfig[clave];
+  return (typeof v==='number'&&v>0)?v:def;
+}
+
+function cfgRenderHomeConfig(wrap){
+  var dc=homeConfigDias('diasCumples',15);
+  var de=homeConfigDias('diasEspeciales',7);
+  var dh=homeConfigDias('diasHabituales',7);
+  wrap.innerHTML='<div class="card" style="max-width:420px">'
+    +'<div class="card-title">🏠 Configuración del Home</div>'
+    +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:16px">Definí con cuántos días de anticipación se muestra cada sección en la pantalla de inicio.</div>'
+    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">🎂 Próximos Cumpleaños — días hacia adelante</label>'
+    +'<input type="number" id="cfg-home-dias-cumples" min="1" max="90" value="'+dc+'" style="margin-bottom:14px;width:100px">'
+    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">📅 Próximos Eventos Especiales — días hacia adelante</label>'
+    +'<input type="number" id="cfg-home-dias-especiales" min="1" max="90" value="'+de+'" style="margin-bottom:14px;width:100px">'
+    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">🔁 Próximas Actividades Habituales — días hacia adelante</label>'
+    +'<input type="number" id="cfg-home-dias-habituales" min="1" max="90" value="'+dh+'" style="margin-bottom:18px;width:100px">'
+    +'<button class="btn btn-primary" onclick="cfgSaveHomeConfig()">💾 Guardar</button>'
+  +'</div>';
+}
+
+async function cfgSaveHomeConfig(){
+  if(!isSuperAdmin()) return;
+  var dc=parseInt(document.getElementById('cfg-home-dias-cumples')?.value)||15;
+  var de=parseInt(document.getElementById('cfg-home-dias-especiales')?.value)||7;
+  var dh=parseInt(document.getElementById('cfg-home-dias-habituales')?.value)||7;
+  dc=Math.min(90,Math.max(1,dc)); de=Math.min(90,Math.max(1,de)); dh=Math.min(90,Math.max(1,dh));
+  var snapshot=JSON.stringify(S.homeConfig||{});
+  S.homeConfig={diasCumples:dc,diasEspeciales:de,diasHabituales:dh};
+  await saveK(SK.homeConfig,S.homeConfig);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.homeConfig=JSON.parse(snapshot);
+    await saveK(SK.homeConfig,S.homeConfig);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Configuración del Home guardada','#16A34A');
+  if(typeof renderHomeCumples==='function') renderHomeCumples();
+  if(typeof renderHomeEventosEspeciales==='function') renderHomeEventosEspeciales();
+  if(typeof renderHomeActividadesHabituales==='function') renderHomeActividadesHabituales();
+}
 
 function cfgRenderModulos(wrap){
   if(!wrap) wrap=document.getElementById('cfg-content');
@@ -6827,20 +6883,42 @@ function agendaHabitualesEnFecha(fechaStr,excluirId){
 // se elija lo que se elija). Agregar no toca ninguna Habitual existente. Cancelar aborta el guardado.
 function agendaMostrarConflictoDialog(conflictos, nuevaHora){
   return new Promise(function(resolve){
-    var lista=conflictos.map(function(c){
-      var mismoHorario=!!(nuevaHora&&c.hora&&c.hora===nuevaHora);
-      return '<div style="font-size:12.5px;margin-bottom:4px;color:#374151">• '+c.habitualTitulo+' el '+fmtAA(c.fecha)+(c.hora?' a las '+c.hora:'')
-        +(mismoHorario?' <span style="color:#DC2626;font-weight:600">(mismo horario)</span>':' <span style="color:#9CA3AF">(horario distinto)</span>')
+    // Agrupar por Habitual — en campañas largas (ej. 40 días) puede haber decenas de fechas
+    // en conflicto con la misma actividad recurrente; listarlas una por una haría el diálogo
+    // enorme e inmanejable, así que se resumen fechas por actividad.
+    var grupos={}, ordenGrupos=[];
+    conflictos.forEach(function(c){
+      var key=c.habitualId;
+      if(!grupos[key]){ grupos[key]={titulo:c.habitualTitulo,hora:c.hora,fechas:[]}; ordenGrupos.push(key); }
+      grupos[key].fechas.push(c.fecha);
+    });
+    var listaHtml=ordenGrupos.map(function(key){
+      var g=grupos[key];
+      var mismoHorario=!!(nuevaHora&&g.hora&&g.hora===nuevaHora);
+      var fechasOrdenadas=g.fechas.slice().sort();
+      var fechasTxt=fechasOrdenadas.length<=3
+        ? fechasOrdenadas.map(fmtAA).join(', ')
+        : fechasOrdenadas.length+' fechas (de '+fmtAA(fechasOrdenadas[0])+' a '+fmtAA(fechasOrdenadas[fechasOrdenadas.length-1])+')';
+      return '<div style="font-size:12.5px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #F3F4F6">'
+        +'<div style="font-weight:600;color:#374151">'+g.titulo+(g.hora?' · '+g.hora:'')+' '
+          +(mismoHorario?'<span style="color:#DC2626;font-weight:600">(mismo horario)</span>':'<span style="color:#9CA3AF;font-weight:400">(horario distinto)</span>')
+        +'</div>'
+        +'<div style="color:#9CA3AF;margin-top:2px">'+fechasTxt+'</div>'
       +'</div>';
     }).join('');
-    var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:460px;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
-      +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:10px">Ya existe'+(conflictos.length>1?'n actividades habituales':' una actividad habitual')+' para '+(conflictos.length>1?'estas fechas':'esa fecha')+':</div>'
-      +lista
-      +'<div style="font-size:12.5px;color:#6B7280;margin:14px 0 10px">¿Qué querés hacer?</div>'
-      +'<div style="display:flex;flex-direction:column;gap:8px">'
-        +'<button class="btn btn-primary" id="agenda-conflicto-reemplazar" style="width:100%">🔄 Reemplazar (solo las del mismo horario)</button>'
-        +'<button class="btn" id="agenda-conflicto-agregar" style="width:100%">➕ Agregar de todas formas, sin tocar las existentes</button>'
-        +'<button class="btn" id="agenda-conflicto-cancelar" style="width:100%;color:#6B7280">Cancelar</button>'
+
+    var modalHtml='<div style="background:#fff;border-radius:14px;width:100%;max-width:460px;max-height:85vh;box-shadow:0 12px 40px rgba(0,0,0,.2);display:flex;flex-direction:column;overflow:hidden">'
+      +'<div style="padding:1.25rem 1.5rem 0.5rem;flex-shrink:0">'
+        +'<div style="font-size:15px;font-weight:700;color:#1F4E79">Coincide con '+conflictos.length+' fecha'+(conflictos.length!==1?'s':'')+' de actividad'+(ordenGrupos.length!==1?'es':'')+' habitual'+(ordenGrupos.length!==1?'es':'')+':</div>'
+      +'</div>'
+      +'<div style="padding:0.5rem 1.5rem;overflow-y:auto;flex:1;min-height:0">'+listaHtml+'</div>'
+      +'<div style="padding:0.75rem 1.5rem 1.25rem;flex-shrink:0;border-top:1px solid #F3F4F6">'
+        +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:10px">¿Qué querés hacer?</div>'
+        +'<div style="display:flex;flex-direction:column;gap:8px">'
+          +'<button class="btn btn-primary" id="agenda-conflicto-reemplazar" style="width:100%">🔄 Reemplazar (solo las del mismo horario)</button>'
+          +'<button class="btn" id="agenda-conflicto-agregar" style="width:100%">➕ Agregar de todas formas, sin tocar las existentes</button>'
+          +'<button class="btn" id="agenda-conflicto-cancelar" style="width:100%;color:#6B7280">Cancelar</button>'
+        +'</div>'
       +'</div>'
     +'</div>';
     var ov=document.getElementById('agenda-dialogo-overlay');
@@ -7013,7 +7091,7 @@ async function agendaGuardarEvento(){
 // permite elegir entre quitar solo esa fecha puntual (la serie sigue) o borrar toda la serie.
 function agendaMostrarEliminarDialog(ev, fechaOcurrencia){
   return new Promise(function(resolve){
-    var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:440px;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
+    var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:440px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
       +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:8px">Eliminar "'+ev.titulo+'"</div>'
       +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:14px">Esta es una actividad recurrente. ¿Qué querés eliminar?</div>'
       +'<div style="display:flex;flex-direction:column;gap:8px">'
@@ -14118,6 +14196,7 @@ async function deleteRoleGlobal(id, callback){
 function renderHomeCumples(){
   var wrap=document.getElementById('home-cumple-wrap');
   if(!wrap) return;
+  var diasCumples=homeConfigDias('diasCumples',15);
 
   var hoy=new Date(); hoy.setHours(0,0,0,0);
   var hoyMes=hoy.getMonth()+1;
@@ -14153,17 +14232,17 @@ function renderHomeCumples(){
       diff:diff,
       genero:m.genero
     };
-  }).filter(function(m){ return m.diff<=15; })
+  }).filter(function(m){ return m.diff<=diasCumples; })
     .sort(function(a,b){ return a.diff-b.diff; });
 
   if(!conCumple.length){
-    wrap.innerHTML='<div class="card" style="border-left:4px solid #F59E0B;padding:10px 14px;font-size:13px;color:#92400E">🎂 Sin cumpleaños en los próximos 15 días</div>';
+    wrap.innerHTML='<div class="card" style="border-left:4px solid #F59E0B;padding:10px 14px;font-size:13px;color:#92400E">🎂 Sin cumpleaños en los próximos '+diasCumples+' días</div>';
     return;
   }
 
   var html='<div class="card" style="border-left:4px solid #F59E0B">';
   html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">';
-  html+='<div class="card-title" style="margin:0">🎂 Próximos cumpleaños <span style="font-size:12px;color:#6B7280;font-weight:400">(próximos 15 días)</span></div>';
+  html+='<div class="card-title" style="margin:0">🎂 Próximos cumpleaños <span style="font-size:12px;color:#6B7280;font-weight:400">(próximos '+diasCumples+' días)</span></div>';
   html+='<span style="font-size:12px;color:#F59E0B;font-weight:600">'+conCumple.length+' cumpleaños</span>';
   html+='</div>';
 
@@ -14198,51 +14277,79 @@ function renderHomeCumples(){
   wrap.innerHTML=html;
 }
 
-// Próximos eventos en el Home — ventana de 7 días desde "hoy" inclusive.
+// Tarjeta de una ocurrencia (usada tanto por Eventos Especiales como por Actividades Habituales del Home)
+function homeOcurrenciaCardHtml(o, hoy, hoyStr, icon){
+  var diffDias=Math.round((new Date(o.fechaOcurrencia+'T00:00:00')-hoy)/86400000);
+  var badge;
+  if(o.fechaOcurrencia===hoyStr) badge='<span style="background:#EDE9FE;color:#5B21B6;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600">🔵 ¡HOY!</span>';
+  else if(diffDias===1) badge='<span style="background:#FEE2E2;color:#991B1B;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600">🔔 Mañana</span>';
+  else badge='<span style="background:#F3F4F6;color:#6B7280;font-size:11px;padding:2px 8px;border-radius:99px">En '+diffDias+' días</span>';
+  var minLabel=agendaMinisterioLabel(o.ministerioId);
+  var meta=[fmtAA(o.fechaOcurrencia)];
+  if(o.hora) meta.push(o.hora);
+  if(minLabel) meta.push(minLabel);
+  if(o.lugar) meta.push(o.lugar);
+  return '<div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #F3F4F6">'+
+    '<div style="font-size:20px">'+icon+'</div>'+
+    '<div style="flex:1">'+
+    '<div style="font-size:13px;font-weight:600;color:#1F2937">'+o.titulo+'</div>'+
+    '<div style="font-size:11px;color:#6B7280">'+meta.join(' · ')+'</div>'+
+    '</div>'+badge+'</div>';
+}
+
+// Próximos Eventos Especiales — ventana de días configurable desde Configuración → Home.
 // Reutiliza agendaGetOcurrencias (misma lógica de recurrencia/período que usa Agenda).
-function renderHomeEventos(){
+function renderHomeEventosEspeciales(){
   var wrap=document.getElementById('home-eventos-wrap');
   if(!wrap) return;
   if(typeof agendaGetOcurrencias!=='function'){ wrap.innerHTML=''; return; }
+  var dias=homeConfigDias('diasEspeciales',7);
 
   var hoy=new Date(); hoy.setHours(0,0,0,0);
   var hoyStr=hoy.toISOString().slice(0,10);
-  var hasta=new Date(hoy); hasta.setDate(hasta.getDate()+6); hasta.setHours(23,59,59,999); // 7 días, hoy incluido
+  var hasta=new Date(hoy); hasta.setDate(hasta.getDate()+(dias-1)); hasta.setHours(23,59,59,999);
 
-  var ocs=agendaGetOcurrencias(hoy,hasta);
+  var ocs=agendaGetOcurrencias(hoy,hasta).filter(function(o){return o.tipoActividad==='especial';});
 
   if(!ocs.length){
-    wrap.innerHTML='<div class="card" style="border-left:4px solid #7C3AED;padding:10px 14px;font-size:13px;color:#5B21B6">📅 Sin eventos en los próximos 7 días</div>';
+    wrap.innerHTML='<div class="card" style="border-left:4px solid #7C3AED;padding:10px 14px;font-size:13px;color:#5B21B6">📅 Sin eventos especiales en los próximos '+dias+' días</div>';
     return;
   }
 
   var html='<div class="card" style="border-left:4px solid #7C3AED">';
   html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">';
-  html+='<div class="card-title" style="margin:0">📅 Próximos eventos <span style="font-size:12px;color:#6B7280;font-weight:400">(próximos 7 días)</span></div>';
+  html+='<div class="card-title" style="margin:0">📅 Próximos eventos especiales <span style="font-size:12px;color:#6B7280;font-weight:400">(próximos '+dias+' días)</span></div>';
   html+='<span style="font-size:12px;color:#7C3AED;font-weight:600">'+ocs.length+' evento'+(ocs.length!==1?'s':'')+'</span>';
   html+='</div>';
+  html+=ocs.map(function(o){ return homeOcurrenciaCardHtml(o,hoy,hoyStr,'📅'); }).join('');
+  html+='</div>';
+  wrap.innerHTML=html;
+}
 
-  ocs.forEach(function(o){
-    var diffDias=Math.round((new Date(o.fechaOcurrencia+'T00:00:00')-hoy)/86400000);
-    var badge;
-    if(o.fechaOcurrencia===hoyStr) badge='<span style="background:#EDE9FE;color:#5B21B6;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600">🔵 ¡HOY!</span>';
-    else if(diffDias===1) badge='<span style="background:#FEE2E2;color:#991B1B;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600">🔔 Mañana</span>';
-    else badge='<span style="background:#F3F4F6;color:#6B7280;font-size:11px;padding:2px 8px;border-radius:99px">En '+diffDias+' días</span>';
-    var minLabel=agendaMinisterioLabel(o.ministerioId);
-    var meta=[fmtAA(o.fechaOcurrencia)];
-    if(o.hora) meta.push(o.hora);
-    if(minLabel) meta.push(minLabel);
-    if(o.lugar) meta.push(o.lugar);
-    html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #F3F4F6">';
-    html+='<div style="font-size:20px">📅</div>';
-    html+='<div style="flex:1">';
-    html+='<div style="font-size:13px;font-weight:600;color:#1F2937">'+o.titulo+'</div>';
-    html+='<div style="font-size:11px;color:#6B7280">'+meta.join(' · ')+'</div>';
-    html+='</div>';
-    html+=badge;
-    html+='</div>';
-  });
+// Próximas Actividades Habituales — mismo mecanismo, ventana de días configurable por separado.
+function renderHomeActividadesHabituales(){
+  var wrap=document.getElementById('home-habituales-wrap');
+  if(!wrap) return;
+  if(typeof agendaGetOcurrencias!=='function'){ wrap.innerHTML=''; return; }
+  var dias=homeConfigDias('diasHabituales',7);
 
+  var hoy=new Date(); hoy.setHours(0,0,0,0);
+  var hoyStr=hoy.toISOString().slice(0,10);
+  var hasta=new Date(hoy); hasta.setDate(hasta.getDate()+(dias-1)); hasta.setHours(23,59,59,999);
+
+  var ocs=agendaGetOcurrencias(hoy,hasta).filter(function(o){return o.tipoActividad==='habitual';});
+
+  if(!ocs.length){
+    wrap.innerHTML='<div class="card" style="border-left:4px solid #0891B2;padding:10px 14px;font-size:13px;color:#0E7490">🔁 Sin actividades habituales en los próximos '+dias+' días</div>';
+    return;
+  }
+
+  var html='<div class="card" style="border-left:4px solid #0891B2">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">';
+  html+='<div class="card-title" style="margin:0">🔁 Próximas actividades habituales <span style="font-size:12px;color:#6B7280;font-weight:400">(próximos '+dias+' días)</span></div>';
+  html+='<span style="font-size:12px;color:#0891B2;font-weight:600">'+ocs.length+' actividad'+(ocs.length!==1?'es':'')+'</span>';
+  html+='</div>';
+  html+=ocs.map(function(o){ return homeOcurrenciaCardHtml(o,hoy,hoyStr,'🔁'); }).join('');
   html+='</div>';
   wrap.innerHTML=html;
 }

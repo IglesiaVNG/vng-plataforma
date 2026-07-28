@@ -7603,15 +7603,16 @@ async function agendaGuardarChecklistNuevo(){
   if(agendaChecklistCrearEditando){
     var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(agendaChecklistCrearEditando);});
     if(!checklist) return;
-    checklistPrevio={coordinadorIds:checklist.coordinadorIds.slice(),colaboradorIds:checklist.colaboradorIds.slice()};
+    checklistPrevio={coordinadorIds:checklist.coordinadorIds.slice(),colaboradorIds:checklist.colaboradorIds.slice(),_ts:checklist._ts};
     checklist.coordinadorIds=coordinadorIds;
     checklist.colaboradorIds=colaboradorIds;
+    checklist._ts=Date.now();
   } else {
     var nuevoId=Date.now();
     S.checklists.push({
       id:nuevoId, eventoId:agendaChecklistCrearEventoId,
       coordinadorIds:coordinadorIds, colaboradorIds:colaboradorIds,
-      estado:'Activo', creadoPor:currentUser?.name||'Sistema', ts:Date.now()
+      estado:'Activo', creadoPor:currentUser?.name||'Sistema', ts:Date.now(), _ts:Date.now()
     });
   }
   await saveK(SK.checklists,S.checklists);
@@ -7975,7 +7976,7 @@ async function agendaCrearSeccion(){
   if(!nombre){ showToast('Escribí un nombre para la Sección','#D97706'); return; }
   var existentes=agendaGetSecciones(checklist.id,true);
   var maxOrden=existentes.reduce(function(max,s){return Math.max(max,s.orden||0);},0);
-  var nuevaSeccion={id:Date.now(),checklistId:checklist.id,nombre:nombre,orden:maxOrden+1,estado:'Activa'};
+  var nuevaSeccion={id:Date.now(),checklistId:checklist.id,nombre:nombre,orden:maxOrden+1,estado:'Activa',_ts:Date.now()};
   S.checklistSecciones.push(nuevaSeccion);
   await saveK(SK.checklistSecciones,S.checklistSecciones);
   try{
@@ -7999,13 +8000,15 @@ async function agendaRenombrarSeccion(id){
   if(nuevoNombre===null) return;
   nuevoNombre=nuevoNombre.trim();
   if(!nuevoNombre) return;
-  var prev=s.nombre;
+  var prev={nombre:s.nombre,_ts:s._ts};
   s.nombre=nuevoNombre;
+  s._ts=Date.now();
   await saveK(SK.checklistSecciones,S.checklistSecciones);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    s.nombre=prev;
+    s.nombre=prev.nombre;
+    s._ts=prev._ts;
     await saveK(SK.checklistSecciones,S.checklistSecciones);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -8024,12 +8027,15 @@ async function agendaMoverSeccion(id,direccion){
   if(idxVecino<0||idxVecino>=todas.length) return;
   var vecino=todas[idxVecino];
   var ordenPrevS=s.orden, ordenPrevVecino=vecino.orden;
+  var tsPrevS=s._ts, tsPrevVecino=vecino._ts;
   var tmp=s.orden; s.orden=vecino.orden; vecino.orden=tmp;
+  s._ts=Date.now(); vecino._ts=Date.now();
   await saveK(SK.checklistSecciones,S.checklistSecciones);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     s.orden=ordenPrevS; vecino.orden=ordenPrevVecino;
+    s._ts=tsPrevS; vecino._ts=tsPrevVecino;
     await saveK(SK.checklistSecciones,S.checklistSecciones);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -8043,12 +8049,15 @@ async function agendaToggleSeccionActiva(id){
   var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(s.checklistId);});
   if(!checklist||!agendaPuedeAdminTareas(checklist)){ alert('No tenés permiso.'); return; }
   var prev=s.estado;
+  var tsPrev=s._ts;
   s.estado=s.estado==='Inactiva'?'Activa':'Inactiva';
+  s._ts=Date.now();
   await saveK(SK.checklistSecciones,S.checklistSecciones);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     s.estado=prev;
+    s._ts=tsPrev;
     await saveK(SK.checklistSecciones,S.checklistSecciones);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -8088,12 +8097,15 @@ async function agendaCicloPrioridad(tareaId){
   var orden=['Alta','Media','Baja'];
   var idx=orden.indexOf(t.prioridad||'Media');
   var prev=t.prioridad;
+  var tsPrev=t._ts;
   t.prioridad=orden[(idx+1)%orden.length];
+  t._ts=Date.now();
   await saveK(SK.checklistTareas,S.checklistTareas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     t.prioridad=prev;
+    t._ts=tsPrev;
     await saveK(SK.checklistTareas,S.checklistTareas);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -8118,13 +8130,14 @@ async function agendaCrearTarea(){
   if(agendaEditandoTareaId){
     var t=(S.checklistTareas||[]).find(function(x){return x.id===agendaEditandoTareaId;});
     if(!t) return;
-    var snapshot={titulo:t.titulo,seccionId:t.seccionId,prioridad:t.prioridad,asignadosIds:(t.asignadosIds||[]).slice(),editadoPor:t.editadoPor,fechaEdicion:t.fechaEdicion};
+    var snapshot={titulo:t.titulo,seccionId:t.seccionId,prioridad:t.prioridad,asignadosIds:(t.asignadosIds||[]).slice(),editadoPor:t.editadoPor,fechaEdicion:t.fechaEdicion,_ts:t._ts};
     t.titulo=titulo;
     t.seccionId=seccionId;
     t.prioridad=prioridad;
     t.asignadosIds=agendaNuevaTareaAsignados.slice();
     t.editadoPor=currentUser?.name||'Sistema';
     t.fechaEdicion=new Date().toISOString();
+    t._ts=Date.now();
     await saveK(SK.checklistTareas,S.checklistTareas);
     try{
       if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -8150,7 +8163,7 @@ async function agendaCrearTarea(){
     creadoPor:currentUser?.name||'Sistema', fechaCreacion:new Date().toISOString(),
     editadoPor:null, fechaEdicion:null,
     comentarios:[], completadoPor:null, comentarioCompletado:null, fechaCompletado:null,
-    finalizadoPor:null, fechaFinalizado:null
+    finalizadoPor:null, fechaFinalizado:null, _ts:Date.now()
   };
   S.checklistTareas.push(nuevaTarea);
   await saveK(SK.checklistTareas,S.checklistTareas);
@@ -8226,13 +8239,14 @@ async function agendaMarcarCompletada(tareaId){
   if(comentario===null) return;
   comentario=comentario.trim();
   if(comentario.length<10){ alert('El comentario es obligatorio y debe tener al menos 10 caracteres.'); return; }
-  var prev={estado:t.estado,completadoPor:t.completadoPor,comentarioCompletado:t.comentarioCompletado,fechaCompletado:t.fechaCompletado,comentarios:(t.comentarios||[]).slice()};
+  var prev={estado:t.estado,completadoPor:t.completadoPor,comentarioCompletado:t.comentarioCompletado,fechaCompletado:t.fechaCompletado,comentarios:(t.comentarios||[]).slice(),_ts:t._ts};
   t.estado='Completada';
   t.completadoPor=currentUser?.name||'Sistema';
   t.comentarioCompletado=comentario;
   t.fechaCompletado=new Date().toISOString();
   if(!t.comentarios) t.comentarios=[];
   t.comentarios.push({texto:'✅ Completada: '+comentario,autor:t.completadoPor,ts:Date.now()});
+  t._ts=Date.now();
   await saveK(SK.checklistTareas,S.checklistTareas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -8252,10 +8266,11 @@ async function agendaFinalizarTarea(tareaId){
   if(!t) return;
   var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(t.checklistId);});
   if(!checklist||!agendaPuedeAdminTareas(checklist)){ alert('No tenés permiso para finalizar esta tarea.'); return; }
-  var prev={estado:t.estado,finalizadoPor:t.finalizadoPor,fechaFinalizado:t.fechaFinalizado};
+  var prev={estado:t.estado,finalizadoPor:t.finalizadoPor,fechaFinalizado:t.fechaFinalizado,_ts:t._ts};
   t.estado='Finalizada';
   t.finalizadoPor=currentUser?.name||'Sistema';
   t.fechaFinalizado=new Date().toISOString();
+  t._ts=Date.now();
   await saveK(SK.checklistTareas,S.checklistTareas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -8275,9 +8290,10 @@ async function agendaVolverPendiente(tareaId){
   if(!t) return;
   var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(t.checklistId);});
   if(!checklist||!agendaPuedeAdminTareas(checklist)){ alert('No tenés permiso para esta acción.'); return; }
-  var prev={estado:t.estado,completadoPor:t.completadoPor,comentarioCompletado:t.comentarioCompletado,fechaCompletado:t.fechaCompletado};
+  var prev={estado:t.estado,completadoPor:t.completadoPor,comentarioCompletado:t.comentarioCompletado,fechaCompletado:t.fechaCompletado,_ts:t._ts};
   t.estado='Pendiente';
   t.completadoPor=null; t.comentarioCompletado=null; t.fechaCompletado=null;
+  t._ts=Date.now();
   await saveK(SK.checklistTareas,S.checklistTareas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -8296,10 +8312,11 @@ async function agendaRevertirFinalizada(tareaId){
   var t=(S.checklistTareas||[]).find(function(x){return x.id===tareaId;});
   if(!t) return;
   if(!confirm('¿Revertir esta tarea Finalizada a Pendiente?')) return;
-  var prev={estado:t.estado,finalizadoPor:t.finalizadoPor,fechaFinalizado:t.fechaFinalizado,completadoPor:t.completadoPor,comentarioCompletado:t.comentarioCompletado,fechaCompletado:t.fechaCompletado};
+  var prev={estado:t.estado,finalizadoPor:t.finalizadoPor,fechaFinalizado:t.fechaFinalizado,completadoPor:t.completadoPor,comentarioCompletado:t.comentarioCompletado,fechaCompletado:t.fechaCompletado,_ts:t._ts};
   t.estado='Pendiente';
   t.finalizadoPor=null; t.fechaFinalizado=null;
   t.completadoPor=null; t.comentarioCompletado=null; t.fechaCompletado=null;
+  t._ts=Date.now();
   await saveK(SK.checklistTareas,S.checklistTareas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -8324,15 +8341,18 @@ async function agendaAgregarComentarioTarea(tareaId){
   if(!t.comentarios) t.comentarios=[];
   var nuevoComentario={texto:texto,autor:currentUser?.name||'Sistema',ts:Date.now()};
   var estadoPrevio=t.estado;
+  var tsPrevio=t._ts;
   t.comentarios.push(nuevoComentario);
   var pasoAEnCurso=false;
   if(t.estado==='Pendiente'){ t.estado='En Curso'; pasoAEnCurso=true; }
+  t._ts=Date.now();
   await saveK(SK.checklistTareas,S.checklistTareas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     t.comentarios=t.comentarios.filter(function(c){return c!==nuevoComentario;});
     t.estado=estadoPrevio;
+    t._ts=tsPrevio;
     await saveK(SK.checklistTareas,S.checklistTareas);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -8356,10 +8376,11 @@ async function agendaCerrarChecklist(checklistId){
     return;
   }
   if(!confirm('¿Cerrar este Checklist? Pasará a Histórico.')) return;
-  var prev={estado:checklist.estado,fechaCierre:checklist.fechaCierre,cerradoPor:checklist.cerradoPor};
+  var prev={estado:checklist.estado,fechaCierre:checklist.fechaCierre,cerradoPor:checklist.cerradoPor,_ts:checklist._ts};
   checklist.estado='Historico';
   checklist.fechaCierre=today();
   checklist.cerradoPor=currentUser?.name||'Sistema';
+  checklist._ts=Date.now();
   await saveK(SK.checklists,S.checklists);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);

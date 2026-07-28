@@ -2087,9 +2087,9 @@ function ngToggleSinEnc(checked){
 }
 
 function ngSyncFormularioUI(){
-  var cid=ngCurrentComunidadId;
-  var fecha=document.getElementById('ng-fecha')?.value;
-  if(typeof formRenderRespuestaUI==='function') formRenderRespuestaUI('ng-form-wrap','ng',cid,fecha);
+  // Se sacó el Formulario de acá adentro a pedido — ver nota en gdvSyncFormularioUI.
+  var wrap=document.getElementById('ng-form-wrap');
+  if(wrap) wrap.innerHTML='';
 }
 
 function ngCheckExistingRecord(){
@@ -5901,7 +5901,13 @@ async function formGuardarRespuesta(formularioId, tipoOrigen, unidadId, fecha){
     return;
   }
   showToast('✅ Formulario guardado','#16A34A');
-  // Re-renderizar para mostrar el tag "Respondido" actualizado
+  // Si se completó desde el modal de Registros, cerrarlo y refrescar la lista para que el
+  // indicador pase de "Pendiente" a "Completado" al instante. Por ahora el indicador solo
+  // existe en Registros de GdV.
+  var completarWrap=document.getElementById('form-completar-registro-wrap');
+  if(completarWrap) formCloseModal();
+  if(typeof gdvRenderRegistros==='function'&&document.getElementById('gdv-registros-list')) gdvRenderRegistros();
+  // Re-renderizar por si quedara algo (ya no debería mostrar nada — ver nota en gdvSyncFormularioUI)
   if(tipoOrigen==='gdv'&&typeof gdvSyncFormularioUI==='function') gdvSyncFormularioUI();
   else if(tipoOrigen==='ng'&&typeof ngSyncFormularioUI==='function') ngSyncFormularioUI();
   else if(tipoOrigen==='discipulado'&&typeof discSyncFormularioUI==='function') discSyncFormularioUI();
@@ -6034,16 +6040,14 @@ function formRenderActivos(c){
   activos.forEach(function(f){
     var semanas=formSemanasDelRango(f.fechaDesde,f.fechaHasta).sort(function(a,b){return b.lunes.localeCompare(a.lunes);});
     var prop=(S.ministerios||[]).find(function(m){return Number(m.id)===Number(f.propositoId);});
-    html+='<div style="margin-bottom:1.5rem">'
-      +'<div class="card" style="margin-bottom:8px;padding:10px 14px">'
-        +'<div style="font-size:15px;font-weight:700;color:#1F4E79">📋 '+f.titulo+'</div>'
-      +'</div>';
+    html+='<div class="card" style="margin-bottom:1.25rem;padding:14px">'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:10px">📋 '+f.titulo+'</div>';
     if(!semanas.length){
       html+='<div class="empty" style="padding:1rem">Todavía no arrancó ninguna semana de este Formulario.</div>';
     } else {
       semanas.forEach(function(w){
         var agg=formEstadoAgregadoSemana(f,w.semanaISO,w.anio);
-        html+='<div class="card" style="margin-bottom:.6rem;padding:12px;border-left:4px solid '+colorMap[agg.estado]+';cursor:pointer" onclick="formOpenSemanaDetalle('+f.id+','+w.semanaISO+','+w.anio+')">'
+        html+='<div style="border:1px solid #E5E7EB;border-left:4px solid '+colorMap[agg.estado]+';border-radius:8px;padding:10px 12px;margin-bottom:.5rem;cursor:pointer" onclick="formOpenSemanaDetalle('+f.id+','+w.semanaISO+','+w.anio+')">'
           +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
             +'<span style="font-size:13px;font-weight:600">Semana '+w.semanaISO+' ('+fmtAA(w.lunes)+' al '+fmtAA(w.domingo)+')</span>'
             +(prop?'<span style="font-size:11px;color:#7C3AED;font-weight:600">Propósito: '+prop.nombre+'</span>':'')
@@ -6203,7 +6207,24 @@ function gdvFormularioBadgeHtml(grupoId, fecha){
   if(todosCompletos){
     return '<span onclick="event.stopPropagation();formVerRespuestasUnidad(\'gdv\','+grupoId+',\''+fecha+'\')" style="font-size:11px;font-weight:700;color:#16A34A;cursor:pointer;text-decoration:underline">✅ Formulario Completado</span>';
   }
-  return '<span style="font-size:11px;font-weight:700;color:#DC2626">⚠️ Formulario Pendiente</span>';
+  return '<span onclick="event.stopPropagation();formAbrirCompletarDesdeRegistro(\'gdv\','+grupoId+',\''+fecha+'\')" style="font-size:11px;font-weight:700;color:#DC2626;cursor:pointer;text-decoration:underline">⚠️ Formulario Pendiente</span>';
+}
+
+// Completar el Formulario aparte de Cargar Asistencia (a pedido — la carga de Asistencia debe
+// quedar rápida y no obligar a completar el Formulario en el momento). Se accede tocando
+// "Formulario Pendiente" en Registros; reutiliza el mismo bloque de preguntas/respuestas que
+// antes vivía embebido en Cargar Asistencia, ahora en un modal aparte.
+function formAbrirCompletarDesdeRegistro(tipoOrigen, unidadId, fecha){
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.25rem;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'
+      +'<div style="font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.03em">📋 Completar Formulario — '+fmtAA(fecha)+'</div>'
+      +'<button class="btn btn-sm" onclick="formCloseModal()">✕</button>'
+    +'</div>'
+    +'<div id="form-completar-registro-wrap"></div>'
+  +'</div>';
+  document.getElementById('form-modal-overlay').innerHTML=modalHtml;
+  document.getElementById('form-modal-overlay').style.display='flex';
+  formRenderRespuestaUI('form-completar-registro-wrap',tipoOrigen,unidadId,fecha);
 }
 
 // Popup liviano: ve las preguntas/respuestas de UNA unidad puntual para una fecha — usado desde
@@ -9653,11 +9674,11 @@ function gdvCheckDuplicateWeekOnDateChange(){
 }
 
 function gdvSyncFormularioUI(){
-  var facGids=isGdVFacilitador()?getFacilitadorGroupIds():[];
-  var gid=facGids.length===1?facGids[0]:currentUser.groupId;
-  if(isGdVAdmin()||facGids.length>1){var sel=document.getElementById('gdv-grupo-sel');if(sel)gid=parseInt(sel.value)||null;}
-  var fecha=document.getElementById('gdv-fecha')?.value;
-  if(typeof formRenderRespuestaUI==='function') formRenderRespuestaUI('gdv-form-wrap','gdv',gid,fecha);
+  // Se sacó el Formulario de acá adentro a pedido — la carga de Asistencia debe quedar rápida
+  // (1 minuto) sin depender de completar el Formulario en el momento. El Formulario ahora se
+  // completa aparte, desde el indicador en Registros.
+  var wrap=document.getElementById('gdv-form-wrap');
+  if(wrap) wrap.innerHTML='';
 }
 
 function gdvToggleSinEncuentro(){
@@ -16314,9 +16335,9 @@ function discCheckDuplicateWeek(){
 }
 
 function discSyncFormularioUI(){
-  var cursadaId=discSelectedPasoId;
-  var fecha=document.getElementById('disc-fecha')?.value;
-  if(typeof formRenderRespuestaUI==='function') formRenderRespuestaUI('disc-form-wrap','discipulado',cursadaId,fecha);
+  // Se sacó el Formulario de acá adentro a pedido — ver nota en gdvSyncFormularioUI.
+  var wrap=document.getElementById('disc-form-wrap');
+  if(wrap) wrap.innerHTML='';
 }
 
 function discLoadPasoForm(){

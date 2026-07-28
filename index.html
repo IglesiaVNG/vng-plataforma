@@ -7817,7 +7817,7 @@ function agendaRenderFiltrosChecklist(todasLasTareas){
     var m=S.members.find(function(x){return x.id===id;});
     return m?{id:id,nombre:listName(m)}:null;
   }).filter(Boolean).sort(function(a,b){return a.nombre.localeCompare(b.nombre);});
-  var selectHtml='<select onchange="agendaSetFiltroAsignado(this.value)" style="font-size:12px;padding:5px 10px;border-radius:99px;border:1px solid #E5E7EB;color:#4B5563">'
+  var selectHtml='<select onchange="agendaSetFiltroAsignado(this.value)" style="font-size:12px;padding:5px 10px;border-radius:99px;border:1px solid #E5E7EB;color:#4B5563;max-width:150px;flex-shrink:0">'
     +'<option value="">👤 Asignada a...</option>'
     +nombresOpts.map(function(o){return '<option value="'+o.id+'"'+(String(agendaFiltroAsignado)===String(o.id)?' selected':'')+'>'+o.nombre+'</option>';}).join('')
     +'</select>';

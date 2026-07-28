@@ -5703,7 +5703,7 @@ async function formSaveFormulario(){
       id:Date.now(),titulo:titulo,propositoId:propositoId?parseInt(propositoId):null,fechaDesde:fechaDesde,fechaHasta:fechaHasta,
       preguntas:preguntasFinal,destinatarios:destinatariosFinal,
       estado:activo?'Activo':'Inactivo',
-      creadoPor:currentUser.id,ts:new Date().toISOString(),_ts:Date.now()
+      creadoPor:currentUser.name,ts:new Date().toISOString(),_ts:Date.now()
     };
     S.formularios.push(nuevoRef);
   }
@@ -5852,13 +5852,13 @@ async function formGuardarRespuesta(formularioId, tipoOrigen, unidadId, fecha){
   if(existing){
     rRef=existing;
     snapshot=JSON.parse(JSON.stringify(existing));
-    Object.assign(rRef,{respuestas:respuestasObj,completadoPor:currentUser.id,fecha:fecha,_ts:Date.now()});
+    Object.assign(rRef,{respuestas:respuestasObj,completadoPor:currentUser.name,fecha:fecha,fechaGuardado:new Date().toISOString(),_ts:Date.now()});
   } else {
     esNuevo=true;
     nuevoRef={
       id:Date.now(),formularioId:f.id,tipoOrigen:tipoOrigen,unidadId:unidadId,
       semanaISO:semanaISO,anio:anio,respuestas:respuestasObj,
-      completadoPor:currentUser.id,fecha:fecha,
+      completadoPor:currentUser.name,fecha:fecha,fechaGuardado:new Date().toISOString(),
       revisado:false,revisadoPor:null,fechaRevision:null,
       ts:new Date().toISOString(),_ts:Date.now()
     };
@@ -6011,7 +6011,7 @@ function formRenderActivos(c){
   activos.forEach(function(f){
     var semanas=formSemanasDelRango(f.fechaDesde,f.fechaHasta).sort(function(a,b){return b.lunes.localeCompare(a.lunes);});
     html+='<div style="margin-bottom:1.5rem">'
-      +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:8px">📋 '+f.titulo+'</div>';
+      +'<div style="font-size:15px;font-weight:700;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);margin-bottom:8px">📋 '+f.titulo+'</div>';
     if(!semanas.length){
       html+='<div class="empty" style="padding:1rem">Todavía no arrancó ninguna semana de este Formulario.</div>';
     } else {
@@ -6045,7 +6045,7 @@ function formRenderHistorico(c){
   var opts=todos.map(function(f){
     return '<option value="'+f.id+'"'+(Number(f.id)===Number(formHistSelectedId)?' selected':'')+'>'+f.titulo+(f.estado==='Inactivo'?' (Inactivo)':'')+'</option>';
   }).join('');
-  c.innerHTML='<div style="margin-bottom:1rem"><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Formulario</label>'
+  c.innerHTML='<div style="margin-bottom:1rem"><label style="font-size:12px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);display:block;margin-bottom:4px">Formulario</label>'
     +'<select id="form-hist-sel" onchange="formHistCambiarSeleccion(this.value)" style="width:100%;max-width:360px">'+opts+'</select></div>'
     +'<div id="form-hist-detalle"></div>';
   formRenderHistoricoDetalle(formHistSelectedId);
@@ -6081,39 +6081,49 @@ function formRenderHistoricoDetalle(formularioId){
   wrap.innerHTML=html;
 }
 
-function formOpenSemanaDetalle(formularioId, semanaISO, anio){
+var formDetalleExpandido={}; // qué filas de unidad están desplegadas — clave: tipoOrigen+'-'+unidadId
+var formDetalleActual=null; // {formularioId,semanaISO,anio} del detalle de semana actualmente abierto
+
+function formOpenSemanaDetalle(formularioId, semanaISO, anio, manteniendoEstado){
   var f=(S.formularios||[]).find(function(x){return Number(x.id)===Number(formularioId);});
   if(!f) return;
+  if(!manteniendoEstado) formDetalleExpandido={};
+  formDetalleActual={formularioId:formularioId,semanaISO:semanaISO,anio:anio};
   var unidades=formTodasUnidadesIncluidas(f);
   var esSuper=isSuperAdmin();
   var iconMap={gdv:'🏘',ng:'🌱',discipulado:'📖'};
   var colorMap={completo:'#16A34A',parcial:'#D97706',pendiente:'#9CA3AF'};
   var rowsHtml=unidades.map(function(u){
+    var key=u.tipoOrigen+'-'+u.id;
     var asistInfo=formModuloAsistenciaInfo(u.tipoOrigen,u.id,semanaISO,anio);
     var resp=formGetRespuesta(f.id,u.tipoOrigen,u.id,semanaISO,anio);
     var est=formEstadoUnidadSemana(f.id,u.tipoOrigen,u.id,semanaISO,anio);
     var labelMap={completo:asistInfo.sinEncuentro?'⏸ Sin Encuentro':'✅ Completo',parcial:'◐ Parcial',pendiente:'○ Pendiente'};
+    var abierto=!!formDetalleExpandido[key];
+    var tieneQueVer=!!resp; // solo hay algo para desplegar si respondieron el Formulario
     var detalleHtml='';
-    if(resp){
+    if(resp&&abierto){
       detalleHtml='<div style="margin-top:6px;padding-left:8px;border-left:2px solid #E5E7EB">'
         +(f.preguntas||[]).map(function(p){
           var val=resp.respuestas?resp.respuestas[p.id]:null;
           var valStr=Array.isArray(val)?(val.join(', ')||'—'):(val||'—');
           return '<div style="font-size:11.5px;margin-bottom:4px"><strong style="color:#4B5563">'+formFormatTexto(p.texto)+':</strong> <span style="color:#6B7280">'+formFormatTexto(valStr)+'</span></div>';
         }).join('');
-      if(esSuper){
-        detalleHtml+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6B7280;margin-top:4px;cursor:pointer">'
-          +'<input type="checkbox" '+(resp.revisado?'checked':'')+' onchange="formToggleRevisado('+resp.id+',this)">Revisado'
-        +'</label>';
-      } else if(resp.revisado){
-        detalleHtml+='<div style="font-size:10.5px;color:#16A34A;margin-top:4px">✓ Revisado</div>';
+      detalleHtml+='<div style="font-size:10px;color:#9CA3AF;margin-top:6px">✍️ Completado por '+(resp.completadoPor||'—')+' · '+fmtFechaHora(resp.fechaGuardado||resp.ts)+'</div>';
+      if(resp.revisado){
+        detalleHtml+='<div style="font-size:10px;color:#16A34A;margin-top:2px">✓ Revisado por '+(resp.revisadoPor||'—')+' · '+fmtFechaHora(resp.fechaRevision)+'</div>';
+        if(esSuper){
+          detalleHtml+='<button class="btn btn-sm" style="margin-top:6px" onclick="event.stopPropagation();formToggleRevisado('+resp.id+')">↩️ Deshacer Revisado</button>';
+        }
+      } else if(esSuper){
+        detalleHtml+='<button class="btn btn-sm btn-primary" style="margin-top:6px" onclick="event.stopPropagation();formToggleRevisado('+resp.id+')">✅ Marcar Revisado</button>';
       }
       detalleHtml+='</div>';
     }
     return '<div style="border:1px solid #E5E7EB;border-radius:8px;padding:10px;margin-bottom:8px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
-        +'<span style="font-size:13px;font-weight:600">'+iconMap[u.tipoOrigen]+' '+u.nombre+'</span>'
-        +'<span style="font-size:11px;font-weight:700;color:'+colorMap[est]+'">'+labelMap[est]+'</span>'
+      +'<div'+(tieneQueVer?' onclick="formToggleDetalleUnidad(\''+key+'\','+f.id+','+semanaISO+','+anio+')" style="cursor:pointer"':'')+' style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
+        +'<span style="font-size:13px;font-weight:600">'+iconMap[u.tipoOrigen]+' '+u.nombre+(tieneQueVer?(abierto?' ▲':' ▼'):'')+'</span>'
+        +'<span style="font-size:11px;font-weight:700;color:'+colorMap[est]+'">'+labelMap[est]+(resp&&resp.revisado?' · ✓':'')+'</span>'
       +'</div>'
       +detalleHtml
     +'</div>';
@@ -6132,6 +6142,22 @@ function formOpenSemanaDetalle(formularioId, semanaISO, anio){
   +'</div>';
   document.getElementById('form-modal-overlay').innerHTML=modalHtml;
   document.getElementById('form-modal-overlay').style.display='flex';
+}
+
+function formToggleDetalleUnidad(key, formularioId, semanaISO, anio){
+  formDetalleExpandido[key]=!formDetalleExpandido[key];
+  formOpenSemanaDetalle(formularioId,semanaISO,anio,true);
+}
+
+// Formatea una fecha ISO (con hora) a algo legible tipo "08/08/26 14:35"; si solo hay fecha
+// (sin hora, formato antiguo), cae a fmtAA.
+function fmtFechaHora(iso){
+  if(!iso) return '—';
+  var d=new Date(iso);
+  if(isNaN(d.getTime())) return fmtAA(iso);
+  var dd=String(d.getDate()).padStart(2,'0'), mm=String(d.getMonth()+1).padStart(2,'0'), yy=String(d.getFullYear()).slice(-2);
+  var hh=String(d.getHours()).padStart(2,'0'), mi=String(d.getMinutes()).padStart(2,'0');
+  return dd+'/'+mm+'/'+yy+' '+hh+':'+mi;
 }
 
 function formAnalisisSectionHtml(formularioId, semanaISO, anio){
@@ -6164,10 +6190,10 @@ async function formGuardarAnalisis(formularioId, semanaISO, anio){
   if(existing){
     aRef=existing;
     snapshot=JSON.parse(JSON.stringify(existing));
-    Object.assign(aRef,{texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.id,ts:new Date().toISOString()});
+    Object.assign(aRef,{texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.name,ts:new Date().toISOString()});
   } else {
     esNuevo=true;
-    nuevoRef={id:Date.now(),formularioId:formularioId,semanaISO:semanaISO,anio:anio,texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.id,ts:new Date().toISOString()};
+    nuevoRef={id:Date.now(),formularioId:formularioId,semanaISO:semanaISO,anio:anio,texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.name,ts:new Date().toISOString()};
     S.formAnalisis.push(nuevoRef);
   }
   await saveK(SK.formAnalisis,S.formAnalisis);
@@ -6210,38 +6236,80 @@ function formExportarSemana(formularioId, semanaISO, anio){
     lineas.push('');
   });
   var texto=lineas.join('\n').replace(/\*\*(.+?)\*\*/g,'*$1*');
+
+  // En vez de depender solo del portapapeles (que en varios navegadores/celulares queda
+  // bloqueado o directamente no anda), siempre se muestra el texto en pantalla, seleccionable
+  // a mano, con un botón que INTENTA copiarlo directo como atajo.
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.25rem;width:100%;max-width:460px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-shrink:0">'
+      +'<div style="font-size:14px;font-weight:700;color:#1F4E79">📋 Resumen de la semana</div>'
+      +'<button class="btn btn-sm" onclick="formCerrarExportOverlay()">✕</button>'
+    +'</div>'
+    +'<textarea id="form-export-texto" readonly onclick="this.select()" style="flex:1;min-height:220px;width:100%;padding:10px;border:1px solid #E5E7EB;border-radius:8px;font-size:12.5px;font-family:inherit;box-sizing:border-box;resize:vertical">'+texto.replace(/</g,'&lt;')+'</textarea>'
+    +'<div style="font-size:11px;color:#9CA3AF;margin:6px 0 10px;flex-shrink:0">Tocá el texto para seleccionarlo todo, o usá el botón para copiarlo directo.</div>'
+    +'<button class="btn btn-primary" style="flex-shrink:0" onclick="formCopiarExportTexto()">📋 Copiar al portapapeles</button>'
+  +'</div>';
+
+  var ov=document.getElementById('form-export-overlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='form-export-overlay';
+    ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10600;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML=modalHtml;
+  ov.style.display='flex';
+}
+function formCerrarExportOverlay(){
+  var ov=document.getElementById('form-export-overlay');
+  if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+}
+function formCopiarExportTexto(){
+  var ta=document.getElementById('form-export-texto');
+  if(!ta) return;
+  ta.focus();
+  ta.select();
+  try{ ta.setSelectionRange(0,999999); }catch(e){}
+  var hecho=false;
+  try{
+    if(document.execCommand) hecho=document.execCommand('copy');
+  }catch(e){ hecho=false; }
+  if(hecho){
+    showToast('📋 Copiado','#16A34A');
+    return;
+  }
   if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(texto).then(function(){
-      showToast('📋 Resumen de la semana copiado','#16A34A');
+    navigator.clipboard.writeText(ta.value).then(function(){
+      showToast('📋 Copiado','#16A34A');
     }).catch(function(){
-      prompt('Copiá manualmente:', texto);
+      showToast('No se pudo copiar solo — el texto ya está seleccionado, copialo con el celular/teclado','#D97706');
     });
   } else {
-    prompt('Copiá manualmente:', texto);
+    showToast('No se pudo copiar solo — el texto ya está seleccionado, copialo con el celular/teclado','#D97706');
   }
 }
 
-async function formToggleRevisado(respuestaId, checkboxEl){
+async function formToggleRevisado(respuestaId){
   if(!isSuperAdmin()) return;
   var r=(S.formRespuestas||[]).find(function(x){return Number(x.id)===Number(respuestaId);});
   if(!r) return;
-  var snapshot={revisado:r.revisado,revisadoPor:r.revisadoPor,fechaRevision:r.fechaRevision};
+  var snapshot={revisado:r.revisado,revisadoPor:r.revisadoPor,fechaRevision:r.fechaRevision,_ts:r._ts};
   var nuevoValor=!r.revisado;
   r.revisado=nuevoValor;
-  r.revisadoPor=nuevoValor?currentUser.id:null;
-  r.fechaRevision=nuevoValor?today():null;
+  r.revisadoPor=nuevoValor?currentUser.name:null;
+  r.fechaRevision=nuevoValor?new Date().toISOString():null;
   r._ts=Date.now();
   await saveK(SK.formRespuestas,S.formRespuestas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     Object.assign(r,snapshot);
-    if(checkboxEl) checkboxEl.checked=snapshot.revisado;
     await saveK(SK.formRespuestas,S.formRespuestas);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
   showToast(nuevoValor?'✓ Marcado como Revisado':'Revisión deshecha','#16A34A');
+  if(formDetalleActual) formOpenSemanaDetalle(formDetalleActual.formularioId,formDetalleActual.semanaISO,formDetalleActual.anio,true);
 }
 
 function buildEquipoHTML(){

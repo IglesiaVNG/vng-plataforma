@@ -5376,7 +5376,7 @@ function formRenderCreacion(c){
         +'<div>'
           +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+f.titulo+'</div>'
           +'<div style="font-size:12px;color:#6B7280;margin-top:3px">'+(prop?prop.nombre:'— sin Propósito —')+' · '+nPreg+' pregunta'+(nPreg!==1?'s':'')+' · '+(tipos.length?tipos.join(' · '):'sin destinatarios')+'</div>'
-          +'<div style="font-size:11px;color:#9CA3AF;margin-top:3px">'+(f.fechaDesde?fmtAA(f.fechaDesde):'—')+' al '+(f.fechaHasta?fmtAA(f.fechaHasta):'—')+'</div>'
+          +'<div style="font-size:12px;color:#6B7280;margin-top:3px">'+(f.fechaDesde?fmtAA(f.fechaDesde):'—')+' al '+(f.fechaHasta?fmtAA(f.fechaHasta):'—')+'</div>'
         +'</div>'
         +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
           +'<span class="badge '+(f.estado==='Activo'?'b-ok':'b-muted')+'">'+f.estado+'</span>'
@@ -5610,6 +5610,7 @@ function formRenderDestinatarios(){
   function seccion(tipo,label,icon,unidades,nombreFn){
     var dest=_formWorking.destinatarios[tipo];
     var activo=!!dest;
+    var incluidas=activo?(unidades.length-(dest.excluidos||[]).length):0;
     var html='<div style="border:1px solid #E5E7EB;border-radius:8px;padding:10px;margin-bottom:8px">'
       +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#374151">'
         +'<input type="checkbox" id="form-dest-'+tipo+'-toggle" onchange="formToggleDestTipo(\''+tipo+'\')" '+(activo?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
@@ -5619,11 +5620,18 @@ function formRenderDestinatarios(){
       if(!unidades.length){
         html+='<div style="font-size:12px;color:#9CA3AF;font-style:italic;margin-top:6px">No hay ninguna activa por ahora.</div>';
       } else {
-        html+='<div style="max-height:140px;overflow-y:auto;margin-top:8px;border-top:1px solid #F3F4F6;padding-top:6px">'
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;border-top:1px solid #F3F4F6;padding-top:6px">'
+          +'<span id="form-dest-'+tipo+'-contador" style="font-size:11px;font-weight:700;color:'+(incluidas===unidades.length?'#16A34A':'#D97706')+'">✔ '+incluidas+' de '+unidades.length+' incluidas</span>'
+          +'<span style="font-size:11px">'
+            +'<span onclick="formMarcarTodasDest(\''+tipo+'\',true)" style="color:#2563EB;cursor:pointer;text-decoration:underline">Tildar todas</span>'
+            +' · <span onclick="formMarcarTodasDest(\''+tipo+'\',false)" style="color:#DC2626;cursor:pointer;text-decoration:underline">Destildar todas</span>'
+          +'</span>'
+        +'</div>'
+        +'<div style="max-height:140px;overflow-y:auto;margin-top:6px">'
           +unidades.map(function(u){
             var excluido=(dest.excluidos||[]).map(String).includes(String(u.id));
             return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:12px">'
-              +'<input type="checkbox" class="form-dest-'+tipo+'-cb" value="'+u.id+'" '+(!excluido?'checked':'')+' style="width:14px;height:14px;cursor:pointer">'
+              +'<input type="checkbox" class="form-dest-'+tipo+'-cb" onchange="formActualizarContadorDest(\''+tipo+'\')" value="'+u.id+'" '+(!excluido?'checked':'')+' style="width:14px;height:14px;cursor:pointer">'
               +nombreFn(u)
             +'</label>';
           }).join('')
@@ -5638,6 +5646,21 @@ function formRenderDestinatarios(){
     seccion('gdv','Grupos de Vida','🏘',gruposActivos,function(g){return g.name;})
     +seccion('ng','Nuevas Generaciones','🌱',comsActivas,function(cm){return cm.name;})
     +seccion('discipulado','Discipulado','📖',cursadasActivas,function(cu){return cu.label;});
+}
+
+function formMarcarTodasDest(tipo, valor){
+  document.querySelectorAll('.form-dest-'+tipo+'-cb').forEach(function(cb){cb.checked=valor;});
+  formActualizarContadorDest(tipo);
+}
+function formActualizarContadorDest(tipo){
+  var boxes=document.querySelectorAll('.form-dest-'+tipo+'-cb');
+  var total=boxes.length, marcadas=0;
+  boxes.forEach(function(cb){ if(cb.checked) marcadas++; });
+  var contador=document.getElementById('form-dest-'+tipo+'-contador');
+  if(contador){
+    contador.textContent='✔ '+marcadas+' de '+total+' incluidas';
+    contador.style.color=marcadas===total?'#16A34A':'#D97706';
+  }
 }
 
 function formToggleDestTipo(tipo){
@@ -6010,8 +6033,11 @@ function formRenderActivos(c){
   var html='';
   activos.forEach(function(f){
     var semanas=formSemanasDelRango(f.fechaDesde,f.fechaHasta).sort(function(a,b){return b.lunes.localeCompare(a.lunes);});
+    var prop=(S.ministerios||[]).find(function(m){return Number(m.id)===Number(f.propositoId);});
     html+='<div style="margin-bottom:1.5rem">'
-      +'<div style="font-size:15px;font-weight:700;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);margin-bottom:8px">📋 '+f.titulo+'</div>';
+      +'<div class="card" style="margin-bottom:8px;padding:10px 14px">'
+        +'<div style="font-size:15px;font-weight:700;color:#1F4E79">📋 '+f.titulo+'</div>'
+      +'</div>';
     if(!semanas.length){
       html+='<div class="empty" style="padding:1rem">Todavía no arrancó ninguna semana de este Formulario.</div>';
     } else {
@@ -6020,6 +6046,7 @@ function formRenderActivos(c){
         html+='<div class="card" style="margin-bottom:.6rem;padding:12px;border-left:4px solid '+colorMap[agg.estado]+';cursor:pointer" onclick="formOpenSemanaDetalle('+f.id+','+w.semanaISO+','+w.anio+')">'
           +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
             +'<span style="font-size:13px;font-weight:600">Semana '+w.semanaISO+' ('+fmtAA(w.lunes)+' al '+fmtAA(w.domingo)+')</span>'
+            +(prop?'<span style="font-size:11px;color:#7C3AED;font-weight:600">Propósito: '+prop.nombre+'</span>':'')
             +'<span class="badge" style="background:'+colorMap[agg.estado]+'22;color:'+colorMap[agg.estado]+'">'+labelMap[agg.estado]+' — '+agg.respondieron+'/'+agg.total+'</span>'
           +'</div>'
         +'</div>';
@@ -6068,12 +6095,14 @@ function formRenderHistoricoDetalle(formularioId){
   }
   var colorMap={pendiente:'#9CA3AF',en_curso:'#D97706',completado:'#16A34A'};
   var labelMap={pendiente:'Pendiente',en_curso:'En Curso',completado:'Completado'};
+  var prop=(S.ministerios||[]).find(function(m){return Number(m.id)===Number(f.propositoId);});
   var html='';
   semanas.forEach(function(w){
     var agg=formEstadoAgregadoSemana(f,w.semanaISO,w.anio);
     html+='<div class="card" style="margin-bottom:.6rem;padding:12px;border-left:4px solid '+colorMap[agg.estado]+';cursor:pointer" onclick="formOpenSemanaDetalle('+f.id+','+w.semanaISO+','+w.anio+')">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
         +'<span style="font-size:13px;font-weight:600">Semana '+w.semanaISO+' ('+fmtAA(w.lunes)+' al '+fmtAA(w.domingo)+')</span>'
+        +(prop?'<span style="font-size:11px;color:#7C3AED;font-weight:600">Propósito: '+prop.nombre+'</span>':'')
         +'<span class="badge" style="background:'+colorMap[agg.estado]+'22;color:'+colorMap[agg.estado]+'">'+labelMap[agg.estado]+' — '+agg.respondieron+'/'+agg.total+'</span>'
       +'</div>'
     +'</div>';
@@ -6159,6 +6188,59 @@ function fmtFechaHora(iso){
   var hh=String(d.getHours()).padStart(2,'0'), mi=String(d.getMinutes()).padStart(2,'0');
   return dd+'/'+mm+'/'+yy+' '+hh+':'+mi;
 }
+
+// ── Indicador de Formulario en la lista de Registros (GdV/NG/Discipulado) ──
+// Rojo "Formulario Pendiente" (solo visual) · Verde "Formulario Completado" (clickeable, ve
+// preguntas y respuestas) · Negro "Semana Sin Formulario" (no aplica ninguno esa semana).
+function gdvFormularioBadgeHtml(grupoId, fecha){
+  if(typeof formFormulariosAplicables!=='function') return '';
+  var aplicables=formFormulariosAplicables('gdv',grupoId,fecha);
+  if(!aplicables.length){
+    return '<span style="font-size:11px;font-weight:700;color:#111827">Semana Sin Formulario</span>';
+  }
+  var semanaISO=getISOWeek(fecha), anio=parseLocalDate(fecha).getFullYear();
+  var todosCompletos=aplicables.every(function(f){ return !!formGetRespuesta(f.id,'gdv',grupoId,semanaISO,anio); });
+  if(todosCompletos){
+    return '<span onclick="event.stopPropagation();formVerRespuestasUnidad(\'gdv\','+grupoId+',\''+fecha+'\')" style="font-size:11px;font-weight:700;color:#16A34A;cursor:pointer;text-decoration:underline">✅ Formulario Completado</span>';
+  }
+  return '<span style="font-size:11px;font-weight:700;color:#DC2626">⚠️ Formulario Pendiente</span>';
+}
+
+// Popup liviano: ve las preguntas/respuestas de UNA unidad puntual para una fecha — usado desde
+// el indicador de Formulario en Registros (evita reabrir el detalle de semana completo con
+// todas las unidades, que es para Activos/Histórico).
+function formVerRespuestasUnidad(tipoOrigen, unidadId, fecha){
+  var semanaISO=getISOWeek(fecha), anio=parseLocalDate(fecha).getFullYear();
+  var aplicables=formFormulariosAplicables(tipoOrigen,unidadId,fecha);
+  if(!aplicables.length) return;
+  var html=aplicables.map(function(f){
+    var resp=formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio);
+    var cuerpo=resp
+      ?(f.preguntas||[]).map(function(p){
+          var val=resp.respuestas?resp.respuestas[p.id]:null;
+          var valStr=Array.isArray(val)?(val.join(', ')||'—'):(val||'—');
+          return '<div style="font-size:12px;margin-bottom:6px"><strong style="color:#4B5563">'+formFormatTexto(p.texto)+':</strong> <span style="color:#6B7280">'+formFormatTexto(valStr)+'</span></div>';
+        }).join('')
+      :'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Todavía no se respondió.</div>';
+    var meta=resp?('<div style="font-size:10px;color:#9CA3AF;margin-top:6px">✍️ Completado por '+(resp.completadoPor||'—')+' · '+fmtFechaHora(resp.fechaGuardado||resp.ts)
+      +(resp.revisado?' · ✓ Revisado por '+(resp.revisadoPor||'—')+' · '+fmtFechaHora(resp.fechaRevision):'')+'</div>'):'';
+    return '<div class="card" style="margin-bottom:10px;border-left:4px solid #7C3AED;padding:12px">'
+      +'<div style="font-weight:700;color:#1F4E79;margin-bottom:8px">📋 '+f.titulo+'</div>'
+      +cuerpo+meta
+    +'</div>';
+  }).join('');
+
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">'
+      +'<div style="font-size:14px;font-weight:700;color:#1F4E79">Formulario — Semana '+semanaISO+'</div>'
+      +'<button class="btn btn-sm" onclick="formCloseModal()">✕</button>'
+    +'</div>'
+    +html
+  +'</div>';
+  document.getElementById('form-modal-overlay').innerHTML=modalHtml;
+  document.getElementById('form-modal-overlay').style.display='flex';
+}
+
 
 function formAnalisisSectionHtml(formularioId, semanaISO, anio){
   var esSuper=isSuperAdmin();
@@ -9252,6 +9334,9 @@ function buildGdVHTML(){
             <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Motivo (opcional)</label>
             <input type="text" id="gdv-motivo" placeholder="Ej: Feriado, enfermedad del facilitador, etc.">
           </div>
+          <div id="gdv-sin-encuentro-guardar-wrap" style="display:none;margin-top:12px">
+            <button class="btn btn-primary" style="width:100%" onclick="gdvSaveRecord()">💾 Guardar</button>
+          </div>
         </div>
       </div>
       <div id="gdv-form-wrap"></div>
@@ -9277,7 +9362,7 @@ function buildGdVHTML(){
           ➕ No está en la lista — Registrar como Nuevo Contacto
         </button>
       </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:1.5rem">
+      <div id="gdv-bottom-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:1.5rem">
         <button class="btn" onclick="gdvInitFacForm()">Limpiar</button>
         <button class="btn btn-primary" onclick="gdvSaveRecord()">💾 Guardar</button>
       </div>
@@ -9581,11 +9666,13 @@ function gdvToggleSinEncuentro(){
   const asistCard=document.getElementById('gdv-asistencia-card');
   const visitCards=document.querySelectorAll('.gdv-visit-card');
   const formWrap=document.getElementById('gdv-form-wrap');
-  if(asistCard) asistCard.style.opacity=checked?'0.35':'1';
-  if(asistCard) asistCard.style.pointerEvents=checked?'none':'auto';
-  if(formWrap) formWrap.style.opacity=checked?'0.35':'1';
-  if(formWrap) formWrap.style.pointerEvents=checked?'none':'auto';
-  visitCards.forEach(c=>{c.style.opacity=checked?'0.35':'1';c.style.pointerEvents=checked?'none':'auto';});
+  const guardarInline=document.getElementById('gdv-sin-encuentro-guardar-wrap');
+  const bottomActions=document.getElementById('gdv-bottom-actions');
+  if(asistCard) asistCard.style.display=checked?'none':'';
+  if(formWrap) formWrap.style.display=checked?'none':'';
+  visitCards.forEach(c=>{c.style.display=checked?'none':'';});
+  if(guardarInline) guardarInline.style.display=checked?'block':'none';
+  if(bottomActions) bottomActions.style.display=checked?'none':'flex';
 }
 
 function gdvInitFacForm(){
@@ -9606,7 +9693,14 @@ function gdvInitFacForm(){
   const mw=document.getElementById('gdv-motivo-wrap');
   if(mw){mw.style.display='none';}
   const ac=document.getElementById('gdv-asistencia-card');
-  if(ac){ac.style.opacity='1';ac.style.pointerEvents='auto';}
+  if(ac){ac.style.display='';}
+  document.querySelectorAll('.gdv-visit-card').forEach(function(c){c.style.display='';});
+  const fw=document.getElementById('gdv-form-wrap');
+  if(fw){fw.style.display='';}
+  const gi=document.getElementById('gdv-sin-encuentro-guardar-wrap');
+  if(gi){gi.style.display='none';}
+  const ba=document.getElementById('gdv-bottom-actions');
+  if(ba){ba.style.display='flex';}
   const mot=document.getElementById('gdv-motivo');
   if(mot){mot.value='';}
   gdvRenderVisitTags();
@@ -9683,6 +9777,8 @@ function gdvAdminGroupChanged(){
   }
   gdvCheckPendingWeeks(gid);
   gdvCheckDuplicateWeek(gid);
+  const chkSE=document.getElementById('gdv-sin-encuentro');
+  if(chkSE&&chkSE.checked){ chkSE.checked=false; gdvToggleSinEncuentro(); }
   gdvSyncFormularioUI();
 }
 
@@ -10695,6 +10791,7 @@ function gdvRenderRegistros(){
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span style="font-weight:600;min-width:88px">${fmt(r.fecha)}</span>
         <span style="flex:1;font-size:13px">${r.grupoName}</span>
+        ${typeof gdvFormularioBadgeHtml==='function'?gdvFormularioBadgeHtml(r.grupoId,r.fecha):''}
         <span class="badge ${p>=70?'b-ok':'b-muted'}">${pre}/${att.length} (${p}%)</span>
         <button class="btn btn-sm" onclick="gdvEditRecord(${r.id})">✏️</button>
         <button class="btn btn-sm btn-danger" onclick="gdvDeleteRecord(${r.id})">🗑</button>

@@ -2669,7 +2669,13 @@ function agendaEsResponsableDe(checklist){
 }
 // Crear/editar/eliminar tareas, y mover Completada <-> Finalizada/Pendiente
 function agendaPuedeAdminTareas(checklist){
-  return agendaEsCoordinadorDe(checklist)||agendaEsResponsableDe(checklist);
+  return agendaEsCoordinadorDe(checklist)||agendaEsResponsableDe(checklist)||hasRole('pastor');
+}
+// Editar equipo (Coordinadores/Colaboradores) del Checklist — a propósito MÁS restrictivo que
+// agendaPuedeAdminTareas: solo Responsable de la Actividad, Pastor o Super Admin. Ni Coordinadores
+// ni Colaboradores pueden tocar quién integra el equipo, aunque sí puedan administrar tareas.
+function agendaPuedeEditarEquipoChecklist(checklist){
+  return isSuperAdmin() || hasRole('pastor') || agendaEsResponsableDe(checklist);
 }
 // Está asignado a alguna tarea de este checklist (aunque no sea Coordinador/Colaborador formal)
 function agendaEsAsignadoEnChecklist(checklist){
@@ -5189,7 +5195,7 @@ function buildAgendaHTML(){
     </div>
 
     <!-- Modal: crear Checklist -->
-    <div id="agenda-cl-crear-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:340;align-items:center;justify-content:center;padding:1rem">
+    <div id="agenda-cl-crear-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:350;align-items:center;justify-content:center;padding:1rem">
       <div class="modal-box-md modal-box-resp" style="background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 12px 40px rgba(0,0,0,.2)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
           <div style="font-size:15px;font-weight:700;color:#1F4E79">Nuevo Checklist — <span id="agenda-cl-crear-titulo"></span></div>
@@ -5228,10 +5234,13 @@ function buildAgendaHTML(){
         </div>
         <div id="agenda-cl-det-equipo" style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:1rem;font-size:12.5px"></div>
         <div id="agenda-cl-det-cerrar-wrap" style="margin-bottom:1rem"></div>
+        <div id="agenda-cl-nueva-tarea-toggle-wrap" style="display:none;margin-bottom:1rem">
+          <button class="btn btn-primary btn-sm" style="width:100%" onclick="agendaToggleFormNuevaTarea()">+ Agregar tarea</button>
+        </div>
         <div id="agenda-cl-det-add-wrap" style="display:none;margin-bottom:1rem;background:#F9FAFB;border-radius:10px;padding:10px 12px">
           <div class="form-grid-2">
           <div>
-            <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Nueva tarea</label>
+            <label id="agenda-cl-tarea-form-label" style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Nueva tarea</label>
             <input type="text" id="agenda-cl-nueva-tarea" placeholder="Título de la tarea..." style="width:100%;margin-bottom:8px">
             <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Sección</label>
             <div style="display:flex;gap:6px;margin-bottom:8px">
@@ -5253,8 +5262,9 @@ function buildAgendaHTML(){
               <div id="agenda-cl-tarea-asig-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:160px;overflow-y:auto"></div>
             </div>
           </div>
-          <div class="form-col-full">
-            <button class="btn btn-primary btn-sm" style="width:100%" onclick="agendaCrearTarea()">+ Agregar tarea</button>
+          <div class="form-col-full" style="display:flex;gap:8px">
+            <button class="btn" style="flex:1" onclick="agendaToggleFormNuevaTarea()">Cancelar</button>
+            <button class="btn btn-primary" id="agenda-cl-tarea-form-submit" style="flex:2" onclick="agendaCrearTarea()">✅ Guardar tarea</button>
           </div>
           </div>
         </div>
@@ -6173,7 +6183,7 @@ function buildEquipoHTML(){
     <div id="agenda-checklist-list"></div>
 
     <!-- Modal: crear Checklist -->
-    <div id="agenda-cl-crear-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:340;align-items:center;justify-content:center;padding:1rem">
+    <div id="agenda-cl-crear-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:350;align-items:center;justify-content:center;padding:1rem">
       <div class="modal-box-md modal-box-resp" style="background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 12px 40px rgba(0,0,0,.2)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
           <div style="font-size:15px;font-weight:700;color:#1F4E79">Nuevo Checklist — <span id="agenda-cl-crear-titulo"></span></div>
@@ -6212,10 +6222,13 @@ function buildEquipoHTML(){
         </div>
         <div id="agenda-cl-det-equipo" style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-bottom:1rem;font-size:12.5px"></div>
         <div id="agenda-cl-det-cerrar-wrap" style="margin-bottom:1rem"></div>
+        <div id="agenda-cl-nueva-tarea-toggle-wrap" style="display:none;margin-bottom:1rem">
+          <button class="btn btn-primary btn-sm" style="width:100%" onclick="agendaToggleFormNuevaTarea()">+ Agregar tarea</button>
+        </div>
         <div id="agenda-cl-det-add-wrap" style="display:none;margin-bottom:1rem;background:#F9FAFB;border-radius:10px;padding:10px 12px">
           <div class="form-grid-2">
           <div>
-            <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Nueva tarea</label>
+            <label id="agenda-cl-tarea-form-label" style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Nueva tarea</label>
             <input type="text" id="agenda-cl-nueva-tarea" placeholder="Título de la tarea..." style="width:100%;margin-bottom:8px">
             <label style="font-size:12px;font-weight:600;color:#4B5563;display:block;margin-bottom:4px">Sección</label>
             <div style="display:flex;gap:6px;margin-bottom:8px">
@@ -6237,8 +6250,9 @@ function buildEquipoHTML(){
               <div id="agenda-cl-tarea-asig-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:160px;overflow-y:auto"></div>
             </div>
           </div>
-          <div class="form-col-full">
-            <button class="btn btn-primary btn-sm" style="width:100%" onclick="agendaCrearTarea()">+ Agregar tarea</button>
+          <div class="form-col-full" style="display:flex;gap:8px">
+            <button class="btn" style="flex:1" onclick="agendaToggleFormNuevaTarea()">Cancelar</button>
+            <button class="btn btn-primary" id="agenda-cl-tarea-form-submit" style="flex:2" onclick="agendaCrearTarea()">✅ Guardar tarea</button>
           </div>
           </div>
         </div>
@@ -7485,6 +7499,28 @@ let agendaChecklistCrearEventoId=null;
 let agendaChecklistCrearEditando=null;
 let agendaChecklistDetalleId=null;
 let agendaTareasComentariosAbiertos={};
+let agendaMostrarFormNuevaTarea=false;
+let agendaEditandoTareaId=null; // null = creando una nueva; si no, id de la tarea que se está editando
+function agendaToggleFormNuevaTarea(){
+  agendaMostrarFormNuevaTarea=!agendaMostrarFormNuevaTarea;
+  if(!agendaMostrarFormNuevaTarea) agendaEditandoTareaId=null; // al cerrar/cancelar, siempre vuelve a modo "nueva"
+  var addWrap=document.getElementById('agenda-cl-det-add-wrap');
+  var toggleWrap=document.getElementById('agenda-cl-nueva-tarea-toggle-wrap');
+  if(addWrap) addWrap.style.display=agendaMostrarFormNuevaTarea?'block':'none';
+  if(toggleWrap) toggleWrap.style.display=agendaMostrarFormNuevaTarea?'none':'block';
+  if(agendaMostrarFormNuevaTarea&&!agendaEditandoTareaId) agendaSetFormTareaModoCreacion();
+}
+function agendaSetFormTareaModoCreacion(){
+  var lbl=document.getElementById('agenda-cl-tarea-form-label');
+  var btn=document.getElementById('agenda-cl-tarea-form-submit');
+  if(lbl) lbl.textContent='Nueva tarea';
+  if(btn) btn.textContent='✅ Guardar tarea';
+  var inp=document.getElementById('agenda-cl-nueva-tarea'); if(inp) inp.value='';
+  var seccionSel=document.getElementById('agenda-cl-nueva-tarea-seccion'); if(seccionSel) seccionSel.value='';
+  var prioSel=document.getElementById('agenda-cl-nueva-tarea-prioridad'); if(prioSel) prioSel.value='Media';
+  agendaNuevaTareaAsignados=[];
+  agendaRenderAsignadoChips();
+}
 let agendaNuevaTareaAsignados=[]; // ids de las 1-3 personas asignadas mientras se arma una tarea nueva
 let agendaFiltroEstado='todas'; // todas | pendiente | en_curso | completada | finalizada
 let agendaFiltroAsignado=''; // '' = todos, o un memberId
@@ -7537,6 +7573,10 @@ function agendaAbrirModalCrearChecklist(eventoId){
 function agendaAbrirModalEditarEquipo(checklistId){
   var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(checklistId);});
   if(!checklist) return;
+  if(!agendaPuedeEditarEquipoChecklist(checklist)){
+    alert('Solo el Responsable de la Actividad, un Pastor o el Super Admin pueden editar el equipo.');
+    return;
+  }
   agendaChecklistCrearEventoId=checklist.eventoId;
   agendaChecklistCrearEditando=checklist.id;
   var ev=S.eventos.find(function(e){return Number(e.id)===Number(checklist.eventoId);});
@@ -7615,6 +7655,7 @@ function agendaRenderChecklistDetalle(){
   if(!checklist) return;
   var ev=S.eventos.find(function(e){return Number(e.id)===Number(checklist.eventoId);});
   var puedeAdmin=agendaPuedeAdminTareas(checklist);
+  var puedeEditarEquipo=agendaPuedeEditarEquipoChecklist(checklist);
   var puedeCerrar=agendaEsResponsableDe(checklist);
   var esHistorico=checklist.estado==='Historico';
 
@@ -7628,7 +7669,7 @@ function agendaRenderChecklistDetalle(){
   document.getElementById('agenda-cl-det-equipo').innerHTML=
     '<div style="margin-bottom:4px"><strong>👔 Coordinadores:</strong> '+(coordNames||'—')+'</div>'
     +'<div><strong>🙋 Colaboradores:</strong> '+(colabNames||'—')+'</div>'
-    +(puedeAdmin&&!esHistorico?'<button class="btn btn-sm" style="margin-top:8px" onclick="agendaAbrirModalEditarEquipo('+checklist.id+')">✏️ Editar equipo</button>':'');
+    +(puedeEditarEquipo&&!esHistorico?'<button class="btn btn-sm" style="margin-top:8px" onclick="agendaAbrirModalEditarEquipo('+checklist.id+')">✏️ Editar equipo</button>':'');
 
   var todasLasTareas=(S.checklistTareas||[]).filter(function(t){return Number(t.checklistId)===Number(checklist.id);});
   var seccionesActivas=agendaGetSecciones(checklist.id,false);
@@ -7652,8 +7693,12 @@ function agendaRenderChecklistDetalle(){
     cerrarWrap.innerHTML='';
   }
 
+  agendaMostrarFormNuevaTarea=false;
+  agendaEditandoTareaId=null;
   var addWrap=document.getElementById('agenda-cl-det-add-wrap');
-  addWrap.style.display=(puedeAdmin&&!esHistorico)?'block':'none';
+  if(addWrap) addWrap.style.display='none';
+  var toggleWrap=document.getElementById('agenda-cl-nueva-tarea-toggle-wrap');
+  if(toggleWrap) toggleWrap.style.display=(puedeAdmin&&!esHistorico)?'block':'none';
   var nuevaTareaInp=document.getElementById('agenda-cl-nueva-tarea');
   if(nuevaTareaInp) nuevaTareaInp.value='';
   agendaRenderAsignadoChips();
@@ -7696,9 +7741,13 @@ function agendaRenderChecklistDetalle(){
   }
 
   var rankPrioridad={Alta:0,Media:1,Baja:2};
+  function rankDePrioridad(p){
+    var r=rankPrioridad[p||'Media'];
+    return (typeof r==='number')?r:1; // ojo: NO usar "||1" acá — Alta es 0, y 0 es falsy en JS
+  }
   function ordenarPorPrioridad(lista){
     return lista.slice().sort(function(a,b){
-      return (rankPrioridad[a.prioridad||'Media']||1)-(rankPrioridad[b.prioridad||'Media']||1);
+      return rankDePrioridad(a.prioridad)-rankDePrioridad(b.prioridad);
     });
   }
 
@@ -7799,45 +7848,47 @@ function agendaRenderTareaRow(t,checklist,puedeAdmin,esHistorico){
   var acciones='';
   if(!esHistorico){
     if(t.estado==='Pendiente'||t.estado==='En Curso'){
-      acciones+='<button class="btn btn-sm" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600" onclick="agendaMarcarCompletada('+t.id+')">✅ Marcar Completada</button>';
+      acciones+='<button class="btn btn-sm" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600" onclick="agendaMarcarCompletada('+t.id+')">✅ Completada</button>';
     } else if(t.estado==='Completada'&&puedeAdmin){
       acciones+='<button class="btn btn-sm" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600" onclick="agendaFinalizarTarea('+t.id+')">🔒 Finalizar</button>'
-        +'<button class="btn btn-sm" onclick="agendaVolverPendiente('+t.id+')">↩️ Volver a Pendiente</button>';
+        +'<button class="btn btn-sm" onclick="agendaVolverPendiente('+t.id+')" title="Volver a Pendiente">↩️</button>';
     } else if(t.estado==='Finalizada'&&isSuperAdmin()){
-      acciones+='<button class="btn btn-sm" style="color:#D97706" onclick="agendaRevertirFinalizada('+t.id+')">↩️ Revertir (Super Admin)</button>';
+      acciones+='<button class="btn btn-sm" style="color:#D97706" onclick="agendaRevertirFinalizada('+t.id+')" title="Revertir (Super Admin)">↩️</button>';
     }
     if(puedeAdmin){
-      acciones+='<button class="btn btn-sm" onclick="agendaEditarTarea('+t.id+')">✏️</button>'
-        +'<button onclick="agendaEliminarTarea('+t.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px">🗑️</button>';
+      acciones+='<button class="btn btn-sm" onclick="agendaEditarTarea('+t.id+')" title="Editar">✏️</button>'
+        +'<button onclick="agendaEliminarTarea('+t.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:12px" title="Eliminar">🗑️</button>';
     }
   }
 
-  var html='<div class="card" style="margin-bottom:.6rem;padding:10px 12px;border-left:4px solid '+estadoColor+';background:'+estadoBg+'">';
+  // Meta compacto: prioridad + estado + asignados, todo en una sola línea
+  var metaLine=prioBadge
+    +' <span style="font-size:10.5px;color:'+estadoColor+';font-weight:700">'+t.estado+'</span>'
+    +(asignadosNombres.length?' <span style="font-size:11px;color:#4B5563">👤 '+asignadosNombres.join(', ')+'</span>':'');
+
+  // Info secundaria (creación/edición/completado/finalizado), condensada en una sola línea chica
+  var infoBits=['Creada por '+(t.creadoPor||'—')+' · '+agendaFmtFechaHora(t.fechaCreacion)];
+  if(t.editadoPor) infoBits.push('✏️ '+t.editadoPor+' · '+agendaFmtFechaHora(t.fechaEdicion));
+  if(t.estado!=='Pendiente'&&t.comentarioCompletado) infoBits.push('✅ '+t.comentarioCompletado+' — '+(t.completadoPor||'')+' · '+agendaFmtFechaHora(t.fechaCompletado));
+  if(t.estado==='Finalizada') infoBits.push('🔒 '+(t.finalizadoPor||'')+' · '+agendaFmtFechaHora(t.fechaFinalizado));
+
+  var html='<div class="card" style="margin-bottom:.5rem;padding:8px 10px;border-left:4px solid '+estadoColor+';background:'+estadoBg+'">';
   html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">';
   html+='<div style="flex:1;min-width:180px">';
-  html+='<div style="font-weight:700;font-size:13.5px;color:#1F2937">'+t.titulo+'</div>';
-  html+='<div style="margin-top:4px">'+prioBadge+'</div>';
-  html+='<div style="font-size:11px;color:'+estadoColor+';font-weight:700;margin-top:4px">'+t.estado+'</div>';
-  if(asignadosNombres.length){
-    html+='<div style="font-size:11.5px;color:#4B5563;margin-top:3px">👤 '+asignadosNombres.join(', ')+'</div>';
-  }
-  html+='<div style="font-size:10.5px;color:#9CA3AF;margin-top:3px">Creada por '+(t.creadoPor||'—')+' · '+agendaFmtFechaHora(t.fechaCreacion)+'</div>';
-  if(t.editadoPor){
-    html+='<div style="font-size:10.5px;color:#9CA3AF;margin-top:1px">✏️ Editada por '+t.editadoPor+' · '+agendaFmtFechaHora(t.fechaEdicion)+'</div>';
-  }
-  if(t.estado!=='Pendiente'&&t.comentarioCompletado){
-    html+='<div style="font-size:12px;color:#6B7280;margin-top:4px">✅ '+t.comentarioCompletado+'</div>';
-    html+='<div style="font-size:10.5px;color:#9CA3AF;margin-top:1px">Completada por '+(t.completadoPor||'')+' · '+agendaFmtFechaHora(t.fechaCompletado)+'</div>';
-  }
-  if(t.estado==='Finalizada'){
-    html+='<div style="font-size:10.5px;color:#9CA3AF;margin-top:1px">🔒 Finalizada por '+(t.finalizadoPor||'')+' · '+agendaFmtFechaHora(t.fechaFinalizado)+'</div>';
-  }
+  html+='<div style="font-weight:700;font-size:13px;color:#1F2937">'+t.titulo+'</div>';
+  html+='<div style="margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+metaLine+'</div>';
+  html+='<div style="font-size:9.5px;color:#9CA3AF;margin-top:3px">'+infoBits.join(' · ')+'</div>';
   html+='</div>';
   html+='<div style="display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0">'+acciones+'</div>';
   html+='</div>';
 
-  html+='<div style="margin-top:8px">';
-  html+='<span onclick="agendaToggleComentariosTarea('+t.id+')" style="font-size:11.5px;font-weight:600;color:#6B7280;cursor:pointer">💬 '+(abiertos?'Ocultar':'Ver')+' comentarios ('+comentarios.length+')</span>';
+  html+='<div style="margin-top:6px">';
+  if(comentarios.length&&!abiertos){
+    var ultimo=comentarios[comentarios.length-1];
+    html+='<div style="background:#F7F3E9;border-left:3px solid #C7A233;border-radius:6px;padding:5px 8px;font-size:11.5px;color:#2B2620;margin-bottom:4px">'
+      +ultimo.texto+'<div style="color:#9CA3AF;font-size:10px;margin-top:1px">'+ultimo.autor+' · '+agendaFmtFechaHora(ultimo.ts)+'</div></div>';
+  }
+  html+='<span onclick="agendaToggleComentariosTarea('+t.id+')" style="font-size:11px;font-weight:600;color:#6B7280;cursor:pointer">💬 '+(abiertos?'Ocultar':'Ver')+' comentarios ('+comentarios.length+')</span>';
   if(abiertos){
     html+='<div style="margin-top:6px;display:flex;flex-direction:column;gap:5px">';
     comentarios.forEach(function(c){
@@ -8062,6 +8113,36 @@ async function agendaCrearTarea(){
   }
   var seccionId=parseInt(document.getElementById('agenda-cl-nueva-tarea-seccion')?.value)||null;
   var prioridad=document.getElementById('agenda-cl-nueva-tarea-prioridad')?.value||'Media';
+
+  // ── Modo edición: guardar cambios sobre una tarea existente (incluye reasignar personas) ──
+  if(agendaEditandoTareaId){
+    var t=(S.checklistTareas||[]).find(function(x){return x.id===agendaEditandoTareaId;});
+    if(!t) return;
+    var snapshot={titulo:t.titulo,seccionId:t.seccionId,prioridad:t.prioridad,asignadosIds:(t.asignadosIds||[]).slice(),editadoPor:t.editadoPor,fechaEdicion:t.fechaEdicion};
+    t.titulo=titulo;
+    t.seccionId=seccionId;
+    t.prioridad=prioridad;
+    t.asignadosIds=agendaNuevaTareaAsignados.slice();
+    t.editadoPor=currentUser?.name||'Sistema';
+    t.fechaEdicion=new Date().toISOString();
+    await saveK(SK.checklistTareas,S.checklistTareas);
+    try{
+      if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    }catch(e){
+      Object.assign(t,snapshot);
+      await saveK(SK.checklistTareas,S.checklistTareas);
+      alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+      return;
+    }
+    agendaNuevaTareaAsignados=[];
+    agendaEditandoTareaId=null;
+    agendaRenderChecklistDetalle();
+    agendaRenderChecklistList();
+    showToast('✅ Tarea actualizada','#16A34A');
+    return;
+  }
+
+  // ── Modo creación: tarea nueva ──
   var nuevaTarea={
     id:Date.now(), checklistId:checklist.id, titulo:titulo, estado:'Pendiente',
     seccionId:seccionId, prioridad:prioridad,
@@ -8087,32 +8168,31 @@ async function agendaCrearTarea(){
   agendaRenderChecklistList();
 }
 
-async function agendaEditarTarea(tareaId){
+function agendaEditarTarea(tareaId){
   var t=(S.checklistTareas||[]).find(function(x){return x.id===tareaId;});
   if(!t) return;
   var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(t.checklistId);});
   if(!checklist||!agendaPuedeAdminTareas(checklist)){ alert('No tenés permiso para editar esta tarea.'); return; }
-  var nuevoTitulo=prompt('Editar tarea:',t.titulo);
-  if(nuevoTitulo===null) return;
-  nuevoTitulo=nuevoTitulo.trim();
-  if(!nuevoTitulo) return;
-  var tituloPrevio=t.titulo;
-  var editadoPorPrevio=t.editadoPor, fechaEdicionPrevia=t.fechaEdicion;
-  t.titulo=nuevoTitulo;
-  t.editadoPor=currentUser?.name||'Sistema';
-  t.fechaEdicion=new Date().toISOString();
-  await saveK(SK.checklistTareas,S.checklistTareas);
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    t.titulo=tituloPrevio;
-    t.editadoPor=editadoPorPrevio;
-    t.fechaEdicion=fechaEdicionPrevia;
-    await saveK(SK.checklistTareas,S.checklistTareas);
-    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
-    return;
-  }
-  agendaRenderChecklistDetalle();
+
+  agendaEditandoTareaId=tareaId;
+  agendaMostrarFormNuevaTarea=true;
+  var addWrap=document.getElementById('agenda-cl-det-add-wrap');
+  var toggleWrap=document.getElementById('agenda-cl-nueva-tarea-toggle-wrap');
+  if(addWrap) addWrap.style.display='block';
+  if(toggleWrap) toggleWrap.style.display='none';
+
+  var lbl=document.getElementById('agenda-cl-tarea-form-label');
+  var btn=document.getElementById('agenda-cl-tarea-form-submit');
+  if(lbl) lbl.textContent='Editar tarea';
+  if(btn) btn.textContent='✅ Guardar cambios';
+
+  var inp=document.getElementById('agenda-cl-nueva-tarea'); if(inp) inp.value=t.titulo;
+  var seccionSel=document.getElementById('agenda-cl-nueva-tarea-seccion'); if(seccionSel) seccionSel.value=t.seccionId||'';
+  var prioSel=document.getElementById('agenda-cl-nueva-tarea-prioridad'); if(prioSel) prioSel.value=t.prioridad||'Media';
+  agendaNuevaTareaAsignados=(t.asignadosIds||[]).slice();
+  agendaRenderAsignadoChips();
+
+  if(addWrap) addWrap.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 async function agendaEliminarTarea(tareaId){

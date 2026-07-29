@@ -5447,10 +5447,16 @@ function formOpenModal(id, duplicarDeId){
       +'<div id="form-destinatarios-wrap"></div>'
     +'</div>'
 
-    +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151;margin-bottom:16px">'
-      +'<input type="checkbox" id="form-f-activo" '+(!f||f.estado==='Activo'?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
-      +'Formulario Activo'
-    +'</label>'
+    +'<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px">'
+      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151">'
+        +'<input type="checkbox" id="form-f-activo" '+(!f||f.estado==='Activo'?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
+        +'Formulario Activo'
+      +'</label>'
+      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151">'
+        +'<input type="checkbox" id="form-f-aplica-analisis" '+(!f||f.aplicaAnalisis!==false?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
+        +'Aplica Análisis App'
+      +'</label>'
+    +'</div>'
 
     +'<div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;padding-top:4px">'
       +'<button class="btn btn-sm" onclick="formMostrarVistaPrevia()">👁 Vista previa</button>'
@@ -5691,6 +5697,7 @@ async function formSaveFormulario(){
   var fechaDesde=document.getElementById('form-f-desde')?.value||'';
   var fechaHasta=document.getElementById('form-f-hasta')?.value||'';
   var activo=document.getElementById('form-f-activo')?.checked;
+  var aplicaAnalisis=document.getElementById('form-f-aplica-analisis')?.checked!==false;
 
   if(!titulo){ alert('Ingresá el Título del Formulario'); return; }
   if(!fechaDesde||!fechaHasta){ alert('Completá el rango de fechas (Desde / Hasta)'); return; }
@@ -5717,7 +5724,7 @@ async function formSaveFormulario(){
       Object.assign(fRef,{
         titulo:titulo,propositoId:propositoId?parseInt(propositoId):null,fechaDesde:fechaDesde,fechaHasta:fechaHasta,
         preguntas:preguntasFinal,destinatarios:destinatariosFinal,
-        estado:activo?'Activo':'Inactivo',_ts:Date.now()
+        estado:activo?'Activo':'Inactivo',aplicaAnalisis:aplicaAnalisis,_ts:Date.now()
       });
     }
   } else {
@@ -5725,7 +5732,7 @@ async function formSaveFormulario(){
     nuevoRef={
       id:Date.now(),titulo:titulo,propositoId:propositoId?parseInt(propositoId):null,fechaDesde:fechaDesde,fechaHasta:fechaHasta,
       preguntas:preguntasFinal,destinatarios:destinatariosFinal,
-      estado:activo?'Activo':'Inactivo',
+      estado:activo?'Activo':'Inactivo',aplicaAnalisis:aplicaAnalisis,
       creadoPor:currentUser.name,ts:new Date().toISOString(),_ts:Date.now()
     };
     S.formularios.push(nuevoRef);
@@ -6055,6 +6062,7 @@ function formSemanaGraduada(f, semanaISO, anio){
     return !!(resp&&resp.revisado);
   });
   if(!todasOk) return false;
+  if(f.aplicaAnalisis===false) return true; // este Formulario no usa Análisis App — no hace falta para graduar
   var an=formGetAnalisis(f.id,semanaISO,anio);
   return !!(an&&an.revisadoLider);
 }
@@ -6361,6 +6369,7 @@ function formVerRespuestasUnidad(tipoOrigen, unidadId, fecha){
 
 
 function formAnalisisSectionHtml(f, semanaISO, anio){
+  if(f.aplicaAnalisis===false) return ''; // el Formulario no usa Análisis App
   var esSuper=isSuperAdmin();
   var an=formGetAnalisis(f.id,semanaISO,anio);
   var texto=an?an.texto:'';
@@ -13933,27 +13942,29 @@ function nvExportarCampanaExcel(){
   if(!camp){ showToast('Elegí una Campaña primero','#D97706'); return; }
   var contactos=nvCampanaContactosFiltrados();
   if(!contactos.length){ showToast('No hay contactos para exportar con este filtro','#D97706'); return; }
-  var filas=[['Nombre','Apellido','Teléfono','Fecha Ingreso','Edad','Barrio','Contactado por WhatsApp']];
-  contactos.forEach(function(m){
+  var rows=contactos.map(function(m){
     var edad=nvEdad(m);
-    filas.push([m.nombre||'',m.apellido||'',m.tel||'',m.fechaRegistro||'',edad!==null?edad:'',m.dir||'',m.ultimoContactoWA?new Date(m.ultimoContactoWA).toLocaleString('es-AR'):'No']);
+    return {
+      nombre:m.nombre||'',
+      apellido:m.apellido||'',
+      telefono:m.tel||'',
+      fechaIngreso:m.fechaRegistro||'',
+      edad:edad!==null?edad:'',
+      barrio:m.dir||'',
+      contactadoWA:m.ultimoContactoWA?new Date(m.ultimoContactoWA).toLocaleString('es-AR'):'No'
+    };
   });
-  var csv=filas.map(function(row){
-    return row.map(function(cell){
-      var s=String(cell===null||cell===undefined?'':cell);
-      if(s.indexOf(',')>-1||s.indexOf('"')>-1||s.indexOf('\n')>-1) s='"'+s.replace(/"/g,'""')+'"';
-      return s;
-    }).join(',');
-  }).join('\r\n');
-  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}); // \uFEFF = BOM, para que Excel abra los acentos bien
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  a.href=url;
-  a.download='Campaña - '+camp.nombre.replace(/[^a-zA-Z0-9 ]/g,'')+' - '+todayAA().replace(/\//g,'-')+'.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  var cols=[
+    {key:'nombre',      label:'Nombre',                   width:18},
+    {key:'apellido',    label:'Apellido',                 width:18},
+    {key:'telefono',    label:'Teléfono',                 width:16},
+    {key:'fechaIngreso',label:'Fecha Ingreso',            width:14},
+    {key:'edad',        label:'Edad',                     width:8},
+    {key:'barrio',      label:'Barrio',                   width:20},
+    {key:'contactadoWA',label:'Contactado por WhatsApp',  width:22},
+  ];
+  var nombreArchivo='Campaña - '+camp.nombre.replace(/[^a-zA-Z0-9 ]/g,'')+' - '+todayAA().replace(/\//g,'-');
+  exportToExcel(rows, cols, nombreArchivo);
   showToast('📊 '+contactos.length+' contacto'+(contactos.length!==1?'s':'')+' exportado'+(contactos.length!==1?'s':''),'#16A34A');
 }
 

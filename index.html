@@ -2727,8 +2727,27 @@ function getFacilitadorGroupId(){
   const ids=getFacilitadorGroupIds();
   return ids.length?ids[0]:null;
 }
+// Principio general: si CUALQUIERA de las Funciones de la persona le da acceso ejecutar SIN
+// quedar restringida a su grupo/comunidad (scope='ninguno' + cargar='ejecuta'), esa Función más
+// amplia gana — ninguna otra Función más limitada (ej: Facilitador de un grupo puntual) puede
+// bloquearla. Se usa antes de aplicar cualquier scope hardcodeado por nombre de rol.
+function tieneAccesoSinScope(scopeKey, cargarKey){
+  var roles=userRoles();
+  var sr=currentUser&&currentUser.role;
+  var todos=sr?[sr].concat(roles):roles;
+  return todos.some(function(r){
+    if(!PERMISOS[r]) return false;
+    var scope=PERMISOS[r][scopeKey]||'ninguno';
+    var cargar=PERMISOS[r][cargarKey]||'ninguno';
+    return scope==='ninguno'&&cargar==='ejecuta';
+  });
+}
+
 function isGdVScoped(){
   if(isSuperAdmin()) return false;
+  // Si alguna otra Función (ej: Pastor) ya le da acceso completo sin restricción, esa gana —
+  // no lo limita el hecho de tener ADEMÁS una Función de Facilitador de un grupo puntual.
+  if(tieneAccesoSinScope('gdv_scope_grupo','gdv_cargar')) return false;
   // Facilitador role: always scoped if they have a group assigned (via user or group record)
   // Usa hasRole (array completo de roles) en vez de currentUser.role (singular) para que
   // funcione correctamente en personas con más de un rol asignado (ej: Facilitador + Líder NG)

@@ -2087,9 +2087,9 @@ function ngToggleSinEnc(checked){
 }
 
 function ngSyncFormularioUI(){
-  var cid=ngCurrentComunidadId;
-  var fecha=document.getElementById('ng-fecha')?.value;
-  if(typeof formRenderRespuestaUI==='function') formRenderRespuestaUI('ng-form-wrap','ng',cid,fecha);
+  // Se sacó el Formulario de acá adentro a pedido — ver nota en gdvSyncFormularioUI.
+  var wrap=document.getElementById('ng-form-wrap');
+  if(wrap) wrap.innerHTML='';
 }
 
 function ngCheckExistingRecord(){
@@ -2727,8 +2727,27 @@ function getFacilitadorGroupId(){
   const ids=getFacilitadorGroupIds();
   return ids.length?ids[0]:null;
 }
+// Principio general: si CUALQUIERA de las Funciones de la persona le da acceso ejecutar SIN
+// quedar restringida a su grupo/comunidad (scope='ninguno' + cargar='ejecuta'), esa Función más
+// amplia gana — ninguna otra Función más limitada (ej: Facilitador de un grupo puntual) puede
+// bloquearla. Se usa antes de aplicar cualquier scope hardcodeado por nombre de rol.
+function tieneAccesoSinScope(scopeKey, cargarKey){
+  var roles=userRoles();
+  var sr=currentUser&&currentUser.role;
+  var todos=sr?[sr].concat(roles):roles;
+  return todos.some(function(r){
+    if(!PERMISOS[r]) return false;
+    var scope=PERMISOS[r][scopeKey]||'ninguno';
+    var cargar=PERMISOS[r][cargarKey]||'ninguno';
+    return scope==='ninguno'&&cargar==='ejecuta';
+  });
+}
+
 function isGdVScoped(){
   if(isSuperAdmin()) return false;
+  // Si alguna otra Función (ej: Pastor) ya le da acceso completo sin restricción, esa gana —
+  // no lo limita el hecho de tener ADEMÁS una Función de Facilitador de un grupo puntual.
+  if(tieneAccesoSinScope('gdv_scope_grupo','gdv_cargar')) return false;
   // Facilitador role: always scoped if they have a group assigned (via user or group record)
   // Usa hasRole (array completo de roles) en vez de currentUser.role (singular) para que
   // funcione correctamente en personas con más de un rol asignado (ej: Facilitador + Líder NG)
@@ -5332,7 +5351,7 @@ function buildFormulariosHTML(){
       +'<button class="nav-btn" id="form-tab-historico" onclick="formTab(\'historico\',this)">📁 Histórico</button>'
     +'</div>'
     +'<div id="form-content"></div>'
-    +'<div id="form-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem"></div>'
+    +'<div id="form-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;-webkit-overflow-scrolling:touch"></div>'
   +'</div>';
 }
 
@@ -5376,12 +5395,13 @@ function formRenderCreacion(c){
         +'<div>'
           +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+f.titulo+'</div>'
           +'<div style="font-size:12px;color:#6B7280;margin-top:3px">'+(prop?prop.nombre:'— sin Propósito —')+' · '+nPreg+' pregunta'+(nPreg!==1?'s':'')+' · '+(tipos.length?tipos.join(' · '):'sin destinatarios')+'</div>'
-          +'<div style="font-size:11px;color:#9CA3AF;margin-top:3px">'+(f.fechaDesde?fmtAA(f.fechaDesde):'—')+' al '+(f.fechaHasta?fmtAA(f.fechaHasta):'—')+'</div>'
+          +'<div style="font-size:12px;color:#6B7280;margin-top:3px">'+(f.fechaDesde?fmtAA(f.fechaDesde):'—')+' al '+(f.fechaHasta?fmtAA(f.fechaHasta):'—')+'</div>'
         +'</div>'
         +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
           +'<span class="badge '+(f.estado==='Activo'?'b-ok':'b-muted')+'">'+f.estado+'</span>'
           +'<button class="btn btn-sm" onclick="formToggleEstado('+f.id+')">'+(f.estado==='Activo'?'⏸ Desactivar':'▶ Activar')+'</button>'
           +'<button class="btn btn-sm" onclick="formOpenModal('+f.id+')">✏️ Editar</button>'
+          +'<button class="btn btn-sm" onclick="formOpenModal(null,'+f.id+')" title="Crea uno nuevo con el mismo diseño">📋 Duplicar</button>'
           +'<button class="btn btn-sm btn-danger" onclick="formDeleteFormulario('+f.id+')">🗑</button>'
         +'</div>'
       +'</div>'
@@ -5390,42 +5410,46 @@ function formRenderCreacion(c){
   c.innerHTML=html;
 }
 
-function formOpenModal(id){
+function formOpenModal(id, duplicarDeId){
   if(!isSuperAdmin()) return;
   formEditingId=id||null;
   var f=id?(S.formularios||[]).find(function(x){return Number(x.id)===Number(id);}):null;
+  var fuente=f||(duplicarDeId?(S.formularios||[]).find(function(x){return Number(x.id)===Number(duplicarDeId);}):null);
+  var esDuplicado=!id&&!!duplicarDeId&&!!fuente;
   _formPregSeq=0;
   _formWorking={
-    preguntas:(f&&f.preguntas?f.preguntas:[]).map(function(p){
+    preguntas:(fuente&&fuente.preguntas?fuente.preguntas:[]).map(function(p){
       _formPregSeq++;
       return {_uid:'p'+_formPregSeq,tipo:p.tipo,texto:p.texto,opciones:(p.opciones||[]).slice()};
     }),
     destinatarios:{
-      gdv:(f&&f.destinatarios&&f.destinatarios.gdv)?{excluidos:(f.destinatarios.gdv.excluidos||[]).slice()}:null,
-      ng:(f&&f.destinatarios&&f.destinatarios.ng)?{excluidos:(f.destinatarios.ng.excluidos||[]).slice()}:null,
-      discipulado:(f&&f.destinatarios&&f.destinatarios.discipulado)?{excluidos:(f.destinatarios.discipulado.excluidos||[]).slice()}:null
+      gdv:(fuente&&fuente.destinatarios&&fuente.destinatarios.gdv)?{excluidos:(fuente.destinatarios.gdv.excluidos||[]).slice()}:null,
+      ng:(fuente&&fuente.destinatarios&&fuente.destinatarios.ng)?{excluidos:(fuente.destinatarios.ng.excluidos||[]).slice()}:null,
+      discipulado:(fuente&&fuente.destinatarios&&fuente.destinatarios.discipulado)?{excluidos:(fuente.destinatarios.discipulado.excluidos||[]).slice()}:null
     }
   };
   var propOpts='<option value="">— Sin Propósito —</option>'+(S.ministerios||[]).slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).map(function(m){
-    return '<option value="'+m.id+'"'+(f&&Number(f.propositoId)===Number(m.id)?' selected':'')+'>'+m.nombre+'</option>';
+    return '<option value="'+m.id+'"'+(fuente&&Number(fuente.propositoId)===Number(m.id)?' selected':'')+'>'+m.nombre+'</option>';
   }).join('');
+
+  var tituloInicial=esDuplicado?(String(fuente.titulo||'')+' (copia)'):(f?String(f.titulo||''):'');
 
   var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">'
-      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+(id?'Editar':'Nuevo')+' Formulario de Trabajo</div>'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79">'+(id?'Editar':esDuplicado?'Duplicar Formulario de Trabajo':'Nuevo Formulario de Trabajo')+'</div>'
       +'<button class="btn btn-sm" onclick="formCloseModal()">✕</button>'
     +'</div>'
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Título *</label>'
-    +'<input id="form-f-titulo" type="text" maxlength="80" value="'+(f?String(f.titulo||'').replace(/"/g,'&quot;'):'')+'" placeholder="Ej: Formulario semanal — 40 días" style="width:100%;margin-bottom:12px">'
+    +'<input id="form-f-titulo" type="text" maxlength="80" value="'+tituloInicial.replace(/"/g,'&quot;')+'" placeholder="Ej: Formulario semanal — 40 días" style="width:100%;margin-bottom:12px">'
 
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Propósito <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'
     +'<select id="form-f-proposito" style="width:100%;margin-bottom:12px">'+propOpts+'</select>'
 
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'
       +'<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Desde *</label>'
-        +'<input id="form-f-desde" type="date" value="'+(f&&f.fechaDesde?f.fechaDesde:'')+'" style="width:100%"></div>'
+        +'<input id="form-f-desde" type="date" value="'+(fuente&&fuente.fechaDesde?fuente.fechaDesde:'')+'" style="width:100%"></div>'
       +'<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Hasta *</label>'
-        +'<input id="form-f-hasta" type="date" value="'+(f&&f.fechaHasta?f.fechaHasta:'')+'" style="width:100%"></div>'
+        +'<input id="form-f-hasta" type="date" value="'+(fuente&&fuente.fechaHasta?fuente.fechaHasta:'')+'" style="width:100%"></div>'
     +'</div>'
 
     +'<div style="margin-bottom:14px">'
@@ -5433,6 +5457,7 @@ function formOpenModal(id){
         +'<label style="font-size:13px;font-weight:600;color:#374151">Preguntas</label>'
         +'<button class="btn btn-sm" onclick="formAddPregunta()">+ Agregar</button>'
       +'</div>'
+      +'<div style="font-size:11px;color:#9CA3AF;margin-bottom:8px">Tip: Enter dentro del texto arranca un renglón nuevo. Poné **así** algo entre doble asterisco para que se vea en <strong>negrita</strong>.</div>'
       +'<div id="form-preguntas-list"></div>'
     +'</div>'
 
@@ -5441,14 +5466,23 @@ function formOpenModal(id){
       +'<div id="form-destinatarios-wrap"></div>'
     +'</div>'
 
-    +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151;margin-bottom:16px">'
-      +'<input type="checkbox" id="form-f-activo" '+(!f||f.estado==='Activo'?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
-      +'Formulario Activo'
-    +'</label>'
+    +'<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px">'
+      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151">'
+        +'<input type="checkbox" id="form-f-activo" '+(!f||f.estado==='Activo'?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
+        +'Formulario Activo'
+      +'</label>'
+      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151">'
+        +'<input type="checkbox" id="form-f-aplica-analisis" '+(!f||f.aplicaAnalisis!==false?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
+        +'Aplica Análisis App'
+      +'</label>'
+    +'</div>'
 
-    +'<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px">'
-      +'<button class="btn" onclick="formCloseModal()">Cancelar</button>'
-      +'<button class="btn btn-primary" onclick="formSaveFormulario()">Confirmar</button>'
+    +'<div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;padding-top:4px">'
+      +'<button class="btn btn-sm" onclick="formMostrarVistaPrevia()">👁 Vista previa</button>'
+      +'<div style="display:flex;gap:8px">'
+        +'<button class="btn" onclick="formCloseModal()">Cancelar</button>'
+        +'<button class="btn btn-primary" onclick="formSaveFormulario()">Confirmar</button>'
+      +'</div>'
     +'</div>'
   +'</div>';
 
@@ -5458,11 +5492,72 @@ function formOpenModal(id){
   formRenderDestinatarios();
 }
 
+// ── Vista previa: cómo se ve el Formulario para quien lo completa (Cargar Asistencia) ──
+function formMostrarVistaPrevia(){
+  if(!_formWorking) return;
+  formSyncPreguntasFromDom();
+  var titulo=(document.getElementById('form-f-titulo')?.value||'').trim()||'(sin título)';
+  var preguntasHtml=(_formWorking.preguntas||[]).map(function(p){
+    var textoHtml=formFormatTexto(p.texto||'(pregunta sin texto)');
+    if(p.tipo==='texto_largo'){
+      return '<div style="margin-bottom:14px">'
+        +'<label style="font-size:13px;color:#374151;font-weight:600;display:block;margin-bottom:6px">'+textoHtml+'</label>'
+        +'<textarea disabled placeholder="Acá la persona escribe su respuesta..." style="width:100%;min-height:60px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;background:#F9FAFB;color:#9CA3AF;box-sizing:border-box;font-family:inherit"></textarea>'
+      +'</div>';
+    }
+    var opcionesHtml=(p.opciones||[]).map(function(op){
+      return '<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12.5px;color:#4B5563"><input type="checkbox" disabled>'+op.replace(/</g,'&lt;')+'</label>';
+    }).join('');
+    return '<div style="margin-bottom:14px">'
+      +'<label style="font-size:13px;color:#374151;font-weight:600;display:block;margin-bottom:6px">'+textoHtml+'</label>'
+      +(opcionesHtml||'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Sin opciones cargadas</div>')
+    +'</div>';
+  }).join('');
+
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">'
+      +'<div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em">👁 Así lo va a ver quien completa el Formulario</div>'
+      +'<button class="btn btn-sm" onclick="formCerrarVistaPrevia()">✕</button>'
+    +'</div>'
+    +'<div class="card" style="border-left:4px solid #7C3AED;padding:14px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
+        +'<span style="font-weight:700;font-size:15px;color:#1F4E79">📋 '+formFormatTexto(titulo)+'</span>'
+        +'<span class="badge b-muted" style="font-size:10px">Pendiente</span>'
+      +'</div>'
+      +(preguntasHtml||'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Todavía no agregaste preguntas.</div>')
+      +'<button class="btn btn-primary btn-sm" disabled style="margin-top:4px;opacity:.55;cursor:default">💾 Guardar Formulario</button>'
+    +'</div>'
+  +'</div>';
+
+  var ov=document.getElementById('form-preview-overlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='form-preview-overlay';
+    ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10500;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML=modalHtml;
+  ov.style.display='flex';
+}
+function formCerrarVistaPrevia(){
+  var ov=document.getElementById('form-preview-overlay');
+  if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+}
+
 function formCloseModal(){
   var ov=document.getElementById('form-modal-overlay');
   if(ov){ ov.style.display='none'; ov.innerHTML=''; }
   formEditingId=null;
   _formWorking=null;
+}
+
+// Formatea texto de pregunta/título para mostrar: escapa HTML primero, luego permite
+// **negrita** (doble asterisco) y respeta saltos de línea (Enter → nueva línea).
+function formFormatTexto(txt){
+  var esc=String(txt||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  esc=esc.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  esc=esc.replace(/\n/g,'<br>');
+  return esc;
 }
 
 // ── Preguntas (working array en memoria mientras el modal está abierto) ──
@@ -5483,7 +5578,7 @@ function formRenderPreguntas(){
         +'</select>'
         +'<button class="btn btn-sm btn-danger" style="margin-left:auto" onclick="formRemovePregunta(\''+p._uid+'\')">🗑</button>'
       +'</div>'
-      +'<input id="form-preg-texto-'+p._uid+'" type="text" value="'+(p.texto||'').replace(/"/g,'&quot;')+'" placeholder="Texto de la pregunta" style="width:100%'+(p.tipo==='opcion_multiple'?';margin-bottom:6px':'')+'">'
+      +'<textarea id="form-preg-texto-'+p._uid+'" rows="2" placeholder="Texto de la pregunta — Enter para bajar de renglón" style="width:100%;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box'+(p.tipo==='opcion_multiple'?';margin-bottom:6px':'')+'">'+(p.texto||'').replace(/</g,'&lt;')+'</textarea>'
       +(p.tipo==='opcion_multiple'
         ?'<input id="form-preg-opciones-'+p._uid+'" type="text" value="'+(p.opciones||[]).join(', ').replace(/"/g,'&quot;')+'" placeholder="Opciones separadas por coma" style="width:100%">'
         :'')
@@ -5540,6 +5635,7 @@ function formRenderDestinatarios(){
   function seccion(tipo,label,icon,unidades,nombreFn){
     var dest=_formWorking.destinatarios[tipo];
     var activo=!!dest;
+    var incluidas=activo?(unidades.length-(dest.excluidos||[]).length):0;
     var html='<div style="border:1px solid #E5E7EB;border-radius:8px;padding:10px;margin-bottom:8px">'
       +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#374151">'
         +'<input type="checkbox" id="form-dest-'+tipo+'-toggle" onchange="formToggleDestTipo(\''+tipo+'\')" '+(activo?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
@@ -5549,11 +5645,18 @@ function formRenderDestinatarios(){
       if(!unidades.length){
         html+='<div style="font-size:12px;color:#9CA3AF;font-style:italic;margin-top:6px">No hay ninguna activa por ahora.</div>';
       } else {
-        html+='<div style="max-height:140px;overflow-y:auto;margin-top:8px;border-top:1px solid #F3F4F6;padding-top:6px">'
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;border-top:1px solid #F3F4F6;padding-top:6px">'
+          +'<span id="form-dest-'+tipo+'-contador" style="font-size:11px;font-weight:700;color:'+(incluidas===unidades.length?'#16A34A':'#D97706')+'">✔ '+incluidas+' de '+unidades.length+' incluidas</span>'
+          +'<span style="font-size:11px">'
+            +'<span onclick="formMarcarTodasDest(\''+tipo+'\',true)" style="color:#2563EB;cursor:pointer;text-decoration:underline">Tildar todas</span>'
+            +' · <span onclick="formMarcarTodasDest(\''+tipo+'\',false)" style="color:#DC2626;cursor:pointer;text-decoration:underline">Destildar todas</span>'
+          +'</span>'
+        +'</div>'
+        +'<div style="max-height:140px;overflow-y:auto;margin-top:6px">'
           +unidades.map(function(u){
             var excluido=(dest.excluidos||[]).map(String).includes(String(u.id));
             return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:12px">'
-              +'<input type="checkbox" class="form-dest-'+tipo+'-cb" value="'+u.id+'" '+(!excluido?'checked':'')+' style="width:14px;height:14px;cursor:pointer">'
+              +'<input type="checkbox" class="form-dest-'+tipo+'-cb" onchange="formActualizarContadorDest(\''+tipo+'\')" value="'+u.id+'" '+(!excluido?'checked':'')+' style="width:14px;height:14px;cursor:pointer">'
               +nombreFn(u)
             +'</label>';
           }).join('')
@@ -5568,6 +5671,21 @@ function formRenderDestinatarios(){
     seccion('gdv','Grupos de Vida','🏘',gruposActivos,function(g){return g.name;})
     +seccion('ng','Nuevas Generaciones','🌱',comsActivas,function(cm){return cm.name;})
     +seccion('discipulado','Discipulado','📖',cursadasActivas,function(cu){return cu.label;});
+}
+
+function formMarcarTodasDest(tipo, valor){
+  document.querySelectorAll('.form-dest-'+tipo+'-cb').forEach(function(cb){cb.checked=valor;});
+  formActualizarContadorDest(tipo);
+}
+function formActualizarContadorDest(tipo){
+  var boxes=document.querySelectorAll('.form-dest-'+tipo+'-cb');
+  var total=boxes.length, marcadas=0;
+  boxes.forEach(function(cb){ if(cb.checked) marcadas++; });
+  var contador=document.getElementById('form-dest-'+tipo+'-contador');
+  if(contador){
+    contador.textContent='✔ '+marcadas+' de '+total+' incluidas';
+    contador.style.color=marcadas===total?'#16A34A':'#D97706';
+  }
 }
 
 function formToggleDestTipo(tipo){
@@ -5598,6 +5716,7 @@ async function formSaveFormulario(){
   var fechaDesde=document.getElementById('form-f-desde')?.value||'';
   var fechaHasta=document.getElementById('form-f-hasta')?.value||'';
   var activo=document.getElementById('form-f-activo')?.checked;
+  var aplicaAnalisis=document.getElementById('form-f-aplica-analisis')?.checked!==false;
 
   if(!titulo){ alert('Ingresá el Título del Formulario'); return; }
   if(!fechaDesde||!fechaHasta){ alert('Completá el rango de fechas (Desde / Hasta)'); return; }
@@ -5624,7 +5743,7 @@ async function formSaveFormulario(){
       Object.assign(fRef,{
         titulo:titulo,propositoId:propositoId?parseInt(propositoId):null,fechaDesde:fechaDesde,fechaHasta:fechaHasta,
         preguntas:preguntasFinal,destinatarios:destinatariosFinal,
-        estado:activo?'Activo':'Inactivo',_ts:Date.now()
+        estado:activo?'Activo':'Inactivo',aplicaAnalisis:aplicaAnalisis,_ts:Date.now()
       });
     }
   } else {
@@ -5632,8 +5751,8 @@ async function formSaveFormulario(){
     nuevoRef={
       id:Date.now(),titulo:titulo,propositoId:propositoId?parseInt(propositoId):null,fechaDesde:fechaDesde,fechaHasta:fechaHasta,
       preguntas:preguntasFinal,destinatarios:destinatariosFinal,
-      estado:activo?'Activo':'Inactivo',
-      creadoPor:currentUser.id,ts:new Date().toISOString(),_ts:Date.now()
+      estado:activo?'Activo':'Inactivo',aplicaAnalisis:aplicaAnalisis,
+      creadoPor:currentUser.name,ts:new Date().toISOString(),_ts:Date.now()
     };
     S.formularios.push(nuevoRef);
   }
@@ -5721,6 +5840,22 @@ function formGetRespuesta(formularioId, tipoOrigen, unidadId, semanaISO, anio){
 // Renderiza (o limpia) el bloque de Formularios aplicables dentro de la pantalla de Cargar
 // Asistencia de un módulo. wrapId es el contenedor propio de cada módulo (gdv-form-wrap,
 // ng-form-wrap, disc-form-wrap); se llama cada vez que cambia unidad o fecha.
+// Auto-capitaliza: primera letra del texto, y primera letra después de cada ". "/"! "/"? ".
+function formCapitalizarTexto(txt){
+  if(!txt) return txt;
+  var out=txt.charAt(0).toUpperCase()+txt.slice(1);
+  out=out.replace(/([.!?]\s+)([a-záéíóúñ])/gi,function(m,p1,p2){return p1+p2.toUpperCase();});
+  return out;
+}
+function formCapitalizarTextarea(el){
+  var pos=el.selectionStart, posEnd=el.selectionEnd;
+  var nuevo=formCapitalizarTexto(el.value);
+  if(nuevo!==el.value){
+    el.value=nuevo;
+    try{ el.setSelectionRange(pos,posEnd); }catch(e){}
+  }
+}
+
 function formRenderRespuestaUI(wrapId, tipoOrigen, unidadId, fecha){
   var wrap=document.getElementById(wrapId);
   if(!wrap) return;
@@ -5729,36 +5864,71 @@ function formRenderRespuestaUI(wrapId, tipoOrigen, unidadId, fecha){
   if(!aplicables.length){ wrap.innerHTML=''; return; }
   var semanaISO=getISOWeek(fecha);
   var anio=parseLocalDate(fecha).getFullYear();
+  var esSuper=isSuperAdmin();
   wrap.innerHTML=aplicables.map(function(f){
     var existing=formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio);
+    // Una vez completado, queda solo de lectura — nadie (ni el mismo Facilitador) lo puede
+    // reeditar. Solo Super Admin puede revertirlo a Pendiente si hace falta corregir algo.
+    var soloLectura=!!existing;
     var preguntasHtml=(f.preguntas||[]).map(function(p){
       var valorPrevio=existing?existing.respuestas[p.id]:null;
       if(p.tipo==='texto_largo'){
         return '<div style="margin-bottom:10px">'
-          +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+p.texto+'</label>'
-          +'<textarea id="form-resp-'+f.id+'-'+p.id+'" style="width:100%;min-height:60px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box">'+(valorPrevio||'')+'</textarea>'
+          +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+formFormatTexto(p.texto)+'</label>'
+          +'<textarea id="form-resp-'+f.id+'-'+p.id+'" '+(soloLectura?'disabled':'onblur="formCapitalizarTextarea(this)"')+' style="width:100%;min-height:60px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box'+(soloLectura?';background:#F9FAFB;color:#374151':'')+'">'+(valorPrevio||'')+'</textarea>'
         +'</div>';
       }
       var opcionesHtml=(p.opciones||[]).map(function(op){
         var checked=Array.isArray(valorPrevio)&&valorPrevio.includes(op);
-        return '<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12.5px;cursor:pointer">'
-          +'<input type="checkbox" class="form-resp-'+f.id+'-'+p.id+'-cb" value="'+op.replace(/"/g,'&quot;')+'" '+(checked?'checked':'')+' style="cursor:pointer">'+op
+        return '<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12.5px'+(soloLectura?'':';cursor:pointer')+'">'
+          +'<input type="checkbox" class="form-resp-'+f.id+'-'+p.id+'-cb" value="'+op.replace(/"/g,'&quot;')+'" '+(checked?'checked':'')+' '+(soloLectura?'disabled':'')+' style="'+(soloLectura?'':'cursor:pointer')+'">'+op
         +'</label>';
       }).join('');
       return '<div style="margin-bottom:10px">'
-        +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+p.texto+'</label>'
+        +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+formFormatTexto(p.texto)+'</label>'
         +opcionesHtml
       +'</div>';
     }).join('');
+    var pieHtml;
+    if(soloLectura){
+      pieHtml='<div style="font-size:11px;color:#9CA3AF;margin-top:4px;font-style:italic">Ya completado — no se puede editar.</div>';
+      if(esSuper){
+        pieHtml+='<button class="btn btn-sm" style="margin-top:6px;color:#D97706" onclick="formRevertirRespuestaAPendiente('+f.id+',\''+tipoOrigen+'\',\''+unidadId+'\',\''+fecha+'\')">🔓 Revertir a Pendiente (Super Admin)</button>';
+      }
+    } else {
+      pieHtml='<button class="btn btn-primary btn-sm" onclick="formGuardarRespuesta('+f.id+',\''+tipoOrigen+'\',\''+unidadId+'\',\''+fecha+'\')" style="margin-top:4px">💾 Guardar Formulario</button>';
+    }
     return '<div class="card" style="margin-top:12px;border-left:4px solid #7C3AED">'
       +'<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'
-        +'<span>📋 '+f.titulo+'</span>'
+        +'<span>📋 '+formFormatTexto(f.titulo)+'</span>'
         +(existing?'<span class="badge b-ok" style="font-size:10px">Respondido</span>':'<span class="badge b-muted" style="font-size:10px">Pendiente</span>')
       +'</div>'
       +(preguntasHtml||'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Este Formulario todavía no tiene preguntas cargadas.</div>')
-      +'<button class="btn btn-primary btn-sm" onclick="formGuardarRespuesta('+f.id+',\''+tipoOrigen+'\',\''+unidadId+'\',\''+fecha+'\')" style="margin-top:4px">💾 Guardar Formulario</button>'
+      +pieHtml
     +'</div>';
   }).join('');
+}
+
+async function formRevertirRespuestaAPendiente(formularioId, tipoOrigen, unidadId, fecha){
+  if(!isSuperAdmin()) return;
+  var semanaISO=getISOWeek(fecha), anio=parseLocalDate(fecha).getFullYear();
+  var resp=formGetRespuesta(formularioId,tipoOrigen,unidadId,semanaISO,anio);
+  if(!resp) return;
+  if(!confirm('¿Revertir esta respuesta a Pendiente?\n\nSe van a borrar las respuestas ya cargadas — la persona va a tener que completarlo de nuevo. Esta acción no se puede deshacer.')) return;
+  S.formRespuestas=(S.formRespuestas||[]).filter(function(r){return Number(r.id)!==Number(resp.id);});
+  addTombstone(SK.formRespuestas,resp.id);
+  await saveK(SK.formRespuestas,S.formRespuestas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.formRespuestas.push(resp);
+    await saveK(SK.formRespuestas,S.formRespuestas);
+    alert('No se pudo revertir. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('🔓 Revertido a Pendiente','#D97706');
+  formCloseModal();
+  if(typeof gdvRenderRegistros==='function'&&document.getElementById('gdv-registros-list')) gdvRenderRegistros();
 }
 
 async function formGuardarRespuesta(formularioId, tipoOrigen, unidadId, fecha){
@@ -5767,28 +5937,35 @@ async function formGuardarRespuesta(formularioId, tipoOrigen, unidadId, fecha){
   var semanaISO=getISOWeek(fecha);
   var anio=parseLocalDate(fecha).getFullYear();
   var respuestasObj={};
+  var faltantes=[];
   (f.preguntas||[]).forEach(function(p){
     if(p.tipo==='texto_largo'){
       var ta=document.getElementById('form-resp-'+f.id+'-'+p.id);
-      respuestasObj[p.id]=ta?ta.value.trim():'';
+      var val=ta?formCapitalizarTexto(ta.value.trim()):'';
+      respuestasObj[p.id]=val;
+      if(val.length<20) faltantes.push(p.texto);
     } else {
       var boxes=document.querySelectorAll('.form-resp-'+f.id+'-'+p.id+'-cb:checked');
       respuestasObj[p.id]=Array.from(boxes).map(function(cb){return cb.value;});
     }
   });
+  if(faltantes.length){
+    alert('Las respuestas de texto necesitan al menos 20 caracteres — no pueden quedar vacías ni muy cortas. Falta completar bien:\n\n'+faltantes.map(function(t){return '• '+(t||'').split('\n')[0];}).join('\n'));
+    return;
+  }
 
   var existing=formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio);
   var snapshot=null, esNuevo=false, nuevoRef=null, rRef;
   if(existing){
     rRef=existing;
     snapshot=JSON.parse(JSON.stringify(existing));
-    Object.assign(rRef,{respuestas:respuestasObj,completadoPor:currentUser.id,fecha:fecha,_ts:Date.now()});
+    Object.assign(rRef,{respuestas:respuestasObj,completadoPor:currentUser.name,fecha:fecha,fechaGuardado:new Date().toISOString(),_ts:Date.now()});
   } else {
     esNuevo=true;
     nuevoRef={
       id:Date.now(),formularioId:f.id,tipoOrigen:tipoOrigen,unidadId:unidadId,
       semanaISO:semanaISO,anio:anio,respuestas:respuestasObj,
-      completadoPor:currentUser.id,fecha:fecha,
+      completadoPor:currentUser.name,fecha:fecha,fechaGuardado:new Date().toISOString(),
       revisado:false,revisadoPor:null,fechaRevision:null,
       ts:new Date().toISOString(),_ts:Date.now()
     };
@@ -5808,7 +5985,13 @@ async function formGuardarRespuesta(formularioId, tipoOrigen, unidadId, fecha){
     return;
   }
   showToast('✅ Formulario guardado','#16A34A');
-  // Re-renderizar para mostrar el tag "Respondido" actualizado
+  // Si se completó desde el modal de Registros, cerrarlo y refrescar la lista para que el
+  // indicador pase de "Pendiente" a "Completado" al instante. Por ahora el indicador solo
+  // existe en Registros de GdV.
+  var completarWrap=document.getElementById('form-completar-registro-wrap');
+  if(completarWrap) formCloseModal();
+  if(typeof gdvRenderRegistros==='function'&&document.getElementById('gdv-registros-list')) gdvRenderRegistros();
+  // Re-renderizar por si quedara algo (ya no debería mostrar nada — ver nota en gdvSyncFormularioUI)
   if(tipoOrigen==='gdv'&&typeof gdvSyncFormularioUI==='function') gdvSyncFormularioUI();
   else if(tipoOrigen==='ng'&&typeof ngSyncFormularioUI==='function') ngSyncFormularioUI();
   else if(tipoOrigen==='discipulado'&&typeof discSyncFormularioUI==='function') discSyncFormularioUI();
@@ -5883,6 +6066,26 @@ function formEstadoAgregadoSemana(formulario, semanaISO, anio){
   return {estado:estado,respondieron:respondieron,total:unidades.length};
 }
 
+// Una semana "gradúa" de Activos a (solo) Histórico cuando TODAS las unidades que ampara están
+// Completadas Y Revisadas (los "Sin Encuentro" quedan exceptuados del Revisado, no hay nada que
+// revisar ahí), Y además el Análisis App de esa semana también está Revisado por el Líder de
+// Propósito. Mientras no gradúe, sigue viéndose en Activos aunque ya esté 100% completada —
+// necesita el visto bueno de Revisado para dejar de pedir atención ahí.
+function formSemanaGraduada(f, semanaISO, anio){
+  var unidades=formTodasUnidadesIncluidas(f);
+  if(!unidades.length) return false;
+  var todasOk=unidades.every(function(u){
+    var asistInfo=formModuloAsistenciaInfo(u.tipoOrigen,u.id,semanaISO,anio);
+    if(asistInfo.sinEncuentro) return true; // exceptuado del Revisado
+    var resp=formGetRespuesta(f.id,u.tipoOrigen,u.id,semanaISO,anio);
+    return !!(resp&&resp.revisado);
+  });
+  if(!todasOk) return false;
+  if(f.aplicaAnalisis===false) return true; // este Formulario no usa Análisis App — no hace falta para graduar
+  var an=formGetAnalisis(f.id,semanaISO,anio);
+  return !!(an&&an.revisadoLider);
+}
+
 // Lista de semanas ISO (lunes a domingo) entre fechaDesde y fechaHasta, nunca más allá de la
 // última semana permitida de carga (misma ventana que limiteFechaCarga().max).
 function formSemanasDelRango(fechaDesde, fechaHasta){
@@ -5939,17 +6142,23 @@ function formRenderActivos(c){
   var labelMap={pendiente:'Pendiente',en_curso:'En Curso',completado:'Completado'};
   var html='';
   activos.forEach(function(f){
-    var semanas=formSemanasDelRango(f.fechaDesde,f.fechaHasta).sort(function(a,b){return b.lunes.localeCompare(a.lunes);});
-    html+='<div style="margin-bottom:1.5rem">'
-      +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:8px">📋 '+f.titulo+'</div>';
-    if(!semanas.length){
+    var todasLasSemanas=formSemanasDelRango(f.fechaDesde,f.fechaHasta);
+    var semanas=todasLasSemanas.filter(function(w){return !formSemanaGraduada(f,w.semanaISO,w.anio);})
+      .sort(function(a,b){return b.lunes.localeCompare(a.lunes);});
+    var prop=(S.ministerios||[]).find(function(m){return Number(m.id)===Number(f.propositoId);});
+    html+='<div class="card" style="margin-bottom:1.25rem;padding:14px">'
+      +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:10px">📋 '+f.titulo+'</div>';
+    if(!todasLasSemanas.length){
       html+='<div class="empty" style="padding:1rem">Todavía no arrancó ninguna semana de este Formulario.</div>';
+    } else if(!semanas.length){
+      html+='<div class="empty" style="padding:1rem;color:#16A34A">✅ Todas las semanas están Completadas y Revisadas — quedan solo en Histórico.</div>';
     } else {
       semanas.forEach(function(w){
         var agg=formEstadoAgregadoSemana(f,w.semanaISO,w.anio);
-        html+='<div class="card" style="margin-bottom:.6rem;padding:12px;border-left:4px solid '+colorMap[agg.estado]+';cursor:pointer" onclick="formOpenSemanaDetalle('+f.id+','+w.semanaISO+','+w.anio+')">'
+        html+='<div style="border:1px solid #E5E7EB;border-left:4px solid '+colorMap[agg.estado]+';border-radius:8px;padding:10px 12px;margin-bottom:.5rem;cursor:pointer" onclick="formOpenSemanaDetalle('+f.id+','+w.semanaISO+','+w.anio+')">'
           +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
             +'<span style="font-size:13px;font-weight:600">Semana '+w.semanaISO+' ('+fmtAA(w.lunes)+' al '+fmtAA(w.domingo)+')</span>'
+            +(prop?'<span style="font-size:11px;color:#7C3AED;font-weight:600">Propósito: '+prop.nombre+'</span>':'')
             +'<span class="badge" style="background:'+colorMap[agg.estado]+'22;color:'+colorMap[agg.estado]+'">'+labelMap[agg.estado]+' — '+agg.respondieron+'/'+agg.total+'</span>'
           +'</div>'
         +'</div>';
@@ -5975,7 +6184,7 @@ function formRenderHistorico(c){
   var opts=todos.map(function(f){
     return '<option value="'+f.id+'"'+(Number(f.id)===Number(formHistSelectedId)?' selected':'')+'>'+f.titulo+(f.estado==='Inactivo'?' (Inactivo)':'')+'</option>';
   }).join('');
-  c.innerHTML='<div style="margin-bottom:1rem"><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Formulario</label>'
+  c.innerHTML='<div style="margin-bottom:1rem"><label style="font-size:12px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);display:block;margin-bottom:4px">Formulario</label>'
     +'<select id="form-hist-sel" onchange="formHistCambiarSeleccion(this.value)" style="width:100%;max-width:360px">'+opts+'</select></div>'
     +'<div id="form-hist-detalle"></div>';
   formRenderHistoricoDetalle(formHistSelectedId);
@@ -5998,12 +6207,14 @@ function formRenderHistoricoDetalle(formularioId){
   }
   var colorMap={pendiente:'#9CA3AF',en_curso:'#D97706',completado:'#16A34A'};
   var labelMap={pendiente:'Pendiente',en_curso:'En Curso',completado:'Completado'};
+  var prop=(S.ministerios||[]).find(function(m){return Number(m.id)===Number(f.propositoId);});
   var html='';
   semanas.forEach(function(w){
     var agg=formEstadoAgregadoSemana(f,w.semanaISO,w.anio);
     html+='<div class="card" style="margin-bottom:.6rem;padding:12px;border-left:4px solid '+colorMap[agg.estado]+';cursor:pointer" onclick="formOpenSemanaDetalle('+f.id+','+w.semanaISO+','+w.anio+')">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
         +'<span style="font-size:13px;font-weight:600">Semana '+w.semanaISO+' ('+fmtAA(w.lunes)+' al '+fmtAA(w.domingo)+')</span>'
+        +(prop?'<span style="font-size:11px;color:#7C3AED;font-weight:600">Propósito: '+prop.nombre+'</span>':'')
         +'<span class="badge" style="background:'+colorMap[agg.estado]+'22;color:'+colorMap[agg.estado]+'">'+labelMap[agg.estado]+' — '+agg.respondieron+'/'+agg.total+'</span>'
       +'</div>'
     +'</div>';
@@ -6011,39 +6222,50 @@ function formRenderHistoricoDetalle(formularioId){
   wrap.innerHTML=html;
 }
 
-function formOpenSemanaDetalle(formularioId, semanaISO, anio){
+var formDetalleExpandido={}; // qué filas de unidad están desplegadas — clave: tipoOrigen+'-'+unidadId
+var formAnalisisEditando={}; // qué Análisis App puso Super Admin en modo edición — clave: 'analisis-'+formularioId+'-'+semanaISO+'-'+anio
+var formDetalleActual=null; // {formularioId,semanaISO,anio} del detalle de semana actualmente abierto
+
+function formOpenSemanaDetalle(formularioId, semanaISO, anio, manteniendoEstado){
   var f=(S.formularios||[]).find(function(x){return Number(x.id)===Number(formularioId);});
   if(!f) return;
+  if(!manteniendoEstado) formDetalleExpandido={};
+  formDetalleActual={formularioId:formularioId,semanaISO:semanaISO,anio:anio};
   var unidades=formTodasUnidadesIncluidas(f);
   var esSuper=isSuperAdmin();
   var iconMap={gdv:'🏘',ng:'🌱',discipulado:'📖'};
   var colorMap={completo:'#16A34A',parcial:'#D97706',pendiente:'#9CA3AF'};
   var rowsHtml=unidades.map(function(u){
+    var key=u.tipoOrigen+'-'+u.id;
     var asistInfo=formModuloAsistenciaInfo(u.tipoOrigen,u.id,semanaISO,anio);
     var resp=formGetRespuesta(f.id,u.tipoOrigen,u.id,semanaISO,anio);
     var est=formEstadoUnidadSemana(f.id,u.tipoOrigen,u.id,semanaISO,anio);
     var labelMap={completo:asistInfo.sinEncuentro?'⏸ Sin Encuentro':'✅ Completo',parcial:'◐ Parcial',pendiente:'○ Pendiente'};
+    var abierto=!!formDetalleExpandido[key];
+    var tieneQueVer=!!resp; // solo hay algo para desplegar si respondieron el Formulario
     var detalleHtml='';
-    if(resp){
+    if(resp&&abierto){
       detalleHtml='<div style="margin-top:6px;padding-left:8px;border-left:2px solid #E5E7EB">'
         +(f.preguntas||[]).map(function(p){
           var val=resp.respuestas?resp.respuestas[p.id]:null;
           var valStr=Array.isArray(val)?(val.join(', ')||'—'):(val||'—');
-          return '<div style="font-size:11.5px;margin-bottom:4px"><strong style="color:#4B5563">'+p.texto+':</strong> <span style="color:#6B7280">'+valStr+'</span></div>';
+          return '<div style="font-size:11.5px;margin-bottom:4px"><strong style="color:#4B5563">'+formFormatTexto(p.texto)+':</strong> <span style="color:#6B7280">'+formFormatTexto(valStr)+'</span></div>';
         }).join('');
-      if(esSuper){
-        detalleHtml+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6B7280;margin-top:4px;cursor:pointer">'
-          +'<input type="checkbox" '+(resp.revisado?'checked':'')+' onchange="formToggleRevisado('+resp.id+',this)">Revisado'
-        +'</label>';
-      } else if(resp.revisado){
-        detalleHtml+='<div style="font-size:10.5px;color:#16A34A;margin-top:4px">✓ Revisado</div>';
+      detalleHtml+='<div style="font-size:10px;color:#9CA3AF;margin-top:6px">✍️ Completado por '+(resp.completadoPor||'—')+' · '+fmtFechaHora(resp.fechaGuardado||resp.ts)+'</div>';
+      if(resp.revisado){
+        detalleHtml+='<div style="font-size:10px;color:#16A34A;margin-top:2px">✓ Revisado por '+(resp.revisadoPor||'—')+' · '+fmtFechaHora(resp.fechaRevision)+'</div>';
+        if(esSuper){
+          detalleHtml+='<button class="btn btn-sm" style="margin-top:6px" onclick="event.stopPropagation();formToggleRevisado('+resp.id+')">↩️ Deshacer Revisado</button>';
+        }
+      } else if(esSuper){
+        detalleHtml+='<button class="btn btn-sm btn-primary" style="margin-top:6px" onclick="event.stopPropagation();formToggleRevisado('+resp.id+')">✅ Marcar Revisado</button>';
       }
       detalleHtml+='</div>';
     }
     return '<div style="border:1px solid #E5E7EB;border-radius:8px;padding:10px;margin-bottom:8px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
-        +'<span style="font-size:13px;font-weight:600">'+iconMap[u.tipoOrigen]+' '+u.nombre+'</span>'
-        +'<span style="font-size:11px;font-weight:700;color:'+colorMap[est]+'">'+labelMap[est]+'</span>'
+      +'<div'+(tieneQueVer?' onclick="formToggleDetalleUnidad(\''+key+'\','+f.id+','+semanaISO+','+anio+')" style="cursor:pointer"':'')+' style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
+        +'<span style="font-size:13px;font-weight:600">'+iconMap[u.tipoOrigen]+' '+u.nombre+(tieneQueVer?(abierto?' ▲':' ▼'):'')+'</span>'
+        +'<span style="font-size:11px;font-weight:700;color:'+colorMap[est]+'">'+labelMap[est]+(resp&&resp.revisado?' · ✓':'')+'</span>'
       +'</div>'
       +detalleHtml
     +'</div>';
@@ -6058,25 +6280,193 @@ function formOpenSemanaDetalle(formularioId, semanaISO, anio){
       +'</div>'
     +'</div>'
     +(rowsHtml||'<div class="empty">No hay unidades incluidas.</div>')
-    +formAnalisisSectionHtml(f.id,semanaISO,anio)
+    +formAnalisisSectionHtml(f,semanaISO,anio)
   +'</div>';
   document.getElementById('form-modal-overlay').innerHTML=modalHtml;
   document.getElementById('form-modal-overlay').style.display='flex';
 }
 
-function formAnalisisSectionHtml(formularioId, semanaISO, anio){
-  var esSuper=isSuperAdmin();
-  var an=formGetAnalisis(formularioId,semanaISO,anio);
-  var texto=an?an.texto:'';
-  return '<div style="margin-top:16px;border-top:1px solid #E5E7EB;padding-top:12px">'
-    +'<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">🧠 Análisis App'
-      +(an&&an.estado==='Completado'?' <span class="badge b-ok" style="font-size:10px">Completado</span>':' <span class="badge b-muted" style="font-size:10px">Pendiente</span>')
+function formToggleDetalleUnidad(key, formularioId, semanaISO, anio){
+  formDetalleExpandido[key]=!formDetalleExpandido[key];
+  formOpenSemanaDetalle(formularioId,semanaISO,anio,true);
+}
+
+// Formatea una fecha ISO (con hora) a algo legible tipo "08/08/26 14:35"; si solo hay fecha
+// (sin hora, formato antiguo), cae a fmtAA.
+function fmtFechaHora(iso){
+  if(!iso) return '—';
+  var d=new Date(iso);
+  if(isNaN(d.getTime())) return fmtAA(iso);
+  var dd=String(d.getDate()).padStart(2,'0'), mm=String(d.getMonth()+1).padStart(2,'0'), yy=String(d.getFullYear()).slice(-2);
+  var hh=String(d.getHours()).padStart(2,'0'), mi=String(d.getMinutes()).padStart(2,'0');
+  return dd+'/'+mm+'/'+yy+' '+hh+':'+mi;
+}
+
+// ── Indicador de Formulario en la lista de Registros (GdV/NG/Discipulado) ──
+// Rojo "Formulario Pendiente" (solo visual) · Verde "Formulario Completado" (clickeable, ve
+// preguntas y respuestas) · Negro "Semana Sin Formulario" (no aplica ninguno esa semana).
+// El overlay #form-modal-overlay vive en el HTML del módulo Formularios de Trabajo — si se
+// abre un modal de Formulario desde OTRO módulo (ej: el indicador en Registros de GdV), ese
+// contenedor no existe todavía en el DOM. Esta función lo crea al vuelo, colgado directo de
+// <body>, para que funcione sin importar qué pantalla esté abierta.
+function formEnsureModalOverlay(){
+  var ov=document.getElementById('form-modal-overlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='form-modal-overlay';
+    ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;-webkit-overflow-scrolling:touch';
+    document.body.appendChild(ov);
+  }
+  return ov;
+}
+
+function gdvFormularioBadgeHtml(grupoId, fecha){
+  if(typeof formFormulariosAplicables!=='function') return '';
+  var aplicables=formFormulariosAplicables('gdv',grupoId,fecha);
+  if(!aplicables.length){
+    return '<span style="font-size:11px;font-weight:700;color:#111827">Semana Sin Formulario</span>';
+  }
+  var semanaISO=getISOWeek(fecha), anio=parseLocalDate(fecha).getFullYear();
+  var todosCompletos=aplicables.every(function(f){ return !!formGetRespuesta(f.id,'gdv',grupoId,semanaISO,anio); });
+  if(todosCompletos){
+    return '<span onclick="event.stopPropagation();formVerRespuestasUnidad(\'gdv\','+grupoId+',\''+fecha+'\')" style="font-size:11px;font-weight:700;color:#16A34A;cursor:pointer;text-decoration:underline">✅ Formulario Completado</span>';
+  }
+  return '<span onclick="event.stopPropagation();formAbrirCompletarDesdeRegistro(\'gdv\','+grupoId+',\''+fecha+'\')" style="font-size:11px;font-weight:700;color:#DC2626;cursor:pointer;text-decoration:underline">⚠️ Formulario Pendiente</span>';
+}
+
+// Completar el Formulario aparte de Cargar Asistencia (a pedido — la carga de Asistencia debe
+// quedar rápida y no obligar a completar el Formulario en el momento). Se accede tocando
+// "Formulario Pendiente" en Registros; reutiliza el mismo bloque de preguntas/respuestas que
+// antes vivía embebido en Cargar Asistencia, ahora en un modal aparte.
+function formAbrirCompletarDesdeRegistro(tipoOrigen, unidadId, fecha){
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.25rem;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'
+      +'<div style="font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.03em">📋 Completar Formulario — '+fmtAA(fecha)+'</div>'
+      +'<button class="btn btn-sm" onclick="formCloseModal()">✕</button>'
     +'</div>'
-    +(esSuper
-      ?'<textarea id="form-analisis-texto" style="width:100%;min-height:90px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:12.5px;font-family:inherit;box-sizing:border-box" placeholder="Pegá acá el análisis generado en el chat con Claude sobre los Formularios de esta semana...">'+(texto||'')+'</textarea>'
-        +'<button class="btn btn-primary btn-sm" onclick="formGuardarAnalisis('+formularioId+','+semanaISO+','+anio+')" style="margin-top:6px">💾 Guardar Análisis</button>'
-      :(texto?'<div style="font-size:12.5px;color:#4B5563;white-space:pre-wrap">'+texto+'</div>':'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Todavía no hay Análisis cargado para esta semana.</div>'))
+    +'<div id="form-completar-registro-wrap"></div>'
   +'</div>';
+  formEnsureModalOverlay().innerHTML=modalHtml;
+  formEnsureModalOverlay().style.display='flex';
+  formRenderRespuestaUI('form-completar-registro-wrap',tipoOrigen,unidadId,fecha);
+}
+
+// Popup liviano: ve las preguntas/respuestas de UNA unidad puntual para una fecha — usado desde
+// el indicador de Formulario en Registros (evita reabrir el detalle de semana completo con
+// todas las unidades, que es para Activos/Histórico).
+function formVerRespuestasUnidad(tipoOrigen, unidadId, fecha){
+  var semanaISO=getISOWeek(fecha), anio=parseLocalDate(fecha).getFullYear();
+  var aplicables=formFormulariosAplicables(tipoOrigen,unidadId,fecha);
+  if(!aplicables.length) return;
+  var html=aplicables.map(function(f){
+    var resp=formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio);
+    var cuerpo=resp
+      ?(f.preguntas||[]).map(function(p){
+          var val=resp.respuestas?resp.respuestas[p.id]:null;
+          var valStr=Array.isArray(val)?(val.join(', ')||'—'):(val||'—');
+          return '<div style="font-size:12px;margin-bottom:6px"><strong style="color:#4B5563">'+formFormatTexto(p.texto)+':</strong> <span style="color:#6B7280">'+formFormatTexto(valStr)+'</span></div>';
+        }).join('')
+      :'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Todavía no se respondió.</div>';
+    var meta=resp?('<div style="font-size:10px;color:#9CA3AF;margin-top:6px">✍️ Completado por '+(resp.completadoPor||'—')+' · '+fmtFechaHora(resp.fechaGuardado||resp.ts)
+      +(resp.revisado?' · ✓ Revisado por '+(resp.revisadoPor||'—')+' · '+fmtFechaHora(resp.fechaRevision):'')+'</div>'):'';
+    return '<div class="card" style="margin-bottom:10px;border-left:4px solid #7C3AED;padding:12px">'
+      +'<div style="font-weight:700;color:#1F4E79;margin-bottom:8px">📋 '+f.titulo+'</div>'
+      +cuerpo+meta
+    +'</div>';
+  }).join('');
+
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">'
+      +'<div style="font-size:14px;font-weight:700;color:#1F4E79">Formulario — Semana '+semanaISO+'</div>'
+      +'<button class="btn btn-sm" onclick="formCloseModal()">✕</button>'
+    +'</div>'
+    +html
+  +'</div>';
+  formEnsureModalOverlay().innerHTML=modalHtml;
+  formEnsureModalOverlay().style.display='flex';
+}
+
+
+function formAnalisisSectionHtml(f, semanaISO, anio){
+  if(f.aplicaAnalisis===false) return ''; // el Formulario no usa Análisis App
+  var esSuper=isSuperAdmin();
+  var an=formGetAnalisis(f.id,semanaISO,anio);
+  var texto=an?an.texto:'';
+  var hayContenido=!!(an&&an.texto);
+  // Oculto por completo para quien no sea Super Admin hasta que Super Admin haya cargado algo
+  if(!esSuper&&!hayContenido) return '';
+
+  var puedeRevisar=formPuedeRevisarAnalisis(f);
+  var key='analisis-'+f.id+'-'+semanaISO+'-'+anio;
+  var abierto=!!formDetalleExpandido[key];
+  var editando=esSuper&&!!formAnalisisEditando[key];
+
+  var headerHtml='<div'+(hayContenido?' onclick="formToggleAnalisisDetalle(\''+key+'\','+f.id+','+semanaISO+','+anio+')" style="cursor:pointer;':' style="'
+    )+'display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'
+    +'<span style="font-size:13px;font-weight:600;color:#374151">🧠 Análisis App'+(hayContenido?(abierto?' ▲':' ▼'):'')+'</span>'
+    +'<span>'
+      +(hayContenido?'<span class="badge b-ok" style="font-size:10px">Completado</span>':'<span class="badge b-muted" style="font-size:10px">Pendiente</span>')
+      +(an&&an.revisadoLider?' <span class="badge b-ok" style="font-size:10px">✓ Revisado</span>':'')
+    +'</span>'
+  +'</div>';
+
+  var cuerpo='';
+  if(!hayContenido){
+    // Todavía no se cargó nada — solo Super Admin ve esto, siempre a la vista (no tiene sentido
+    // colapsar el único formulario para cargarlo por primera vez).
+    cuerpo='<textarea id="form-analisis-texto" style="width:100%;min-height:90px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:12.5px;font-family:inherit;box-sizing:border-box;margin-top:8px" placeholder="Pegá acá el análisis generado en el chat con Claude sobre los Formularios de esta semana...">'+(texto||'')+'</textarea>'
+      +'<button class="btn btn-primary btn-sm" onclick="formGuardarAnalisis('+f.id+','+semanaISO+','+anio+')" style="margin-top:6px">💾 Guardar Análisis</button>';
+  } else if(abierto){
+    if(editando){
+      cuerpo='<textarea id="form-analisis-texto" style="width:100%;min-height:90px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:12.5px;font-family:inherit;box-sizing:border-box;margin-top:8px">'+(texto||'')+'</textarea>'
+        +'<div style="display:flex;gap:8px;margin-top:6px">'
+          +'<button class="btn btn-sm" onclick="event.stopPropagation();formCancelarEdicionAnalisis(\''+key+'\','+f.id+','+semanaISO+','+anio+')">Cancelar</button>'
+          +'<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();formGuardarAnalisis('+f.id+','+semanaISO+','+anio+')">💾 Guardar cambios</button>'
+        +'</div>';
+    } else {
+      cuerpo='<div style="font-size:12.5px;color:#4B5563;white-space:pre-wrap;margin-top:8px">'+texto+'</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">';
+      if(an&&an.revisadoLider){
+        cuerpo+='<span style="font-size:10.5px;color:#16A34A">✓ Revisado por '+(an.revisadoLiderPor||'—')+' · '+fmtFechaHora(an.fechaRevisadoLider)+'</span>';
+        if(esSuper){
+          cuerpo+='<button class="btn btn-sm" onclick="event.stopPropagation();formDeshacerAnalisisRevisado('+f.id+','+semanaISO+','+anio+')">↩️ Deshacer Revisado</button>';
+        }
+      } else if(puedeRevisar){
+        cuerpo+='<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();formMarcarAnalisisRevisadoLider('+f.id+','+semanaISO+','+anio+')">✅ Marcar Revisado</button>';
+      }
+      if(esSuper){
+        cuerpo+='<button class="btn btn-sm" onclick="event.stopPropagation();formEditarAnalisis(\''+key+'\','+f.id+','+semanaISO+','+anio+')">✏️ Editar</button>';
+      }
+      cuerpo+='</div>';
+    }
+  }
+
+  return '<div style="margin-top:16px;border-top:1px solid #E5E7EB;padding-top:12px">'
+    +headerHtml
+    +cuerpo
+  +'</div>';
+}
+
+function formToggleAnalisisDetalle(key, formularioId, semanaISO, anio){
+  formDetalleExpandido[key]=!formDetalleExpandido[key];
+  formOpenSemanaDetalle(formularioId,semanaISO,anio,true);
+}
+function formEditarAnalisis(key, formularioId, semanaISO, anio){
+  if(!isSuperAdmin()) return;
+  formAnalisisEditando[key]=true;
+  formOpenSemanaDetalle(formularioId,semanaISO,anio,true);
+}
+function formCancelarEdicionAnalisis(key, formularioId, semanaISO, anio){
+  formAnalisisEditando[key]=false;
+  formOpenSemanaDetalle(formularioId,semanaISO,anio,true);
+}
+
+// Puede marcar el Análisis como Revisado: Super Admin, Pastor, o el Líder del Propósito
+// asignado a este Formulario (mismo criterio que ya usamos para el scope de Activos/Histórico).
+function formPuedeRevisarAnalisis(f){
+  if(isSuperAdmin()||hasRole('pastor')) return true;
+  if(!f||!f.propositoId) return false;
+  return formPropositosLiderados().map(Number).includes(Number(f.propositoId));
 }
 
 function formGetAnalisis(formularioId, semanaISO, anio){
@@ -6087,33 +6477,88 @@ function formGetAnalisis(formularioId, semanaISO, anio){
 
 async function formGuardarAnalisis(formularioId, semanaISO, anio){
   if(!isSuperAdmin()) return;
-  var ta=document.getElementById('form-analisis-texto');
-  var texto=(ta?ta.value:'').trim();
-  var existing=formGetAnalisis(formularioId,semanaISO,anio);
-  var snapshot=null, esNuevo=false, nuevoRef=null, aRef;
-  if(existing){
-    aRef=existing;
-    snapshot=JSON.parse(JSON.stringify(existing));
-    Object.assign(aRef,{texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.id,ts:new Date().toISOString()});
-  } else {
-    esNuevo=true;
-    nuevoRef={id:Date.now(),formularioId:formularioId,semanaISO:semanaISO,anio:anio,texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.id,ts:new Date().toISOString()};
-    S.formAnalisis.push(nuevoRef);
+  try{
+    var ta=document.getElementById('form-analisis-texto');
+    if(!ta){ alert('No se encontró el campo de Análisis — cerrá y volvé a abrir el detalle de la semana.'); return; }
+    var texto=ta.value.trim();
+    var existing=formGetAnalisis(formularioId,semanaISO,anio);
+    var snapshot=null, esNuevo=false, nuevoRef=null, aRef;
+    if(existing){
+      aRef=existing;
+      snapshot=JSON.parse(JSON.stringify(existing));
+      Object.assign(aRef,{texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.name,ts:new Date().toISOString(),_ts:Date.now()});
+    } else {
+      esNuevo=true;
+      nuevoRef={id:Date.now(),formularioId:formularioId,semanaISO:semanaISO,anio:anio,texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.name,
+        revisadoLider:false,revisadoLiderPor:null,fechaRevisadoLider:null,ts:new Date().toISOString(),_ts:Date.now()};
+      S.formAnalisis.push(nuevoRef);
+    }
+    await saveK(SK.formAnalisis,S.formAnalisis);
+    try{
+      if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    }catch(e){
+      if(esNuevo){
+        S.formAnalisis=S.formAnalisis.filter(function(x){return x!==nuevoRef;});
+      } else if(aRef&&snapshot){
+        Object.assign(aRef,snapshot);
+      }
+      await saveK(SK.formAnalisis,S.formAnalisis);
+      alert('No se pudo guardar el Análisis en la nube. Verificá tu conexión e intentá de nuevo.');
+      return;
+    }
+    showToast('✅ Análisis guardado','#16A34A');
+    formAnalisisEditando['analisis-'+formularioId+'-'+semanaISO+'-'+anio]=false;
+    formOpenSemanaDetalle(formularioId,semanaISO,anio,true); // refrescar in-place (mantiene lo expandido)
+  }catch(errGeneral){
+    alert('Ocurrió un error inesperado al guardar el Análisis: '+(errGeneral&&errGeneral.message?errGeneral.message:errGeneral));
   }
+}
+
+async function formMarcarAnalisisRevisadoLider(formularioId, semanaISO, anio){
+  var f=(S.formularios||[]).find(function(x){return Number(x.id)===Number(formularioId);});
+  if(!f||!formPuedeRevisarAnalisis(f)) return;
+  var an=formGetAnalisis(formularioId,semanaISO,anio);
+  if(!an) return;
+  var snapshot={revisadoLider:an.revisadoLider,revisadoLiderPor:an.revisadoLiderPor,fechaRevisadoLider:an.fechaRevisadoLider,_ts:an._ts};
+  an.revisadoLider=true;
+  an.revisadoLiderPor=currentUser.name;
+  an.fechaRevisadoLider=new Date().toISOString();
+  an._ts=Date.now();
   await saveK(SK.formAnalisis,S.formAnalisis);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    if(esNuevo){
-      S.formAnalisis=S.formAnalisis.filter(function(x){return x!==nuevoRef;});
-    } else if(aRef&&snapshot){
-      Object.assign(aRef,snapshot);
-    }
+    Object.assign(an,snapshot);
     await saveK(SK.formAnalisis,S.formAnalisis);
-    alert('No se pudo guardar el Análisis en la nube. Verificá tu conexión e intentá de nuevo.');
+    alert('No se pudo guardar. Verificá tu conexión e intentá de nuevo.');
     return;
   }
-  showToast('✅ Análisis guardado','#16A34A');
+  showToast('✅ Análisis revisado','#16A34A');
+  formOpenSemanaDetalle(formularioId,semanaISO,anio,true);
+}
+
+// Deshacer el Revisado del Análisis App — exclusivo Super Admin (a diferencia de marcarlo, que
+// también pueden hacerlo Líderes de Propósito y Pastores).
+async function formDeshacerAnalisisRevisado(formularioId, semanaISO, anio){
+  if(!isSuperAdmin()) return;
+  var an=formGetAnalisis(formularioId,semanaISO,anio);
+  if(!an||!an.revisadoLider) return;
+  var snapshot={revisadoLider:an.revisadoLider,revisadoLiderPor:an.revisadoLiderPor,fechaRevisadoLider:an.fechaRevisadoLider,_ts:an._ts};
+  an.revisadoLider=false;
+  an.revisadoLiderPor=null;
+  an.fechaRevisadoLider=null;
+  an._ts=Date.now();
+  await saveK(SK.formAnalisis,S.formAnalisis);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(an,snapshot);
+    await saveK(SK.formAnalisis,S.formAnalisis);
+    alert('No se pudo guardar. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('↩️ Revisión deshecha','#D97706');
+  formOpenSemanaDetalle(formularioId,semanaISO,anio,true);
 }
 
 function formExportarSemana(formularioId, semanaISO, anio){
@@ -6139,39 +6584,81 @@ function formExportarSemana(formularioId, semanaISO, anio){
     }
     lineas.push('');
   });
-  var texto=lineas.join('\n');
+  var texto=lineas.join('\n').replace(/\*\*(.+?)\*\*/g,'*$1*');
+
+  // En vez de depender solo del portapapeles (que en varios navegadores/celulares queda
+  // bloqueado o directamente no anda), siempre se muestra el texto en pantalla, seleccionable
+  // a mano, con un botón que INTENTA copiarlo directo como atajo.
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.25rem;width:100%;max-width:460px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-shrink:0">'
+      +'<div style="font-size:14px;font-weight:700;color:#1F4E79">📋 Resumen de la semana</div>'
+      +'<button class="btn btn-sm" onclick="formCerrarExportOverlay()">✕</button>'
+    +'</div>'
+    +'<textarea id="form-export-texto" readonly onclick="this.select()" style="flex:1;min-height:220px;width:100%;padding:10px;border:1px solid #E5E7EB;border-radius:8px;font-size:12.5px;font-family:inherit;box-sizing:border-box;resize:vertical">'+texto.replace(/</g,'&lt;')+'</textarea>'
+    +'<div style="font-size:11px;color:#9CA3AF;margin:6px 0 10px;flex-shrink:0">Tocá el texto para seleccionarlo todo, o usá el botón para copiarlo directo.</div>'
+    +'<button class="btn btn-primary" style="flex-shrink:0" onclick="formCopiarExportTexto()">📋 Copiar al portapapeles</button>'
+  +'</div>';
+
+  var ov=document.getElementById('form-export-overlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='form-export-overlay';
+    ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10600;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML=modalHtml;
+  ov.style.display='flex';
+}
+function formCerrarExportOverlay(){
+  var ov=document.getElementById('form-export-overlay');
+  if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+}
+function formCopiarExportTexto(){
+  var ta=document.getElementById('form-export-texto');
+  if(!ta) return;
+  ta.focus();
+  ta.select();
+  try{ ta.setSelectionRange(0,999999); }catch(e){}
+  var hecho=false;
+  try{
+    if(document.execCommand) hecho=document.execCommand('copy');
+  }catch(e){ hecho=false; }
+  if(hecho){
+    showToast('📋 Copiado','#16A34A');
+    return;
+  }
   if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(texto).then(function(){
-      showToast('📋 Resumen de la semana copiado','#16A34A');
+    navigator.clipboard.writeText(ta.value).then(function(){
+      showToast('📋 Copiado','#16A34A');
     }).catch(function(){
-      prompt('Copiá manualmente:', texto);
+      showToast('No se pudo copiar solo — el texto ya está seleccionado, copialo con el celular/teclado','#D97706');
     });
   } else {
-    prompt('Copiá manualmente:', texto);
+    showToast('No se pudo copiar solo — el texto ya está seleccionado, copialo con el celular/teclado','#D97706');
   }
 }
 
-async function formToggleRevisado(respuestaId, checkboxEl){
+async function formToggleRevisado(respuestaId){
   if(!isSuperAdmin()) return;
   var r=(S.formRespuestas||[]).find(function(x){return Number(x.id)===Number(respuestaId);});
   if(!r) return;
-  var snapshot={revisado:r.revisado,revisadoPor:r.revisadoPor,fechaRevision:r.fechaRevision};
+  var snapshot={revisado:r.revisado,revisadoPor:r.revisadoPor,fechaRevision:r.fechaRevision,_ts:r._ts};
   var nuevoValor=!r.revisado;
   r.revisado=nuevoValor;
-  r.revisadoPor=nuevoValor?currentUser.id:null;
-  r.fechaRevision=nuevoValor?today():null;
+  r.revisadoPor=nuevoValor?currentUser.name:null;
+  r.fechaRevision=nuevoValor?new Date().toISOString():null;
   r._ts=Date.now();
   await saveK(SK.formRespuestas,S.formRespuestas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     Object.assign(r,snapshot);
-    if(checkboxEl) checkboxEl.checked=snapshot.revisado;
     await saveK(SK.formRespuestas,S.formRespuestas);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
   showToast(nuevoValor?'✓ Marcado como Revisado':'Revisión deshecha','#16A34A');
+  if(formDetalleActual) formOpenSemanaDetalle(formDetalleActual.formularioId,formDetalleActual.semanaISO,formDetalleActual.anio,true);
 }
 
 function buildEquipoHTML(){
@@ -9114,6 +9601,9 @@ function buildGdVHTML(){
             <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Motivo (opcional)</label>
             <input type="text" id="gdv-motivo" placeholder="Ej: Feriado, enfermedad del facilitador, etc.">
           </div>
+          <div id="gdv-sin-encuentro-guardar-wrap" style="display:none;margin-top:12px">
+            <button class="btn btn-primary" style="width:100%" onclick="gdvSaveRecord()">💾 Guardar</button>
+          </div>
         </div>
       </div>
       <div id="gdv-form-wrap"></div>
@@ -9139,7 +9629,7 @@ function buildGdVHTML(){
           ➕ No está en la lista — Registrar como Nuevo Contacto
         </button>
       </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:1.5rem">
+      <div id="gdv-bottom-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:1.5rem">
         <button class="btn" onclick="gdvInitFacForm()">Limpiar</button>
         <button class="btn btn-primary" onclick="gdvSaveRecord()">💾 Guardar</button>
       </div>
@@ -9430,11 +9920,11 @@ function gdvCheckDuplicateWeekOnDateChange(){
 }
 
 function gdvSyncFormularioUI(){
-  var facGids=isGdVFacilitador()?getFacilitadorGroupIds():[];
-  var gid=facGids.length===1?facGids[0]:currentUser.groupId;
-  if(isGdVAdmin()||facGids.length>1){var sel=document.getElementById('gdv-grupo-sel');if(sel)gid=parseInt(sel.value)||null;}
-  var fecha=document.getElementById('gdv-fecha')?.value;
-  if(typeof formRenderRespuestaUI==='function') formRenderRespuestaUI('gdv-form-wrap','gdv',gid,fecha);
+  // Se sacó el Formulario de acá adentro a pedido — la carga de Asistencia debe quedar rápida
+  // (1 minuto) sin depender de completar el Formulario en el momento. El Formulario ahora se
+  // completa aparte, desde el indicador en Registros.
+  var wrap=document.getElementById('gdv-form-wrap');
+  if(wrap) wrap.innerHTML='';
 }
 
 function gdvToggleSinEncuentro(){
@@ -9443,11 +9933,13 @@ function gdvToggleSinEncuentro(){
   const asistCard=document.getElementById('gdv-asistencia-card');
   const visitCards=document.querySelectorAll('.gdv-visit-card');
   const formWrap=document.getElementById('gdv-form-wrap');
-  if(asistCard) asistCard.style.opacity=checked?'0.35':'1';
-  if(asistCard) asistCard.style.pointerEvents=checked?'none':'auto';
-  if(formWrap) formWrap.style.opacity=checked?'0.35':'1';
-  if(formWrap) formWrap.style.pointerEvents=checked?'none':'auto';
-  visitCards.forEach(c=>{c.style.opacity=checked?'0.35':'1';c.style.pointerEvents=checked?'none':'auto';});
+  const guardarInline=document.getElementById('gdv-sin-encuentro-guardar-wrap');
+  const bottomActions=document.getElementById('gdv-bottom-actions');
+  if(asistCard) asistCard.style.display=checked?'none':'';
+  if(formWrap) formWrap.style.display=checked?'none':'';
+  visitCards.forEach(c=>{c.style.display=checked?'none':'';});
+  if(guardarInline) guardarInline.style.display=checked?'block':'none';
+  if(bottomActions) bottomActions.style.display=checked?'none':'flex';
 }
 
 function gdvInitFacForm(){
@@ -9468,7 +9960,14 @@ function gdvInitFacForm(){
   const mw=document.getElementById('gdv-motivo-wrap');
   if(mw){mw.style.display='none';}
   const ac=document.getElementById('gdv-asistencia-card');
-  if(ac){ac.style.opacity='1';ac.style.pointerEvents='auto';}
+  if(ac){ac.style.display='';}
+  document.querySelectorAll('.gdv-visit-card').forEach(function(c){c.style.display='';});
+  const fw=document.getElementById('gdv-form-wrap');
+  if(fw){fw.style.display='';}
+  const gi=document.getElementById('gdv-sin-encuentro-guardar-wrap');
+  if(gi){gi.style.display='none';}
+  const ba=document.getElementById('gdv-bottom-actions');
+  if(ba){ba.style.display='flex';}
   const mot=document.getElementById('gdv-motivo');
   if(mot){mot.value='';}
   gdvRenderVisitTags();
@@ -9545,6 +10044,8 @@ function gdvAdminGroupChanged(){
   }
   gdvCheckPendingWeeks(gid);
   gdvCheckDuplicateWeek(gid);
+  const chkSE=document.getElementById('gdv-sin-encuentro');
+  if(chkSE&&chkSE.checked){ chkSE.checked=false; gdvToggleSinEncuentro(); }
   gdvSyncFormularioUI();
 }
 
@@ -10557,6 +11058,7 @@ function gdvRenderRegistros(){
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span style="font-weight:600;min-width:88px">${fmt(r.fecha)}</span>
         <span style="flex:1;font-size:13px">${r.grupoName}</span>
+        ${typeof gdvFormularioBadgeHtml==='function'?gdvFormularioBadgeHtml(r.grupoId,r.fecha):''}
         <span class="badge ${p>=70?'b-ok':'b-muted'}">${pre}/${att.length} (${p}%)</span>
         <button class="btn btn-sm" onclick="gdvEditRecord(${r.id})">✏️</button>
         <button class="btn btn-sm btn-danger" onclick="gdvDeleteRecord(${r.id})">🗑</button>
@@ -13459,27 +13961,29 @@ function nvExportarCampanaExcel(){
   if(!camp){ showToast('Elegí una Campaña primero','#D97706'); return; }
   var contactos=nvCampanaContactosFiltrados();
   if(!contactos.length){ showToast('No hay contactos para exportar con este filtro','#D97706'); return; }
-  var filas=[['Nombre','Apellido','Teléfono','Fecha Ingreso','Edad','Barrio','Contactado por WhatsApp']];
-  contactos.forEach(function(m){
+  var rows=contactos.map(function(m){
     var edad=nvEdad(m);
-    filas.push([m.nombre||'',m.apellido||'',m.tel||'',m.fechaRegistro||'',edad!==null?edad:'',m.dir||'',m.ultimoContactoWA?new Date(m.ultimoContactoWA).toLocaleString('es-AR'):'No']);
+    return {
+      nombre:m.nombre||'',
+      apellido:m.apellido||'',
+      telefono:m.tel||'',
+      fechaIngreso:m.fechaRegistro||'',
+      edad:edad!==null?edad:'',
+      barrio:m.dir||'',
+      contactadoWA:m.ultimoContactoWA?new Date(m.ultimoContactoWA).toLocaleString('es-AR'):'No'
+    };
   });
-  var csv=filas.map(function(row){
-    return row.map(function(cell){
-      var s=String(cell===null||cell===undefined?'':cell);
-      if(s.indexOf(',')>-1||s.indexOf('"')>-1||s.indexOf('\n')>-1) s='"'+s.replace(/"/g,'""')+'"';
-      return s;
-    }).join(',');
-  }).join('\r\n');
-  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}); // \uFEFF = BOM, para que Excel abra los acentos bien
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  a.href=url;
-  a.download='Campaña - '+camp.nombre.replace(/[^a-zA-Z0-9 ]/g,'')+' - '+todayAA().replace(/\//g,'-')+'.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  var cols=[
+    {key:'nombre',      label:'Nombre',                   width:18},
+    {key:'apellido',    label:'Apellido',                 width:18},
+    {key:'telefono',    label:'Teléfono',                 width:16},
+    {key:'fechaIngreso',label:'Fecha Ingreso',            width:14},
+    {key:'edad',        label:'Edad',                     width:8},
+    {key:'barrio',      label:'Barrio',                   width:20},
+    {key:'contactadoWA',label:'Contactado por WhatsApp',  width:22},
+  ];
+  var nombreArchivo='Campaña - '+camp.nombre.replace(/[^a-zA-Z0-9 ]/g,'')+' - '+todayAA().replace(/\//g,'-');
+  exportToExcel(rows, cols, nombreArchivo);
   showToast('📊 '+contactos.length+' contacto'+(contactos.length!==1?'s':'')+' exportado'+(contactos.length!==1?'s':''),'#16A34A');
 }
 
@@ -16079,9 +16583,9 @@ function discCheckDuplicateWeek(){
 }
 
 function discSyncFormularioUI(){
-  var cursadaId=discSelectedPasoId;
-  var fecha=document.getElementById('disc-fecha')?.value;
-  if(typeof formRenderRespuestaUI==='function') formRenderRespuestaUI('disc-form-wrap','discipulado',cursadaId,fecha);
+  // Se sacó el Formulario de acá adentro a pedido — ver nota en gdvSyncFormularioUI.
+  var wrap=document.getElementById('disc-form-wrap');
+  if(wrap) wrap.innerHTML='';
 }
 
 function discLoadPasoForm(){

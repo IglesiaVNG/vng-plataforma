@@ -5814,6 +5814,22 @@ function formGetRespuesta(formularioId, tipoOrigen, unidadId, semanaISO, anio){
 // Renderiza (o limpia) el bloque de Formularios aplicables dentro de la pantalla de Cargar
 // Asistencia de un módulo. wrapId es el contenedor propio de cada módulo (gdv-form-wrap,
 // ng-form-wrap, disc-form-wrap); se llama cada vez que cambia unidad o fecha.
+// Auto-capitaliza: primera letra del texto, y primera letra después de cada ". "/"! "/"? ".
+function formCapitalizarTexto(txt){
+  if(!txt) return txt;
+  var out=txt.charAt(0).toUpperCase()+txt.slice(1);
+  out=out.replace(/([.!?]\s+)([a-záéíóúñ])/gi,function(m,p1,p2){return p1+p2.toUpperCase();});
+  return out;
+}
+function formCapitalizarTextarea(el){
+  var pos=el.selectionStart, posEnd=el.selectionEnd;
+  var nuevo=formCapitalizarTexto(el.value);
+  if(nuevo!==el.value){
+    el.value=nuevo;
+    try{ el.setSelectionRange(pos,posEnd); }catch(e){}
+  }
+}
+
 function formRenderRespuestaUI(wrapId, tipoOrigen, unidadId, fecha){
   var wrap=document.getElementById(wrapId);
   if(!wrap) return;
@@ -5833,7 +5849,7 @@ function formRenderRespuestaUI(wrapId, tipoOrigen, unidadId, fecha){
       if(p.tipo==='texto_largo'){
         return '<div style="margin-bottom:10px">'
           +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+formFormatTexto(p.texto)+'</label>'
-          +'<textarea id="form-resp-'+f.id+'-'+p.id+'" '+(soloLectura?'disabled':'')+' style="width:100%;min-height:60px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box'+(soloLectura?';background:#F9FAFB;color:#374151':'')+'">'+(valorPrevio||'')+'</textarea>'
+          +'<textarea id="form-resp-'+f.id+'-'+p.id+'" '+(soloLectura?'disabled':'onblur="formCapitalizarTextarea(this)"')+' style="width:100%;min-height:60px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box'+(soloLectura?';background:#F9FAFB;color:#374151':'')+'">'+(valorPrevio||'')+'</textarea>'
         +'</div>';
       }
       var opcionesHtml=(p.opciones||[]).map(function(op){
@@ -5899,7 +5915,7 @@ async function formGuardarRespuesta(formularioId, tipoOrigen, unidadId, fecha){
   (f.preguntas||[]).forEach(function(p){
     if(p.tipo==='texto_largo'){
       var ta=document.getElementById('form-resp-'+f.id+'-'+p.id);
-      var val=ta?ta.value.trim():'';
+      var val=ta?formCapitalizarTexto(ta.value.trim()):'';
       respuestasObj[p.id]=val;
       if(val.length<20) faltantes.push(p.texto);
     } else {
@@ -6024,6 +6040,25 @@ function formEstadoAgregadoSemana(formulario, semanaISO, anio){
   return {estado:estado,respondieron:respondieron,total:unidades.length};
 }
 
+// Una semana "gradúa" de Activos a (solo) Histórico cuando TODAS las unidades que ampara están
+// Completadas Y Revisadas (los "Sin Encuentro" quedan exceptuados del Revisado, no hay nada que
+// revisar ahí), Y además el Análisis App de esa semana también está Revisado por el Líder de
+// Propósito. Mientras no gradúe, sigue viéndose en Activos aunque ya esté 100% completada —
+// necesita el visto bueno de Revisado para dejar de pedir atención ahí.
+function formSemanaGraduada(f, semanaISO, anio){
+  var unidades=formTodasUnidadesIncluidas(f);
+  if(!unidades.length) return false;
+  var todasOk=unidades.every(function(u){
+    var asistInfo=formModuloAsistenciaInfo(u.tipoOrigen,u.id,semanaISO,anio);
+    if(asistInfo.sinEncuentro) return true; // exceptuado del Revisado
+    var resp=formGetRespuesta(f.id,u.tipoOrigen,u.id,semanaISO,anio);
+    return !!(resp&&resp.revisado);
+  });
+  if(!todasOk) return false;
+  var an=formGetAnalisis(f.id,semanaISO,anio);
+  return !!(an&&an.revisadoLider);
+}
+
 // Lista de semanas ISO (lunes a domingo) entre fechaDesde y fechaHasta, nunca más allá de la
 // última semana permitida de carga (misma ventana que limiteFechaCarga().max).
 function formSemanasDelRango(fechaDesde, fechaHasta){
@@ -6080,12 +6115,16 @@ function formRenderActivos(c){
   var labelMap={pendiente:'Pendiente',en_curso:'En Curso',completado:'Completado'};
   var html='';
   activos.forEach(function(f){
-    var semanas=formSemanasDelRango(f.fechaDesde,f.fechaHasta).sort(function(a,b){return b.lunes.localeCompare(a.lunes);});
+    var todasLasSemanas=formSemanasDelRango(f.fechaDesde,f.fechaHasta);
+    var semanas=todasLasSemanas.filter(function(w){return !formSemanaGraduada(f,w.semanaISO,w.anio);})
+      .sort(function(a,b){return b.lunes.localeCompare(a.lunes);});
     var prop=(S.ministerios||[]).find(function(m){return Number(m.id)===Number(f.propositoId);});
     html+='<div class="card" style="margin-bottom:1.25rem;padding:14px">'
       +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:10px">📋 '+f.titulo+'</div>';
-    if(!semanas.length){
+    if(!todasLasSemanas.length){
       html+='<div class="empty" style="padding:1rem">Todavía no arrancó ninguna semana de este Formulario.</div>';
+    } else if(!semanas.length){
+      html+='<div class="empty" style="padding:1rem;color:#16A34A">✅ Todas las semanas están Completadas y Revisadas — quedan solo en Histórico.</div>';
     } else {
       semanas.forEach(function(w){
         var agg=formEstadoAgregadoSemana(f,w.semanaISO,w.anio);
@@ -6213,7 +6252,7 @@ function formOpenSemanaDetalle(formularioId, semanaISO, anio, manteniendoEstado)
       +'</div>'
     +'</div>'
     +(rowsHtml||'<div class="empty">No hay unidades incluidas.</div>')
-    +formAnalisisSectionHtml(f.id,semanaISO,anio)
+    +formAnalisisSectionHtml(f,semanaISO,anio)
   +'</div>';
   document.getElementById('form-modal-overlay').innerHTML=modalHtml;
   document.getElementById('form-modal-overlay').style.display='flex';
@@ -6320,19 +6359,42 @@ function formVerRespuestasUnidad(tipoOrigen, unidadId, fecha){
 }
 
 
-function formAnalisisSectionHtml(formularioId, semanaISO, anio){
+function formAnalisisSectionHtml(f, semanaISO, anio){
   var esSuper=isSuperAdmin();
-  var an=formGetAnalisis(formularioId,semanaISO,anio);
+  var an=formGetAnalisis(f.id,semanaISO,anio);
   var texto=an?an.texto:'';
+  var hayContenido=!!(an&&an.texto);
+  // Oculto por completo para quien no sea Super Admin hasta que Super Admin haya cargado algo
+  if(!esSuper&&!hayContenido) return '';
+
+  var puedeRevisar=formPuedeRevisarAnalisis(f);
+  var cuerpo;
+  if(esSuper){
+    cuerpo='<textarea id="form-analisis-texto" style="width:100%;min-height:90px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:12.5px;font-family:inherit;box-sizing:border-box" placeholder="Pegá acá el análisis generado en el chat con Claude sobre los Formularios de esta semana...">'+(texto||'')+'</textarea>'
+      +'<button class="btn btn-primary btn-sm" onclick="formGuardarAnalisis('+f.id+','+semanaISO+','+anio+')" style="margin-top:6px">💾 Guardar Análisis</button>';
+  } else {
+    cuerpo='<div style="font-size:12.5px;color:#4B5563;white-space:pre-wrap">'+texto+'</div>';
+    if(an&&an.revisadoLider){
+      cuerpo+='<div style="font-size:10.5px;color:#16A34A;margin-top:6px">✓ Revisado por '+(an.revisadoLiderPor||'—')+' · '+fmtFechaHora(an.fechaRevisadoLider)+'</div>';
+    } else if(puedeRevisar){
+      cuerpo+='<button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="formMarcarAnalisisRevisadoLider('+f.id+','+semanaISO+','+anio+')">✅ Revisado</button>';
+    }
+  }
   return '<div style="margin-top:16px;border-top:1px solid #E5E7EB;padding-top:12px">'
     +'<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">🧠 Análisis App'
-      +(an&&an.estado==='Completado'?' <span class="badge b-ok" style="font-size:10px">Completado</span>':' <span class="badge b-muted" style="font-size:10px">Pendiente</span>')
+      +(hayContenido?' <span class="badge b-ok" style="font-size:10px">Completado</span>':' <span class="badge b-muted" style="font-size:10px">Pendiente</span>')
+      +(an&&an.revisadoLider?' <span class="badge b-ok" style="font-size:10px">✓ Revisado</span>':'')
     +'</div>'
-    +(esSuper
-      ?'<textarea id="form-analisis-texto" style="width:100%;min-height:90px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:12.5px;font-family:inherit;box-sizing:border-box" placeholder="Pegá acá el análisis generado en el chat con Claude sobre los Formularios de esta semana...">'+(texto||'')+'</textarea>'
-        +'<button class="btn btn-primary btn-sm" onclick="formGuardarAnalisis('+formularioId+','+semanaISO+','+anio+')" style="margin-top:6px">💾 Guardar Análisis</button>'
-      :(texto?'<div style="font-size:12.5px;color:#4B5563;white-space:pre-wrap">'+texto+'</div>':'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Todavía no hay Análisis cargado para esta semana.</div>'))
+    +cuerpo
   +'</div>';
+}
+
+// Puede marcar el Análisis como Revisado: Super Admin, Pastor, o el Líder del Propósito
+// asignado a este Formulario (mismo criterio que ya usamos para el scope de Activos/Histórico).
+function formPuedeRevisarAnalisis(f){
+  if(isSuperAdmin()||hasRole('pastor')) return true;
+  if(!f||!f.propositoId) return false;
+  return formPropositosLiderados().map(Number).includes(Number(f.propositoId));
 }
 
 function formGetAnalisis(formularioId, semanaISO, anio){
@@ -6343,33 +6405,63 @@ function formGetAnalisis(formularioId, semanaISO, anio){
 
 async function formGuardarAnalisis(formularioId, semanaISO, anio){
   if(!isSuperAdmin()) return;
-  var ta=document.getElementById('form-analisis-texto');
-  var texto=(ta?ta.value:'').trim();
-  var existing=formGetAnalisis(formularioId,semanaISO,anio);
-  var snapshot=null, esNuevo=false, nuevoRef=null, aRef;
-  if(existing){
-    aRef=existing;
-    snapshot=JSON.parse(JSON.stringify(existing));
-    Object.assign(aRef,{texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.name,ts:new Date().toISOString()});
-  } else {
-    esNuevo=true;
-    nuevoRef={id:Date.now(),formularioId:formularioId,semanaISO:semanaISO,anio:anio,texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.name,ts:new Date().toISOString()};
-    S.formAnalisis.push(nuevoRef);
+  try{
+    var ta=document.getElementById('form-analisis-texto');
+    if(!ta){ alert('No se encontró el campo de Análisis — cerrá y volvé a abrir el detalle de la semana.'); return; }
+    var texto=ta.value.trim();
+    var existing=formGetAnalisis(formularioId,semanaISO,anio);
+    var snapshot=null, esNuevo=false, nuevoRef=null, aRef;
+    if(existing){
+      aRef=existing;
+      snapshot=JSON.parse(JSON.stringify(existing));
+      Object.assign(aRef,{texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.name,ts:new Date().toISOString(),_ts:Date.now()});
+    } else {
+      esNuevo=true;
+      nuevoRef={id:Date.now(),formularioId:formularioId,semanaISO:semanaISO,anio:anio,texto:texto,estado:texto?'Completado':'Pendiente',actualizadoPor:currentUser.name,
+        revisadoLider:false,revisadoLiderPor:null,fechaRevisadoLider:null,ts:new Date().toISOString(),_ts:Date.now()};
+      S.formAnalisis.push(nuevoRef);
+    }
+    await saveK(SK.formAnalisis,S.formAnalisis);
+    try{
+      if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    }catch(e){
+      if(esNuevo){
+        S.formAnalisis=S.formAnalisis.filter(function(x){return x!==nuevoRef;});
+      } else if(aRef&&snapshot){
+        Object.assign(aRef,snapshot);
+      }
+      await saveK(SK.formAnalisis,S.formAnalisis);
+      alert('No se pudo guardar el Análisis en la nube. Verificá tu conexión e intentá de nuevo.');
+      return;
+    }
+    showToast('✅ Análisis guardado','#16A34A');
+    formOpenSemanaDetalle(formularioId,semanaISO,anio,true); // refrescar in-place (mantiene lo expandido)
+  }catch(errGeneral){
+    alert('Ocurrió un error inesperado al guardar el Análisis: '+(errGeneral&&errGeneral.message?errGeneral.message:errGeneral));
   }
+}
+
+async function formMarcarAnalisisRevisadoLider(formularioId, semanaISO, anio){
+  var f=(S.formularios||[]).find(function(x){return Number(x.id)===Number(formularioId);});
+  if(!f||!formPuedeRevisarAnalisis(f)) return;
+  var an=formGetAnalisis(formularioId,semanaISO,anio);
+  if(!an) return;
+  var snapshot={revisadoLider:an.revisadoLider,revisadoLiderPor:an.revisadoLiderPor,fechaRevisadoLider:an.fechaRevisadoLider,_ts:an._ts};
+  an.revisadoLider=true;
+  an.revisadoLiderPor=currentUser.name;
+  an.fechaRevisadoLider=new Date().toISOString();
+  an._ts=Date.now();
   await saveK(SK.formAnalisis,S.formAnalisis);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    if(esNuevo){
-      S.formAnalisis=S.formAnalisis.filter(function(x){return x!==nuevoRef;});
-    } else if(aRef&&snapshot){
-      Object.assign(aRef,snapshot);
-    }
+    Object.assign(an,snapshot);
     await saveK(SK.formAnalisis,S.formAnalisis);
-    alert('No se pudo guardar el Análisis en la nube. Verificá tu conexión e intentá de nuevo.');
+    alert('No se pudo guardar. Verificá tu conexión e intentá de nuevo.');
     return;
   }
-  showToast('✅ Análisis guardado','#16A34A');
+  showToast('✅ Análisis revisado','#16A34A');
+  formOpenSemanaDetalle(formularioId,semanaISO,anio,true);
 }
 
 function formExportarSemana(formularioId, semanaISO, anio){

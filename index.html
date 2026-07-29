@@ -408,7 +408,7 @@ const KEY_GROUPS = {
   'ng':      ['gdv_ng5','_tomb_gdv_ng_records','gdv_ng_records'],
   'modules': ['gdv_modules5'],
   'homeConfig': ['gdv_home_config'],
-  'agenda':  ['gdv_ministerios','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas','_tomb_gdv_checklist_secciones','gdv_checklist_secciones'],
+  'agenda':  ['gdv_ministerios','_tomb_gdv_eventos','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas','_tomb_gdv_checklist_secciones','gdv_checklist_secciones'],
   'campanas':['gdv_campanas'],
   'formularios': ['_tomb_gdv_formularios','gdv_formularios','_tomb_gdv_form_respuestas','gdv_form_respuestas','_tomb_gdv_form_analisis','gdv_form_analisis'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
@@ -438,8 +438,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -597,8 +597,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -5246,7 +5246,10 @@ function buildAgendaHTML(){
       <div class="modal-box-lg modal-box-resp" style="background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 12px 40px rgba(0,0,0,.2)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
           <div>
-            <div style="font-size:15px;font-weight:700;color:#1F4E79" id="agenda-cl-det-titulo">—</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="font-size:15px;font-weight:700;color:#1F4E79" id="agenda-cl-det-titulo">—</div>
+              <button id="agenda-cl-det-edit-meta-btn" style="display:none;background:none;border:none;font-size:13px;cursor:pointer;padding:0" onclick="agendaAbrirEditarChecklistMeta()" title="Editar título / Evento asociado (Super Admin)">✏️</button>
+            </div>
             <div id="agenda-cl-det-estado" style="font-size:11px;margin-top:2px"></div>
           </div>
           <button onclick="agendaCerrarModalDetalleChecklist()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1">✕</button>
@@ -6702,7 +6705,10 @@ function buildEquipoHTML(){
       <div class="modal-box-lg modal-box-resp" style="background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 12px 40px rgba(0,0,0,.2)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
           <div>
-            <div style="font-size:15px;font-weight:700;color:#1F4E79" id="agenda-cl-det-titulo">—</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="font-size:15px;font-weight:700;color:#1F4E79" id="agenda-cl-det-titulo">—</div>
+              <button id="agenda-cl-det-edit-meta-btn" style="display:none;background:none;border:none;font-size:13px;cursor:pointer;padding:0" onclick="agendaAbrirEditarChecklistMeta()" title="Editar título / Evento asociado (Super Admin)">✏️</button>
+            </div>
             <div id="agenda-cl-det-estado" style="font-size:11px;margin-top:2px"></div>
           </div>
           <button onclick="agendaCerrarModalDetalleChecklist()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1">✕</button>
@@ -7537,7 +7543,7 @@ async function agendaGuardarEvento(){
   var nuevoEventoRef=null;
 
   function snapshotHabitual(hab){
-    if(!snapshotHabituales.some(function(s){return s.hab===hab;})) snapshotHabituales.push({hab:hab,excepciones:(hab.excepciones||[]).slice()});
+    if(!snapshotHabituales.some(function(s){return s.hab===hab;})) snapshotHabituales.push({hab:hab,excepciones:(hab.excepciones||[]).slice(),_ts:hab._ts});
   }
 
   // Si esto ya era una Especial con reemplazos previos, primero los revertimos (la Habitual
@@ -7545,7 +7551,7 @@ async function agendaGuardarEvento(){
   if(ev&&ev.reemplazos&&ev.reemplazos.length){
     ev.reemplazos.forEach(function(r){
       var hab=S.eventos.find(function(x){return Number(x.id)===Number(r.eventoHabitualId);});
-      if(hab){ snapshotHabitual(hab); hab.excepciones=(hab.excepciones||[]).filter(function(f){return f!==r.fecha;}); }
+      if(hab){ snapshotHabitual(hab); hab.excepciones=(hab.excepciones||[]).filter(function(f){return f!==r.fecha;}); hab._ts=Date.now(); }
     });
   }
   // Aplicar los reemplazos nuevos
@@ -7555,15 +7561,16 @@ async function agendaGuardarEvento(){
       snapshotHabitual(hab);
       if(!hab.excepciones) hab.excepciones=[];
       if(hab.excepciones.indexOf(r.fecha)===-1) hab.excepciones.push(r.fecha);
+      hab._ts=Date.now();
     }
   });
   data.reemplazos=nuevosReemplazos;
 
   if(agendaEditingId){
-    if(ev){ snapshotEvento=Object.assign({},ev); Object.assign(ev,data); }
+    if(ev){ snapshotEvento=Object.assign({},ev); Object.assign(ev,data); ev._ts=Date.now(); }
   } else {
     esNuevoEvento=true;
-    nuevoEventoRef=Object.assign({id:Date.now(),estado:'Activo',creadoPor:currentUser?.name||'Sistema',ts:Date.now(),excepciones:[]},data);
+    nuevoEventoRef=Object.assign({id:Date.now(),estado:'Activo',creadoPor:currentUser?.name||'Sistema',ts:Date.now(),_ts:Date.now(),excepciones:[]},data);
     S.eventos.push(nuevoEventoRef);
   }
 
@@ -7579,6 +7586,7 @@ async function agendaGuardarEvento(){
     } else {
       delete ev.overrides[agendaEditingFechaOcurrencia];
     }
+    ev._ts=Date.now();
   }
 
   await saveK(SK.eventos,S.eventos);
@@ -7591,7 +7599,7 @@ async function agendaGuardarEvento(){
       Object.assign(ev,snapshotEvento);
     }
     if(ev&&overridesSnapshotStr!==null) ev.overrides=JSON.parse(overridesSnapshotStr);
-    snapshotHabituales.forEach(function(s){ s.hab.excepciones=s.excepciones; });
+    snapshotHabituales.forEach(function(s){ s.hab.excepciones=s.excepciones; s.hab._ts=s._ts; });
     await saveK(SK.eventos,S.eventos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -7646,9 +7654,11 @@ async function agendaEliminarEvento(id, fechaOcurrencia){
     if(eleccion==='soloFecha'){
       var snapshotExc=(ev.excepciones||[]).slice();
       var snapshotOverridesStr=JSON.stringify(ev.overrides||{});
+      var snapshotTsExc=ev._ts;
       if(!ev.excepciones) ev.excepciones=[];
       if(ev.excepciones.indexOf(fechaOcurrencia)===-1) ev.excepciones.push(fechaOcurrencia);
       if(ev.overrides&&ev.overrides[fechaOcurrencia]) delete ev.overrides[fechaOcurrencia];
+      ev._ts=Date.now();
       try{
         await saveK(SK.eventos,S.eventos);
         if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -7661,6 +7671,7 @@ async function agendaEliminarEvento(id, fechaOcurrencia){
       }catch(e){
         ev.excepciones=snapshotExc;
         ev.overrides=JSON.parse(snapshotOverridesStr);
+        ev._ts=snapshotTsExc;
         await saveK(SK.eventos,S.eventos);
         alert('No se pudo eliminar esa fecha. Verificá tu conexión.');
       }
@@ -7675,14 +7686,16 @@ async function agendaEliminarEvento(id, fechaOcurrencia){
   }
 
   S.eventos=S.eventos.filter(function(x){return Number(x.id)!==Number(id);});
+  addTombstone(SK.eventos,id);
   // Si esta Especial había reemplazado alguna Habitual, restaurarla en esa fecha
   var habitualesTocadas=[];
   if(ev.reemplazos&&ev.reemplazos.length){
     ev.reemplazos.forEach(function(r){
       var hab=S.eventos.find(function(x){return Number(x.id)===Number(r.eventoHabitualId);});
       if(hab&&(hab.excepciones||[]).indexOf(r.fecha)!==-1){
-        habitualesTocadas.push({hab:hab,excepciones:hab.excepciones.slice()});
+        habitualesTocadas.push({hab:hab,excepciones:hab.excepciones.slice(),_ts:hab._ts});
         hab.excepciones=hab.excepciones.filter(function(f){return f!==r.fecha;});
+        hab._ts=Date.now();
       }
     });
   }
@@ -7697,7 +7710,7 @@ async function agendaEliminarEvento(id, fechaOcurrencia){
     showToast('🗑️ Evento eliminado','#DC2626');
   }catch(e){
     S.eventos.push(ev);
-    habitualesTocadas.forEach(function(s){ s.hab.excepciones=s.excepciones; });
+    habitualesTocadas.forEach(function(s){ s.hab.excepciones=s.excepciones; s.hab._ts=s._ts; });
     await saveK(SK.eventos,S.eventos);
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
@@ -8057,6 +8070,67 @@ function agendaAbrirModalCrearChecklist(eventoId){
   document.getElementById('agenda-cl-crear-overlay').style.display='flex';
 }
 
+// Editar Título manual y/o reasignar el Evento asociado a un Checklist — exclusivo Super Admin.
+// Pensado para Checklists "huérfanos" (su Evento se borró/perdió) que quedaron mostrando el
+// título genérico "Actividad" sin forma de asociarlos a otra cosa.
+function agendaAbrirEditarChecklistMeta(){
+  if(!isSuperAdmin()) return;
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(agendaChecklistDetalleId);});
+  if(!checklist) return;
+  var eventosOpts='<option value="">— Sin Evento asociado —</option>'
+    +(S.eventos||[]).slice().sort(function(a,b){return (b.fecha||'').localeCompare(a.fecha||'');}).map(function(e){
+      return '<option value="'+e.id+'"'+(Number(checklist.eventoId)===Number(e.id)?' selected':'')+'>'+e.titulo+(e.fecha?' — '+fmtAA(e.fecha):'')+'</option>';
+    }).join('');
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:440px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+    +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:14px">✏️ Editar Checklist</div>'
+    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Título manual <span style="font-weight:400;color:#9CA3AF">(opcional — vacío usa el título del Evento asociado)</span></label>'
+    +'<input type="text" id="agenda-cl-meta-titulo" value="'+(checklist.tituloManual||'').replace(/"/g,'&quot;')+'" placeholder="Ej: 10° Aniversario NVG" style="width:100%;margin-bottom:14px">'
+    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Evento asociado</label>'
+    +'<select id="agenda-cl-meta-evento" style="width:100%;margin-bottom:16px">'+eventosOpts+'</select>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+      +'<button class="btn" onclick="agendaCerrarEditarChecklistMeta()">Cancelar</button>'
+      +'<button class="btn btn-primary" onclick="agendaGuardarEditarChecklistMeta()">💾 Guardar</button>'
+    +'</div>'
+  +'</div>';
+  var ov=document.getElementById('agenda-dialogo-overlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='agenda-dialogo-overlay';
+    ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML=modalHtml;
+  ov.style.display='flex';
+}
+function agendaCerrarEditarChecklistMeta(){
+  var ov=document.getElementById('agenda-dialogo-overlay');
+  if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+}
+async function agendaGuardarEditarChecklistMeta(){
+  if(!isSuperAdmin()) return;
+  var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(agendaChecklistDetalleId);});
+  if(!checklist) return;
+  var tituloManual=(document.getElementById('agenda-cl-meta-titulo')?.value||'').trim();
+  var eventoIdSel=document.getElementById('agenda-cl-meta-evento')?.value||'';
+  var snapshot={tituloManual:checklist.tituloManual,eventoId:checklist.eventoId,_ts:checklist._ts};
+  checklist.tituloManual=tituloManual||null;
+  checklist.eventoId=eventoIdSel?parseInt(eventoIdSel):null;
+  checklist._ts=Date.now();
+  await saveK(SK.checklists,S.checklists);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.assign(checklist,snapshot);
+    await saveK(SK.checklists,S.checklists);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Checklist actualizado','#16A34A');
+  agendaCerrarEditarChecklistMeta();
+  agendaRenderChecklistDetalle();
+  agendaRenderChecklistList();
+}
+
 function agendaAbrirModalEditarEquipo(checklistId){
   var checklist=(S.checklists||[]).find(function(c){return Number(c.id)===Number(checklistId);});
   if(!checklist) return;
@@ -8147,7 +8221,9 @@ function agendaRenderChecklistDetalle(){
   var puedeCerrar=agendaEsResponsableDe(checklist);
   var esHistorico=checklist.estado==='Historico';
 
-  document.getElementById('agenda-cl-det-titulo').textContent=(ev?ev.titulo:'Actividad')+' — Checklist';
+  document.getElementById('agenda-cl-det-titulo').textContent=(checklist.tituloManual||(ev?ev.titulo:'Actividad'))+' — Checklist';
+  var editMetaBtn=document.getElementById('agenda-cl-det-edit-meta-btn');
+  if(editMetaBtn) editMetaBtn.style.display=isSuperAdmin()?'inline':'none';
   document.getElementById('agenda-cl-det-estado').innerHTML=esHistorico
     ?'<span class="badge b-muted">📁 Histórico — cerrado por '+(checklist.cerradoPor||'—')+' el '+fmtAA(checklist.fechaCierre||'')+'</span>'
     :'<span class="badge b-ok">🟢 Activo</span>';
@@ -8909,7 +8985,7 @@ function agendaRenderChecklistList(){
     return '<div class="card" style="margin-bottom:.6rem;padding:12px;cursor:pointer" onclick="agendaAbrirChecklistDetalle('+c.id+')">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">'
       +'<div>'
-      +'<div style="font-weight:700;font-size:14px;color:#1F2937">'+(ev?ev.titulo:'Actividad')+'</div>'
+      +'<div style="font-weight:700;font-size:14px;color:#1F2937">'+(c.tituloManual||(ev?ev.titulo:'Actividad'))+'</div>'
       +'<div style="font-size:12px;color:#6B7280;margin-top:2px">'+(ev?fmt(ev.fecha):'')+(resps.length?' · 👤 '+resps.map(listName).join(', '):'')+'</div>'
       +'</div>'
       +'<span class="badge '+(fin===tareas.length&&tareas.length>0?'b-ok':'b-muted')+'">'+fin+'/'+tareas.length+' finalizadas</span>'

@@ -6196,6 +6196,21 @@ function fmtFechaHora(iso){
 // ── Indicador de Formulario en la lista de Registros (GdV/NG/Discipulado) ──
 // Rojo "Formulario Pendiente" (solo visual) · Verde "Formulario Completado" (clickeable, ve
 // preguntas y respuestas) · Negro "Semana Sin Formulario" (no aplica ninguno esa semana).
+// El overlay #form-modal-overlay vive en el HTML del módulo Formularios de Trabajo — si se
+// abre un modal de Formulario desde OTRO módulo (ej: el indicador en Registros de GdV), ese
+// contenedor no existe todavía en el DOM. Esta función lo crea al vuelo, colgado directo de
+// <body>, para que funcione sin importar qué pantalla esté abierta.
+function formEnsureModalOverlay(){
+  var ov=document.getElementById('form-modal-overlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='form-modal-overlay';
+    ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(ov);
+  }
+  return ov;
+}
+
 function gdvFormularioBadgeHtml(grupoId, fecha){
   if(typeof formFormulariosAplicables!=='function') return '';
   var aplicables=formFormulariosAplicables('gdv',grupoId,fecha);
@@ -6222,8 +6237,8 @@ function formAbrirCompletarDesdeRegistro(tipoOrigen, unidadId, fecha){
     +'</div>'
     +'<div id="form-completar-registro-wrap"></div>'
   +'</div>';
-  document.getElementById('form-modal-overlay').innerHTML=modalHtml;
-  document.getElementById('form-modal-overlay').style.display='flex';
+  formEnsureModalOverlay().innerHTML=modalHtml;
+  formEnsureModalOverlay().style.display='flex';
   formRenderRespuestaUI('form-completar-registro-wrap',tipoOrigen,unidadId,fecha);
 }
 
@@ -6258,8 +6273,8 @@ function formVerRespuestasUnidad(tipoOrigen, unidadId, fecha){
     +'</div>'
     +html
   +'</div>';
-  document.getElementById('form-modal-overlay').innerHTML=modalHtml;
-  document.getElementById('form-modal-overlay').style.display='flex';
+  formEnsureModalOverlay().innerHTML=modalHtml;
+  formEnsureModalOverlay().style.display='flex';
 }
 
 

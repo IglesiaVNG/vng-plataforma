@@ -5332,7 +5332,7 @@ function buildFormulariosHTML(){
       +'<button class="nav-btn" id="form-tab-historico" onclick="formTab(\'historico\',this)">📁 Histórico</button>'
     +'</div>'
     +'<div id="form-content"></div>'
-    +'<div id="form-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem"></div>'
+    +'<div id="form-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;-webkit-overflow-scrolling:touch"></div>'
   +'</div>';
 }
 
@@ -5822,20 +5822,24 @@ function formRenderRespuestaUI(wrapId, tipoOrigen, unidadId, fecha){
   if(!aplicables.length){ wrap.innerHTML=''; return; }
   var semanaISO=getISOWeek(fecha);
   var anio=parseLocalDate(fecha).getFullYear();
+  var esSuper=isSuperAdmin();
   wrap.innerHTML=aplicables.map(function(f){
     var existing=formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio);
+    // Una vez completado, queda solo de lectura — nadie (ni el mismo Facilitador) lo puede
+    // reeditar. Solo Super Admin puede revertirlo a Pendiente si hace falta corregir algo.
+    var soloLectura=!!existing;
     var preguntasHtml=(f.preguntas||[]).map(function(p){
       var valorPrevio=existing?existing.respuestas[p.id]:null;
       if(p.tipo==='texto_largo'){
         return '<div style="margin-bottom:10px">'
           +'<label style="font-size:12px;color:#4B5563;display:block;margin-bottom:4px">'+formFormatTexto(p.texto)+'</label>'
-          +'<textarea id="form-resp-'+f.id+'-'+p.id+'" style="width:100%;min-height:60px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box">'+(valorPrevio||'')+'</textarea>'
+          +'<textarea id="form-resp-'+f.id+'-'+p.id+'" '+(soloLectura?'disabled':'')+' style="width:100%;min-height:60px;padding:8px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box'+(soloLectura?';background:#F9FAFB;color:#374151':'')+'">'+(valorPrevio||'')+'</textarea>'
         +'</div>';
       }
       var opcionesHtml=(p.opciones||[]).map(function(op){
         var checked=Array.isArray(valorPrevio)&&valorPrevio.includes(op);
-        return '<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12.5px;cursor:pointer">'
-          +'<input type="checkbox" class="form-resp-'+f.id+'-'+p.id+'-cb" value="'+op.replace(/"/g,'&quot;')+'" '+(checked?'checked':'')+' style="cursor:pointer">'+op
+        return '<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12.5px'+(soloLectura?'':';cursor:pointer')+'">'
+          +'<input type="checkbox" class="form-resp-'+f.id+'-'+p.id+'-cb" value="'+op.replace(/"/g,'&quot;')+'" '+(checked?'checked':'')+' '+(soloLectura?'disabled':'')+' style="'+(soloLectura?'':'cursor:pointer')+'">'+op
         +'</label>';
       }).join('');
       return '<div style="margin-bottom:10px">'
@@ -5843,15 +5847,46 @@ function formRenderRespuestaUI(wrapId, tipoOrigen, unidadId, fecha){
         +opcionesHtml
       +'</div>';
     }).join('');
+    var pieHtml;
+    if(soloLectura){
+      pieHtml='<div style="font-size:11px;color:#9CA3AF;margin-top:4px;font-style:italic">Ya completado — no se puede editar.</div>';
+      if(esSuper){
+        pieHtml+='<button class="btn btn-sm" style="margin-top:6px;color:#D97706" onclick="formRevertirRespuestaAPendiente('+f.id+',\''+tipoOrigen+'\',\''+unidadId+'\',\''+fecha+'\')">🔓 Revertir a Pendiente (Super Admin)</button>';
+      }
+    } else {
+      pieHtml='<button class="btn btn-primary btn-sm" onclick="formGuardarRespuesta('+f.id+',\''+tipoOrigen+'\',\''+unidadId+'\',\''+fecha+'\')" style="margin-top:4px">💾 Guardar Formulario</button>';
+    }
     return '<div class="card" style="margin-top:12px;border-left:4px solid #7C3AED">'
       +'<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'
         +'<span>📋 '+formFormatTexto(f.titulo)+'</span>'
         +(existing?'<span class="badge b-ok" style="font-size:10px">Respondido</span>':'<span class="badge b-muted" style="font-size:10px">Pendiente</span>')
       +'</div>'
       +(preguntasHtml||'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Este Formulario todavía no tiene preguntas cargadas.</div>')
-      +'<button class="btn btn-primary btn-sm" onclick="formGuardarRespuesta('+f.id+',\''+tipoOrigen+'\',\''+unidadId+'\',\''+fecha+'\')" style="margin-top:4px">💾 Guardar Formulario</button>'
+      +pieHtml
     +'</div>';
   }).join('');
+}
+
+async function formRevertirRespuestaAPendiente(formularioId, tipoOrigen, unidadId, fecha){
+  if(!isSuperAdmin()) return;
+  var semanaISO=getISOWeek(fecha), anio=parseLocalDate(fecha).getFullYear();
+  var resp=formGetRespuesta(formularioId,tipoOrigen,unidadId,semanaISO,anio);
+  if(!resp) return;
+  if(!confirm('¿Revertir esta respuesta a Pendiente?\n\nSe van a borrar las respuestas ya cargadas — la persona va a tener que completarlo de nuevo. Esta acción no se puede deshacer.')) return;
+  S.formRespuestas=(S.formRespuestas||[]).filter(function(r){return Number(r.id)!==Number(resp.id);});
+  addTombstone(SK.formRespuestas,resp.id);
+  await saveK(SK.formRespuestas,S.formRespuestas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.formRespuestas.push(resp);
+    await saveK(SK.formRespuestas,S.formRespuestas);
+    alert('No se pudo revertir. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('🔓 Revertido a Pendiente','#D97706');
+  formCloseModal();
+  if(typeof gdvRenderRegistros==='function'&&document.getElementById('gdv-registros-list')) gdvRenderRegistros();
 }
 
 async function formGuardarRespuesta(formularioId, tipoOrigen, unidadId, fecha){
@@ -5860,15 +5895,22 @@ async function formGuardarRespuesta(formularioId, tipoOrigen, unidadId, fecha){
   var semanaISO=getISOWeek(fecha);
   var anio=parseLocalDate(fecha).getFullYear();
   var respuestasObj={};
+  var faltantes=[];
   (f.preguntas||[]).forEach(function(p){
     if(p.tipo==='texto_largo'){
       var ta=document.getElementById('form-resp-'+f.id+'-'+p.id);
-      respuestasObj[p.id]=ta?ta.value.trim():'';
+      var val=ta?ta.value.trim():'';
+      respuestasObj[p.id]=val;
+      if(val.length<20) faltantes.push(p.texto);
     } else {
       var boxes=document.querySelectorAll('.form-resp-'+f.id+'-'+p.id+'-cb:checked');
       respuestasObj[p.id]=Array.from(boxes).map(function(cb){return cb.value;});
     }
   });
+  if(faltantes.length){
+    alert('Las respuestas de texto necesitan al menos 20 caracteres — no pueden quedar vacías ni muy cortas. Falta completar bien:\n\n'+faltantes.map(function(t){return '• '+(t||'').split('\n')[0];}).join('\n'));
+    return;
+  }
 
   var existing=formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio);
   var snapshot=null, esNuevo=false, nuevoRef=null, rRef;
@@ -6205,7 +6247,7 @@ function formEnsureModalOverlay(){
   if(!ov){
     ov=document.createElement('div');
     ov.id='form-modal-overlay';
-    ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem';
+    ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;-webkit-overflow-scrolling:touch';
     document.body.appendChild(ov);
   }
   return ov;
@@ -6230,7 +6272,7 @@ function gdvFormularioBadgeHtml(grupoId, fecha){
 // "Formulario Pendiente" en Registros; reutiliza el mismo bloque de preguntas/respuestas que
 // antes vivía embebido en Cargar Asistencia, ahora en un modal aparte.
 function formAbrirCompletarDesdeRegistro(tipoOrigen, unidadId, fecha){
-  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.25rem;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.25rem;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'
       +'<div style="font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.03em">📋 Completar Formulario — '+fmtAA(fecha)+'</div>'
       +'<button class="btn btn-sm" onclick="formCloseModal()">✕</button>'

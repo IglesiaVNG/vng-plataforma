@@ -5187,6 +5187,12 @@ function buildAgendaHTML(){
               <option value="semanal">Semanal</option>
               <option value="mensual">Mensual</option>
             </select>
+            <div id="agenda-f-recur-mensual-modo-wrap" style="display:none;margin-top:8px">
+              <select id="agenda-f-recur-mensual-modo">
+                <option value="dia_mes">Mismo número de día (ej: día 6)</option>
+                <option value="dia_semana">Mismo día de la semana (ej: 1er jueves)</option>
+              </select>
+            </div>
           </div>
           <div id="agenda-f-recur-hasta-wrap" style="display:none;background:#F9FAFB;border-radius:10px;padding:10px 12px">
             <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:4px">Repetir hasta</label>
@@ -6834,6 +6840,27 @@ function agendaBadgeTipoHtml(o){
   return '<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;background:#CFFAFE;color:#155E75">🔁 Habitual</span>';
 }
 
+// Para recurrencia mensual "mismo día de la semana" (ej: 1er jueves de cada mes).
+// Devuelve la fecha del enésimo (1..5) día de semana `weekday` (0=domingo..6=sábado) del mes
+// indicado, o null si ese mes no tiene una ocurrencia número n de ese día (ej: no hay 5to jueves).
+function agendaNesimoDiaSemanaDelMes(anio, mesIndex, weekday, n){
+  var primero=new Date(anio,mesIndex,1);
+  var offset=(weekday-primero.getDay()+7)%7;
+  var dia=1+offset+(n-1)*7;
+  var resultado=new Date(anio,mesIndex,dia);
+  if(resultado.getMonth()!==mesIndex) return null;
+  return resultado;
+}
+
+// Texto legible ("1er jueves", "3er martes", etc.) para una fecha base — usado en la etiqueta
+// de recurrencia mensual por día de semana.
+function agendaDescribirPosicionMensual(fechaStr){
+  var d=parseLocalDate(fechaStr);
+  var pos=Math.ceil(d.getDate()/7);
+  var posTxt={1:'1er',2:'2do',3:'3er',4:'4to',5:'5to'}[pos]||(pos+'to');
+  return posTxt+' '+DIAS_SEMANA[d.getDay()].toLowerCase()+' de cada mes';
+}
+
 function agendaGetOcurrencias(desde,hasta){
   var ocs=[];
   (S.eventos||[]).filter(function(e){return e.estado!=='Cancelado';}).forEach(function(e){
@@ -6863,6 +6890,11 @@ function agendaGetOcurrencias(desde,hasta){
     var tope=limite<hasta?limite:hasta;
     var cur=new Date(fechaBase);
     var pasos=0;
+    // Para "mensual — mismo día de la semana": memorizamos de la fecha original qué día de la
+    // semana es, y qué posición ocupa dentro del mes (1er, 2do, 3er... jueves, etc.)
+    var mensualDiaSemana=rec.tipo==='mensual'&&rec.mensualModo==='dia_semana';
+    var diaSemanaOrigen=fechaBase.getDay();
+    var posicionOrigen=Math.ceil(fechaBase.getDate()/7);
     while(cur<=tope&&pasos<520){ // tope de seguridad
       var fechaOc=cur.toISOString().slice(0,10);
       if(cur>=desde&&cur>=fechaBase&&(e.excepciones||[]).indexOf(fechaOc)===-1){
@@ -6871,7 +6903,21 @@ function agendaGetOcurrencias(desde,hasta){
       }
       if(rec.tipo==='diaria') cur.setDate(cur.getDate()+1);
       else if(rec.tipo==='semanal') cur.setDate(cur.getDate()+7);
-      else if(rec.tipo==='mensual') cur.setMonth(cur.getMonth()+1);
+      else if(rec.tipo==='mensual'){
+        if(mensualDiaSemana){
+          var sigMes=cur.getMonth()+1, sigAnio=cur.getFullYear();
+          if(sigMes>11){ sigMes=0; sigAnio++; }
+          var siguiente=agendaNesimoDiaSemanaDelMes(sigAnio,sigMes,diaSemanaOrigen,posicionOrigen);
+          if(!siguiente){ // ese mes no tiene, ej: no hay 5to jueves — probamos el mes siguiente
+            sigMes++; if(sigMes>11){ sigMes=0; sigAnio++; }
+            siguiente=agendaNesimoDiaSemanaDelMes(sigAnio,sigMes,diaSemanaOrigen,posicionOrigen);
+          }
+          if(!siguiente) break;
+          cur=siguiente;
+        } else {
+          cur.setMonth(cur.getMonth()+1);
+        }
+      }
       else break;
       pasos++;
     }
@@ -7042,7 +7088,7 @@ function agendaOpenDia(fechaStr){
             (minLabel?'<div style="font-size:11px;color:#7C3AED;margin-top:2px">🤝 '+minLabel+'</div>':'')+
             (resps.length?'<div style="font-size:11px;color:#1E40AF;margin-top:2px"><strong>Responsables:</strong> 👤 '+resps.map(listName).join(', ')+'</div>':'')+
             (mensajeLabels.length?'<div style="font-size:11px;color:#6D28D9;margin-top:2px"><strong>Mensaje:</strong> 🎤 '+mensajeLabels.join(', ')+'</div>':'')+
-            (o.recurrencia&&o.recurrencia.tipo!=='ninguna'?'<div style="font-size:10px;color:#9CA3AF;margin-top:2px">🔁 Se repite '+(o.recurrencia.tipo==='diaria'?'cada día':o.recurrencia.tipo==='semanal'?'cada semana':'cada mes')+'</div>':'')+
+            (o.recurrencia&&o.recurrencia.tipo!=='ninguna'?'<div style="font-size:10px;color:#9CA3AF;margin-top:2px">🔁 Se repite '+(o.recurrencia.tipo==='diaria'?'cada día':o.recurrencia.tipo==='semanal'?'cada semana':(o.recurrencia.mensualModo==='dia_semana'?'el '+agendaDescribirPosicionMensual(o.fecha):'cada mes'))+'</div>':'')+
           '</div>'+
           (canCrearEventos()?'<div style="display:flex;gap:4px;flex-shrink:0">'+
             '<button class="btn btn-sm" onclick="agendaAbrirForm('+o.id+',null,\''+o.fechaOcurrencia+'\')">✏️</button>'+
@@ -7236,6 +7282,8 @@ function agendaToggleRecurrencia(){
   var tipo=document.getElementById('agenda-f-recur-tipo')?.value;
   var wrap=document.getElementById('agenda-f-recur-hasta-wrap');
   if(wrap) wrap.style.display=(tipo&&tipo!=='ninguna')?'block':'none';
+  var modoWrap=document.getElementById('agenda-f-recur-mensual-modo-wrap');
+  if(modoWrap) modoWrap.style.display=(tipo==='mensual')?'block':'none';
 }
 function agendaTogglePeriodo(){
   var esPeriodo=document.getElementById('agenda-f-es-periodo')?.checked;
@@ -7380,8 +7428,10 @@ function agendaAbrirForm(eventoId, fechaPrefill, fechaOcurrencia){
   // Recurrencia
   var recurSel=document.getElementById('agenda-f-recur-tipo');
   var recurHasta=document.getElementById('agenda-f-recur-hasta');
+  var recurModo=document.getElementById('agenda-f-recur-mensual-modo');
   if(recurSel) recurSel.value=(ev&&ev.recurrencia&&ev.recurrencia.tipo)?ev.recurrencia.tipo:'ninguna';
   if(recurHasta) recurHasta.value=(ev&&ev.recurrencia&&ev.recurrencia.hasta)?ev.recurrencia.hasta:'';
+  if(recurModo) recurModo.value=(ev&&ev.recurrencia&&ev.recurrencia.mensualModo)?ev.recurrencia.mensualModo:'dia_mes';
   agendaToggleRecurrencia();
 
   document.getElementById('agenda-form-overlay').style.display='flex';
@@ -7510,7 +7560,8 @@ async function agendaGuardarEvento(){
   }
   var recurrencia={
     tipo:recurTipo,
-    hasta: recurTipo!=='ninguna' ? (document.getElementById('agenda-f-recur-hasta')?.value||'') : ''
+    hasta: recurTipo!=='ninguna' ? (document.getElementById('agenda-f-recur-hasta')?.value||'') : '',
+    mensualModo: recurTipo==='mensual' ? (document.getElementById('agenda-f-recur-mensual-modo')?.value||'dia_mes') : undefined
   };
 
   var ev=agendaEditingId?S.eventos.find(function(x){return Number(x.id)===Number(agendaEditingId);}):null;

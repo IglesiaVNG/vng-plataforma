@@ -405,7 +405,7 @@ const KEY_GROUPS = {
   'members': ['_tomb_gdv_m5','gdv_m5'],
   'records': ['_tomb_gdv_r5','gdv_r5'],
   'disc':    ['gdv_disc_pasos','_tomb_gdv_disc_records','gdv_disc_records','_tomb_gdv_disc_cursadas','gdv_disc_cursadas','_tomb_gdv_disc_inscripciones','gdv_disc_inscripciones'],
-  'ng':      ['gdv_ng5','_tomb_gdv_ng_records','gdv_ng_records'],
+  'ng':      ['_tomb_gdv_ng5','gdv_ng5','_tomb_gdv_ng_records','gdv_ng_records'],
   'modules': ['gdv_modules5'],
   'homeConfig': ['gdv_home_config'],
   'agenda':  ['gdv_ministerios','_tomb_gdv_eventos','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas','_tomb_gdv_checklist_secciones','gdv_checklist_secciones'],
@@ -438,8 +438,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -597,8 +597,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -2026,7 +2026,7 @@ function ngRenderCargar(c){
             '<input type="text" id="ng-nuevo-nombre" placeholder="Escribí el nombre..." style="width:100%" oninput="ngAutoComplete(this.value)" autocomplete="off">'+
             '<div id="ng-ac-new" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:100;max-height:180px;overflow-y:auto"></div>'+
           '</div>'+
-          '<button class="btn btn-sm" onclick="nvOpenInlineForm()" style="margin-top:10px;width:100%;background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">'+
+          '<button class="btn btn-sm" onclick="ngAbrirFormNuevoContacto()" style="margin-top:10px;width:100%;background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">'+
             '➕ No está en la lista — Registrar como Nuevo Contacto'+
           '</button>'+
         '</div>'+
@@ -2165,6 +2165,12 @@ function ngBuildAsistList(cid){
 function ngToggleAtt(mid,checked){
   if(ngFacAtt[mid]) ngFacAtt[mid].state=checked?'presente':'ausente';
 }
+// Pre-selecciona la Comunidad que se está cargando, para que la Persona Nueva quede vinculada
+// de una y aparezca como Integrante en la próxima carga — ver misma nota en gdvAbrirFormNuevoContacto.
+function ngAbrirFormNuevoContacto(){
+  nvOpenInlineForm(ngCurrentComunidadId?{grupoId:ngCurrentComunidadId,tipoGrupo:'ng'}:undefined);
+}
+
 function ngAutoComplete(query){
   const dropdown=document.getElementById('ng-ac-new');
   if(!dropdown) return;
@@ -4430,8 +4436,10 @@ async function ngToggleComunidadActiva(id){
   var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(id);});
   if(!ng) return;
   var prevEstado=ng.estado;
+  var prevTs=ng._ts;
   var nuevoEstado=ng.estado==='Inactivo'?'Activo':'Inactivo';
   ng.estado=nuevoEstado;
+  ng._ts=Date.now();
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
   var tocoEventos=agendaSincronizarActividadOrigen('ng',ng.id,{
     nombre:ng.name,dia:ng.dia,horario:ng.horario,
@@ -4444,6 +4452,7 @@ async function ngToggleComunidadActiva(id){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     ng.estado=prevEstado;
+    ng._ts=prevTs;
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades,S.ngComunidades);
     if(tocoEventos) await saveK(SK.eventos,S.eventos);
@@ -4555,9 +4564,9 @@ async function ngSaveComunidad(){
   var ngRef;
   if(ngEditingId){
     ngRef=S.ngComunidades.find(function(x){return Number(x.id)===Number(ngEditingId);});
-    if(ngRef){ Object.assign(ngRef,{name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado}); }
+    if(ngRef){ Object.assign(ngRef,{name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado}); ngRef._ts=Date.now(); }
   } else {
-    ngRef={id:Date.now(),name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado:estado};
+    ngRef={id:Date.now(),name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado:estado,_ts:Date.now()};
     S.ngComunidades.push(ngRef);
   }
   // Sincronizar funciones NG con S.members para que se vean en Rebaños
@@ -10325,7 +10334,13 @@ function gdvAddVisit(type){
 }
 
 function gdvAbrirFormNuevoContacto(){
-  nvOpenInlineForm(); // Usa el mismo formulario que Nuevos Contactos
+  // Pre-selecciona el Grupo que se está cargando, para que la Persona Nueva quede vinculada
+  // de una y aparezca como Integrante en la próxima carga — antes había que acordarse de elegirlo
+  // a mano en el desplegable genérico, y si se salteaba, la persona no quedaba en ningún grupo.
+  var facGids=isGdVFacilitador()?getFacilitadorGroupIds():[];
+  var gid=facGids.length===1?facGids[0]:currentUser.groupId;
+  if(isGdVAdmin()||facGids.length>1){var sel=document.getElementById('gdv-grupo-sel');if(sel)gid=parseInt(sel.value)||null;}
+  nvOpenInlineForm(gid?{grupoId:gid,tipoGrupo:'gdv'}:undefined);
 }
 
 
@@ -13092,6 +13107,7 @@ async function nvAplicarParticipando(m){
   m.subEstado='Participando';
   if(!m.subEstadoHistorial) m.subEstadoHistorial=[];
   m.subEstadoHistorial.push({de,a:'Participando',autor:'Sistema (grupo asignado)',fecha:new Date().toISOString()});
+  m._ts=Date.now();
   return true;
 }
 
@@ -13429,6 +13445,7 @@ async function nvGuardarComentario(){
   const huboSeguimiento=nvDraftSeguimientoSet;
   if(!txt&&!huboSeguimiento){showToast('No hay cambios para confirmar','#6B7280');return;}
   var comentarioAgregado=null;
+  var prevTs=m._ts;
   if(txt){
     if(!m.comentarios) m.comentarios=[];
     comentarioAgregado={
@@ -13438,12 +13455,14 @@ async function nvGuardarComentario(){
     };
     m.comentarios.push(comentarioAgregado);
   }
+  m._ts=Date.now();
   document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     if(comentarioAgregado) m.comentarios=m.comentarios.filter(function(c){return c!==comentarioAgregado;});
+    m._ts=prevTs;
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -13458,7 +13477,7 @@ async function nvCambiarSubEstadoManual(nuevoSubEstado){
   if(!m) return;
   const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
   const anterior=m.subEstado||'Ingresado';
-  var snapshot={subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice()};
+  var snapshot={subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   m.subEstado=nuevoSubEstado;
   if(nuevoSubEstado==='Contactado'&&anterior!=='Contactado'){
     m.contactadoPor=currentUser?.name||'Sistema';
@@ -13468,12 +13487,14 @@ async function nvCambiarSubEstadoManual(nuevoSubEstado){
   m.subEstadoHistorial.push({de:anterior,a:nuevoSubEstado,autor:currentUser?.name||'Sistema',fecha:new Date().toISOString(),comentario:txtComentario||''});
   if(!m.comentarios) m.comentarios=[];
   m.comentarios.push({texto:`Sub-estado cambiado de "${anterior}" a "${nuevoSubEstado}".`+(txtComentario?` ${txtComentario}`:''),autor:currentUser?.name||'Sistema',ts:Date.now()});
+  m._ts=Date.now();
   document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     Object.assign(m,snapshot);
+    m._ts=snapshot._ts;
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -13526,7 +13547,7 @@ async function nvGuardarComentarioContactar(){
     alert('Para registrar el primer contacto escribí un comentario de al menos 10 caracteres (cómo fue, qué se conversó).');
     return;
   }
-  var snapshot={subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice()};
+  var snapshot={subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   if(!m.comentarios) m.comentarios=[];
   m.comentarios.push({texto:txt,autor:currentUser?.name||'Sistema',ts:Date.now()});
   if(esPrimerContacto){
@@ -13536,6 +13557,7 @@ async function nvGuardarComentarioContactar(){
     if(!m.subEstadoHistorial) m.subEstadoHistorial=[];
     m.subEstadoHistorial.push({de:'Ingresado',a:'Contactado',autor:m.contactadoPor,fecha:m.contactadoFecha,comentario:txt});
   }
+  m._ts=Date.now();
   document.getElementById('nv-contactar-comentario-txt').value='';
   await saveK(SK.members,S.members);
   try{
@@ -13566,7 +13588,7 @@ async function nvPromover(condicion){
     document.getElementById('nv-comentario-txt')?.focus();
     return;
   }
-  var snapshot={condicion:m.condicion,subEstado:m.subEstado,comentarios:(m.comentarios||[]).slice()};
+  var snapshot={condicion:m.condicion,subEstado:m.subEstado,comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   const condAnterior=m.condicion||'Nuevo';
   m.condicion=condicion;
   if(condicion!=='Nuevo'){
@@ -13582,6 +13604,7 @@ async function nvPromover(condicion){
     autor:currentUser?.name||'Sistema',
     ts:Date.now()
   });
+  m._ts=Date.now();
   document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
   // Upload to Firebase so condicion change persists across devices
@@ -13624,6 +13647,7 @@ async function nvDarDeBaja(){
     autor:currentUser?.name||'Sistema',
     ts:Date.now()
   });
+  m._ts=Date.now();
   document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
   try{
@@ -13725,7 +13749,6 @@ async function nvGuardarEditar(){
   m.dni=(document.getElementById('nv-edit-dni')?.value||'').trim();
   var grupoVals=nvGetGrupoIdFromVal(document.getElementById('nv-edit-grupo')?.value||'');
   m.grupoId=grupoVals.grupoId;
-  m.ngComunidadId=grupoVals.ngComunidadId;
   await nvAplicarParticipando(m);
   if(isSuperAdmin()){
     const fechaVal=document.getElementById('nv-edit-fecha')?.value.trim();
@@ -13769,6 +13792,7 @@ async function nvReactivar(){
     autor:currentUser?.name||'Sistema',
     ts:Date.now()
   });
+  m._ts=Date.now();
   if(document.getElementById('nv-comentario-txt')) document.getElementById('nv-comentario-txt').value='';
   await saveK(SK.members,S.members);
   try{
@@ -14344,6 +14368,7 @@ async function nvAplicarGraduacion(m, destino){
     m.condicion='Historico';
     m.estado='Baja';
   }
+  m._ts=Date.now();
 }
 
 // ── Comentarios de Campaña (sin cambio de estado) ──
@@ -14379,11 +14404,14 @@ async function nvCampGuardarComentario(){
   if(!m.comentarios) m.comentarios=[];
   var nuevoComentario={texto:txt,autor:currentUser?.name||'Sistema',ts:Date.now()};
   m.comentarios.push(nuevoComentario);
+  var prevTs=m._ts;
+  m._ts=Date.now();
   await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     m.comentarios=m.comentarios.filter(function(c){return c!==nuevoComentario;});
+    m._ts=prevTs;
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -14480,15 +14508,19 @@ function nvBuildGrupoSelector(selId, selectedId){
 }
 
 function nvGetGrupoIdFromVal(val){
-  if(!val) return {grupoId:null, ngComunidadId:null};
-  if(val.startsWith('gdv_')) return {grupoId:parseInt(val.replace('gdv_','')), ngComunidadId:null};
-  if(val.startsWith('ng_')) return {grupoId:null, ngComunidadId:parseInt(val.replace('ng_',''))};
-  return {grupoId:null, ngComunidadId:null};
+  if(!val) return {grupoId:null};
+  if(val.startsWith('gdv_')) return {grupoId:parseInt(val.replace('gdv_',''))};
+  if(val.startsWith('ng_')) return {grupoId:parseInt(val.replace('ng_',''))};
+  return {grupoId:null};
 }
 
+// Determina el prefijo (gdv_/ng_) buscando en qué lista vive realmente ese id — grupoId es el
+// mismo campo para ambos casos en todo el resto de la app (ver ngGetMembersOfComunidad), así que
+// hace falta mirar en qué array está para saber si mostrarlo como Grupo de Vida o Comunidad NG.
 function nvGetGrupoValFromMember(m){
-  if(m.grupoId) return 'gdv_'+m.grupoId;
-  if(m.ngComunidadId) return 'ng_'+m.ngComunidadId;
+  if(!m.grupoId) return '';
+  if((S.groups||[]).some(function(g){return Number(g.id)===Number(m.grupoId);})) return 'gdv_'+m.grupoId;
+  if((S.ngComunidades||[]).some(function(ng){return Number(ng.id)===Number(m.grupoId);})) return 'ng_'+m.grupoId;
   return '';
 }
 
@@ -14503,7 +14535,7 @@ function nvOpenInlineForm(prefill){
     const fnacEl=document.getElementById('nv-mf-fnac'); if(fnacEl) fnacEl.value='';
     const genEl=document.getElementById('nv-mf-genero'); if(genEl) genEl.value='';
     const dniNvEl=document.getElementById('nv-mf-dni'); if(dniNvEl) dniNvEl.value='';
-    nvBuildGrupoSelector('nv-mf-grupo', prefill?.grupoId?'gdv_'+prefill.grupoId:'');
+    nvBuildGrupoSelector('nv-mf-grupo', prefill?.grupoId?(prefill.tipoGrupo==='ng'?'ng_':'gdv_')+prefill.grupoId:'');
     const como=document.getElementById('nv-mf-como'); if(como) como.value='';
     const seg=document.getElementById('nv-mf-seguimiento-id'); if(seg) seg.value='';
     document.getElementById('nv-mf-seguimiento-label').textContent='Pendiente de asignar';
@@ -17566,6 +17598,28 @@ async function pnvEnviar(){
   var btn=document.getElementById('pnv-submit-btn');
   var textoOriginal=btn?btn.textContent:'';
   if(btn){ btn.disabled=true; btn.style.opacity='.6'; btn.style.cursor='default'; btn.textContent='Enviando...'; }
+
+  // 0) Chequeo de duplicado: si ya existe alguien con este mismo teléfono anotado en esta misma
+  // Campaña (o en el mismo QR general de "Nuevo Contacto" si no hay Campaña), no se crea un
+  // registro nuevo — evita los triplicados típicos de quien reintenta porque no vio confirmación
+  // a tiempo, o vuelve a escanear el mismo QR sin darse cuenta de que ya se había anotado.
+  var telNormalizado=cel.replace(/\D/g,'');
+  try{
+    var membersChk=JSON.parse(localStorage.getItem('gdv_m5')||'[]');
+    var yaExiste=membersChk.some(function(m){
+      if(!m.tel) return false;
+      if(String(m.tel).replace(/\D/g,'')!==telNormalizado) return false;
+      return campanaId ? String(m.campanaId)===String(campanaId) : !m.campanaId;
+    });
+    if(yaExiste){
+      if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent=textoOriginal; }
+      var formWrapDup=document.getElementById('pnv-form-wrap');
+      var successDup=document.getElementById('pnv-success');
+      if(formWrapDup) formWrapDup.style.display='none';
+      if(successDup) successDup.style.display='block';
+      return;
+    }
+  }catch(e){ /* si falla el chequeo, seguimos normal — no bloqueamos el alta por esto */ }
 
   // 1) Guardar en este dispositivo, y verificar que realmente quedó guardado
   var guardadoLocal=false;

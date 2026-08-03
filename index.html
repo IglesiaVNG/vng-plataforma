@@ -409,7 +409,7 @@ const KEY_GROUPS = {
   'modules': ['gdv_modules5'],
   'homeConfig': ['gdv_home_config'],
   'agenda':  ['gdv_ministerios','_tomb_gdv_eventos','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas','_tomb_gdv_checklist_secciones','gdv_checklist_secciones'],
-  'campanas':['gdv_campanas'],
+  'campanas':['_tomb_gdv_campanas','gdv_campanas'],
   'formularios': ['_tomb_gdv_formularios','gdv_formularios','_tomb_gdv_form_respuestas','gdv_form_respuestas','_tomb_gdv_form_analisis','gdv_form_analisis'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
                'of5_part','of5_obspart','of5_obspago','of5_materias'],
@@ -438,8 +438,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -597,8 +597,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -4895,10 +4895,10 @@ async function campanaSaveCampana(){
   var snapshotCamp=null, esNuevaCamp=false, nuevaCampRef=null, camp;
   if(campanaEditingId){
     camp=S.campanas.find(function(x){return Number(x.id)===Number(campanaEditingId);});
-    if(camp){ snapshotCamp=Object.assign({},camp); camp.nombre=nombre; camp.fechaInicio=fechaInicio; camp.fechaFin=fechaFin; }
+    if(camp){ snapshotCamp=Object.assign({},camp); camp.nombre=nombre; camp.fechaInicio=fechaInicio; camp.fechaFin=fechaFin; camp._ts=Date.now(); }
   } else {
     esNuevaCamp=true;
-    nuevaCampRef={id:Date.now(),nombre,fechaInicio,fechaFin,activo:true,ts:Date.now()};
+    nuevaCampRef={id:Date.now(),nombre,fechaInicio,fechaFin,activo:true,ts:Date.now(),_ts:Date.now()};
     S.campanas.push(nuevaCampRef);
   }
   await saveK(SK.campanas,S.campanas);
@@ -4923,12 +4923,15 @@ async function campanaToggleActiva(id, activo){
   var camp=S.campanas.find(function(x){return Number(x.id)===Number(id);});
   if(!camp) return;
   var prev=camp.activo;
+  var prevTs=camp._ts;
   camp.activo=activo;
+  camp._ts=Date.now();
   await saveK(SK.campanas,S.campanas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     camp.activo=prev;
+    camp._ts=prevTs;
     await saveK(SK.campanas,S.campanas);
     campanaRenderList();
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
@@ -4948,6 +4951,7 @@ async function campanaDeleteCampana(id){
   }
   if(!confirm('¿Eliminar la Campaña "'+camp.nombre+'"? Esta acción no se puede deshacer.')) return;
   S.campanas=S.campanas.filter(function(x){return Number(x.id)!==Number(id);});
+  addTombstone(SK.campanas,id);
   try{
     await saveK(SK.campanas,S.campanas);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -12827,7 +12831,7 @@ function buildNuevosHTML(){
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid #F3F4F6">
           <label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">💬 Mensaje para WhatsApp (el material del día — usá <code>{nombre}</code> para personalizar)</label>
           <textarea id="nv-camp-msg-wa" rows="2" placeholder="Ej: Hola {nombre}! Te comparto el material de hoy: ..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid #D1D5DB;resize:vertical"></textarea>
-          <div style="display:flex;justify-content:flex-end;margin-top:6px">
+          <div id="nv-camp-msg-wa-acciones" style="display:flex;justify-content:flex-end;margin-top:6px">
             <button class="btn btn-sm btn-primary" onclick="nvGuardarMensajeWA()">Guardar mensaje</button>
           </div>
         </div>
@@ -14105,16 +14109,20 @@ async function nvAbrirWhatsapp(id){
 }
 
 async function nvGuardarMensajeWA(){
+  if(!nvPuedeEditarMensajeWA()) return;
   var camp=nvCampanaActual();
   if(!camp){ showToast('Elegí una Campaña primero','#D97706'); return; }
   var nuevoMsg=(document.getElementById('nv-camp-msg-wa')||{value:''}).value;
   var snapshot=camp.mensajeWhatsapp;
+  var prevTs=camp._ts;
   camp.mensajeWhatsapp=nuevoMsg;
+  camp._ts=Date.now();
   await saveK(SK.campanas,S.campanas);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     camp.mensajeWhatsapp=snapshot;
+    camp._ts=prevTs;
     await saveK(SK.campanas,S.campanas);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -14153,14 +14161,44 @@ function nvExportarCampanaExcel(){
   showToast('📊 '+contactos.length+' contacto'+(contactos.length!==1?'s':'')+' exportado'+(contactos.length!==1?'s':''),'#16A34A');
 }
 
+// Editar el mensaje de WhatsApp del día: exclusivo Super Admin y Pastor. El resto (Contactar y
+// demás) solo lo ve y lo puede copiar — evita que alguien lo pise sin querer mientras otro lo
+// está usando para mandar los mensajes del día.
+function nvPuedeEditarMensajeWA(){
+  return isSuperAdmin()||hasRole('pastor');
+}
+function nvCopiarMensajeWA(){
+  var msgEl=document.getElementById('nv-camp-msg-wa');
+  if(!msgEl) return;
+  msgEl.focus(); msgEl.select();
+  try{ msgEl.setSelectionRange(0,999999); }catch(e){}
+  var copiado=false;
+  try{ copiado=document.execCommand&&document.execCommand('copy'); }catch(e){ copiado=false; }
+  if(copiado){ showToast('📋 Copiado','#16A34A'); return; }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(msgEl.value).then(function(){ showToast('📋 Copiado','#16A34A'); })
+      .catch(function(){ showToast('Ya está seleccionado — copialo con el teclado','#D97706'); });
+  } else {
+    showToast('Ya está seleccionado — copialo con el teclado','#D97706');
+  }
+}
+
 function nvRenderCampana(){
   var camp=nvCampanaActual();
   var infoEl=document.getElementById('nv-camp-info');
   var listEl=document.getElementById('nv-campana-list');
   var msgEl=document.getElementById('nv-camp-msg-wa');
+  var msgAcciones=document.getElementById('nv-camp-msg-wa-acciones');
   nvCampSeleccionados=[];
   nvCampActualizarToolbar();
   if(msgEl) msgEl.value=camp?(camp.mensajeWhatsapp||''):'';
+  var puedeEditarMsg=nvPuedeEditarMensajeWA();
+  if(msgEl) msgEl.readOnly=!puedeEditarMsg;
+  if(msgAcciones){
+    msgAcciones.innerHTML=puedeEditarMsg
+      ?'<button class="btn btn-sm btn-primary" onclick="nvGuardarMensajeWA()">Guardar mensaje</button>'
+      :'<button class="btn btn-sm" onclick="nvCopiarMensajeWA()">📋 Copiar</button>';
+  }
   if(!camp){
     if(infoEl) infoEl.innerHTML='';
     if(listEl) listEl.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">'+(S.campanas.length?'Elegí una Campaña arriba para ver sus contactos.':'Sin Campañas cargadas — creá una desde Configuración → Campañas.')+'</div>';
@@ -14558,6 +14596,7 @@ async function nvSaveInlineForm(){
       fechaRegistro:todayAA(),
       origen:'Carga manual',
       dni:dni,
+      ts:new Date().toISOString(),_ts:Date.now(),
       ...nvGetGrupoIdFromVal(document.getElementById('nv-mf-grupo')?.value||'')
     };
     S.members.push(nuevo);
@@ -17542,6 +17581,7 @@ async function pnvEnviar(){
       dir:barrio,fnac:fnac,edadDeclarada:edadOk?edadNum:null,roles:[],
       motivoContacto:motivo,
       fechaRegistro:todayAA(),
+      ts:new Date().toISOString(),_ts:Date.now()
     }, campanaId?{
       condicion:'Campaña',campanaId:campanaId,
       comoNosConocio:campanaObj?campanaObj.nombre:'Campaña',

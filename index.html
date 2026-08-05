@@ -375,7 +375,19 @@ import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/1
 // Detect environment: PROD only if exact production URL, everything else = DEV
 const _PROD_HOSTS = ['vng-plataforma.vercel.app', 'iglesiavng.vercel.app'];
 const _isProd = _PROD_HOSTS.includes(window.location.hostname);
-const VNG_COL = _isProd ? 'vng' : 'vng_dev';
+
+// ── MULTI-TENANCY — Fase A, Paso 4 ──────────────────────────
+// Resolución de tenant (iglesia). Hoy fijo/hardcodeado mientras se prueba en DEV;
+// en Fase B (login real) se reemplaza por el tenant de la persona logueada.
+// Estructura Firestore: tenants/{tenantId}/data/{docName} (prod) o data_dev/{docName} (dev).
+// Toda lectura/escritura pasa por vngDocRef() — es el único punto que arma la ruta,
+// así ninguna de las funciones de guardado existentes necesita tocarse.
+const TENANT_ID = 'vidanuevagerli';
+const _TENANT_DATA_SEG = _isProd ? 'data' : 'data_dev';
+function vngDocRef(docName){
+  return doc(db, 'tenants', TENANT_ID, _TENANT_DATA_SEG, docName);
+}
+window._vngTenantId = TENANT_ID; // referenciable fuera del module para diagnóstico
 
 const firebaseConfig = {
   apiKey: "AIzaSyCuyEMfRh_It13tBv71itzXW_OT1kliGMY",
@@ -445,7 +457,7 @@ window.fbUpload = async function(force) {
     const uploadTs=Date.now();
     localStorage.setItem('_vng_last_upload', String(uploadTs));
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
-      const docRef = doc(db, VNG_COL, docName);
+      const docRef = vngDocRef(docName);
       const needsMerge = keys.some(function(k){ return MERGE_KEYS.includes(k) || TOMB_KEYS.includes(k); });
       if(needsMerge){
         await runTransaction(db, async (transaction) => {
@@ -567,7 +579,7 @@ window.addTombstone = addTombstone;
 // sin que alguien tenga que ir a buscarlo a mano dispositivo por dispositivo.
 window.fbCheckOrphan = async function(docName, key, recordId){
   try{
-    const snap = await getDoc(doc(db, VNG_COL, docName));
+    const snap = await getDoc(vngDocRef(docName));
     if(!snap.exists()) return true;
     const cloudData = snap.data();
     if(!cloudData[key]) return true;
@@ -584,7 +596,7 @@ function mergeMembers(localStr, cloudStr){ return mergeByTs(localStr, cloudStr, 
 window.fbDownload = async function() {
   try {
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
-      const snap = await getDoc(doc(db, VNG_COL, docName));
+      const snap = await getDoc(vngDocRef(docName));
       if(snap.exists()) {
         const data = snap.data();
         keys.forEach(k => {
@@ -644,13 +656,13 @@ window.syncNow = async function() {
 // Dedicated permisos read/write using vng/config (existing working path)
 window.fbSavePermisos = async function(permisosStr) {
   try {
-    await setDoc(doc(db,VNG_COL,'config'), {gdv_permisos: permisosStr, gdv_permisos_ts: Date.now()}, {merge:true});
+    await setDoc(vngDocRef('config'), {gdv_permisos: permisosStr, gdv_permisos_ts: Date.now()}, {merge:true});
     return true;
   } catch(e) { console.error('fbSavePermisos error:', e); return false; }
 };
 window.fbLoadPermisos = async function() {
   try {
-    const snap = await getDoc(doc(db,VNG_COL,'config'));
+    const snap = await getDoc(vngDocRef('config'));
     if(snap.exists() && snap.data().gdv_permisos) return snap.data();
     return null;
   } catch(e) { return null; }
@@ -665,7 +677,7 @@ const APP_VERSION = '2026-07-22-a';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
-    const ref = doc(db, VNG_COL, 'config');
+    const ref = vngDocRef('config');
     const snap = await getDoc(ref);
     const stored = snap.exists() ? (snap.data()._app_version||'') : '';
     if(!stored || APP_VERSION > stored){
@@ -684,8 +696,34 @@ async function fbCheckVersion(){
 fbCheckVersion();
 setInterval(fbCheckVersion, 90000); // reintentar cada 90 segundos mientras la app esté abierta
 
+// ── MULTI-TENANCY — Fase A, Paso 4: chequeo de tenant activo ──
+// Antes de cargar cualquier dato ministerial, se valida que la iglesia (tenant)
+// esté activa. Hoy con un solo tenant siempre activo esto no cambia nada visible,
+// pero queda listo para cuando haya que suspender el acceso de una iglesia sin
+// tener que tocar código (ej. si deja de pagar).
+async function fbCheckTenantActive(){
+  try{
+    const snap = await getDoc(doc(db, 'tenants', TENANT_ID));
+    if(!snap.exists()) return true; // tenant sin doc de metadata todavía: no bloquear (ej. primer arranque)
+    const data = snap.data();
+    return data.activo !== false; // activo:false explícito bloquea; ausencia del campo no bloquea
+  }catch(e){
+    console.warn('No se pudo verificar el estado del tenant:', e);
+    return true; // ante un error de red, no bloquear el acceso — más seguro para el usuario
+  }
+}
+
 // Auto-download when Firebase is ready (fixes mobile timing issue)
-window.fbDownload().then(function(hasData) {
+fbCheckTenantActive().then(function(isActive){
+  if(!isActive){
+    window._vngUpdating = true; // evita que fbCheckVersion dispare un reload en medio del bloqueo
+    document.getElementById('app-content') && (document.getElementById('app-content').innerHTML =
+      '<div style="max-width:420px;margin:80px auto;text-align:center;padding:24px;font-family:sans-serif">'+
+      '<div style="font-size:15px;color:#374151">Esta cuenta no está disponible.<br>Contactá al administrador.</div></div>');
+    console.warn('Tenant inactivo — acceso bloqueado antes de cargar datos');
+    return;
+  }
+  window.fbDownload().then(function(hasData) {
   // Cargar permisos desde Firebase separadamente via fbLoadPermisos (tiene acceso al scope correcto)
   if(typeof window.fbLoadPermisos === 'function'){
     window.fbLoadPermisos().then(function(data){
@@ -752,6 +790,7 @@ window.fbDownload().then(function(hasData) {
     }catch(e){ console.error('Firebase post-sync error:',e); }
   }
   }).catch(function(e){ console.error('Firebase auto-download error:', e); });
+}).catch(function(e){ console.error('Firebase tenant-check error:', e); });
 </script>
 
 <script>

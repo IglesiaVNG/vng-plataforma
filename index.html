@@ -375,19 +375,7 @@ import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/1
 // Detect environment: PROD only if exact production URL, everything else = DEV
 const _PROD_HOSTS = ['vng-plataforma.vercel.app', 'iglesiavng.vercel.app'];
 const _isProd = _PROD_HOSTS.includes(window.location.hostname);
-
-// ── MULTI-TENANCY — Fase A, Paso 4 ──────────────────────────
-// Resolución de tenant (iglesia). Hoy fijo/hardcodeado mientras se prueba en DEV;
-// en Fase B (login real) se reemplaza por el tenant de la persona logueada.
-// Estructura Firestore: tenants/{tenantId}/data/{docName} (prod) o data_dev/{docName} (dev).
-// Toda lectura/escritura pasa por vngDocRef() — es el único punto que arma la ruta,
-// así ninguna de las funciones de guardado existentes necesita tocarse.
-const TENANT_ID = 'vidanuevagerli';
-const _TENANT_DATA_SEG = _isProd ? 'data' : 'data_dev';
-function vngDocRef(docName){
-  return doc(db, 'tenants', TENANT_ID, _TENANT_DATA_SEG, docName);
-}
-window._vngTenantId = TENANT_ID; // referenciable fuera del module para diagnóstico
+const VNG_COL = _isProd ? 'vng' : 'vng_dev';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCuyEMfRh_It13tBv71itzXW_OT1kliGMY",
@@ -457,7 +445,7 @@ window.fbUpload = async function(force) {
     const uploadTs=Date.now();
     localStorage.setItem('_vng_last_upload', String(uploadTs));
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
-      const docRef = vngDocRef(docName);
+      const docRef = doc(db, VNG_COL, docName);
       const needsMerge = keys.some(function(k){ return MERGE_KEYS.includes(k) || TOMB_KEYS.includes(k); });
       if(needsMerge){
         await runTransaction(db, async (transaction) => {
@@ -579,7 +567,7 @@ window.addTombstone = addTombstone;
 // sin que alguien tenga que ir a buscarlo a mano dispositivo por dispositivo.
 window.fbCheckOrphan = async function(docName, key, recordId){
   try{
-    const snap = await getDoc(vngDocRef(docName));
+    const snap = await getDoc(doc(db, VNG_COL, docName));
     if(!snap.exists()) return true;
     const cloudData = snap.data();
     if(!cloudData[key]) return true;
@@ -596,7 +584,7 @@ function mergeMembers(localStr, cloudStr){ return mergeByTs(localStr, cloudStr, 
 window.fbDownload = async function() {
   try {
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
-      const snap = await getDoc(vngDocRef(docName));
+      const snap = await getDoc(doc(db, VNG_COL, docName));
       if(snap.exists()) {
         const data = snap.data();
         keys.forEach(k => {
@@ -656,13 +644,13 @@ window.syncNow = async function() {
 // Dedicated permisos read/write using vng/config (existing working path)
 window.fbSavePermisos = async function(permisosStr) {
   try {
-    await setDoc(vngDocRef('config'), {gdv_permisos: permisosStr, gdv_permisos_ts: Date.now()}, {merge:true});
+    await setDoc(doc(db,VNG_COL,'config'), {gdv_permisos: permisosStr, gdv_permisos_ts: Date.now()}, {merge:true});
     return true;
   } catch(e) { console.error('fbSavePermisos error:', e); return false; }
 };
 window.fbLoadPermisos = async function() {
   try {
-    const snap = await getDoc(vngDocRef('config'));
+    const snap = await getDoc(doc(db,VNG_COL,'config'));
     if(snap.exists() && snap.data().gdv_permisos) return snap.data();
     return null;
   } catch(e) { return null; }
@@ -677,7 +665,7 @@ const APP_VERSION = '2026-07-22-a';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
-    const ref = vngDocRef('config');
+    const ref = doc(db, VNG_COL, 'config');
     const snap = await getDoc(ref);
     const stored = snap.exists() ? (snap.data()._app_version||'') : '';
     if(!stored || APP_VERSION > stored){
@@ -696,34 +684,8 @@ async function fbCheckVersion(){
 fbCheckVersion();
 setInterval(fbCheckVersion, 90000); // reintentar cada 90 segundos mientras la app esté abierta
 
-// ── MULTI-TENANCY — Fase A, Paso 4: chequeo de tenant activo ──
-// Antes de cargar cualquier dato ministerial, se valida que la iglesia (tenant)
-// esté activa. Hoy con un solo tenant siempre activo esto no cambia nada visible,
-// pero queda listo para cuando haya que suspender el acceso de una iglesia sin
-// tener que tocar código (ej. si deja de pagar).
-async function fbCheckTenantActive(){
-  try{
-    const snap = await getDoc(doc(db, 'tenants', TENANT_ID));
-    if(!snap.exists()) return true; // tenant sin doc de metadata todavía: no bloquear (ej. primer arranque)
-    const data = snap.data();
-    return data.activo !== false; // activo:false explícito bloquea; ausencia del campo no bloquea
-  }catch(e){
-    console.warn('No se pudo verificar el estado del tenant:', e);
-    return true; // ante un error de red, no bloquear el acceso — más seguro para el usuario
-  }
-}
-
 // Auto-download when Firebase is ready (fixes mobile timing issue)
-fbCheckTenantActive().then(function(isActive){
-  if(!isActive){
-    window._vngUpdating = true; // evita que fbCheckVersion dispare un reload en medio del bloqueo
-    document.getElementById('app-content') && (document.getElementById('app-content').innerHTML =
-      '<div style="max-width:420px;margin:80px auto;text-align:center;padding:24px;font-family:sans-serif">'+
-      '<div style="font-size:15px;color:#374151">Esta cuenta no está disponible.<br>Contactá al administrador.</div></div>');
-    console.warn('Tenant inactivo — acceso bloqueado antes de cargar datos');
-    return;
-  }
-  window.fbDownload().then(function(hasData) {
+window.fbDownload().then(function(hasData) {
   // Cargar permisos desde Firebase separadamente via fbLoadPermisos (tiene acceso al scope correcto)
   if(typeof window.fbLoadPermisos === 'function'){
     window.fbLoadPermisos().then(function(data){
@@ -790,7 +752,6 @@ fbCheckTenantActive().then(function(isActive){
     }catch(e){ console.error('Firebase post-sync error:',e); }
   }
   }).catch(function(e){ console.error('Firebase auto-download error:', e); });
-}).catch(function(e){ console.error('Firebase tenant-check error:', e); });
 </script>
 
 <script>
@@ -2215,10 +2176,10 @@ function ngAutoComplete(query){
   if(!dropdown) return;
   if(query.length<2){dropdown.style.display='none';return;}
   let pool=S.members.filter(function(m){ return m.estado!=='Baja'; });
-  // Personas Nuevas: solo condición Nuevo O sin grupo/comunidad asignada
+  // Personas Nuevas: solo quienes todavía NO tienen grupo/comunidad asignada — ver misma nota
+  // en gdvAutoComplete sobre por qué ya no alcanza con mirar la condición.
   pool=pool.filter(function(m){
-    const sinGrupo=!m.grupoId&&!(m.grupoIds||[]).length;
-    return m.condicion==='Nuevo'||sinGrupo;
+    return !m.grupoId&&!(m.grupoIds||[]).length;
   });
   const q=query.toLowerCase();
   const results=pool.filter(function(m){
@@ -10306,10 +10267,12 @@ function gdvAutoComplete(type, query){
     }
     // Super Admin y facilitadores sin grupo propio: mostrar todos
   } else if(type==='new'){
-    // Personas Nuevas: solo condición Nuevo O sin grupo GdV asignado
+    // Personas Nuevas: solo quienes todavía NO tienen grupo asignado. Antes también aparecían
+    // acá los que ya tenían condición "Nuevo" aunque YA estuvieran vinculados a un grupo — eso
+    // hacía que se los siguiera encontrando en esta búsqueda y pareciera que "no quedaban
+    // guardados", cuando en realidad ya figuraban como Integrantes en la lista de Asistencia.
     pool=pool.filter(function(m){
-      const sinGrupo=!m.grupoId&&!(m.grupoIds||[]).length;
-      return m.condicion==='Nuevo'||sinGrupo;
+      return !m.grupoId&&!(m.grupoIds||[]).length;
     });
   }
 
@@ -12986,6 +12949,10 @@ function buildNuevosHTML(){
           👤 Seguimiento: <span id="nv-promote-seg" style="color:#1F4E79;font-weight:600">—</span>
           <button onclick="nvEditSeguimiento(nvSelectedId)" class="btn btn-sm" style="margin-left:8px;font-size:11px">Asignar</button>
         </div>
+        <div id="nv-promote-grupo-wrap" style="margin-bottom:1rem;padding:10px 12px;background:#F9FAFB;border-radius:8px">
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">🏘 Grupo de Vida / Comunidad NG <span style="font-weight:400;color:#9CA3AF">(opcional — para vincularla ya, sin esperar a la próxima Asistencia)</span></label>
+          <select id="nv-promote-grupo" style="width:100%"><option value="">— Sin asignar —</option></select>
+        </div>
         <div id="nv-promote-nopermiso" style="display:none"></div>
         <div id="nv-promote-acciones" style="flex-direction:column;gap:10px;display:flex">
         <!-- Re-activar (solo para histórico) -->
@@ -13349,6 +13316,7 @@ function nvOpenPromote(id){
   nvDraftSeguimientoSet=false;
   const segEl=document.getElementById('nv-promote-seg');
   if(segEl) segEl.textContent=m.seguimientoNombre||'Pendiente de asignar';
+  nvBuildGrupoSelector('nv-promote-grupo', nvGetGrupoValFromMember(m));
   nvRenderComentarios(m);
   // Show/hide buttons based on condition
   const isHistorico=m.condicion==='Historico'||m.estado==='Baja';
@@ -13374,6 +13342,8 @@ function nvOpenPromote(id){
   if(accionesWrap) accionesWrap.style.display=canGest?'flex':'none';
   const segWrap=document.getElementById('nv-promote-seg-wrap');
   if(segWrap) segWrap.style.display=canGest?'block':'none';
+  const grupoWrap=document.getElementById('nv-promote-grupo-wrap');
+  if(grupoWrap) grupoWrap.style.display=canGest?'block':'none';
   const noPermiso=document.getElementById('nv-promote-nopermiso');
   if(noPermiso) noPermiso.style.display=canGest?'none':'block';
   document.getElementById('nv-promote-overlay').style.display='flex';
@@ -13389,6 +13359,15 @@ function nvConfirmarGestion(){
   if(nvDraftSeguimientoSet){
     m.seguimientoId=nvDraftSeguimientoId;
     m.seguimientoNombre=nvDraftSeguimientoNombre;
+  }
+  // Aplicar el Grupo/Comunidad elegido (segundo camino: vincularla desde acá, sin depender de
+  // que se la agregue primero en una Carga de Asistencia)
+  var grupoSelVal=document.getElementById('nv-promote-grupo')?.value||'';
+  var nuevoGrupoId=nvGetGrupoIdFromVal(grupoSelVal).grupoId;
+  if(nuevoGrupoId!==(m.grupoId||null)){
+    m.grupoId=nuevoGrupoId;
+    nvHuboCambioGrupo=true;
+    if(m.grupoId) nvAplicarParticipando(m);
   }
   const isHistorico=m.condicion==='Historico'||m.estado==='Baja';
   if(isHistorico) return nvGuardarComentario(); // Re-activar tiene su propio botón
@@ -13411,6 +13390,7 @@ function nvConfirmarGestion(){
 function nvClosePromote(){
   document.getElementById('nv-promote-overlay').style.display='none';
   nvSelectedId=null;
+  nvHuboCambioGrupo=false;
   // Descartar cualquier selección de Seguimiento no confirmada
   nvDraftSeguimientoId=null;
   nvDraftSeguimientoNombre=null;
@@ -13477,14 +13457,17 @@ function nvRenderComentarios(m){
   }
 }
 
+let nvHuboCambioGrupo=false;
+
 async function nvGuardarComentario(){
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m||!nvCanComentario(m)) return;
   const txt=(document.getElementById('nv-comentario-txt')?.value||'').trim();
   const huboSeguimiento=nvDraftSeguimientoSet;
-  if(!txt&&!huboSeguimiento){showToast('No hay cambios para confirmar','#6B7280');return;}
+  if(!txt&&!huboSeguimiento&&!nvHuboCambioGrupo){showToast('No hay cambios para confirmar','#6B7280');return;}
+  nvHuboCambioGrupo=false;
   var comentarioAgregado=null;
-  var prevTs=m._ts;
+  var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),_ts:m._ts};
   if(txt){
     if(!m.comentarios) m.comentarios=[];
     comentarioAgregado={
@@ -13501,7 +13484,7 @@ async function nvGuardarComentario(){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     if(comentarioAgregado) m.comentarios=m.comentarios.filter(function(c){return c!==comentarioAgregado;});
-    m._ts=prevTs;
+    Object.assign(m,snapshot);
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -13516,7 +13499,7 @@ async function nvCambiarSubEstadoManual(nuevoSubEstado){
   if(!m) return;
   const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
   const anterior=m.subEstado||'Ingresado';
-  var snapshot={subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
+  var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   m.subEstado=nuevoSubEstado;
   if(nuevoSubEstado==='Contactado'&&anterior!=='Contactado'){
     m.contactadoPor=currentUser?.name||'Sistema';
@@ -13586,7 +13569,7 @@ async function nvGuardarComentarioContactar(){
     alert('Para registrar el primer contacto escribí un comentario de al menos 10 caracteres (cómo fue, qué se conversó).');
     return;
   }
-  var snapshot={subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
+  var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   if(!m.comentarios) m.comentarios=[];
   m.comentarios.push({texto:txt,autor:currentUser?.name||'Sistema',ts:Date.now()});
   if(esPrimerContacto){
@@ -13627,7 +13610,7 @@ async function nvPromover(condicion){
     document.getElementById('nv-comentario-txt')?.focus();
     return;
   }
-  var snapshot={condicion:m.condicion,subEstado:m.subEstado,comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
+  var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,condicion:m.condicion,subEstado:m.subEstado,comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   const condAnterior=m.condicion||'Nuevo';
   m.condicion=condicion;
   if(condicion!=='Nuevo'){

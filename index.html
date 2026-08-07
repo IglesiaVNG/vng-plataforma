@@ -2176,10 +2176,10 @@ function ngAutoComplete(query){
   if(!dropdown) return;
   if(query.length<2){dropdown.style.display='none';return;}
   let pool=S.members.filter(function(m){ return m.estado!=='Baja'; });
-  // Personas Nuevas: solo condición Nuevo O sin grupo/comunidad asignada
+  // Personas Nuevas: solo quienes todavía NO tienen grupo/comunidad asignada — ver misma nota
+  // en gdvAutoComplete sobre por qué ya no alcanza con mirar la condición.
   pool=pool.filter(function(m){
-    const sinGrupo=!m.grupoId&&!(m.grupoIds||[]).length;
-    return m.condicion==='Nuevo'||sinGrupo;
+    return !m.grupoId&&!(m.grupoIds||[]).length;
   });
   const q=query.toLowerCase();
   const results=pool.filter(function(m){
@@ -10267,10 +10267,12 @@ function gdvAutoComplete(type, query){
     }
     // Super Admin y facilitadores sin grupo propio: mostrar todos
   } else if(type==='new'){
-    // Personas Nuevas: solo condición Nuevo O sin grupo GdV asignado
+    // Personas Nuevas: solo quienes todavía NO tienen grupo asignado. Antes también aparecían
+    // acá los que ya tenían condición "Nuevo" aunque YA estuvieran vinculados a un grupo — eso
+    // hacía que se los siguiera encontrando en esta búsqueda y pareciera que "no quedaban
+    // guardados", cuando en realidad ya figuraban como Integrantes en la lista de Asistencia.
     pool=pool.filter(function(m){
-      const sinGrupo=!m.grupoId&&!(m.grupoIds||[]).length;
-      return m.condicion==='Nuevo'||sinGrupo;
+      return !m.grupoId&&!(m.grupoIds||[]).length;
     });
   }
 
@@ -12947,6 +12949,10 @@ function buildNuevosHTML(){
           👤 Seguimiento: <span id="nv-promote-seg" style="color:#1F4E79;font-weight:600">—</span>
           <button onclick="nvEditSeguimiento(nvSelectedId)" class="btn btn-sm" style="margin-left:8px;font-size:11px">Asignar</button>
         </div>
+        <div id="nv-promote-grupo-wrap" style="margin-bottom:1rem;padding:10px 12px;background:#F9FAFB;border-radius:8px">
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">🏘 Grupo de Vida / Comunidad NG <span style="font-weight:400;color:#9CA3AF">(opcional — para vincularla ya, sin esperar a la próxima Asistencia)</span></label>
+          <select id="nv-promote-grupo" style="width:100%"><option value="">— Sin asignar —</option></select>
+        </div>
         <div id="nv-promote-nopermiso" style="display:none"></div>
         <div id="nv-promote-acciones" style="flex-direction:column;gap:10px;display:flex">
         <!-- Re-activar (solo para histórico) -->
@@ -13310,6 +13316,7 @@ function nvOpenPromote(id){
   nvDraftSeguimientoSet=false;
   const segEl=document.getElementById('nv-promote-seg');
   if(segEl) segEl.textContent=m.seguimientoNombre||'Pendiente de asignar';
+  nvBuildGrupoSelector('nv-promote-grupo', nvGetGrupoValFromMember(m));
   nvRenderComentarios(m);
   // Show/hide buttons based on condition
   const isHistorico=m.condicion==='Historico'||m.estado==='Baja';
@@ -13335,6 +13342,8 @@ function nvOpenPromote(id){
   if(accionesWrap) accionesWrap.style.display=canGest?'flex':'none';
   const segWrap=document.getElementById('nv-promote-seg-wrap');
   if(segWrap) segWrap.style.display=canGest?'block':'none';
+  const grupoWrap=document.getElementById('nv-promote-grupo-wrap');
+  if(grupoWrap) grupoWrap.style.display=canGest?'block':'none';
   const noPermiso=document.getElementById('nv-promote-nopermiso');
   if(noPermiso) noPermiso.style.display=canGest?'none':'block';
   document.getElementById('nv-promote-overlay').style.display='flex';
@@ -13350,6 +13359,15 @@ function nvConfirmarGestion(){
   if(nvDraftSeguimientoSet){
     m.seguimientoId=nvDraftSeguimientoId;
     m.seguimientoNombre=nvDraftSeguimientoNombre;
+  }
+  // Aplicar el Grupo/Comunidad elegido (segundo camino: vincularla desde acá, sin depender de
+  // que se la agregue primero en una Carga de Asistencia)
+  var grupoSelVal=document.getElementById('nv-promote-grupo')?.value||'';
+  var nuevoGrupoId=nvGetGrupoIdFromVal(grupoSelVal).grupoId;
+  if(nuevoGrupoId!==(m.grupoId||null)){
+    m.grupoId=nuevoGrupoId;
+    nvHuboCambioGrupo=true;
+    if(m.grupoId) nvAplicarParticipando(m);
   }
   const isHistorico=m.condicion==='Historico'||m.estado==='Baja';
   if(isHistorico) return nvGuardarComentario(); // Re-activar tiene su propio botón
@@ -13372,6 +13390,7 @@ function nvConfirmarGestion(){
 function nvClosePromote(){
   document.getElementById('nv-promote-overlay').style.display='none';
   nvSelectedId=null;
+  nvHuboCambioGrupo=false;
   // Descartar cualquier selección de Seguimiento no confirmada
   nvDraftSeguimientoId=null;
   nvDraftSeguimientoNombre=null;
@@ -13438,14 +13457,17 @@ function nvRenderComentarios(m){
   }
 }
 
+let nvHuboCambioGrupo=false;
+
 async function nvGuardarComentario(){
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m||!nvCanComentario(m)) return;
   const txt=(document.getElementById('nv-comentario-txt')?.value||'').trim();
   const huboSeguimiento=nvDraftSeguimientoSet;
-  if(!txt&&!huboSeguimiento){showToast('No hay cambios para confirmar','#6B7280');return;}
+  if(!txt&&!huboSeguimiento&&!nvHuboCambioGrupo){showToast('No hay cambios para confirmar','#6B7280');return;}
+  nvHuboCambioGrupo=false;
   var comentarioAgregado=null;
-  var prevTs=m._ts;
+  var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),_ts:m._ts};
   if(txt){
     if(!m.comentarios) m.comentarios=[];
     comentarioAgregado={
@@ -13462,7 +13484,7 @@ async function nvGuardarComentario(){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     if(comentarioAgregado) m.comentarios=m.comentarios.filter(function(c){return c!==comentarioAgregado;});
-    m._ts=prevTs;
+    Object.assign(m,snapshot);
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -13477,7 +13499,7 @@ async function nvCambiarSubEstadoManual(nuevoSubEstado){
   if(!m) return;
   const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
   const anterior=m.subEstado||'Ingresado';
-  var snapshot={subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
+  var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   m.subEstado=nuevoSubEstado;
   if(nuevoSubEstado==='Contactado'&&anterior!=='Contactado'){
     m.contactadoPor=currentUser?.name||'Sistema';
@@ -13547,7 +13569,7 @@ async function nvGuardarComentarioContactar(){
     alert('Para registrar el primer contacto escribí un comentario de al menos 10 caracteres (cómo fue, qué se conversó).');
     return;
   }
-  var snapshot={subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
+  var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   if(!m.comentarios) m.comentarios=[];
   m.comentarios.push({texto:txt,autor:currentUser?.name||'Sistema',ts:Date.now()});
   if(esPrimerContacto){
@@ -13588,7 +13610,7 @@ async function nvPromover(condicion){
     document.getElementById('nv-comentario-txt')?.focus();
     return;
   }
-  var snapshot={condicion:m.condicion,subEstado:m.subEstado,comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
+  var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,condicion:m.condicion,subEstado:m.subEstado,comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   const condAnterior=m.condicion||'Nuevo';
   m.condicion=condicion;
   if(condicion!=='Nuevo'){

@@ -14615,6 +14615,31 @@ function nvOpenSeguimientoSelector(){
   document.getElementById('nv-seg-modal').style.display='flex';
 }
 
+// Normaliza texto para comparar personas (minúsculas, sin tildes) — evita que "María" vs "Maria"
+// o mayúsculas/minúsculas distintas hagan fallar la comparación.
+function nvNormalizarTexto(s){
+  return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+// ¿Una persona candidata (nombre/apellido/celular) coincide con un miembro ya cargado en al
+// menos 2 de estos 3 datos?: Nombre, Apellido, últimos 4 dígitos del celular.
+function nvCoincide2de3(nombre, apellido, tel, m){
+  var coincidencias=0;
+  if(nvNormalizarTexto(nombre)&&nvNormalizarTexto(nombre)===nvNormalizarTexto(m.nombre)) coincidencias++;
+  if(nvNormalizarTexto(apellido)&&nvNormalizarTexto(apellido)===nvNormalizarTexto(m.apellido)) coincidencias++;
+  var telNorm=(tel||'').replace(/\D/g,'').slice(-4);
+  var mTelNorm=(m.tel||'').replace(/\D/g,'').slice(-4);
+  if(telNorm.length===4&&telNorm===mTelNorm) coincidencias++;
+  return coincidencias>=2;
+}
+
+// Busca en TODA la base (sin importar condición ni estado) si ya existe alguien parecido.
+function nvBuscarPosibleDuplicado(nombre, apellido, tel){
+  return (S.members||[]).find(function(m){
+    return nvCoincide2de3(nombre,apellido,tel,m);
+  });
+}
+
 async function nvSaveInlineForm(){
   try{
     const nombre=(document.getElementById('nv-mf-nombre')?.value||'').trim();
@@ -14638,6 +14663,24 @@ async function nvSaveInlineForm(){
       return;
     }
     if(err) err.style.display='none';
+
+    const datos={nombre,apellido,cel,genero,barrio,fnac,edadDeclarada,como,motivo,segId,segLabel,dni};
+    const duplicado=nvBuscarPosibleDuplicado(nombre,apellido,cel);
+    if(duplicado){
+      nvMostrarConfirmDuplicado(duplicado, datos);
+      return;
+    }
+    await nvCrearContactoDesdeInline(datos);
+  }catch(e){
+    console.error('nvSaveInlineForm error:',e);
+    const stack=(e.stack||'').split('\n').slice(0,6).join('\n');
+    alert('Error: '+e.message+'\n\nDónde:\n'+stack);
+  }
+}
+
+async function nvCrearContactoDesdeInline(datos){
+  try{
+    const {nombre,apellido,cel,genero,barrio,fnac,edadDeclarada,como,motivo,segId,segLabel,dni}=datos;
     const nuevo={
       id:Date.now(),nombre,apellido,
       tel:cel,genero,grupoId:null,
@@ -14668,10 +14711,85 @@ async function nvSaveInlineForm(){
     nvCloseInlineForm();
     showToast('✅ '+nombre+' '+apellido+' agregado a Nuevos Contactos','#16A34A');
   }catch(e){
-    console.error('nvSaveInlineForm error:',e);
+    console.error('nvCrearContactoDesdeInline error:',e);
     const stack=(e.stack||'').split('\n').slice(0,6).join('\n');
     alert('Error: '+e.message+'\n\nDónde:\n'+stack);
   }
+}
+
+// ── Diálogo de posible duplicado (Nombre/Apellido/Cel — 2 de 3 coinciden) ──
+var nvDatosPendientesInline=null;
+function nvEnsureDialogoOverlay(){
+  var ov=document.getElementById('agenda-dialogo-overlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='agenda-dialogo-overlay';
+    ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10500;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(ov);
+  }
+  return ov;
+}
+function nvMostrarConfirmDuplicado(existente, datos){
+  nvDatosPendientesInline=datos;
+  var grupoLabel='Sin grupo asignado';
+  if(existente.grupoId){
+    var gG=(S.groups||[]).find(function(g){return Number(g.id)===Number(existente.grupoId);});
+    var gNg=(S.ngComunidades||[]).find(function(ng){return Number(ng.id)===Number(existente.grupoId);});
+    grupoLabel=gG?gG.name:(gNg?gNg.name:'Grupo/Comunidad');
+  }
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:420px;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+    +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:10px">⚠️ Ya existe alguien parecido</div>'
+    +'<div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#92400E">'
+      +'<strong>'+fullName(existente)+'</strong><br>'
+      +'Condición: '+(existente.condicion||'—')+' · '+grupoLabel
+      +(existente.tel?'<br>📱 '+existente.tel:'')
+    +'</div>'
+    +'<div style="font-size:13px;color:#4B5563;margin-bottom:16px">¿Es la misma persona que estás por cargar como <strong>'+datos.nombre+' '+datos.apellido+'</strong>?</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+      +'<button class="btn btn-primary" onclick="nvConfirmarEsMismaPersona('+existente.id+')">✅ Sí, es la misma persona</button>'
+      +'<button class="btn" onclick="nvConfirmarEsDistinta()">➕ No, es una persona distinta</button>'
+      +'<button class="btn btn-sm" style="color:#9CA3AF" onclick="nvCancelarConfirmDuplicado()">Cancelar</button>'
+    +'</div>'
+  +'</div>';
+  var ov=nvEnsureDialogoOverlay();
+  ov.innerHTML=modalHtml;
+  ov.style.display='flex';
+}
+function nvCancelarConfirmDuplicado(){
+  nvDatosPendientesInline=null;
+  var ov=document.getElementById('agenda-dialogo-overlay');
+  if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+}
+async function nvConfirmarEsDistinta(){
+  var datos=nvDatosPendientesInline;
+  nvCancelarConfirmDuplicado();
+  if(datos) await nvCrearContactoDesdeInline(datos);
+}
+async function nvConfirmarEsMismaPersona(existenteId){
+  var existente=(S.members||[]).find(function(m){return Number(m.id)===Number(existenteId);});
+  nvCancelarConfirmDuplicado();
+  if(!existente) return;
+  // Vincular a la persona ya existente con el Grupo/Comunidad que se estaba por cargar (si había)
+  // — en vez de crear un registro duplicado
+  var grupoSelVal=document.getElementById('nv-mf-grupo')?.value||'';
+  var nuevoGrupoId=nvGetGrupoIdFromVal(grupoSelVal).grupoId;
+  if(nuevoGrupoId&&nuevoGrupoId!==(existente.grupoId||null)){
+    var snapshot=Object.assign({},existente);
+    existente.grupoId=nuevoGrupoId;
+    existente._ts=Date.now();
+    await nvAplicarParticipando(existente);
+    await saveK(SK.members,S.members);
+    try{
+      if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    }catch(e){
+      Object.assign(existente,snapshot);
+      await saveK(SK.members,S.members);
+      alert('No se pudo vincular en la nube. Verificá tu conexión e intentá de nuevo.');
+      return;
+    }
+  }
+  nvCloseInlineForm();
+  showToast('✅ Vinculado/a con '+fullName(existente)+' — no se creó ningún duplicado','#16A34A');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -17622,17 +17740,15 @@ async function pnvEnviar(){
   var textoOriginal=btn?btn.textContent:'';
   if(btn){ btn.disabled=true; btn.style.opacity='.6'; btn.style.cursor='default'; btn.textContent='Enviando...'; }
 
-  // 0) Chequeo de duplicado: si ya existe alguien con este mismo teléfono anotado en esta misma
-  // Campaña (o en el mismo QR general de "Nuevo Contacto" si no hay Campaña), no se crea un
-  // registro nuevo — evita los triplicados típicos de quien reintenta porque no vio confirmación
-  // a tiempo, o vuelve a escanear el mismo QR sin darse cuenta de que ya se había anotado.
-  var telNormalizado=cel.replace(/\D/g,'');
+  // 0) Chequeo de duplicado: mismo criterio que en el resto de la app — si 2 de estos 3 datos
+  // coinciden con alguien ya cargado (Nombre, Apellido, últimos 4 dígitos del celular), en
+  // CUALQUIER lado de la base (no solo esta misma Campaña), no se crea un registro nuevo. Evita
+  // tanto los triplicados de quien reintenta el QR, como anotar de nuevo a alguien que ya es
+  // Miembro o ya está en Nuevos Contactos.
   try{
     var membersChk=JSON.parse(localStorage.getItem('gdv_m5')||'[]');
     var yaExiste=membersChk.some(function(m){
-      if(!m.tel) return false;
-      if(String(m.tel).replace(/\D/g,'')!==telNormalizado) return false;
-      return campanaId ? String(m.campanaId)===String(campanaId) : !m.campanaId;
+      return nvCoincide2de3(n,a,cel,m);
     });
     if(yaExiste){
       if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent=textoOriginal; }

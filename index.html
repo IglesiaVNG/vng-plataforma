@@ -10512,9 +10512,10 @@ function gdvRenderMyHistory(){
     const att=Object.values(r.asistencia);
     const pre=att.filter(v=>v.state==='presente').length;
     const p=pct(pre,att.length);
-    return `<div class="row" style="cursor:pointer;padding:10px 4px;border-bottom:1px solid #F3F4F6" onclick="gdvShowHistDetail('${r.id}')">
+    return `<div class="row" style="cursor:pointer;padding:10px 4px;border-bottom:1px solid #F3F4F6;flex-wrap:wrap;gap:6px" onclick="gdvShowHistDetail('${r.id}')">
       <span style="font-weight:600;min-width:90px">${fmt(r.fecha)}</span>
       <span style="flex:1;font-size:13px;margin-left:8px">${pre}/${att.length} presentes</span>
+      ${typeof gdvFormularioBadgeHtml==='function'?gdvFormularioBadgeHtml(r.grupoId,r.fecha):''}
       <span class="badge ${p>=70?'b-ok':'b-muted'}">${p}%</span>
     </div>`;
   }).join('');

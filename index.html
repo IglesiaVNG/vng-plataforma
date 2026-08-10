@@ -404,7 +404,7 @@ const KEY_GROUPS = {
   'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_qr_actualizar'], // gdv_permisos se maneja via fbSavePermisos con su propio timestamp
   'members': ['_tomb_gdv_m5','gdv_m5'],
   'records': ['_tomb_gdv_r5','gdv_r5'],
-  'disc':    ['gdv_disc_pasos','_tomb_gdv_disc_records','gdv_disc_records','_tomb_gdv_disc_cursadas','gdv_disc_cursadas','_tomb_gdv_disc_inscripciones','gdv_disc_inscripciones'],
+  'disc':    ['_tomb_gdv_disc_pasos','gdv_disc_pasos','_tomb_gdv_disc_records','gdv_disc_records','_tomb_gdv_disc_cursadas','gdv_disc_cursadas','_tomb_gdv_disc_inscripciones','gdv_disc_inscripciones'],
   'ng':      ['_tomb_gdv_ng5','gdv_ng5','_tomb_gdv_ng_records','gdv_ng_records'],
   'modules': ['gdv_modules5'],
   'homeConfig': ['gdv_home_config'],
@@ -438,8 +438,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -597,8 +597,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -14615,6 +14615,31 @@ function nvOpenSeguimientoSelector(){
   document.getElementById('nv-seg-modal').style.display='flex';
 }
 
+// Normaliza texto para comparar personas (minúsculas, sin tildes) — evita que "María" vs "Maria"
+// o mayúsculas/minúsculas distintas hagan fallar la comparación.
+function nvNormalizarTexto(s){
+  return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+// ¿Una persona candidata (nombre/apellido/celular) coincide con un miembro ya cargado en al
+// menos 2 de estos 3 datos?: Nombre, Apellido, últimos 4 dígitos del celular.
+function nvCoincide2de3(nombre, apellido, tel, m){
+  var coincidencias=0;
+  if(nvNormalizarTexto(nombre)&&nvNormalizarTexto(nombre)===nvNormalizarTexto(m.nombre)) coincidencias++;
+  if(nvNormalizarTexto(apellido)&&nvNormalizarTexto(apellido)===nvNormalizarTexto(m.apellido)) coincidencias++;
+  var telNorm=(tel||'').replace(/\D/g,'').slice(-4);
+  var mTelNorm=(m.tel||'').replace(/\D/g,'').slice(-4);
+  if(telNorm.length===4&&telNorm===mTelNorm) coincidencias++;
+  return coincidencias>=2;
+}
+
+// Busca en TODA la base (sin importar condición ni estado) si ya existe alguien parecido.
+function nvBuscarPosibleDuplicado(nombre, apellido, tel){
+  return (S.members||[]).find(function(m){
+    return nvCoincide2de3(nombre,apellido,tel,m);
+  });
+}
+
 async function nvSaveInlineForm(){
   try{
     const nombre=(document.getElementById('nv-mf-nombre')?.value||'').trim();
@@ -14638,6 +14663,24 @@ async function nvSaveInlineForm(){
       return;
     }
     if(err) err.style.display='none';
+
+    const datos={nombre,apellido,cel,genero,barrio,fnac,edadDeclarada,como,motivo,segId,segLabel,dni};
+    const duplicado=nvBuscarPosibleDuplicado(nombre,apellido,cel);
+    if(duplicado){
+      nvMostrarConfirmDuplicado(duplicado, datos);
+      return;
+    }
+    await nvCrearContactoDesdeInline(datos);
+  }catch(e){
+    console.error('nvSaveInlineForm error:',e);
+    const stack=(e.stack||'').split('\n').slice(0,6).join('\n');
+    alert('Error: '+e.message+'\n\nDónde:\n'+stack);
+  }
+}
+
+async function nvCrearContactoDesdeInline(datos){
+  try{
+    const {nombre,apellido,cel,genero,barrio,fnac,edadDeclarada,como,motivo,segId,segLabel,dni}=datos;
     const nuevo={
       id:Date.now(),nombre,apellido,
       tel:cel,genero,grupoId:null,
@@ -14668,10 +14711,85 @@ async function nvSaveInlineForm(){
     nvCloseInlineForm();
     showToast('✅ '+nombre+' '+apellido+' agregado a Nuevos Contactos','#16A34A');
   }catch(e){
-    console.error('nvSaveInlineForm error:',e);
+    console.error('nvCrearContactoDesdeInline error:',e);
     const stack=(e.stack||'').split('\n').slice(0,6).join('\n');
     alert('Error: '+e.message+'\n\nDónde:\n'+stack);
   }
+}
+
+// ── Diálogo de posible duplicado (Nombre/Apellido/Cel — 2 de 3 coinciden) ──
+var nvDatosPendientesInline=null;
+function nvEnsureDialogoOverlay(){
+  var ov=document.getElementById('agenda-dialogo-overlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='agenda-dialogo-overlay';
+    ov.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10500;align-items:center;justify-content:center;padding:1rem';
+    document.body.appendChild(ov);
+  }
+  return ov;
+}
+function nvMostrarConfirmDuplicado(existente, datos){
+  nvDatosPendientesInline=datos;
+  var grupoLabel='Sin grupo asignado';
+  if(existente.grupoId){
+    var gG=(S.groups||[]).find(function(g){return Number(g.id)===Number(existente.grupoId);});
+    var gNg=(S.ngComunidades||[]).find(function(ng){return Number(ng.id)===Number(existente.grupoId);});
+    grupoLabel=gG?gG.name:(gNg?gNg.name:'Grupo/Comunidad');
+  }
+  var modalHtml='<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:420px;box-shadow:0 12px 40px rgba(0,0,0,.25)">'
+    +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:10px">⚠️ Ya existe alguien parecido</div>'
+    +'<div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#92400E">'
+      +'<strong>'+fullName(existente)+'</strong><br>'
+      +'Condición: '+(existente.condicion||'—')+' · '+grupoLabel
+      +(existente.tel?'<br>📱 '+existente.tel:'')
+    +'</div>'
+    +'<div style="font-size:13px;color:#4B5563;margin-bottom:16px">¿Es la misma persona que estás por cargar como <strong>'+datos.nombre+' '+datos.apellido+'</strong>?</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+      +'<button class="btn btn-primary" onclick="nvConfirmarEsMismaPersona('+existente.id+')">✅ Sí, es la misma persona</button>'
+      +'<button class="btn" onclick="nvConfirmarEsDistinta()">➕ No, es una persona distinta</button>'
+      +'<button class="btn btn-sm" style="color:#9CA3AF" onclick="nvCancelarConfirmDuplicado()">Cancelar</button>'
+    +'</div>'
+  +'</div>';
+  var ov=nvEnsureDialogoOverlay();
+  ov.innerHTML=modalHtml;
+  ov.style.display='flex';
+}
+function nvCancelarConfirmDuplicado(){
+  nvDatosPendientesInline=null;
+  var ov=document.getElementById('agenda-dialogo-overlay');
+  if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+}
+async function nvConfirmarEsDistinta(){
+  var datos=nvDatosPendientesInline;
+  nvCancelarConfirmDuplicado();
+  if(datos) await nvCrearContactoDesdeInline(datos);
+}
+async function nvConfirmarEsMismaPersona(existenteId){
+  var existente=(S.members||[]).find(function(m){return Number(m.id)===Number(existenteId);});
+  nvCancelarConfirmDuplicado();
+  if(!existente) return;
+  // Vincular a la persona ya existente con el Grupo/Comunidad que se estaba por cargar (si había)
+  // — en vez de crear un registro duplicado
+  var grupoSelVal=document.getElementById('nv-mf-grupo')?.value||'';
+  var nuevoGrupoId=nvGetGrupoIdFromVal(grupoSelVal).grupoId;
+  if(nuevoGrupoId&&nuevoGrupoId!==(existente.grupoId||null)){
+    var snapshot=Object.assign({},existente);
+    existente.grupoId=nuevoGrupoId;
+    existente._ts=Date.now();
+    await nvAplicarParticipando(existente);
+    await saveK(SK.members,S.members);
+    try{
+      if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    }catch(e){
+      Object.assign(existente,snapshot);
+      await saveK(SK.members,S.members);
+      alert('No se pudo vincular en la nube. Verificá tu conexión e intentá de nuevo.');
+      return;
+    }
+  }
+  nvCloseInlineForm();
+  showToast('✅ Vinculado/a con '+fullName(existente)+' — no se creó ningún duplicado','#16A34A');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -15577,7 +15695,9 @@ function buildDiscipuladoHTML(){
     <div id="disc-grupo-detalle-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:310;align-items:center;justify-content:center;padding:1rem">
       <div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-          <div style="font-size:15px;font-weight:700;color:#1F4E79">🧑‍🤝‍🧑 <span id="disc-grupo-detalle-nombre"></span></div>
+          <div style="font-size:15px;font-weight:700;color:#1F4E79;display:flex;align-items:center;gap:6px">🧑‍🤝‍🧑 <span id="disc-grupo-detalle-nombre"></span>
+            <button class="btn btn-sm" onclick="discRenombrarGrupo()" title="Editar nombre" style="padding:2px 6px">✏️</button>
+          </div>
           <button class="btn btn-sm" onclick="discCerrarGrupoDetalle()">✕</button>
         </div>
         <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Discipulador(es) de este Grupo</label>
@@ -15591,9 +15711,12 @@ function buildDiscipuladoHTML(){
           <input type="text" id="disc-grupo-detalle-mem-buscar-nuevo" placeholder="Buscar en Rebaños para sumar a alguien nuevo..." oninput="discGrupoBuscarNuevoIntegrante(this.value)" autocomplete="off">
           <div id="disc-grupo-detalle-mem-buscar-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;max-height:180px;overflow-y:auto"></div>
         </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
-          <button class="btn" onclick="discCerrarGrupoDetalle()">Cancelar</button>
-          <button class="btn btn-primary" onclick="discGuardarGrupoDetalle()">Guardar</button>
+        <div style="display:flex;gap:8px;justify-content:space-between;margin-top:1rem">
+          <button class="btn btn-sm btn-danger" onclick="discEliminarGrupo()">🗑 Eliminar Grupo</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="discCerrarGrupoDetalle()">Cancelar</button>
+            <button class="btn btn-primary" onclick="discGuardarGrupoDetalle()">Guardar</button>
+          </div>
         </div>
       </div>
     </div>
@@ -15741,7 +15864,7 @@ async function discToggleCompletado(pasoId, memberId){
   if(!paso) return;
   if(!paso.completados) paso.completados={};
   var yaCompletado=paso.completados[memberId];
-  var snapshotPaso={completados:Object.assign({},paso.completados),fechasCompletado:Object.assign({},paso.fechasCompletado||{})};
+  var snapshotPaso={completados:Object.assign({},paso.completados),fechasCompletado:Object.assign({},paso.fechasCompletado||{}),_ts:paso._ts};
   var miembroTocado=null, snapshotFormacion=null;
 
   if(!yaCompletado){
@@ -15777,6 +15900,7 @@ async function discToggleCompletado(pasoId, memberId){
     paso.completados[memberId]=false;
   }
 
+  paso._ts=Date.now();
   await saveK(SK.discPasos,S.discPasos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -16477,6 +16601,68 @@ async function discGuardarGrupoNuevo(cursada,nombre){
   if(c) discRenderCursada(c);
 }
 
+function discRenombrarGrupo(){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  var grupo=cursada?(cursada.grupos||[]).find(function(g){return g.id===discGrupoDetalleId;}):null;
+  if(!cursada||!grupo) return;
+  var nuevoNombre=prompt('Nuevo nombre del Grupo:', grupo.nombre);
+  if(nuevoNombre===null) return; // canceló
+  nuevoNombre=nuevoNombre.trim();
+  if(!nuevoNombre){ alert('El nombre no puede quedar vacío.'); return; }
+  discGuardarRenombreGrupo(cursada, grupo, nuevoNombre);
+}
+
+async function discGuardarRenombreGrupo(cursada, grupo, nuevoNombre){
+  var nombreAnterior=grupo.nombre;
+  var tsAnterior=cursada._ts;
+  grupo.nombre=nuevoNombre;
+  cursada._ts=Date.now();
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    grupo.nombre=nombreAnterior;
+    cursada._ts=tsAnterior;
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  var nombreEl=document.getElementById('disc-grupo-detalle-nombre');
+  if(nombreEl) nombreEl.textContent=grupo.nombre;
+  discRenderGruposLista();
+  showToast('✅ Nombre actualizado','#16A34A');
+}
+
+async function discEliminarGrupo(){
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===discGruposCursadaId;});
+  var grupo=cursada?(cursada.grupos||[]).find(function(g){return g.id===discGrupoDetalleId;}):null;
+  if(!cursada||!grupo) return;
+  var cant=(grupo.miembros||[]).length;
+  var msg='¿Eliminar el Grupo "'+grupo.nombre+'"?'
+    +(cant?'\n\nTiene '+cant+' integrante'+(cant!==1?'s':'')+' — quedan igual dentro de la Cursada, solo dejan de estar agrupados bajo este Grupo puntual.':'')
+    +'\n\nEsta acción no se puede deshacer.';
+  if(!confirm(msg)) return;
+  var snapshotGrupos=JSON.parse(JSON.stringify(cursada.grupos||[]));
+  var tsAnterior=cursada._ts;
+  cursada.grupos=(cursada.grupos||[]).filter(function(g){return g.id!==grupo.id;});
+  cursada._ts=Date.now();
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    cursada.grupos=snapshotGrupos;
+    cursada._ts=tsAnterior;
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo eliminar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  discCerrarGrupoDetalle();
+  discRenderGruposLista();
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
+  showToast('🗑️ Grupo eliminado','#DC2626');
+}
+
 let discGrupoDetalleNuevosIntegrantes=[]; // ids agregados por búsqueda manual en este modal, recién se persisten al Guardar
 
 function discAbrirGrupoDetalle(grupoId){
@@ -16696,13 +16882,13 @@ async function discGuardarCurso(){
   var esNuevo=!discEditingPasoId;
   var paso, snapshot=null;
   if(esNuevo){
-    paso={id:Date.now(),nombre,nivel,capitulos,discipuladorIds:[],miembros:[],estado:'Activo',completados:{}};
+    paso={id:Date.now(),nombre,nivel,capitulos,discipuladorIds:[],miembros:[],estado:'Activo',completados:{},_ts:Date.now()};
     S.discPasos.push(paso);
   } else {
     paso=S.discPasos.find(function(p){return p.id===discEditingPasoId;});
     if(!paso) return;
-    snapshot={nombre:paso.nombre,nivel:paso.nivel,capitulos:(paso.capitulos||[]).slice()};
-    paso.nombre=nombre; paso.nivel=nivel; paso.capitulos=capitulos;
+    snapshot={nombre:paso.nombre,nivel:paso.nivel,capitulos:(paso.capitulos||[]).slice(),_ts:paso._ts};
+    paso.nombre=nombre; paso.nivel=nivel; paso.capitulos=capitulos; paso._ts=Date.now();
   }
   await saveK(SK.discPasos,S.discPasos);
   try{
@@ -16724,12 +16910,15 @@ async function discToggleEstado(pasoId){
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   if(!paso) return;
   var prev=paso.estado;
+  var prevTs=paso._ts;
   paso.estado=paso.estado==='Activo'?'Inactivo':'Activo';
+  paso._ts=Date.now();
   await saveK(SK.discPasos,S.discPasos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     paso.estado=prev;
+    paso._ts=prevTs;
     await saveK(SK.discPasos,S.discPasos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -16749,6 +16938,7 @@ async function discEliminarPaso(pasoId){
   if(!confirm('¿Eliminar el Curso "'+paso.nombre+'"?\nEsta acción no se puede deshacer.')) return;
   var snapshot=S.discPasos.slice();
   S.discPasos=(S.discPasos||[]).filter(function(p){return p.id!==pasoId;});
+  addTombstone(SK.discPasos,pasoId);
   await saveK(SK.discPasos,S.discPasos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -17622,17 +17812,15 @@ async function pnvEnviar(){
   var textoOriginal=btn?btn.textContent:'';
   if(btn){ btn.disabled=true; btn.style.opacity='.6'; btn.style.cursor='default'; btn.textContent='Enviando...'; }
 
-  // 0) Chequeo de duplicado: si ya existe alguien con este mismo teléfono anotado en esta misma
-  // Campaña (o en el mismo QR general de "Nuevo Contacto" si no hay Campaña), no se crea un
-  // registro nuevo — evita los triplicados típicos de quien reintenta porque no vio confirmación
-  // a tiempo, o vuelve a escanear el mismo QR sin darse cuenta de que ya se había anotado.
-  var telNormalizado=cel.replace(/\D/g,'');
+  // 0) Chequeo de duplicado: mismo criterio que en el resto de la app — si 2 de estos 3 datos
+  // coinciden con alguien ya cargado (Nombre, Apellido, últimos 4 dígitos del celular), en
+  // CUALQUIER lado de la base (no solo esta misma Campaña), no se crea un registro nuevo. Evita
+  // tanto los triplicados de quien reintenta el QR, como anotar de nuevo a alguien que ya es
+  // Miembro o ya está en Nuevos Contactos.
   try{
     var membersChk=JSON.parse(localStorage.getItem('gdv_m5')||'[]');
     var yaExiste=membersChk.some(function(m){
-      if(!m.tel) return false;
-      if(String(m.tel).replace(/\D/g,'')!==telNormalizado) return false;
-      return campanaId ? String(m.campanaId)===String(campanaId) : !m.campanaId;
+      return nvCoincide2de3(n,a,cel,m);
     });
     if(yaExiste){
       if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent=textoOriginal; }

@@ -6378,7 +6378,7 @@ function formRegistroBadgeHtml(tipoOrigen, unidadId, fecha){
   var semanaISO=getISOWeek(fecha), anio=parseLocalDate(fecha).getFullYear();
   var todosCompletos=aplicables.every(function(f){ return !!formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio); });
   if(todosCompletos){
-    return '<span onclick="event.stopPropagation();formVerRespuestasUnidad(\''+tipoOrigen+'\','+unidadId+',\''+fecha+'\')" style="font-size:11px;font-weight:700;color:#16A34A;cursor:pointer;text-decoration:underline">✅ Formulario Completado</span>';
+    return '<span onclick="event.stopPropagation();formAbrirCompletarDesdeRegistro(\''+tipoOrigen+'\','+unidadId+',\''+fecha+'\')" style="font-size:11px;font-weight:700;color:#16A34A;cursor:pointer;text-decoration:underline">✅ Formulario Completado</span>';
   }
   return '<span onclick="event.stopPropagation();formAbrirCompletarDesdeRegistro(\''+tipoOrigen+'\','+unidadId+',\''+fecha+'\')" style="font-size:11px;font-weight:700;color:#DC2626;cursor:pointer;text-decoration:underline">⚠️ Formulario Pendiente</span>';
 }
@@ -18652,9 +18652,12 @@ boot();
       <option value="10:00 hs">10:00 hs</option><option value="10:30 hs">10:30 hs</option>
       <option value="11:00 hs">11:00 hs</option><option value="11:30 hs">11:30 hs</option>
       <option value="12:00 hs">12:00 hs</option><option value="12:30 hs">12:30 hs</option>
-      <option value="13:00 hs">13:00 hs</option><option value="14:00 hs">14:00 hs</option>
-      <option value="15:00 hs">15:00 hs</option><option value="16:00 hs">16:00 hs</option>
-      <option value="17:00 hs">17:00 hs</option><option value="18:00 hs">18:00 hs</option>
+      <option value="13:00 hs">13:00 hs</option><option value="13:30 hs">13:30 hs</option>
+      <option value="14:00 hs">14:00 hs</option><option value="14:30 hs">14:30 hs</option>
+      <option value="15:00 hs">15:00 hs</option><option value="15:30 hs">15:30 hs</option>
+      <option value="16:00 hs">16:00 hs</option><option value="16:30 hs">16:30 hs</option>
+      <option value="17:00 hs">17:00 hs</option><option value="17:30 hs">17:30 hs</option>
+      <option value="18:00 hs">18:00 hs</option>
       <option value="18:30 hs">18:30 hs</option><option value="19:00 hs">19:00 hs</option>
       <option value="19:30 hs">19:30 hs</option><option value="20:00 hs">20:00 hs</option>
       <option value="20:30 hs">20:30 hs</option><option value="21:00 hs">21:00 hs</option>

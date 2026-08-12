@@ -5059,6 +5059,7 @@ function buildAgendaHTML(){
               </select></div>
             <button class="btn btn-sm" onclick="agendaResetProximosFiltro()">↺ Esta semana + la próxima</button>
             ${canCrearEventos()?'<button class="btn btn-sm" onclick="agendaSincronizarTodosLosOrigenes()" style="background:#EEF2FF;border-color:#C7D2FE;color:#4338CA">🔄 Sincronizar Grupos/Comunidades</button>':''}
+            ${isSuperAdmin()?'<button class="btn btn-sm" onclick="agendaLimpiarHabitualesDuplicadas()" style="background:#FEF2F2;border-color:#FECACA;color:#991B1B">🧹 Limpiar duplicados</button>':''}
             ${canCrearEventos()?'<button class="btn btn-primary btn-sm" onclick="agendaAbrirForm()">+ Nuevo evento</button>':''}
           </div>
         </div>
@@ -7712,6 +7713,8 @@ async function agendaGuardarEvento(){
   agendaRenderBanner();
   var proxTab=document.getElementById('agenda-tab-proximos');
   if(proxTab&&proxTab.style.display!=='none') agendaRenderProximos();
+  if(typeof renderHomeEventosEspeciales==='function') renderHomeEventosEspeciales();
+  if(typeof renderHomeActividadesGrupos==='function') renderHomeActividadesGrupos();
   showToast('✅ Evento guardado'+(nuevosReemplazos.length?' — reemplazó '+nuevosReemplazos.length+' fecha'+(nuevosReemplazos.length!==1?'s':'')+' de actividad habitual':''),'#16A34A');
 }
 
@@ -7770,6 +7773,8 @@ async function agendaEliminarEvento(id, fechaOcurrencia){
         agendaRenderBanner();
         var proxTab2=document.getElementById('agenda-tab-proximos');
         if(proxTab2&&proxTab2.style.display!=='none') agendaRenderProximos();
+        if(typeof renderHomeEventosEspeciales==='function') renderHomeEventosEspeciales();
+        if(typeof renderHomeActividadesGrupos==='function') renderHomeActividadesGrupos();
         showToast('🗓 Se quitó esa fecha — la serie sigue activa','#DC2626');
       }catch(e){
         ev.excepciones=snapshotExc;
@@ -7810,6 +7815,8 @@ async function agendaEliminarEvento(id, fechaOcurrencia){
     agendaRenderBanner();
     var proxTab=document.getElementById('agenda-tab-proximos');
     if(proxTab&&proxTab.style.display!=='none') agendaRenderProximos();
+    if(typeof renderHomeEventosEspeciales==='function') renderHomeEventosEspeciales();
+    if(typeof renderHomeActividadesGrupos==='function') renderHomeActividadesGrupos();
     showToast('🗑️ Evento eliminado','#DC2626');
   }catch(e){
     S.eventos.push(ev);
@@ -7994,6 +8001,72 @@ async function agendaSincronizarTodosLosOrigenes(){
   agendaRenderBanner();
   var proxTab=document.getElementById('agenda-tab-proximos');
   if(proxTab&&proxTab.style.display!=='none') agendaRenderProximos();
+}
+
+// Limpia Actividades Habituales duplicadas que quedaron de un bug de sincronización de Eventos
+// ya corregido (antes de que gdv_eventos estuviera protegido por el sistema de fusión por
+// registro, un dispositivo con una copia vieja podía "recrear" el Habitual de un Grupo que ya
+// existía en la nube — al arreglar la fusión, esas copias quedaron ambas, en vez de que una se
+// pisara a la otra como antes). Exclusivo Super Admin. Muestra un resumen y pide confirmación
+// explícita antes de borrar nada — nunca actúa en silencio.
+async function agendaLimpiarHabitualesDuplicadas(){
+  if(!isSuperAdmin()) return;
+  var grupos={};
+  (S.eventos||[]).forEach(function(e){
+    if(e.tipoActividad!=='habitual'||!e.origenTipo||!e.origenId) return;
+    var key=e.origenTipo+'-'+e.origenId;
+    if(!grupos[key]) grupos[key]=[];
+    grupos[key].push(e);
+  });
+  // Puntaje para decidir cuál copia conservar: se prioriza la que tenga Responsables (Facilitador/
+  // Líder) cargados — ya que sabemos que las duplicadas actuales aparecen sin esa info — y como
+  // desempate, la más reciente por _ts.
+  function score(ev){
+    var s=(ev.responsablesIds&&ev.responsablesIds.length)?10:0;
+    return s+(ev._ts||0)/1e15;
+  }
+  var aEliminar=[];
+  var resumenLineas=[];
+  Object.keys(grupos).forEach(function(key){
+    var lista=grupos[key];
+    if(lista.length<2) return;
+    lista.sort(function(a,b){return score(b)-score(a);});
+    var keeper=lista[0];
+    var dups=lista.slice(1);
+    aEliminar=aEliminar.concat(dups);
+    resumenLineas.push('• '+(keeper.titulo||key)+' — se elimina'+(dups.length!==1?'n':'')+' '+dups.length+' copia'+(dups.length!==1?'s':'')+' duplicada'+(dups.length!==1?'s':''));
+  });
+  if(!aEliminar.length){
+    showToast('No se encontraron Habituales duplicadas — todo está bien','#16A34A');
+    return;
+  }
+  var gruposAfectados=Object.keys(grupos).filter(function(k){return grupos[k].length>1;}).length;
+  var resumen='Se encontraron '+gruposAfectados+' Grupo(s)/Comunidad(es) con Actividades Habituales duplicadas:\n\n'
+    +resumenLineas.slice(0,15).join('\n')
+    +(resumenLineas.length>15?'\n... y '+(resumenLineas.length-15)+' más':'')
+    +'\n\nEn total se van a eliminar '+aEliminar.length+' evento'+(aEliminar.length!==1?'s':'')+' duplicado'+(aEliminar.length!==1?'s':'')+', dejando solo la copia con el Facilitador/Líder cargado en cada caso. No se toca ninguna Especial ni Habitual sin origen (las que se cargan directo en Agenda).\n\nEsta acción no se puede deshacer. ¿Confirmás?';
+  if(!confirm(resumen)) return;
+
+  var snapshotEventosStr=JSON.stringify(S.eventos||[]);
+  var idsAEliminar=aEliminar.map(function(e){return e.id;});
+  S.eventos=(S.eventos||[]).filter(function(e){return idsAEliminar.indexOf(e.id)===-1;});
+  idsAEliminar.forEach(function(id){ addTombstone(SK.eventos,id); });
+  await saveK(SK.eventos,S.eventos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.eventos=JSON.parse(snapshotEventosStr);
+    await saveK(SK.eventos,S.eventos);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('🧹 '+aEliminar.length+' evento'+(aEliminar.length!==1?'s':'')+' duplicado'+(aEliminar.length!==1?'s':'')+' eliminado'+(aEliminar.length!==1?'s':''),'#16A34A');
+  agendaRenderCalendario();
+  agendaRenderBanner();
+  var proxTab=document.getElementById('agenda-tab-proximos');
+  if(proxTab&&proxTab.style.display!=='none') agendaRenderProximos();
+  var homeWrap=document.getElementById('home-habituales-wrap');
+  if(homeWrap&&typeof renderHomeActividadesGrupos==='function') renderHomeActividadesGrupos();
 }
 
 function agendaRangoDefault(){
@@ -15315,11 +15388,42 @@ function homeOcurrenciaCardHtml(o, hoy, hoyStr, icon){
   if(o.hora) meta.push(o.hora);
   if(minLabel) meta.push(minLabel);
   if(o.lugar) meta.push(o.lugar);
+
+  // Info extra: a quién va el mensaje de WhatsApp (si tiene), y quién lidera el Grupo/Comunidad
+  // de origen (Facilitadores en GdV, Líderes en NG) — para verlo de un vistazo sin entrar al detalle.
+  var extra=[];
+  if(o.mensajeAsignados&&o.mensajeAsignados.length){
+    var mensajeLabels=o.mensajeAsignados.map(function(p){
+      if(p.tipo==='miembro'){ var m=S.members.find(function(x){return Number(x.id)===Number(p.id);}); return m?listName(m):null; }
+      return p.nombre?(p.nombre+' (externo)'):null;
+    }).filter(Boolean);
+    if(mensajeLabels.length) extra.push('💬 '+mensajeLabels.join(', '));
+  }
+  if(o.origenTipo==='gdv'&&o.origenId){
+    var g=(S.groups||[]).find(function(x){return Number(x.id)===Number(o.origenId);});
+    if(g){
+      var facs=[g.facId,g.facId2].filter(Boolean).map(function(id){
+        var m=S.members.find(function(x){return Number(x.id)===Number(id);}); return m?listName(m):null;
+      }).filter(Boolean);
+      if(facs.length) extra.push('🧑‍🏫 '+facs.join(', '));
+    }
+  } else if(o.origenTipo==='ng'&&o.origenId){
+    var ngc=(S.ngComunidades||[]).find(function(x){return Number(x.id)===Number(o.origenId);});
+    if(ngc){
+      var lids=(ngc.liderIds||[]).map(function(id){
+        var m=S.members.find(function(x){return Number(x.id)===Number(id);}); return m?listName(m):null;
+      }).filter(Boolean);
+      if(lids.length) extra.push('🧑‍🏫 '+lids.join(', '));
+    }
+  }
+  var extraHtml=extra.length?'<div style="font-size:11px;color:#4B5563;margin-top:2px">'+extra.join(' · ')+'</div>':'';
+
   return '<div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #F3F4F6">'+
     '<div style="font-size:20px">'+icon+'</div>'+
     '<div style="flex:1">'+
     '<div style="font-size:13px;font-weight:600;color:#1F2937">'+o.titulo+'</div>'+
     '<div style="font-size:11px;color:#6B7280">'+meta.join(' · ')+'</div>'+
+    extraHtml+
     '</div>'+badge+'</div>';
 }
 

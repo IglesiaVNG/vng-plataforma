@@ -642,11 +642,16 @@ window.syncNow = async function() {
 };
 
 // Dedicated permisos read/write using vng/config (existing working path)
+// IMPORTANTE: NO atrapar el error acá adentro — si Firestore falla, tiene que propagarse hasta
+// cfgSavePermisos(), que es quien realmente avisa al usuario y revierte el cambio local. Antes
+// este catch interno se comía el error silenciosamente (solo console.error, invisible para
+// Marito), así que el guardado "parecía" funcionar en su dispositivo — el timestamp local se
+// actualizaba igual — pero la nube nunca recibía el cambio, y por eso otros dispositivos nunca
+// lo veían.
 window.fbSavePermisos = async function(permisosStr) {
-  try {
-    await setDoc(doc(db,VNG_COL,'config'), {gdv_permisos: permisosStr, gdv_permisos_ts: Date.now()}, {merge:true});
-    return true;
-  } catch(e) { console.error('fbSavePermisos error:', e); return false; }
+  var ts=Date.now();
+  await setDoc(doc(db,VNG_COL,'config'), {gdv_permisos: permisosStr, gdv_permisos_ts: ts}, {merge:true});
+  return ts;
 };
 window.fbLoadPermisos = async function() {
   try {
@@ -15045,13 +15050,14 @@ async function cfgSavePermisos(){
   // Esto garantiza que el timestamp específico de permisos se guarda en Firebase
   // y el download no los pisa al recargar
   try{
-    const ts=Date.now();
+    var tsGuardado;
     if(typeof window.fbSavePermisos==='function'){
-      await window.fbSavePermisos(verificado);
+      tsGuardado=await window.fbSavePermisos(verificado);
     } else {
       await window.fbUpload(true);
+      tsGuardado=Date.now();
     }
-    localStorage.setItem('_local_ts_gdv_permisos', String(ts));
+    localStorage.setItem('_local_ts_gdv_permisos', String(tsGuardado));
   }catch(e){
     // Revertir a la última versión sincronizada, tanto en memoria como en localStorage
     if(permisosPrevios){

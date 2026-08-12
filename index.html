@@ -1032,6 +1032,13 @@ function limiteFechaCarga(){
   lunesEstaSemana.setDate(hoy.getDate()+diffALunes);
   const lunesSemanaAnterior=new Date(lunesEstaSemana);
   lunesSemanaAnterior.setDate(lunesEstaSemana.getDate()-7);
+  // Super Admin puede destrabar Grupos atrasados cargando con más de 2 semanas de demora — el
+  // resto de las Funciones sigue con la ventana normal de 2 semanas, tal como está diseñado.
+  if(typeof isSuperAdmin==='function'&&isSuperAdmin()){
+    const haceUnAnio=new Date(hoy);
+    haceUnAnio.setFullYear(haceUnAnio.getFullYear()-1);
+    return { min: dateToStr(haceUnAnio), max: today() };
+  }
   return { min: dateToStr(lunesSemanaAnterior), max: today() };
 }
 function recordInWeek(fechaStr, offsetWeeks=0){
@@ -2256,7 +2263,7 @@ async function ngSaveRecord(){
   // Ventana permitida — semana ISO en curso y la anterior como máximo, para TODAS las Funciones (incluye Super Admin)
   var lim=limiteFechaCarga();
   if(fecha>lim.max){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+fmtAA(lim.max)+').');return;}
-  if(fecha<lim.min){alert('Solo se puede cargar la semana en curso o la anterior. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
+  if(fecha<lim.min){alert('La fecha elegida está antes del mínimo permitido. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
 
   // ── No se puede cargar la semana en curso si la anterior está pendiente ──
   // (sin excepciones — al menos hay que marcarla como "Sin Encuentro")
@@ -10375,7 +10382,7 @@ async function gdvSaveRecord(){
   // Validate date range — semana ISO en curso y la anterior como máximo, para TODAS las Funciones (incluye Super Admin)
   const lim=limiteFechaCarga();
   if(fecha>lim.max){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+fmtAA(lim.max)+').');return;}
-  if(fecha<lim.min){alert('Solo se puede cargar la semana en curso o la anterior. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
+  if(fecha<lim.min){alert('La fecha elegida está antes del mínimo permitido. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
 
   // ── No se puede cargar la semana en curso si la anterior está pendiente ──
   // (sin excepciones — al menos hay que marcarla como "Sin Encuentro")
@@ -17193,7 +17200,7 @@ async function discGuardarAsistencia(){
   // Ventana permitida — semana ISO en curso y la anterior como máximo, para TODAS las Funciones (incluye Super Admin)
   var lim=limiteFechaCarga();
   if(fecha>lim.max){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+fmtAA(lim.max)+').');return;}
-  if(fecha<lim.min){alert('Solo se puede cargar la semana en curso o la anterior. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
+  if(fecha<lim.min){alert('La fecha elegida está antes del mínimo permitido. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
 
   // ── No se puede cargar la semana en curso si la anterior está pendiente ──
   // (sin excepciones — al menos hay que marcarla como "Sin Encuentro")

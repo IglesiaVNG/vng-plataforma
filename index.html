@@ -684,25 +684,32 @@ async function fbCheckVersion(){
 fbCheckVersion();
 setInterval(fbCheckVersion, 90000); // reintentar cada 90 segundos mientras la app esté abierta
 
+// Revisa si hay una versión más nueva de Permisos en la nube y, si la hay, la aplica a la sesión
+// actual sin necesidad de recargar la página — antes esto solo se chequeaba una vez al abrir la
+// app, así que alguien con la sesión ya abierta nunca se enteraba de un cambio de Permisos hecho
+// por Super Admin mientras tanto (parecía que "no se había guardado", cuando en realidad sí).
+function fbCheckPermisosActualizados(){
+  if(typeof window.fbLoadPermisos !== 'function') return;
+  window.fbLoadPermisos().then(function(data){
+    if(data && data.gdv_permisos){
+      var fbPTs = parseInt(data.gdv_permisos_ts||'0');
+      var localPTs = parseInt(localStorage.getItem('_local_ts_gdv_permisos')||'0');
+      if(fbPTs > localPTs){
+        localStorage.setItem('gdv_permisos', data.gdv_permisos);
+        localStorage.setItem('_local_ts_gdv_permisos', String(fbPTs));
+        console.log('Firebase: permisos actualizados desde nube ts='+fbPTs);
+        if(typeof loadPermisos==='function') loadPermisos();
+      } else {
+        console.log('Firebase: permisos locales son más recientes, no se pisan');
+      }
+    }
+  }).catch(function(e){ console.error('Error cargando permisos:', e); });
+}
+
 // Auto-download when Firebase is ready (fixes mobile timing issue)
 window.fbDownload().then(function(hasData) {
-  // Cargar permisos desde Firebase separadamente via fbLoadPermisos (tiene acceso al scope correcto)
-  if(typeof window.fbLoadPermisos === 'function'){
-    window.fbLoadPermisos().then(function(data){
-      if(data && data.gdv_permisos){
-        var fbPTs = parseInt(data.gdv_permisos_ts||'0');
-        var localPTs = parseInt(localStorage.getItem('_local_ts_gdv_permisos')||'0');
-        if(fbPTs > localPTs){
-          localStorage.setItem('gdv_permisos', data.gdv_permisos);
-          localStorage.setItem('_local_ts_gdv_permisos', String(fbPTs));
-          console.log('Firebase: permisos actualizados desde nube ts='+fbPTs);
-          if(typeof loadPermisos==='function') loadPermisos();
-        } else {
-          console.log('Firebase: permisos locales son más recientes, no se pisan');
-        }
-      }
-    }).catch(function(e){ console.error('Error cargando permisos:', e); });
-  }
+  fbCheckPermisosActualizados();
+  setInterval(fbCheckPermisosActualizados, 90000); // reintentar cada 90 segundos mientras la app esté abierta — así una sesión ya abierta recibe cambios de Permisos sin tener que recargar la página
   if(hasData) {
     console.log('Firebase: auto-download complete');
     // Firebase downloaded new data into localStorage (protected by per-key timestamps).

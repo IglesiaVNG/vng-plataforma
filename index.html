@@ -17198,7 +17198,12 @@ function discRenderCargar(c){
     });
   }
   var pasoOpts=cursadasActivas.map(function(cu){
-    return '<option value="'+cu.id+'">'+cu.label+'</option>';
+    var sufijo='';
+    if(!(cu.grupos||[]).length){
+      var discLbl=(cu.discipuladorIds||[]).length?discDiscipuladoresLabel(cu):'Sin asignar';
+      sufijo=' — Discipulador/a: '+discLbl;
+    }
+    return '<option value="'+cu.id+'">'+cu.label+sufijo+'</option>';
   }).join('');if(!pasoOpts)pasoOpts='<option value="">— No hay cursadas activas —</option>';
 
   var hoy=today();
@@ -17302,10 +17307,18 @@ function discLoadPasoForm(){
   var grupoWrap=document.getElementById('disc-sel-grupo-wrap');
   var grupoSel=document.getElementById('disc-sel-grupo');
   var grupos=(cursada&&cursada.grupos)||[];
+  if(!isSuperAdmin()&&canEjecutar('disc_scope_cursada')){
+    var linkedDiscG=getLinkedMember();
+    var linkedIdG=linkedDiscG?Number(linkedDiscG.id):null;
+    grupos=grupos.filter(function(g){ return linkedIdG&&(g.discipuladorIds||[]).map(Number).includes(linkedIdG); });
+  }
   if(grupos.length>=1&&grupoWrap&&grupoSel){
     grupoWrap.style.display='block';
     var valorPrevio=grupoSel.value;
-    grupoSel.innerHTML='<option value="">— Elegí un Grupo —</option>'+grupos.map(function(g){return '<option value="'+g.id+'">'+g.nombre+'</option>';}).join('');
+    grupoSel.innerHTML='<option value="">— Elegí un Grupo —</option>'+grupos.map(function(g){
+      var discLbl=(g.discipuladorIds||[]).length?discDiscipuladoresLabel(g):'Sin asignar';
+      return '<option value="'+g.id+'">'+g.nombre+' — Discipulador/a: '+discLbl+'</option>';
+    }).join('');
     // Mantener la selección si seguís en la misma cursada y ese grupo todavía existe
     if(valorPrevio&&grupos.some(function(g){return String(g.id)===valorPrevio;})) grupoSel.value=valorPrevio;
     discSelectedGrupoId=grupoSel.value||null;

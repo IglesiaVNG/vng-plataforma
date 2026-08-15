@@ -15903,6 +15903,15 @@ let discAsignandoPasoId=null;
 let discAsignandoCursadaId=null;
 
 // Devuelve el/los nombres de Discipulador(es) de un Paso o Cursada, separados por coma
+// ¿Esta persona es Discipulador de esta Cursada? Chequea tanto el Discipulador a nivel de toda
+// la Cursada, como el de cada Grupo individual dentro de ella — una Cursada con varios Grupos
+// suele quedar "Sin asignar" a nivel general, con cada Grupo teniendo el suyo por separado.
+function discEsDiscipuladorDeCursada(cursada, memberId){
+  if(!cursada||!memberId) return false;
+  if((cursada.discipuladorIds||[]).map(Number).includes(Number(memberId))) return true;
+  return (cursada.grupos||[]).some(function(g){ return (g.discipuladorIds||[]).map(Number).includes(Number(memberId)); });
+}
+
 function discDiscipuladoresLabel(obj){
   var ids=obj&&obj.discipuladorIds?obj.discipuladorIds:[];
   if(!ids.length) return 'Sin asignar';
@@ -15934,11 +15943,12 @@ function discRenderDashboard(c){
     // completo, siempre que tenga algún nivel de acceso a Dashboard (ya filtrado por canAccessDisc).
     pasosToShow=S.discPasos;
   } else {
-    // "Limitar a sus Cursadas asignadas" en Ejecuta: solo ve el/los Curso(s) donde está
-    // asignado como Discipulador — configurable desde Configuración → Permisos.
+    // "Limitar a sus Cursadas asignadas" en Ejecuta: solo ve el/los Curso(s) cuya Cursada
+    // ACTIVA la tiene como Discipulador — a nivel de toda la Cursada, o de alguno de sus Grupos.
     var linkedDisc=getLinkedMember();
     pasosToShow=S.discPasos.filter(function(p){
-      return linkedDisc&&(p.discipuladorIds||[]).map(Number).includes(Number(linkedDisc.id));
+      var cursadaActivaDelPaso=(S.discCursadas||[]).find(function(cu){return cu.pasoId===p.id&&cu.estado==='Activo';});
+      return cursadaActivaDelPaso&&discEsDiscipuladorDeCursada(cursadaActivaDelPaso,linkedDisc&&linkedDisc.id);
     });
   }
 
@@ -17184,7 +17194,7 @@ function discRenderCargar(c){
   if(!isSuperAdmin()&&canEjecutar('disc_scope_cursada')){
     var linkedDisc=getLinkedMember();
     cursadasActivas=cursadasActivas.filter(function(cu){
-      return linkedDisc&&(cu.discipuladorIds||[]).map(Number).includes(Number(linkedDisc.id));
+      return discEsDiscipuladorDeCursada(cu,linkedDisc&&linkedDisc.id);
     });
   }
   var pasoOpts=cursadasActivas.map(function(cu){

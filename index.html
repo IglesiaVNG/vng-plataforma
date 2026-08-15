@@ -1053,6 +1053,29 @@ function limiteFechaCarga(){
   }
   return { min: dateToStr(lunesSemanaAnterior), max: today() };
 }
+// Fecha de referencia dentro de la semana ISO INMEDIATAMENTE anterior a hoy — a diferencia de
+// limiteFechaCarga().min, esto NUNCA cambia según quién pregunta (ni para Super Admin con su
+// ventana ampliada). Se usa específicamente para el chequeo de "¿cargaste la semana pasada?",
+// que siempre debe mirar la semana pasada real, no el límite de cuánto atrás se puede cargar.
+function fechaSemanaAnterior(){
+  var d=new Date();
+  d.setDate(d.getDate()-7);
+  return dateToStr(d);
+}
+// Rango por defecto para los FILTROS DE BÚSQUEDA en Registros: siempre las últimas 2 semanas ISO
+// (la actual y la anterior), para cualquier Función — a diferencia de limiteFechaCarga(), que sí
+// se amplía para Super Admin (esa ampliación es solo para el límite de CARGA de asistencia, no
+// para este default de búsqueda, que se puede ampliar a mano cuando haga falta).
+function registrosRangoDefault(){
+  const hoy=new Date();
+  const dow=hoy.getDay();
+  const diffALunes=(dow===0?-6:1-dow);
+  const lunesEstaSemana=new Date(hoy);
+  lunesEstaSemana.setDate(hoy.getDate()+diffALunes);
+  const lunesSemanaAnterior=new Date(lunesEstaSemana);
+  lunesSemanaAnterior.setDate(lunesEstaSemana.getDate()-7);
+  return { desde: dateToStr(lunesSemanaAnterior), hasta: today() };
+}
 function recordInWeek(fechaStr, offsetWeeks=0){
   const {start,end}=getWeekDates(offsetWeeks);
   const d=new Date(fechaStr);
@@ -1446,8 +1469,8 @@ function canAccessNG(){
 // NUEVAS GENERACIONES MODULE
 // ══════════════════════════════════════════════════════════════════
 var ngCurrentComunidadId=null;
-var ngFilDesde=limiteFechaCarga().min;
-var ngFilHasta='',ngFilComunidad=null,ngFilSexo='';
+var ngFilDesde=registrosRangoDefault().desde;
+var ngFilHasta=registrosRangoDefault().hasta,ngFilComunidad=null,ngFilSexo='';
 
 function openNG(){
   document.getElementById('screen-home').classList.add('hidden');
@@ -1990,11 +2013,11 @@ function ngApplyFilters(){
 }
 
 function ngResetFilters(){
-  ngFilDesde=limiteFechaCarga().min;
-  ngFilHasta=''; ngFilComunidad=null; ngFilSexo='';
+  ngFilDesde=registrosRangoDefault().desde;
+  ngFilHasta=registrosRangoDefault().hasta; ngFilComunidad=null; ngFilSexo='';
   var el;
   if((el=document.getElementById('ng-df-desde'))) el.value=ngFilDesde;
-  if((el=document.getElementById('ng-df-hasta'))) el.value='';
+  if((el=document.getElementById('ng-df-hasta'))) el.value=ngFilHasta;
   if((el=document.getElementById('ng-df-com'))) el.value='';
   if((el=document.getElementById('ng-df-sex'))) el.value='';
   ngRenderDashStats();
@@ -2283,7 +2306,8 @@ async function ngSaveRecord(){
     var semanaActualKey=getWeekKey(lim.max);
     var esSemanaActual=getWeekKey(fecha)===semanaActualKey;
     if(esSemanaActual){
-      var semanaAntKey=lim.min; // ya es el lunes de la semana anterior
+      var fechaAnt=fechaSemanaAnterior();
+      var semanaAntKey=getWeekKey(fechaAnt);
       var existeAnterior=S.ngRecords.some(function(r){
         return Number(r.comunidadId)===Number(cid) && getWeekKey(r.fecha)===semanaAntKey;
       });
@@ -2291,7 +2315,7 @@ async function ngSaveRecord(){
         alert('⚠️ Todavía no cargaste la semana anterior para esta comunidad. Cargala primero — como mínimo marcá "Sin Encuentro" — antes de cargar la semana actual.');
         return;
       }
-      if(typeof formSemanaAnteriorCompleta==='function'&&!formSemanaAnteriorCompleta('ng',cid,lim.min)){
+      if(typeof formSemanaAnteriorCompleta==='function'&&!formSemanaAnteriorCompleta('ng',cid,fechaAnt)){
         alert('⚠️ Todavía falta completar el Formulario de la semana anterior para esta comunidad. Completalo antes de cargar la semana actual.');
         return;
       }
@@ -2390,7 +2414,7 @@ async function ngSaveRecord(){
 function ngRenderRegistros(c){
   if(!c) c=document.getElementById('ng-tab-content');
   var hoy=today();
-  var d2w=limiteFechaCarga().min;
+  var d2w=registrosRangoDefault().desde;
   var coms=isSuperAdmin()?(S.ngComunidades||[]).filter(function(ng){return ng.estado!=='Inactivo';}):ngGetMisComunidades();
   var comOpts=coms.map(function(ng){return '<option value="'+ng.id+'">'+ng.name+'</option>';}).join('');
   c.innerHTML=
@@ -2410,7 +2434,7 @@ function ngRenderRegistros(c){
 }
 
 function ngResetRegFiltros(){
-  var d2w=limiteFechaCarga().min;
+  var d2w=registrosRangoDefault().desde;
   var el;
   if((el=document.getElementById('ng-rf-desde'))) el.value=d2w;
   if((el=document.getElementById('ng-rf-hasta'))) el.value=today();
@@ -9742,7 +9766,7 @@ function cfgCloseRoleForm(){document.getElementById('cfg-role-form').classList.a
 // ════════════════════════════════════════════════════════════
 let gdvFacAtt={},gdvVisitsOther=[],gdvVisitsNew=[],gdvVisitsNewIds=[],gdvSelectedRoles=[];
 let gdvEditingGroupId=null,gdvEditingUserId=null,gdvEditingMemberId=null,gdvEditingRoleId=null;
-var _d2w=limiteFechaCarga().min;
+var _d2w=registrosRangoDefault().desde;
 let gdvFilDesde=_d2w,gdvFilHasta='',gdvFilGrupos=null,gdvFilSexo='';
 let gdvMrSortAsc=true,gdvMrVisible=20;
 
@@ -10476,8 +10500,9 @@ async function gdvSaveRecord(){
     const anioActualNum=parseLocalDate(lim.max).getFullYear();
     const esSemanaActual=getISOWeek(fecha)===semanaActualNum && parseLocalDate(fecha).getFullYear()===anioActualNum;
     if(esSemanaActual){
-      const semanaAntNum=getISOWeek(lim.min);
-      const anioAntNum=parseLocalDate(lim.min).getFullYear();
+      const fechaAnt=fechaSemanaAnterior();
+      const semanaAntNum=getISOWeek(fechaAnt);
+      const anioAntNum=parseLocalDate(fechaAnt).getFullYear();
       const existeAnterior=S.records.some(function(r){
         if(r.grupoId!==gid) return false;
         return getISOWeek(r.fecha)===semanaAntNum && parseLocalDate(r.fecha).getFullYear()===anioAntNum;
@@ -10486,7 +10511,7 @@ async function gdvSaveRecord(){
         alert('⚠️ Todavía no cargaste la semana anterior para este grupo. Cargala primero — como mínimo marcá "Sin Encuentro" — antes de cargar la semana actual.');
         return;
       }
-      if(typeof formSemanaAnteriorCompleta==='function'&&!formSemanaAnteriorCompleta('gdv',gid,lim.min)){
+      if(typeof formSemanaAnteriorCompleta==='function'&&!formSemanaAnteriorCompleta('gdv',gid,fechaAnt)){
         alert('⚠️ Todavía falta completar el Formulario de la semana anterior para este grupo. Completalo antes de cargar la semana actual.');
         return;
       }
@@ -10665,7 +10690,7 @@ function gdvRenderFacChart(recs){
   });
 }
 function gdvGetDefaultDates(){
-  return {desde:limiteFechaCarga().min,hasta:today()};
+  return {desde:registrosRangoDefault().desde,hasta:today()};
 }
 
 function gdvInitFilters(){
@@ -11301,7 +11326,8 @@ function gdvRenderRegistros(){
   // Default: last 2 weeks if no date set
   var _regDesde=document.getElementById('gdv-reg-desde');
   var _regHasta=document.getElementById('gdv-reg-hasta');
-  if(_regDesde&&!_regDesde.value){_regDesde.value=limiteFechaCarga().min;}
+  if(_regDesde&&!_regDesde.value){_regDesde.value=registrosRangoDefault().desde;}
+  if(_regHasta&&!_regHasta.value){_regHasta.value=registrosRangoDefault().hasta;}
   const fd=_regDesde?.value||'';
   const fh=_regHasta?.value||'';
   const sel=document.getElementById('gdv-reg-grupo');
@@ -15749,11 +15775,17 @@ function gdvDescargarFormulario(url){
 // DISCIPULADO MODULE
 // ════════════════════════════════════════════════════════════
 
+// Antes esto era una lista fija de nombres de rol (hasRole('super_admin','admin_disc',...)),
+// que ignoraba por completo lo que se configura en Configuración → Permisos: si habilitabas
+// Discipulado para una Función que no estuviera literalmente en esa lista, la persona igual
+// quedaba afuera sin explicación. Ahora consulta la matriz real, igual que el resto de los
+// módulos — cualquier Función con acceso a al menos una pantalla de Discipulado puede entrar.
 function canAccessDisc(){
-  return hasRole('super_admin','admin_disc','disc_n1','disc_n2','disc_n3','pastor');
+  if(isSuperAdmin()) return true;
+  return canScreen('disc_dashboard')||canScreen('disc_cargar')||canScreen('disc_registros')||canScreen('disc_pasos')||canScreen('disc_inscripciones');
 }
 function canAdminDisc(){
-  return hasRole('super_admin','admin_disc');
+  return isSuperAdmin()||canEjecutar('disc_pasos');
 }
 
 function openDiscipulado(){
@@ -17328,8 +17360,9 @@ async function discGuardarAsistencia(){
     var anioActualNum=parseLocalDate(lim.max).getFullYear();
     var esSemanaActual=getISOWeek(fecha)===semanaActualNum && parseLocalDate(fecha).getFullYear()===anioActualNum;
     if(esSemanaActual){
-      var semanaAntNum=getISOWeek(lim.min);
-      var anioAntNum=parseLocalDate(lim.min).getFullYear();
+      var fechaAnt=fechaSemanaAnterior();
+      var semanaAntNum=getISOWeek(fechaAnt);
+      var anioAntNum=parseLocalDate(fechaAnt).getFullYear();
       var existeAnterior=S.discRecords.some(function(r){
         if((r.cursadaId||r.pasoId)!==pasoId) return false;
         if(discSelectedGrupoId&&String(r.grupoId||'')!==String(discSelectedGrupoId)) return false;
@@ -17339,7 +17372,7 @@ async function discGuardarAsistencia(){
         alert('⚠️ Todavía no cargaste la semana anterior para esta Cursada. Cargala primero — como mínimo marcá "Sin Encuentro" — antes de cargar la semana actual.');
         return;
       }
-      if(typeof formSemanaAnteriorCompleta==='function'&&!formSemanaAnteriorCompleta('discipulado',pasoId,lim.min)){
+      if(typeof formSemanaAnteriorCompleta==='function'&&!formSemanaAnteriorCompleta('discipulado',pasoId,fechaAnt)){
         alert('⚠️ Todavía falta completar el Formulario de la semana anterior para esta Cursada. Completalo antes de cargar la semana actual.');
         return;
       }

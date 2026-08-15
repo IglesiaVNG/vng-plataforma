@@ -15804,8 +15804,9 @@ function buildDiscipuladoHTML(){
       ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-cursos" class="btn btn-sm" onclick="discTab('cursos',this)">🎓 Cursos</button>`:''}
       ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-pasos" class="btn btn-sm" onclick="discTab('cursada',this)">📋 Cursada</button>`:''}
       ${(isSuperAdmin()||canEjecutar('disc_inscripciones'))?`<button id="disc-tab-inscripciones" class="btn btn-sm" onclick="discTab('inscripciones',this)">📝 Inscripciones${discCountPendientes()?` <span style="background:#DC2626;color:#fff;border-radius:999px;padding:1px 7px;font-size:10px;margin-left:2px">${discCountPendientes()}</span>`:''}</button>`:''}
-      <button id="disc-tab-cargar" class="btn btn-sm" onclick="discTab('cargar',this)">✏️ Cargar</button>
-      <button id="disc-tab-registros" class="btn btn-sm" onclick="discTab('registros',this)">📄 Registros</button><button id="disc-tab-historico" class="btn btn-sm" onclick="discTab('historico',this)">📁 Histórico</button>
+      ${(isSuperAdmin()||canEjecutar('disc_cargar'))?`<button id="disc-tab-cargar" class="btn btn-sm" onclick="discTab('cargar',this)">✏️ Cargar Asistencia</button>`:''}
+      ${(isSuperAdmin()||canScreen('disc_registros'))?`<button id="disc-tab-registros" class="btn btn-sm" onclick="discTab('registros',this)">📄 Registros</button>`:''}
+      ${(isSuperAdmin()||canScreen('disc_registros'))?`<button id="disc-tab-historico" class="btn btn-sm" onclick="discTab('historico',this)">📁 Histórico</button>`:''}
     </div>
     <div id="disc-content"></div>
 
@@ -15921,11 +15922,13 @@ function discTab(tab, btn){
 function discRenderDashboard(c){
   // Determine which pasos to show
   var pasosToShow;
-  if(isSuperAdmin()||canEjecutar('disc_pasos')||canEjecutar('disc_registros')){
-    // Ver todos
+  if(isSuperAdmin()||canEjecutar('disc_dashboard')){
+    // Ver todos — cualquier Función con "Ejecuta" en Dashboard ve el panorama completo,
+    // sin depender de si además tiene acceso a Cursos/Cursada/Registros.
     pasosToShow=S.discPasos;
   } else {
-    // Discipulador solo ve su paso
+    // El resto (ej: Discipulador de un Curso puntual, con Cargar/Registros a nivel Consulta)
+    // solo ve el/los Curso(s) donde está asignado como Discipulador.
     var linkedDisc=getLinkedMember();
     pasosToShow=S.discPasos.filter(function(p){
       return linkedDisc&&(p.discipuladorIds||[]).map(Number).includes(Number(linkedDisc.id));
@@ -17125,6 +17128,15 @@ var discSelectedGrupoId=null;
 
 function discRenderCargar(c){
   var cursadasActivas=(S.discCursadas||[]).filter(function(cu){return cu.estado==='Activo';});
+  // Si la persona NO tiene acceso amplio (Super Admin, o Ejecuta en Registros/Cursos/Cursada),
+  // solo ve las Cursadas donde ella misma está asignada como Discipulador — igual que un
+  // Facilitador de GdV solo ve su propio grupo al cargar asistencia.
+  if(!(isSuperAdmin()||canEjecutar('disc_registros')||canEjecutar('disc_pasos'))){
+    var linkedDisc=getLinkedMember();
+    cursadasActivas=cursadasActivas.filter(function(cu){
+      return linkedDisc&&(cu.discipuladorIds||[]).map(Number).includes(Number(linkedDisc.id));
+    });
+  }
   var pasoOpts=cursadasActivas.map(function(cu){
     return '<option value="'+cu.id+'">'+cu.label+'</option>';
   }).join('');if(!pasoOpts)pasoOpts='<option value="">— No hay cursadas activas —</option>';
@@ -17549,12 +17561,52 @@ async function discSaveEdit(){
 }
 
 function discRenderRegistros(c){
-  var recs=[...S.discRecords].sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
+  var pasoOpts='<option value="">Todos</option>'+(S.discPasos||[]).map(function(p){return '<option value="'+p.id+'">'+p.nombre+'</option>';}).join('');
+  c.innerHTML=
+    '<div class="card" style="margin-bottom:1rem">'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
+        +'<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Curso</label>'
+          +'<select id="disc-rf-paso" onchange="discRenderRegistrosList()" style="min-width:170px">'+pasoOpts+'</select></div>'
+        +'<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde</label>'
+          +'<input type="date" id="disc-rf-desde" onchange="discRenderRegistrosList()"></div>'
+        +'<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Hasta</label>'
+          +'<input type="date" id="disc-rf-hasta" onchange="discRenderRegistrosList()"></div>'
+        +'<button class="btn btn-sm" onclick="discResetRegFiltros()">🔄</button>'
+      +'</div>'
+    +'</div>'
+    +'<div id="disc-registros-lista"></div>';
+  var rd=registrosRangoDefault();
+  var elD=document.getElementById('disc-rf-desde'); if(elD) elD.value=rd.desde;
+  var elH=document.getElementById('disc-rf-hasta'); if(elH) elH.value=rd.hasta;
+  discRenderRegistrosList();
+}
+
+function discResetRegFiltros(){
+  var rd=registrosRangoDefault();
+  var el;
+  if((el=document.getElementById('disc-rf-paso'))) el.value='';
+  if((el=document.getElementById('disc-rf-desde'))) el.value=rd.desde;
+  if((el=document.getElementById('disc-rf-hasta'))) el.value=rd.hasta;
+  discRenderRegistrosList();
+}
+
+function discRenderRegistrosList(){
+  var wrap=document.getElementById('disc-registros-lista');
+  if(!wrap) return;
+  var fp=document.getElementById('disc-rf-paso')?.value||'';
+  var fd=document.getElementById('disc-rf-desde')?.value||'';
+  var fh=document.getElementById('disc-rf-hasta')?.value||'';
+  var recs=(S.discRecords||[]).filter(function(r){
+    if(fp&&String(r.pasoId)!==fp) return false;
+    if(fd&&r.fecha<fd) return false;
+    if(fh&&r.fecha>fh) return false;
+    return true;
+  }).sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
   if(!recs.length){
-    c.innerHTML='<div class="empty">Sin registros de asistencia cargados aún</div>';
+    wrap.innerHTML='<div class="empty">Sin registros de asistencia para este filtro</div>';
     return;
   }
-  var html='<div style="font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:1rem">'+recs.length+' registros</div>';
+  var html='<div style="font-size:14px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);margin-bottom:1rem">'+recs.length+' registro'+(recs.length!==1?'s':'')+'</div>';
   recs.forEach(function(r){
     if(r.sinEncuentro){
       html+='<div class="card" style="margin-bottom:.75rem;padding:12px;opacity:.7">';
@@ -17584,7 +17636,7 @@ function discRenderRegistros(c){
     });
     html+='</div></div>';
   });
-  c.innerHTML=html;
+  wrap.innerHTML=html;
 }
 
 

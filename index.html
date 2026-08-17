@@ -16342,11 +16342,13 @@ function discRenderCursada(c){
       }
       html+='<div style="margin-top:14px">';
       if(grupos.length){
-        grupos.forEach(function(gr){
+        var paletaGrupos=['#7C3AED','#0891B2','#16A34A','#D97706','#DB2777','#4338CA','#0D9488','#B45309'];
+        grupos.forEach(function(gr,idx){
           var integrantesGrupo=(gr.miembros||[]).map(function(id){return mems.find(function(m){return m.id===id;});}).filter(Boolean);
-          html+='<div'+(canAdminDisc()?' onclick="discGruposCursadaId='+cursadaActiva.id+';discAbrirGrupoDetalle('+gr.id+')" style="cursor:pointer"':'')+' style="border:1px solid #E5E7EB;border-radius:10px;padding:10px 12px;margin-bottom:8px">'
+          var colorGrupo=paletaGrupos[idx%paletaGrupos.length];
+          html+='<div'+(canAdminDisc()?' onclick="discGruposCursadaId='+cursadaActiva.id+';discAbrirGrupoDetalle('+gr.id+')" style="cursor:pointer"':'')+' style="border:1px solid #E5E7EB;border-left:5px solid '+colorGrupo+';border-radius:10px;padding:10px 12px;margin-bottom:10px;background:'+colorGrupo+'0D">'
             +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">'
-              +'<span style="font-size:13px;font-weight:700;color:#374151">🧑‍🤝‍🧑 '+gr.nombre+'</span>'
+              +'<span style="font-size:13px;font-weight:700;color:'+colorGrupo+'">🧑‍🤝‍🧑 '+gr.nombre+'</span>'
               +'<span style="display:flex;align-items:center;gap:8px">'
                 +'<span style="font-size:11px;color:#6B7280">'+((gr.discipuladorIds||[]).length?'👤 '+discDiscipuladoresLabel(gr):'<span style="color:#D97706;font-weight:600">Sin discipulador</span>')+' · '+integrantesGrupo.length+' integrante'+(integrantesGrupo.length!==1?'s':'')+'</span>'
                 +(canAdminDisc()?'<button class="btn btn-sm" onclick="event.stopPropagation();discGruposCursadaId='+cursadaActiva.id+';discAbrirGrupoDetalle('+gr.id+')" style="padding:2px 8px">✏️ Editar</button>':'')
@@ -16362,7 +16364,15 @@ function discRenderCursada(c){
         if(sinGrupo.length){
           html+='<div style="border:1px dashed #FCA5A5;border-radius:10px;padding:10px 12px">'
             +'<div style="font-size:13px;font-weight:700;color:#991B1B;margin-bottom:8px">⚠️ Sin Grupo asignado ('+sinGrupo.length+')</div>'
-            +'<div style="display:flex;flex-wrap:wrap;gap:6px">'+sinGrupo.map(chipMiembro).join('')+'</div>'
+            +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+            +sinGrupo.map(function(m){
+              var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+              var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+              return '<span style="background:'+genBg+';color:'+genColor+';font-size:11px;padding:2px 4px 2px 8px;border-radius:4px;font-weight:600;display:inline-flex;align-items:center;gap:4px">'+fullName(m)
+                +(canAdminDisc()?'<span onclick="event.stopPropagation();discSacarDeCursada('+cursadaActiva.id+','+m.id+')" title="Sacar de la Cursada" style="cursor:pointer;color:rgba(0,0,0,.45);font-weight:700">✕</span>':'')
+              +'</span>';
+            }).join('')
+            +'</div>'
           +'</div>';
         }
       } else {
@@ -16839,6 +16849,35 @@ async function discGuardarRenombreGrupo(cursada, grupo, nuevoNombre){
   if(nombreEl) nombreEl.textContent=grupo.nombre;
   discRenderGruposLista();
   showToast('✅ Nombre actualizado','#16A34A');
+}
+
+// Saca a alguien por completo de la Cursada (no solo de un Grupo) — para cuando ya no va a
+// participar, y no tiene sentido que quede "observado" en el recuadro de Sin Grupo asignado.
+async function discSacarDeCursada(cursadaId, memberId){
+  if(!canAdminDisc()) return;
+  var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
+  if(!cursada) return;
+  var m=S.members.find(function(x){return x.id===memberId;});
+  if(!confirm('¿Sacar a '+(m?fullName(m):'esta persona')+' de la Cursada "'+(S.discPasos.find(function(p){return p.id===cursada.pasoId;})||{}).nombre+'"?\n\nDeja de contar para la asistencia y el % de esta Cursada. Esta acción no se puede deshacer.')) return;
+  var snapshotMiembros=cursada.miembros.slice();
+  var snapshotGrupos=JSON.parse(JSON.stringify(cursada.grupos||[]));
+  cursada.miembros=cursada.miembros.filter(function(id){return id!==memberId;});
+  (cursada.grupos||[]).forEach(function(g){ g.miembros=(g.miembros||[]).filter(function(id){return id!==memberId;}); });
+  cursada._ts=Date.now();
+  await saveK(SK.discCursadas,S.discCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    cursada.miembros=snapshotMiembros;
+    cursada.grupos=snapshotGrupos;
+    cursada._ts=Date.now();
+    await saveK(SK.discCursadas,S.discCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Sacado/a de la Cursada','#16A34A');
+  var c=document.getElementById('disc-content');
+  if(c) discRenderCursada(c);
 }
 
 async function discEliminarGrupo(){
@@ -17699,11 +17738,18 @@ function discRenderRegistrosList(){
   }
   var html='<div style="font-size:14px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);margin-bottom:1rem">'+recs.length+' registro'+(recs.length!==1?'s':'')+'</div>';
   recs.forEach(function(r){
+    var grupoLbl='';
+    if(r.grupoId){
+      var cursadaDelReg=(S.discCursadas||[]).find(function(cu){return cu.pasoId===r.pasoId;});
+      var grupoDelReg=cursadaDelReg?(cursadaDelReg.grupos||[]).find(function(g){return g.id===r.grupoId;}):null;
+      if(grupoDelReg) grupoLbl='<span class="badge" style="background:#EEF2FF;color:#4338CA">🧑\u200d🤝\u200d🧑 '+grupoDelReg.nombre+'</span>';
+    }
     if(r.sinEncuentro){
       html+='<div class="card" style="margin-bottom:.75rem;padding:12px;opacity:.7">';
       html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
       html+='<span style="font-weight:600">'+(r.fecha?fmt(r.fecha):'—')+'</span>';
       html+='<span class="badge b-muted">'+r.pasoNombre+'</span>';
+      html+=grupoLbl;
       html+='<span style="flex:1;font-size:13px;color:#92400E">⏸ Sin encuentro'+(r.motivo?' — '+r.motivo:'')+'</span>';
       html+='<button class="btn btn-sm" onclick="discEditRecord('+r.id+')">✏️</button>';
       html+='<button class="btn btn-sm btn-danger" onclick="discDeleteRecord('+r.id+')">🗑</button>';
@@ -17716,6 +17762,7 @@ function discRenderRegistrosList(){
     html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
     html+='<span style="font-weight:600">'+(r.fecha?fmt(r.fecha):'—')+'</span>';
     html+='<span class="badge b-muted">'+r.pasoNombre+'</span>';
+    html+=grupoLbl;
     html+='<span style="flex:1;font-size:13px;color:#6B7280">'+r.capitulo+'</span>';
     html+='<span class="badge b-ok">'+presentes+'/'+att.length+' presentes</span>';
     html+='<button class="btn btn-sm" onclick="discEditRecord('+r.id+')">✏️</button>';

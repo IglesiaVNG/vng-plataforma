@@ -5549,7 +5549,12 @@ function formOpenModal(id, duplicarDeId){
         +'<input type="checkbox" id="form-f-aplica-analisis" '+(!f||f.aplicaAnalisis!==false?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
         +'Aplica Análisis App'
       +'</label>'
+      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151">'
+        +'<input type="checkbox" id="form-f-solo-con-encuentro" '+(!f||f.aplicaSoloConEncuentro!==false?'checked':'')+' style="width:16px;height:16px;cursor:pointer">'
+        +'Aplica Solo con Encuentro'
+      +'</label>'
     +'</div>'
+    +'<div style="font-size:11px;color:#9CA3AF;margin:-10px 0 16px">Si lo destildás, el Formulario se sigue exigiendo aunque el Grupo/Comunidad/Cursada haya marcado "Sin Encuentro" esa semana (útil para Formularios de aplicación personal, no ligados a que haya habido reunión).</div>'
 
     +'<div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;padding-top:4px">'
       +'<button class="btn btn-sm" onclick="formMostrarVistaPrevia()">👁 Vista previa</button>'
@@ -5791,6 +5796,7 @@ async function formSaveFormulario(){
   var fechaHasta=document.getElementById('form-f-hasta')?.value||'';
   var activo=document.getElementById('form-f-activo')?.checked;
   var aplicaAnalisis=document.getElementById('form-f-aplica-analisis')?.checked!==false;
+  var aplicaSoloConEncuentro=document.getElementById('form-f-solo-con-encuentro')?.checked!==false;
 
   if(!titulo){ alert('Ingresá el Título del Formulario'); return; }
   if(!fechaDesde||!fechaHasta){ alert('Completá el rango de fechas (Desde / Hasta)'); return; }
@@ -5817,7 +5823,7 @@ async function formSaveFormulario(){
       Object.assign(fRef,{
         titulo:titulo,propositoId:propositoId?parseInt(propositoId):null,fechaDesde:fechaDesde,fechaHasta:fechaHasta,
         preguntas:preguntasFinal,destinatarios:destinatariosFinal,
-        estado:activo?'Activo':'Inactivo',aplicaAnalisis:aplicaAnalisis,_ts:Date.now()
+        estado:activo?'Activo':'Inactivo',aplicaAnalisis:aplicaAnalisis,aplicaSoloConEncuentro:aplicaSoloConEncuentro,_ts:Date.now()
       });
     }
   } else {
@@ -5825,7 +5831,7 @@ async function formSaveFormulario(){
     nuevoRef={
       id:Date.now(),titulo:titulo,propositoId:propositoId?parseInt(propositoId):null,fechaDesde:fechaDesde,fechaHasta:fechaHasta,
       preguntas:preguntasFinal,destinatarios:destinatariosFinal,
-      estado:activo?'Activo':'Inactivo',aplicaAnalisis:aplicaAnalisis,
+      estado:activo?'Activo':'Inactivo',aplicaAnalisis:aplicaAnalisis,aplicaSoloConEncuentro:aplicaSoloConEncuentro,
       creadoPor:currentUser.name,ts:new Date().toISOString(),_ts:Date.now()
     };
     S.formularios.push(nuevoRef);
@@ -6088,8 +6094,10 @@ function formModuloAsistenciaInfo(tipoOrigen, unidadId, semanaISO, anio){
 
 // Estado de una unidad para una semana puntual: 'completo' | 'parcial' | 'pendiente'
 function formEstadoUnidadSemana(formularioId, tipoOrigen, unidadId, semanaISO, anio){
+  var f=(S.formularios||[]).find(function(x){return Number(x.id)===Number(formularioId);});
+  var exceptuaSinEncuentro=!f||f.aplicaSoloConEncuentro!==false; // default true = comportamiento de siempre
   var asistInfo=formModuloAsistenciaInfo(tipoOrigen,unidadId,semanaISO,anio);
-  if(asistInfo.sinEncuentro) return 'completo'; // Sin Encuentro cubre Asistencia y Formulario juntos
+  if(asistInfo.sinEncuentro&&exceptuaSinEncuentro) return 'completo'; // Sin Encuentro cubre Asistencia y Formulario juntos
   var tieneAsist=asistInfo.existe;
   var tieneForm=!!formGetRespuesta(formularioId,tipoOrigen,unidadId,semanaISO,anio);
   if(tieneAsist&&tieneForm) return 'completo';
@@ -6104,10 +6112,13 @@ function formSemanaAnteriorCompleta(tipoOrigen, unidadId, fechaAnteriorRef){
   var semanaISO=getISOWeek(fechaAnteriorRef), anio=parseLocalDate(fechaAnteriorRef).getFullYear();
   var asistInfo=formModuloAsistenciaInfo(tipoOrigen,unidadId,semanaISO,anio);
   if(!asistInfo.existe) return true; // la falta de Asistencia ya la bloquea el chequeo existente — no duplicar el error acá
-  if(asistInfo.sinEncuentro) return true;
   var aplicables=formFormulariosAplicables(tipoOrigen,unidadId,fechaAnteriorRef);
   if(!aplicables.length) return true; // no había ningún Formulario esa semana — depende solo de Asistencia
-  return aplicables.every(function(f){ return !!formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio); });
+  return aplicables.every(function(f){
+    var exceptuaSinEncuentro=f.aplicaSoloConEncuentro!==false;
+    if(asistInfo.sinEncuentro&&exceptuaSinEncuentro) return true; // este Formulario en particular sí se exceptúa
+    return !!formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio);
+  });
 }
 
 // Unidades activas incluidas en un Formulario para un tipoOrigen (todo lo activo salvo exclusión explícita)
@@ -6148,9 +6159,10 @@ function formEstadoAgregadoSemana(formulario, semanaISO, anio){
 function formSemanaGraduada(f, semanaISO, anio){
   var unidades=formTodasUnidadesIncluidas(f);
   if(!unidades.length) return false;
+  var exceptuaSinEncuentro=f.aplicaSoloConEncuentro!==false;
   var todasOk=unidades.every(function(u){
     var asistInfo=formModuloAsistenciaInfo(u.tipoOrigen,u.id,semanaISO,anio);
-    if(asistInfo.sinEncuentro) return true; // exceptuado del Revisado
+    if(asistInfo.sinEncuentro&&exceptuaSinEncuentro) return true; // exceptuado del Revisado
     var resp=formGetRespuesta(f.id,u.tipoOrigen,u.id,semanaISO,anio);
     return !!(resp&&resp.revisado);
   });
@@ -6401,7 +6413,17 @@ function formRegistroBadgeHtml(tipoOrigen, unidadId, fecha){
     return '<span style="font-size:11px;font-weight:700;color:#111827">Semana Sin Formulario</span>';
   }
   var semanaISO=getISOWeek(fecha), anio=parseLocalDate(fecha).getFullYear();
-  var todosCompletos=aplicables.every(function(f){ return !!formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio); });
+  var asistInfo=formModuloAsistenciaInfo(tipoOrigen,unidadId,semanaISO,anio);
+  // Si TODOS los aplicables quedan exceptuados por Sin Encuentro (y ninguno tiene una respuesta
+  // real cargada), mostrarlo aparte — no tiene sentido decir "Completado" de algo que en
+  // realidad nunca se respondió, solo quedó exceptuado.
+  var todosExceptuadosSinRespuesta=asistInfo.sinEncuentro&&aplicables.every(function(f){
+    return f.aplicaSoloConEncuentro!==false && !formGetRespuesta(f.id,tipoOrigen,unidadId,semanaISO,anio);
+  });
+  if(todosExceptuadosSinRespuesta){
+    return '<span style="font-size:11px;font-weight:700;color:#6B7280">⏸ Sin Encuentro</span>';
+  }
+  var todosCompletos=aplicables.every(function(f){ return formEstadoUnidadSemana(f.id,tipoOrigen,unidadId,semanaISO,anio)==='completo'; });
   if(todosCompletos){
     return '<span onclick="event.stopPropagation();formAbrirCompletarDesdeRegistro(\''+tipoOrigen+'\','+unidadId+',\''+fecha+'\')" style="font-size:11px;font-weight:700;color:#16A34A;cursor:pointer;text-decoration:underline">✅ Formulario Completado</span>';
   }

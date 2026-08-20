@@ -781,12 +781,14 @@ const MODULES_PERM=[
     {key:'gdv_cargar',       label:'Cargar Asistencia'},
     {key:'gdv_registros',    label:'Ver registros'},
     {key:'gdv_scope_grupo',  label:'🏘 Limitar a su grupo asignado'},
+    {key:'gdv_fecha_libre',  label:'🗓 Fecha Libre al cargar (no limitada a la ventana de semanas)'},
   ]},
   {key:'ng', label:'Nuevas Generaciones', icon:'🌱', screens:[
     {key:'ng_dashboard',   label:'Dashboard y estadísticas'},
     {key:'ng_cargar',      label:'Cargar Asistencia'},
     {key:'ng_registros',   label:'Ver registros'},
     {key:'ng_scope_grupo', label:'🌱 Limitar a su comunidad'},
+    {key:'ng_fecha_libre', label:'🗓 Fecha Libre al cargar (no limitada a la ventana de semanas)'},
   ]},
   {key:'miembros', label:'Rebaños', icon:'👥', screens:[
     {key:'miembros_ver',   label:'Ver base de miembros'},
@@ -1037,22 +1039,30 @@ function getISOWeek(d){
 }
 // Ventana permitida para cargar Encuentros (GdV, NG y Discipulado): la semana ISO en curso
 // y la anterior como máximo, nunca una fecha futura. Aplica a todas las Funciones, incluso Super Admin.
-function limiteFechaCarga(){
+// tipoOrigen es opcional ('gdv'|'ng') — determina si se consulta el permiso "Fecha Libre" de ese
+// módulo puntual. Si no se pasa (usos genéricos, ej: valores por defecto de filtros), se
+// comporta como si fuera Super Admin-only para la parte de Fecha Libre, sin romper nada.
+function limiteFechaCarga(tipoOrigen){
   const hoy=new Date();
   const dow=hoy.getDay(); // 0=Dom..6=Sáb
   const diffALunes=(dow===0?-6:1-dow);
   const lunesEstaSemana=new Date(hoy);
   lunesEstaSemana.setDate(hoy.getDate()+diffALunes);
-  const lunesSemanaAnterior=new Date(lunesEstaSemana);
-  lunesSemanaAnterior.setDate(lunesEstaSemana.getDate()-7);
-  // Super Admin puede destrabar Grupos atrasados cargando con más de 2 semanas de demora — el
-  // resto de las Funciones sigue con la ventana normal de 2 semanas, tal como está diseñado.
-  if(typeof isSuperAdmin==='function'&&isSuperAdmin()){
+  // Super Admin, o cualquier Función con "Fecha Libre" habilitada en Permisos para este módulo
+  // puntual, puede cargar con más demora — el resto sigue con la ventana configurable (2, 3, o
+  // las semanas que se hayan definido en Configuración → Home).
+  var esFechaLibre = (typeof isSuperAdmin==='function'&&isSuperAdmin())
+    || (tipoOrigen==='gdv'&&typeof canEjecutar==='function'&&canEjecutar('gdv_fecha_libre'))
+    || (tipoOrigen==='ng'&&typeof canEjecutar==='function'&&canEjecutar('ng_fecha_libre'));
+  if(esFechaLibre){
     const haceUnAnio=new Date(hoy);
     haceUnAnio.setFullYear(haceUnAnio.getFullYear()-1);
     return { min: dateToStr(haceUnAnio), max: today() };
   }
-  return { min: dateToStr(lunesSemanaAnterior), max: today() };
+  var ventanaSemanas=(S.homeConfig&&typeof S.homeConfig.ventanaCargaSemanas==='number'&&S.homeConfig.ventanaCargaSemanas>0)?S.homeConfig.ventanaCargaSemanas:2;
+  const lunesLimite=new Date(lunesEstaSemana);
+  lunesLimite.setDate(lunesEstaSemana.getDate()-7*(ventanaSemanas-1));
+  return { min: dateToStr(lunesLimite), max: today() };
 }
 // Fecha de referencia dentro de la semana ISO INMEDIATAMENTE anterior a hoy — a diferencia de
 // limiteFechaCarga().min, esto NUNCA cambia según quién pregunta (ni para Super Admin con su
@@ -2086,7 +2096,7 @@ function ngRenderCargar(c){
 
 function ngFechaSugerida(cid){
   var comRecs=S.ngRecords.filter(function(r){return Number(r.comunidadId)===Number(cid);});
-  var lim=limiteFechaCarga();
+  var lim=limiteFechaCarga('ng');
   if(!comRecs.length) return lim.max;
   var lastRec=comRecs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
   var siguiente=new Date(lastRec.fecha);
@@ -2113,7 +2123,7 @@ function ngCargarComChanged(){
   if(info&&ng) info.textContent=ng.name+' — Comunidad '+ng.tipo;
   var fechaInput=document.getElementById('ng-fecha');
   if(fechaInput){
-    var lim=limiteFechaCarga();
+    var lim=limiteFechaCarga('ng');
     fechaInput.min=lim.min;
     fechaInput.max=lim.max;
     fechaInput.value=ngFechaSugerida(cid);
@@ -2297,7 +2307,7 @@ async function ngSaveRecord(){
   var encNum=parseInt(document.getElementById('ng-encuentro-num')?.value)||1;
   if(!fecha||!cid){alert('Seleccioná la comunidad y la fecha');return;}
   // Ventana permitida — semana ISO en curso y la anterior como máximo, para TODAS las Funciones (incluye Super Admin)
-  var lim=limiteFechaCarga();
+  var lim=limiteFechaCarga('ng');
   if(fecha>lim.max){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+fmtAA(lim.max)+').');return;}
   if(fecha<lim.min){alert('La fecha elegida está antes del mínimo permitido. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
 
@@ -4295,7 +4305,8 @@ function cfgRenderHomeConfig(wrap){
   var dc=homeConfigDias('diasCumples',15);
   var de=homeConfigDias('diasEspeciales',7);
   var dh=homeConfigDias('diasHabituales',7);
-  wrap.innerHTML='<div class="card" style="max-width:420px">'
+  var ventanaCarga=(S.homeConfig&&typeof S.homeConfig.ventanaCargaSemanas==='number'&&S.homeConfig.ventanaCargaSemanas>0)?S.homeConfig.ventanaCargaSemanas:2;
+  wrap.innerHTML='<div class="card" style="max-width:420px;margin-bottom:1rem">'
     +'<div class="card-title">🏠 Configuración del Home</div>'
     +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:16px">Definí con cuántos días de anticipación se muestra cada sección en la pantalla de inicio.</div>'
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">🎂 Próximos Cumpleaños — días hacia adelante</label>'
@@ -4305,6 +4316,13 @@ function cfgRenderHomeConfig(wrap){
     +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">🏘 Próximas Actividades de Grupos — días hacia adelante <span style="font-weight:400;color:#9CA3AF">(Grupos de Vida y Nuevas Generaciones)</span></label>'
     +'<input type="number" id="cfg-home-dias-habituales" min="1" max="90" value="'+dh+'" style="margin-bottom:18px;width:100px">'
     +'<button class="btn btn-primary" onclick="cfgSaveHomeConfig()">💾 Guardar</button>'
+  +'</div>'
+  +'<div class="card" style="max-width:420px">'
+    +'<div class="card-title">✏️ Carga de Asistencia — Grupos de Vida y Nuevas Generaciones</div>'
+    +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:16px">Cuántas semanas ISO hacia atrás (contando la actual) se pueden cargar por defecto. El resto de las Funciones queda limitado a esta ventana; quién tenga "Fecha Libre" habilitada en Permisos no queda condicionada a esto — igual nunca puede saltearse una semana sin registro.</div>'
+    +'<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Ventana de carga (semanas, incluida la actual)</label>'
+    +'<input type="number" id="cfg-ventana-carga" min="1" max="12" value="'+ventanaCarga+'" style="margin-bottom:18px;width:100px">'
+    +'<button class="btn btn-primary" onclick="cfgSaveHomeConfig()">💾 Guardar</button>'
   +'</div>';
 }
 
@@ -4313,9 +4331,11 @@ async function cfgSaveHomeConfig(){
   var dc=parseInt(document.getElementById('cfg-home-dias-cumples')?.value)||15;
   var de=parseInt(document.getElementById('cfg-home-dias-especiales')?.value)||7;
   var dh=parseInt(document.getElementById('cfg-home-dias-habituales')?.value)||7;
+  var vc=parseInt(document.getElementById('cfg-ventana-carga')?.value)||2;
   dc=Math.min(90,Math.max(1,dc)); de=Math.min(90,Math.max(1,de)); dh=Math.min(90,Math.max(1,dh));
+  vc=Math.min(12,Math.max(1,vc));
   var snapshot=JSON.stringify(S.homeConfig||{});
-  S.homeConfig={diasCumples:dc,diasEspeciales:de,diasHabituales:dh};
+  S.homeConfig={diasCumples:dc,diasEspeciales:de,diasHabituales:dh,ventanaCargaSemanas:vc};
   await saveK(SK.homeConfig,S.homeConfig);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -4325,7 +4345,7 @@ async function cfgSaveHomeConfig(){
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
-  showToast('✅ Configuración del Home guardada','#16A34A');
+  showToast('✅ Configuración guardada','#16A34A');
   if(typeof renderHomeCumples==='function') renderHomeCumples();
   if(typeof renderHomeEventosEspeciales==='function') renderHomeEventosEspeciales();
   if(typeof renderHomeActividadesGrupos==='function') renderHomeActividadesGrupos();
@@ -10181,7 +10201,7 @@ function gdvCheckPendingWeeks(grupoId){
     var pendingDate=new Date(lastFecha);
     pendingDate.setDate(pendingDate.getDate()+7);
     var pendingStr=dateToStr(pendingDate);
-    var lim=limiteFechaCarga();
+    var lim=limiteFechaCarga('gdv');
 
     // Si esa semana pendiente ya quedó fuera de la ventana permitida (más de 1 semana de atraso),
     // no tiene sentido sugerir "ir" ahí — ya no se puede cargar retroactivamente.
@@ -10272,7 +10292,7 @@ function gdvInitFacForm(){
   try {
   const fechaInput=document.getElementById('gdv-fecha');
   const hoy=today();
-  const lim=limiteFechaCarga();
+  const lim=limiteFechaCarga('gdv');
   if(fechaInput){
     fechaInput.max=lim.max;
     fechaInput.min=lim.min;
@@ -10339,7 +10359,7 @@ function gdvInitFacForm(){
 
 function gdvFechaSugerida(gid){
   var groupRecs=S.records.filter(function(r){return r.grupoId===gid;});
-  var lim=limiteFechaCarga();
+  var lim=limiteFechaCarga('gdv');
   if(!groupRecs.length) return lim.max;
   var lastRec=groupRecs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
   var siguiente=new Date(lastRec.fecha);
@@ -10362,7 +10382,7 @@ function gdvAdminGroupChanged(){
   gdvRenderFacMembers(members);
   const fechaInput=document.getElementById('gdv-fecha');
   if(fechaInput){
-    var lim=limiteFechaCarga();
+    var lim=limiteFechaCarga('gdv');
     fechaInput.min=lim.min;
     fechaInput.max=lim.max;
     fechaInput.value=gdvFechaSugerida(gid);
@@ -10512,7 +10532,7 @@ async function gdvSaveRecord(){
   const sinEncuentro=document.getElementById('gdv-sin-encuentro')?.checked||false;
   const motivo=document.getElementById('gdv-motivo')?.value.trim()||'';
   // Validate date range — semana ISO en curso y la anterior como máximo, para TODAS las Funciones (incluye Super Admin)
-  const lim=limiteFechaCarga();
+  const lim=limiteFechaCarga('gdv');
   if(fecha>lim.max){alert('No podés cargar una fecha futura. La fecha máxima es hoy ('+fmtAA(lim.max)+').');return;}
   if(fecha<lim.min){alert('La fecha elegida está antes del mínimo permitido. La fecha mínima permitida es '+fmtAA(lim.min)+'.');return;}
 

@@ -2053,11 +2053,12 @@ function ngRenderCargar(c){
     '<div class="card">'+
       '<div class="card-title" style="display:flex;justify-content:space-between;align-items:center">'+
         '<span>📝 Nuevo encuentro</span>'+
-        '<button onclick="nvOpenInlineForm()" style="background:#1D4ED8;color:#fff;font-weight:700;font-size:13px;padding:6px 16px;border:none;border-radius:8px;cursor:pointer">+ Alta Nueva Persona</button>'+
+        '<button onclick="ngAbrirFormNuevoContacto()" style="background:#1D4ED8;color:#fff;font-weight:700;font-size:13px;padding:6px 16px;border:none;border-radius:8px;cursor:pointer">+ Alta Nueva Persona</button>'+
       '</div>'+
       (misComs.length>1?'<div id="ng-admin-sel" style="margin-bottom:12px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Comunidad</label><select id="ng-com-sel" onchange="ngCargarComChanged()" style="margin-bottom:0"><option value="">— Elegir comunidad —</option>'+comOpts+'</select></div>':'<input type="hidden" id="ng-com-sel" value="'+misComs[0].id+'">'+
         '<div id="ng-com-info" style="font-size:13px;color:#1E40AF;padding:8px;background:#EFF6FF;border-radius:6px;margin-bottom:8px;font-weight:600">'+misComs[0].name+' — '+misComs[0].tipo+'</div>')+
       '<div id="ng-pending-alert" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px;font-size:13px;color:#92400E;margin-bottom:12px"></div>'+
+      '<div id="ng-form-pendiente-alert" style="display:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 14px;margin-bottom:12px"></div>'+
       '<div style="margin-bottom:12px">'+
         '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha del encuentro</label>'+
           '<input type="date" id="ng-fecha" value="'+hoy+'" max="'+hoy+'" onchange="ngCheckExistingRecord()">'+
@@ -2095,16 +2096,10 @@ function ngRenderCargar(c){
 }
 
 function ngFechaSugerida(cid){
-  var comRecs=S.ngRecords.filter(function(r){return Number(r.comunidadId)===Number(cid);});
+  var ng=(S.ngComunidades||[]).find(function(x){return Number(x.id)===Number(cid);});
   var lim=limiteFechaCarga('ng');
-  if(!comRecs.length) return lim.max;
-  var lastRec=comRecs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
-  var siguiente=new Date(lastRec.fecha);
-  siguiente.setDate(siguiente.getDate()+7);
-  var sugerida=dateToStr(siguiente);
-  if(sugerida>lim.max) return lim.max;
-  if(sugerida<lim.min) return lim.min;
-  return sugerida;
+  var comRecs=S.ngRecords.filter(function(r){return Number(r.comunidadId)===Number(cid);});
+  return sugerirFechaCarga(comRecs, ng&&ng.dia, lim);
 }
 
 function ngCargarComChanged(){
@@ -2119,6 +2114,8 @@ function ngCargarComChanged(){
     return;
   }
   ngCurrentComunidadId=cid;
+  var fpaNg=document.getElementById('ng-form-pendiente-alert');
+  if(fpaNg){ fpaNg.style.display='none'; fpaNg.innerHTML=''; }
   var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(cid);});
   if(info&&ng) info.textContent=ng.name+' — Comunidad '+ng.tipo;
   var fechaInput=document.getElementById('ng-fecha');
@@ -2149,6 +2146,8 @@ function ngCheckExistingRecord(){
   var fecha=document.getElementById('ng-fecha')?.value;
   var cid=ngCurrentComunidadId;
   if(!fecha||!cid) return;
+  var fpaNgFecha=document.getElementById('ng-form-pendiente-alert');
+  if(fpaNgFecha){ fpaNgFecha.style.display='none'; fpaNgFecha.innerHTML=''; }
   var semana=getWeekKey(fecha);
   var existing=S.ngRecords.filter(function(r){
     return Number(r.comunidadId)===Number(cid)&&getWeekKey(r.fecha)===semana&&!r.sinEncuentro;
@@ -2221,7 +2220,7 @@ function ngToggleAtt(mid,checked){
 // Pre-selecciona la Comunidad que se está cargando, para que la Persona Nueva quede vinculada
 // de una y aparezca como Integrante en la próxima carga — ver misma nota en gdvAbrirFormNuevoContacto.
 function ngAbrirFormNuevoContacto(){
-  nvOpenInlineForm(ngCurrentComunidadId?{grupoId:ngCurrentComunidadId,tipoGrupo:'ng'}:undefined);
+  nvOpenInlineForm(ngCurrentComunidadId?{grupoId:ngCurrentComunidadId,tipoGrupo:'ng',origenModulo:'ng'}:{origenModulo:'ng'});
 }
 
 function ngAutoComplete(query){
@@ -2419,6 +2418,27 @@ async function ngSaveRecord(){
   ngVisitsNewIds=[];
   ngFacAtt={};
   ngRenderCargar(document.getElementById('ng-tab-content'));
+
+  // Mismo aviso que en GdV: si esta semana tiene algún Formulario de Trabajo sin completar,
+  // avisar acá mismo con acceso directo, en vez de que recién se entere al querer cargar la
+  // semana siguiente (Registros sigue funcionando igual, como alternativa).
+  var ngFormAlert=document.getElementById('ng-form-pendiente-alert');
+  if(ngFormAlert){
+    if(!sinEnc&&typeof formFormulariosAplicables==='function'){
+      var semanaISOng=getISOWeek(fecha), anioNg=parseLocalDate(fecha).getFullYear();
+      var pendientesNg=formFormulariosAplicables('ng',cid,fecha).filter(function(f){
+        return !formGetRespuesta(f.id,'ng',cid,semanaISOng,anioNg);
+      });
+      if(pendientesNg.length){
+        ngFormAlert.innerHTML='<div style="font-size:13px;color:#1E40AF;margin-bottom:8px">📋 Antes de cargar la próxima semana, hace falta completar '+(pendientesNg.length>1?'estos Formularios':'este Formulario')+' de esta semana: <strong>'+pendientesNg.map(function(f){return f.titulo;}).join(', ')+'</strong></div>'
+          +pendientesNg.map(function(f){
+            return '<button class="btn btn-sm btn-primary" style="margin-right:6px" onclick="formAbrirCompletarDesdeRegistro(\'ng\','+cid+',\''+fecha+'\')">📋 Completar ahora</button>';
+          }).join('')
+          +'<span style="font-size:11px;color:#6B7280;margin-left:6px">(o buscalo más tarde en Registros)</span>';
+        ngFormAlert.style.display='block';
+      }
+    }
+  }
 }
 
 // ── REGISTROS ──────────────────────────────────────────────────────
@@ -9926,10 +9946,11 @@ function buildGdVHTML(){
     </div><!-- close gdv-tab-dashboard -->
     <div id="gdv-tab-cargar" class="section-tab ${isGdVFacilitador()||(!(isSuperAdmin()||canScreen('gdv_dashboard'))&&canEjecutar('gdv_cargar'))?'on':''}">
       <div id="gdv-fac-alert" class="alert alert-ok hidden"></div>
+      <div id="gdv-form-pendiente-alert" style="display:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 14px;margin-bottom:1rem"></div>
       <div class="card">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
           <span>📅 Nuevo encuentro</span>
-          <button class="btn btn-sm" onclick="nvOpenInlineForm()" style="background:#1D4ED8;color:#fff;font-weight:700;font-size:13px;padding:6px 16px;border:none;border-radius:8px;cursor:pointer">+ Alta Nueva Persona</button>
+          <button class="btn btn-sm" onclick="gdvAbrirFormNuevoContacto()" style="background:#1D4ED8;color:#fff;font-weight:700;font-size:13px;padding:6px 16px;border:none;border-radius:8px;cursor:pointer">+ Alta Nueva Persona</button>
         </div>
         <div id="gdv-admin-sel" class="hidden"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Seleccioná el grupo</label><select id="gdv-grupo-sel" onchange="gdvAdminGroupChanged()" style="margin-bottom:12px"></select></div>
         <div id="gdv-group-info" style="font-size:13px;color:#1E40AF;padding:8px;background:#EFF6FF;border-radius:6px;margin-bottom:8px"></div>
@@ -10262,6 +10283,8 @@ function gdvCheckDuplicateWeekOnDateChange(){
   if(!gid) gid=currentUser.groupId;
   if(gid) gdvCheckDuplicateWeek(gid);
   gdvSyncFormularioUI();
+  var fpa=document.getElementById('gdv-form-pendiente-alert');
+  if(fpa){ fpa.style.display='none'; fpa.innerHTML=''; }
 }
 
 function gdvSyncFormularioUI(){
@@ -10357,18 +10380,42 @@ function gdvInitFacForm(){
   }
 }
 
-function gdvFechaSugerida(gid){
-  var groupRecs=S.records.filter(function(r){return r.grupoId===gid;});
-  var lim=limiteFechaCarga('gdv');
-  if(!groupRecs.length) return lim.max;
-  var lastRec=groupRecs.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
-  var siguiente=new Date(lastRec.fecha);
-  siguiente.setDate(siguiente.getDate()+7);
-  var sugerida=dateToStr(siguiente);
-  // Nunca sugerir fuera de la ventana permitida (ni futura, ni más atrás que la semana anterior)
-  if(sugerida>lim.max) return lim.max;
-  if(sugerida<lim.min) return lim.min;
+// Busca la primera semana ISO (dentro de la ventana permitida) que todavía no tiene un registro
+// cargado para esta unidad, y devuelve la fecha correspondiente al día de reunión configurado
+// (g.dia / ng.dia) dentro de esa semana — así el campo Fecha ya apunta a "la semana que falta
+// completar" y al día correcto, en vez de simplemente "hoy".
+function sugerirFechaCarga(records, dia, lim){
+  var diaIdx=dia?DIAS_SEMANA.indexOf(dia):-1;
+  var cur=parseLocalDate(lim.min);
+  var dow=cur.getDay();
+  cur.setDate(cur.getDate()-(dow===0?6:dow-1)); // alinear al lunes de esa semana
+  var limMax=parseLocalDate(lim.max);
+  var candidata=null;
+  var pasos=0;
+  while(cur<=limMax&&pasos<60){
+    var fechaCur=dateToStr(cur);
+    var semanaISO=getISOWeek(fechaCur), anio=cur.getFullYear();
+    var tieneRegistro=records.some(function(r){return getISOWeek(r.fecha)===semanaISO&&parseLocalDate(r.fecha).getFullYear()===anio;});
+    if(!tieneRegistro){ candidata=new Date(cur); break; }
+    cur.setDate(cur.getDate()+7);
+    pasos++;
+  }
+  if(!candidata) return lim.max; // ya está todo cargado dentro de la ventana permitida
+  if(diaIdx>=0){
+    var offset=(diaIdx-1+7)%7; // días desde el lunes de esa semana (Lunes=0)
+    candidata.setDate(candidata.getDate()+offset);
+  }
+  var sugerida=dateToStr(candidata);
+  if(sugerida>lim.max) sugerida=lim.max;
+  if(sugerida<lim.min) sugerida=lim.min;
   return sugerida;
+}
+
+function gdvFechaSugerida(gid){
+  var g=S.groups.find(function(x){return x.id===gid;});
+  var lim=limiteFechaCarga('gdv');
+  var groupRecs=S.records.filter(function(r){return r.grupoId===gid;});
+  return sugerirFechaCarga(groupRecs, g&&g.dia, lim);
 }
 
 function gdvAdminGroupChanged(){
@@ -10378,6 +10425,8 @@ function gdvAdminGroupChanged(){
   const members=groupMembers(gid);
   document.getElementById('gdv-group-info').textContent=`${g.name} — ${members.length} miembros activos`;
   gdvFacAtt={};
+  var fpaGC=document.getElementById('gdv-form-pendiente-alert');
+  if(fpaGC){ fpaGC.style.display='none'; fpaGC.innerHTML=''; }
   members.forEach(m=>{gdvFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
   gdvRenderFacMembers(members);
   const fechaInput=document.getElementById('gdv-fecha');
@@ -10508,7 +10557,7 @@ function gdvAbrirFormNuevoContacto(){
   var facGids=isGdVFacilitador()?getFacilitadorGroupIds():[];
   var gid=facGids.length===1?facGids[0]:currentUser.groupId;
   if(isGdVAdmin()||facGids.length>1){var sel=document.getElementById('gdv-grupo-sel');if(sel)gid=parseInt(sel.value)||null;}
-  nvOpenInlineForm(gid?{grupoId:gid,tipoGrupo:'gdv'}:undefined);
+  nvOpenInlineForm(gid?{grupoId:gid,tipoGrupo:'gdv',origenModulo:'gdv'}:{origenModulo:'gdv'});
 }
 
 
@@ -10648,6 +10697,33 @@ async function gdvSaveRecord(){
   al.style.border=sinEncuentro?'1px solid #FCD34D':'';
   al.classList.remove('hidden');
   setTimeout(()=>{al.classList.add('hidden');al.style='';},4000);
+
+  // Si esta semana tiene algún Formulario de Trabajo todavía sin completar, avisar acá mismo con
+  // acceso directo — en vez de que la persona recién se entere al querer cargar la semana
+  // siguiente y tenga que ir a buscarlo por su cuenta a Registros (que sigue funcionando igual,
+  // como alternativa).
+  var formAlert=document.getElementById('gdv-form-pendiente-alert');
+  if(formAlert){
+    if(!sinEncuentro&&typeof formFormulariosAplicables==='function'){
+      var semanaISOguardada=getISOWeek(fecha), anioGuardado=parseLocalDate(fecha).getFullYear();
+      var pendientes=formFormulariosAplicables('gdv',gid,fecha).filter(function(f){
+        return !formGetRespuesta(f.id,'gdv',gid,semanaISOguardada,anioGuardado);
+      });
+      if(pendientes.length){
+        formAlert.innerHTML='<div style="font-size:13px;color:#1E40AF;margin-bottom:8px">📋 Antes de cargar la próxima semana, hace falta completar '+(pendientes.length>1?'estos Formularios':'este Formulario')+' de esta semana: <strong>'+pendientes.map(function(f){return f.titulo;}).join(', ')+'</strong></div>'
+          +pendientes.map(function(f){
+            return '<button class="btn btn-sm btn-primary" style="margin-right:6px" onclick="formAbrirCompletarDesdeRegistro(\'gdv\','+gid+',\''+fecha+'\')">📋 Completar ahora</button>';
+          }).join('')
+          +'<span style="font-size:11px;color:#6B7280;margin-left:6px">(o buscalo más tarde en Registros)</span>';
+        formAlert.style.display='block';
+      } else {
+        formAlert.style.display='none';
+      }
+    } else {
+      formAlert.style.display='none';
+    }
+  }
+
   if(isGdVAdmin()&&document.getElementById('gdv-grupo-sel'))document.getElementById('gdv-grupo-sel').value='';
   gdvInitFacForm();
 }
@@ -12982,9 +13058,13 @@ function buildNuevosHTML(){
         <div class="card-title">⏱ Tiempo hasta el primer contacto</div>
         <div id="nv-dash-tiempos"></div>
       </div>
-      <div class="card">
+      <div class="card" style="margin-bottom:1rem">
         <div class="card-title">🔄 Conversión desde el Ingreso</div>
         <div id="nv-dash-conversion"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📍 Origen — de dónde ingresaron</div>
+        <div id="nv-dash-origen"></div>
       </div>
     </div>
 
@@ -13391,10 +13471,11 @@ function renderNuevos(){
     const segLabel=segNombre
       ?`<span style="color:#1F4E79;cursor:pointer;text-decoration:underline dotted" onclick="nvEditSeguimiento(${m.id})">${segNombre}</span>`
       :`<span style="color:#F59E0B;cursor:pointer;font-weight:600" onclick="nvEditSeguimiento(${m.id})">⏳ Pendiente</span>`;
-    const origenBadge=m.origen==='QR / Formulario'
+    const esQR=(m.origen||'').indexOf('QR')===0;
+    const origenBadge=esQR
       ?'<span style="background:#EDE9FE;color:#5B21B6;font-size:10px;padding:1px 7px;border-radius:99px">📱 QR</span>'
-      :m.origen==='Carga manual'
-      ?'<span style="background:#E0F2FE;color:#0369A1;font-size:10px;padding:1px 7px;border-radius:99px">✏️ Manual</span>'
+      :m.origen
+      ?'<span style="background:#E0F2FE;color:#0369A1;font-size:10px;padding:1px 7px;border-radius:99px">✏️ '+m.origen+'</span>'
       :'';
 
     return `<div class="card" style="margin-bottom:.6rem;border-left:4px solid ${atrasado?'#DC2626':'#16A34A'};padding:10px 14px${atrasado?';background:#FFF0F5':''}">
@@ -13418,6 +13499,7 @@ function renderNuevos(){
           </div>
           <div style="font-size:12px;margin-top:3px;display:flex;flex-wrap:wrap;gap:10px">
             ${m.comoNosConocio?`<span style="color:#6B7280">🔗 ${m.comoNosConocio}</span>`:''}
+            ${(m.cargadoPor&&!esQR)?`<span style="color:#6B7280">🧑‍💼 Cargado por: ${m.cargadoPor}</span>`:''}
             <span>👤 Seguimiento: ${segLabel}</span>
           </div>
           ${m.motivoContacto?`<div style="font-size:12px;color:#374151;margin-top:3px;font-style:italic">💬 ${m.motivoContacto}</div>`:''}
@@ -14208,6 +14290,33 @@ function nvRenderDashboard(){
       convWrap.innerHTML+=`<div style="font-size:11px;color:#9CA3AF;margin-top:6px">Total del período: ${sumaVerif} de ${total}</div>`;
     }
   }
+
+  // Desglose por Origen — de dónde ingresó cada contacto del período
+  const origenWrap=document.getElementById('nv-dash-origen');
+  if(origenWrap){
+    if(!total){
+      origenWrap.innerHTML='<div class="empty">Sin datos en el período seleccionado</div>';
+    } else {
+      const porOrigen={};
+      cohort.forEach(m=>{
+        const key=m.origen||'Sin origen registrado';
+        porOrigen[key]=(porOrigen[key]||0)+1;
+      });
+      const coloresOrigen=['#1D4ED8','#7C3AED','#16A34A','#D97706','#DB2777','#0891B2','#6B7280'];
+      const filas=Object.keys(porOrigen).sort((a,b)=>porOrigen[b]-porOrigen[a]);
+      origenWrap.innerHTML=filas.map((key,idx)=>{
+        const count=porOrigen[key];
+        const pct=Math.round(count/total*100);
+        const color=coloresOrigen[idx%coloresOrigen.length];
+        return `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">
+            <span>${key}</span><span style="color:#6B7280"><strong style="color:${color}">${count}</strong> — ${pct}%</span>
+          </div>
+          <div class="pbar-bg"><div style="height:8px;border-radius:999px;background:${color};width:${pct}%"></div></div>
+        </div>`;
+      }).join('');
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -14717,7 +14826,10 @@ function nvGetGrupoValFromMember(m){
   return '';
 }
 
+var nvInlineOrigenModulo='nuevos'; // 'gdv' | 'ng' | 'nuevos' — de dónde se abrió este alta
+
 function nvOpenInlineForm(prefill){
+  nvInlineOrigenModulo=prefill?.origenModulo||'nuevos';
   // nv-form-overlay is in static HTML - always available
   const overlay=document.getElementById('nv-form-overlay');
   if(overlay){
@@ -14851,6 +14963,7 @@ async function nvSaveInlineForm(){
 async function nvCrearContactoDesdeInline(datos){
   try{
     const {nombre,apellido,cel,genero,barrio,fnac,edadDeclarada,como,motivo,segId,segLabel,dni}=datos;
+    var origenLabel=nvInlineOrigenModulo==='gdv'?'Grupos de Vida':nvInlineOrigenModulo==='ng'?'Nuevas Generaciones':'Web Nuevos Contactos';
     const nuevo={
       id:Date.now(),nombre,apellido,
       tel:cel,genero,grupoId:null,
@@ -14862,7 +14975,8 @@ async function nvCrearContactoDesdeInline(datos){
       seguimientoId:segId?parseInt(segId):null,
       seguimientoNombre:segId?segLabel:'',
       fechaRegistro:todayAA(),
-      origen:'Carga manual',
+      origen:origenLabel,
+      cargadoPor:currentUser?.name||'',
       dni:dni,
       ts:new Date().toISOString(),_ts:Date.now(),
       ...nvGetGrupoIdFromVal(document.getElementById('nv-mf-grupo')?.value||'')
@@ -15736,7 +15850,7 @@ function enviarForm(){
       comoNosConocio:como,motivoContacto:motivo,
       fechaRegistro:todayAA(),
       _ts:Date.now(),
-      origen:'QR / Formulario web'
+      origen:'QR Nuevos Contactos'
     };
     S.members.push(nuevo);
     saveK(SK.members, S.members).then(function(){
@@ -17424,14 +17538,29 @@ function discLoadPasoForm(){
     discInfoEl.textContent=objParaDiscipulador?discDiscipuladoresLabel(objParaDiscipulador):'—';
   }
 
-  // Load chapters
+  // Load chapters — se sugiere el siguiente al último completado en este Curso/Grupo, para que
+  // el Discipulador no tenga que acordarse manualmente por dónde iba.
   var capSel=document.getElementById('disc-sel-cap');
   if(paso&&paso.capitulos.length){
-    capSel.innerHTML=paso.capitulos.map(function(c){
-      return '<option value="'+c.replace(/"/g,'&quot;')+'">'+c+'</option>';
+    var recsRelevantes=(S.discRecords||[]).filter(function(r){
+      if(r.pasoId!==paso.id) return false;
+      if(r.sinEncuentro) return false;
+      if(discSelectedGrupoId&&String(r.grupoId||'')!==String(discSelectedGrupoId)) return false;
+      return true;
+    });
+    var idxSugerido=0;
+    if(recsRelevantes.length){
+      var ultimoRec=recsRelevantes.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
+      var idxUltimo=paso.capitulos.indexOf(ultimoRec.capitulo);
+      idxSugerido=idxUltimo===-1?0:Math.min(idxUltimo+1,paso.capitulos.length-1);
+    }
+    capSel.innerHTML=paso.capitulos.map(function(c,idx){
+      return '<option value="'+c.replace(/"/g,'&quot;')+'"'+(idx===idxSugerido?' selected':'')+'>'+c+(idx===idxSugerido?' (sugerido)':'')+'</option>';
     }).join('');
+    capSel.setAttribute('data-sugerido', paso.capitulos[idxSugerido]||'');
   } else {
     capSel.innerHTML='<option value="">Sin capítulos definidos</option>';
+    capSel.setAttribute('data-sugerido','');
   }
 
   // Load members
@@ -17503,10 +17632,14 @@ async function discGuardarAsistencia(){
   var pasoId=discSelectedPasoId;
   var fecha=document.getElementById('disc-fecha').value;
   var capitulo=document.getElementById('disc-sel-cap').value;
+  var capituloSugerido=document.getElementById('disc-sel-cap')?.getAttribute('data-sugerido')||'';
   var sinEncuentro=document.getElementById('disc-sin-encuentro')?.checked||false;
   var motivo=document.getElementById('disc-motivo')?.value.trim()||'';
   if(!pasoId||!fecha||(!sinEncuentro&&!capitulo)){
     alert(sinEncuentro?'Completá Paso y Fecha':'Completá Paso, Fecha y Capítulo');return;
+  }
+  if(!sinEncuentro&&capituloSugerido&&capitulo!==capituloSugerido){
+    if(!confirm('Estás seleccionando "'+capitulo+'" (el sugerido era "'+capituloSugerido+'"). ¿Es correcto?')) return;
   }
   if(!sinEncuentro&&!Object.keys(discFacAtt).length){alert('No hay miembros en este paso');return;}
 
@@ -17644,11 +17777,30 @@ function discEditRecord(id){
   }
   window._discEditId=id;
   var att=Object.entries(r.asistencia||{});
+  var cursadaEdit=(S.discCursadas||[]).find(function(cu){return cu.id===r.cursadaId;});
+  var pasoEdit=cursadaEdit?S.discPasos.find(function(p){return p.id===cursadaEdit.pasoId;}):S.discPasos.find(function(p){return p.id===r.pasoId;});
+  var grupoOptsEdit='';
+  if(cursadaEdit&&(cursadaEdit.grupos||[]).length){
+    grupoOptsEdit='<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label>'
+      +'<select id="disc-edit-grupo" style="margin-bottom:12px">'
+      +'<option value="">— Sin Grupo —</option>'
+      +cursadaEdit.grupos.map(function(g){return '<option value="'+g.id+'"'+(String(r.grupoId||'')===String(g.id)?' selected':'')+'>'+g.nombre+'</option>';}).join('')
+      +'</select>';
+  }
+  var capOptsEdit='';
+  if(!r.sinEncuentro&&pasoEdit&&(pasoEdit.capitulos||[]).length){
+    capOptsEdit='<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Capítulo</label>'
+      +'<select id="disc-edit-capitulo" style="margin-bottom:12px">'
+      +pasoEdit.capitulos.map(function(c){return '<option value="'+c.replace(/"/g,'&quot;')+'"'+(r.capitulo===c?' selected':'')+'>'+c+'</option>';}).join('')
+      +'</select>';
+  }
   document.getElementById('disc-edit-body').innerHTML=
     '<label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha</label>'
     +'<input type="date" id="disc-edit-fecha" value="'+r.fecha+'" max="'+today()+'" style="margin-bottom:12px">'
     +'<div style="font-size:11px;color:#9CA3AF;margin:-8px 0 12px">Solo se puede cambiar a una semana que no tenga ya otro registro de este Paso.</div>'
-    +'<div style="font-size:13px;color:#6B7280;margin-bottom:.75rem">'+r.pasoNombre+' · '+r.capitulo+'</div>'
+    +'<div style="font-size:13px;color:#6B7280;margin-bottom:.75rem">'+r.pasoNombre+(r.sinEncuentro?' · Sin encuentro':'')+'</div>'
+    +grupoOptsEdit
+    +capOptsEdit
     +'<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:.5rem">Asistencia:</div>'
     +att.map(function(entry){
       var k=entry[0], v=entry[1];
@@ -17692,8 +17844,14 @@ async function discSaveEdit(){
   }
   var prevFecha=r.fecha;
   var prevAsistencia=JSON.parse(JSON.stringify(r.asistencia));
+  var prevGrupoId=r.grupoId;
+  var prevCapitulo=r.capitulo;
   var prevTs=r._ts;
   r.fecha=nuevaFecha;
+  var selGrupoEdit=document.getElementById('disc-edit-grupo');
+  if(selGrupoEdit) r.grupoId=selGrupoEdit.value?parseInt(selGrupoEdit.value):null;
+  var selCapEdit=document.getElementById('disc-edit-capitulo');
+  if(selCapEdit) r.capitulo=selCapEdit.value;
   Object.keys(r.asistencia).forEach(function(k){
     var sel=document.getElementById('disc-edit-'+k);
     if(sel) r.asistencia[k].state=sel.value;
@@ -17705,6 +17863,8 @@ async function discSaveEdit(){
   }catch(e){
     r.fecha=prevFecha;
     r.asistencia=prevAsistencia;
+    r.grupoId=prevGrupoId;
+    r.capitulo=prevCapitulo;
     r._ts=prevTs;
     await saveK(SK.discRecords,S.discRecords);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
@@ -17766,9 +17926,14 @@ function discRenderRegistrosList(){
   recs.forEach(function(r){
     var grupoLbl='';
     if(r.grupoId){
-      var cursadaDelReg=(S.discCursadas||[]).find(function(cu){return cu.pasoId===r.pasoId;});
+      var cursadaDelReg=(S.discCursadas||[]).find(function(cu){return cu.id===r.cursadaId;});
       var grupoDelReg=cursadaDelReg?(cursadaDelReg.grupos||[]).find(function(g){return g.id===r.grupoId;}):null;
       if(grupoDelReg) grupoLbl='<span class="badge" style="background:#EEF2FF;color:#4338CA">🧑\u200d🤝\u200d🧑 '+grupoDelReg.nombre+'</span>';
+    } else {
+      var cursadaSinGrupo=(S.discCursadas||[]).find(function(cu){return cu.id===r.cursadaId;});
+      if(cursadaSinGrupo&&(cursadaSinGrupo.grupos||[]).length){
+        grupoLbl='<span class="badge b-muted" title="Este registro no tiene un Grupo asociado — se puede corregir con ✏️ Editar">⚠️ Sin Grupo</span>';
+      }
     }
     if(r.sinEncuentro){
       html+='<div class="card" style="margin-bottom:.75rem;padding:12px;opacity:.7">';
@@ -18248,11 +18413,11 @@ async function pnvEnviar(){
     }, campanaId?{
       condicion:'Campaña',campanaId:campanaId,
       comoNosConocio:campanaObj?campanaObj.nombre:'Campaña',
-      origen:'QR / Campaña'
+      origen:'QR Campaña'+(campanaObj?': '+campanaObj.nombre:'')
     }:{
       condicion:'Nuevo',subEstado:'Ingresado',subEstadoHistorial:[],
       comoNosConocio:como,
-      origen:'QR / Formulario web'
+      origen:'QR Nuevos Contactos'
     }));
     localStorage.setItem('gdv_m5',JSON.stringify(members));
     // Releer para confirmar que el guardado local realmente ocurrió (no asumirlo)

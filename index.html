@@ -1414,6 +1414,34 @@ function initials(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUppe
 function pct(a,b){return b?Math.round(a/b*100):0;}
 function fullName(m){return `${m.nombre} ${m.apellido}`.trim();}
 function listName(m){return [m.apellido,m.nombre].filter(Boolean).join(' ');}
+// Calcula, para cada persona, la fecha de su asistencia MÁS ANTIGUA registrada (Presente o
+// Ausente, pero con un encuentro real — nunca "Sin Encuentro"), cruzando Grupos de Vida y
+// Nuevas Generaciones juntos. Se usa para identificar "Personas Nuevas" de forma sólida: es
+// Nueva únicamente en el registro que coincide con esa fecha más antigua — sin importar por qué
+// camino se la haya dado de alta (Alta Nueva Persona, Persona Nueva en Cargar Asistencia, QR,
+// etc.). Cambiar de Grupo o sumarse como Visita de otro grupo nunca cuenta acá.
+function calcularPrimerasFechasAsistencia(){
+  var mapa={};
+  function procesar(records){
+    (records||[]).forEach(function(r){
+      if(r.sinEncuentro||!r.asistencia) return;
+      Object.keys(r.asistencia).forEach(function(mid){
+        if(!mapa[mid]||r.fecha<mapa[mid]) mapa[mid]=r.fecha;
+      });
+    });
+  }
+  procesar(S.records);
+  procesar(S.ngRecords);
+  return mapa;
+}
+// ¿Esta persona tuvo su primer encuentro real (Presente) justo en este registro? — es decir,
+// esta fecha coincide con la más antigua de todo su historial (GdV + NG), y estuvo Presente.
+function esPersonaNuevaEnRegistro(memberId, fecha, state, mapaPrimerasFechas){
+  if(state!=='presente') return false;
+  var mapa=mapaPrimerasFechas||calcularPrimerasFechasAsistencia();
+  return mapa[memberId]===fecha;
+}
+
 function groupMembers(gid){
   return S.members.filter(m=>m.estado==='Activo' && (Number(m.grupoId)===Number(gid) || (m.grupoIds||[]).map(Number).includes(Number(gid))));
 }
@@ -1670,21 +1698,22 @@ function ngGetStatData(){
   var categoriasActivas=new Set(comsActivas.map(function(c){return ngCategoriaDeTipo(c.tipo);}));
   var porCategoria={}; // categoria -> {pres, nuevos}
   var presTotal=0,nuevosTotal=0;
+  var mapaPrimerasFechasNgStats=calcularPrimerasFechasAsistencia();
   recs.forEach(function(r){
     var com=comMap[Number(r.comunidadId)];
     var cat=ngCategoriaDeTipo(com?com.tipo:null);
     if(!porCategoria[cat]) porCategoria[cat]={pres:0,nuevos:0};
-    Object.values(r.asistencia||{}).forEach(function(a){
+    Object.entries(r.asistencia||{}).forEach(function(entry){
+      var mid=entry[0], a=entry[1];
       if(!ngMatchesSexoFilter(a)) return;
       if(a.state!=='presente') return;
       presTotal++;
       porCategoria[cat].pres++;
+      if(ngFilSexo!=='lideres'&&mapaPrimerasFechasNgStats[mid]===r.fecha){
+        nuevosTotal++;
+        porCategoria[cat].nuevos++;
+      }
     });
-    if(ngFilSexo!=='lideres'){
-      var nNew=(r.visitsNew||[]).length;
-      nuevosTotal+=nNew;
-      porCategoria[cat].nuevos+=nNew;
-    }
   });
   return {categoriasCount:categoriasActivas.size,porCategoria,presTotal,nuevosTotal};
 }
@@ -1772,18 +1801,20 @@ function ngRenderEvolucion(){
   if(!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
   // Agrupar por semana ISO — Hombres y Mujeres presentes (mismo criterio que Grupos de Vida)
   var byWeek={};
+  var mapaPrimerasFechasNgEvo=calcularPrimerasFechasAsistencia();
   recs.forEach(function(r){
     var semana=getISOWeek(r.fecha);
     var anio=r.fecha.substring(0,4);
     var key=anio+'-S'+String(semana).padStart(2,'0');
     if(!byWeek[key]) byWeek[key]={h:0,m:0,semana:semana,anio:anio,new:0};
-    Object.values(r.asistencia||{}).forEach(function(a){
+    Object.entries(r.asistencia||{}).forEach(function(entry){
+      var mid=entry[0], a=entry[1];
       if(!ngMatchesSexoFilter(a)) return;
       if(a.state!=='presente') return;
       if(a.genero==='H') byWeek[key].h++;
       else if(a.genero==='M') byWeek[key].m++;
+      if(ngFilSexo!=='lideres'&&mapaPrimerasFechasNgEvo[mid]===r.fecha) byWeek[key].new++;
     });
-    if(ngFilSexo!=='lideres') byWeek[key].new+=(r.visitsNew||[]).length;
   });
   var sorted=Object.keys(byWeek).sort();
   if(!sorted.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
@@ -1974,16 +2005,27 @@ function ngRenderMiembrosPanel(){
 function ngRenderNuevosPanel(){
   var p=document.getElementById('ng-panel-nuevos');
   if(!p) return;
-  var recs=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro&&(r.visitsNew||[]).length>0;})
-    .sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
-  if(!recs.length){p.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#9CA3AF">Sin personas nuevas en el período</div>';return;}
+  var mapaPrimerasFechasNg=calcularPrimerasFechasAsistencia();
+  var recsBase=ngGetFilteredRecords().filter(function(r){return !r.sinEncuentro;});
+  // Para cada registro, encontrar quiénes tuvieron ahí su primer encuentro real (Presente) —
+  // cruzando todo su historial de GdV y NG, sin depender de por qué camino se los dio de alta.
+  var recsConNuevos=recsBase.map(function(r){
+    var nuevosIds=Object.keys(r.asistencia||{}).filter(function(mid){
+      return r.asistencia[mid].state==='presente' && mapaPrimerasFechasNg[mid]===r.fecha;
+    });
+    return {r:r, nuevosIds:nuevosIds};
+  }).filter(function(x){return x.nuevosIds.length>0;})
+    .sort(function(a,b){return b.r.fecha.localeCompare(a.r.fecha);});
+  if(!recsConNuevos.length){p.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#9CA3AF">Sin personas nuevas en el período</div>';return;}
   var html='<div class="card"><div class="card-title">🌱 Personas Nuevas</div>';
-  recs.forEach(function(r){
+  recsConNuevos.forEach(function(item){
+    var r=item.r;
     var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(r.comunidadId);});
     html+='<div style="margin-bottom:12px">'+
       '<div style="font-size:12px;font-weight:600;color:#6B7280;margin-bottom:4px">'+r.fecha+' · '+(ng?ng.name:'—')+'</div>';
-    (r.visitsNew||[]).forEach(function(n){
-      var m=S.members.find(function(x){return fullName(x).toLowerCase()===n.toLowerCase();});
+    item.nuevosIds.forEach(function(mid){
+      var m=S.members.find(function(x){return String(x.id)===String(mid);});
+      var n=(r.asistencia[mid]||{}).name||(m?fullName(m):'—');
       var altaTxt=m&&m.fechaIngreso?saFmtDate(m.fechaIngreso):'—';
       var edadTxt=m&&m.fnac?saCalcEdad(m.fnac):'—';
       html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#F0FDF4;border-radius:6px;margin-bottom:3px;flex-wrap:wrap">'+
@@ -2489,12 +2531,15 @@ function ngRenderRegistrosList(){
     list.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#9CA3AF">Sin registros para el período seleccionado</div>';
     return;
   }
+  var mapaPrimerasFechasNgReg=calcularPrimerasFechasAsistencia();
   list.innerHTML=recs.map(function(r){
     var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(r.comunidadId);});
     var comName=ng?ng.name:'—';
     var presentes=Object.values(r.asistencia||{}).filter(function(a){return a.state==='presente';}).length;
     var total=Object.keys(r.asistencia||{}).length;
-    var nuevos=(r.visitsNew||[]).length;
+    var nuevos=Object.keys(r.asistencia||{}).filter(function(mid){
+      return r.asistencia[mid].state==='presente' && mapaPrimerasFechasNgReg[mid]===r.fecha;
+    }).length;
     var encuentroSuffix=(!r.sinEncuentro&&r.encuentroNum===2)?' · 2° Encuentro':'';
     return '<div class="card" style="margin-bottom:8px;padding:12px 16px">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'+
@@ -10965,26 +11010,19 @@ function gdvRenderDashboard(){
   }
 
   let totH=0,totM=0,totVis=0,totNewH=0,totNewM=0;
+  var mapaPrimerasFechasGdv=calcularPrimerasFechasAsistencia();
   recs.forEach(r=>{
     const g=S.groups.find(x=>x.id===r.grupoId);
-    Object.values(r.asistencia).forEach(v=>{
+    Object.entries(r.asistencia).forEach(([mid,v])=>{
       if(v.state!=='presente') return;
       const gen=resolveGenero(v, r.grupoId);
       if(gdvFilSexo&&gen!==gdvFilSexo) return;
       if(gen==='H') totH++; else if(gen==='M') totM++;
-    });
-    totVis+=(r.visitsOther||[]).length;
-    // Split new persons by group type
-    const gType=g?g.type:'';
-    const newList=r.visitsNew||[];
-    newList.forEach(name=>{
-      // Try to find in members to get gender
-      const m=S.members.find(x=>fullName(x).toLowerCase()===name.toLowerCase());
-      const gen=m?resolveGenero({genero:m.genero},r.grupoId):(gType==='Hombres'?'H':gType==='Mujeres'?'M':'');
-      if(!gdvFilSexo||gen===gdvFilSexo){
-        if(gen==='H') totNewH++; else if(gen==='M') totNewM++; else totNewH++; // default to H for mixed if unknown
+      if(mapaPrimerasFechasGdv[mid]===r.fecha){
+        if(gen==='H') totNewH++; else if(gen==='M') totNewM++; else totNewH++; // default a H si no se pudo resolver género
       }
     });
+    totVis+=(r.visitsOther||[]).length;
   });
 
   const totPres=(gdvFilSexo==='H'?totH:gdvFilSexo==='M'?totM:totH+totM);
@@ -11017,15 +11055,17 @@ function gdvRenderDashboard(){
     (!gdvFilDesde||r.fecha>=gdvFilDesde)&&(!gdvFilHasta||r.fecha<=gdvFilHasta)&&
     (!gdvFilGrupos||gdvFilGrupos.has(Number(r.grupoId)))).length;
 
-  // Nuevos por grupo (con sus nombres)
+  // Nuevos por grupo (con sus nombres) — solo cuenta a quien tuvo su primer encuentro real
+  // (Presente) justo en este registro, cruzando todo su historial de GdV y NG.
   const nuevosPorGrupo={};
   recs.forEach(r=>{
-    if((r.visitsNew||[]).length===0) return;
     if(gdvFilGrupos&&!gdvFilGrupos.has(Number(r.grupoId))) return;
-    if(!nuevosPorGrupo[r.grupoId]) nuevosPorGrupo[r.grupoId]={grupo:r.grupoName,nombres:[]};
-    (r.visitsNew||[]).forEach(n=>{
-      if(!nuevosPorGrupo[r.grupoId].nombres.includes(n))
-        nuevosPorGrupo[r.grupoId].nombres.push(n);
+    Object.entries(r.asistencia||{}).forEach(([mid,v])=>{
+      if(v.state!=='presente') return;
+      if(mapaPrimerasFechasGdv[mid]!==r.fecha) return;
+      if(!nuevosPorGrupo[r.grupoId]) nuevosPorGrupo[r.grupoId]={grupo:r.grupoName,nombres:[]};
+      if(!nuevosPorGrupo[r.grupoId].nombres.includes(v.name))
+        nuevosPorGrupo[r.grupoId].nombres.push(v.name);
     });
   });
 
@@ -16130,81 +16170,111 @@ function discRenderDashboard(c){
     return;
   }
 
-  var html='';
+  // El Dashboard muestra la CURSADA ACTIVA de cada Curso (no datos guardados en el Curso mismo,
+  // que quedan como plantilla/histórico) — así, si se cerró/revirtió una Cursada, deja de
+  // figurar como "Activo" acá aunque el Curso en sí siga habilitado.
+  var activos=[], inactivos=[];
   pasosToShow.forEach(function(paso){
-    var mems=paso.miembros.map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
-    var recs=S.discRecords.filter(function(r){return r.pasoId===paso.id&&!r.sinEncuentro;});
-
-    // Stats
-    var totalEnc=recs.length;
-    var capsUsadas=[...new Set(recs.map(function(r){return r.capitulo;}))];
-
-    // Per member stats
-    var memberStats=mems.map(function(m){
-      var presencias=recs.filter(function(r){return r.asistencia[m.id]&&r.asistencia[m.id].state==='presente';}).length;
-      var pct=totalEnc>0?Math.round(presencias/totalEnc*100):0;
-      var completado=(paso.completados||{})[m.id]||false;
-      return {m:m,presencias:presencias,pct:pct,completado:completado};
-    });
-
-    var completados=memberStats.filter(function(x){return x.completado;}).length;
-    var isActivo=paso.estado==='Activo';
-
-    html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid '+(isActivo?'#7C3AED':'#9CA3AF')+'">';
-    // Header
-    html+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem">';
-    html+='<div>';
-    var nivelColors={'Inicial':'#3B82F6','Intermedio':'#8B5CF6','Avanzado':'#EC4899'};
-    var nc=nivelColors[paso.nivel]||'#6B7280';
-    html+='<div style="display:flex;align-items:center;gap:8px">';
-    html+='<div style="font-size:16px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>';
-    html+='<span style="background:'+nc+'22;color:'+nc+';font-size:11px;padding:2px 10px;border-radius:99px;font-weight:600">'+(paso.nivel||'')+'</span>';
-    html+='</div>';
-    html+='<div style="font-size:12px;color:#6B7280;margin-top:3px">';
-    html+='Discipulador: <strong>'+discDiscipuladoresLabel(paso)+'</strong>';
-    html+='</div></div>';
-    html+='<span class="badge '+(isActivo?'b-ok':'b-muted')+'">'+(isActivo?'Activo':'Inactivo')+'</span>';
-    html+='</div>';
-
-    // KPIs
-    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:1rem">';
-    html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem">'+mems.length+'</span><span class="stat-lbl">Alumnos</span></div>';
-    html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem">'+totalEnc+'</span><span class="stat-lbl">Encuentros</span></div>';
-    html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem;color:#7C3AED">'+capsUsadas.length+'/'+paso.capitulos.length+'</span><span class="stat-lbl">Caps. dados</span></div>';
-    html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem;color:#16A34A">'+completados+'/'+mems.length+'</span><span class="stat-lbl">Completados</span></div>';
-    html+='</div>';
-
-    // Member progress table
-    if(mems.length){
-      html+='<div style="font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Progreso individual</div>';
-      memberStats.forEach(function(ms){
-        var barColor=ms.pct>=75?'#16A34A':ms.pct>=50?'#1F4E79':ms.pct>=25?'#D97706':'#DC2626';
-        var genBg=ms.m.genero==='H'?'#DBEAFE':'#FCE7F3';
-        var genColor=ms.m.genero==='H'?'#1E40AF':'#9D174D';
-        html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap">';
-        html+='<span style="background:'+genBg+';color:'+genColor+';font-size:11px;padding:1px 7px;border-radius:4px;font-weight:600;flex-shrink:0">'+ms.m.genero+'</span>';
-        html+='<span style="font-size:13px;font-weight:600;flex:1;min-width:120px">'+fullName(ms.m)+'</span>';
-        html+='<div style="flex:2;min-width:100px">';
-        html+='<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">';
-        html+='<span style="color:#6B7280">'+ms.presencias+'/'+totalEnc+' enc.</span>';
-        html+='<strong style="color:'+barColor+'">'+ms.pct+'%</strong></div>';
-        html+='<div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+barColor+';width:'+ms.pct+'%"></div></div>';
-        html+='</div>';
-        // Completado toggle
-        if(canAdminDisc()){
-          html+='<button onclick="discToggleCompletado('+paso.id+','+ms.m.id+')" '
-            +'style="padding:4px 12px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600;flex-shrink:0;'
-            +(ms.completado?'background:#D1FAE5;color:#065F46':'background:#F3F4F6;color:#6B7280')+'">'
-            +(ms.completado?'✅ Completado':'⬜ Incompleto')+'</button>';
-        } else {
-          html+='<span style="font-size:11px;padding:4px 10px;border-radius:6px;'+(ms.completado?'background:#D1FAE5;color:#065F46':'background:#F3F4F6;color:#6B7280')+'">'+(ms.completado?'✅ Completado':'Incompleto')+'</span>';
-        }
-        html+='</div>';
-      });
-    }
-    html+='</div>';
+    var cursadaActiva=(S.discCursadas||[]).find(function(cu){return cu.pasoId===paso.id&&cu.estado==='Activo';});
+    if(cursadaActiva) activos.push({paso:paso,cursada:cursadaActiva});
+    else inactivos.push(paso);
   });
+
+  var html='';
+  activos.forEach(function(item){
+    html+=discDashboardCardHtml(item.paso,item.cursada);
+  });
+  if(inactivos.length){
+    html+='<div style="font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);text-transform:uppercase;letter-spacing:.05em;margin:1.5rem 0 .75rem">Sin Cursada activa ahora mismo</div>';
+    inactivos.forEach(function(paso){
+      html+='<div class="card" style="margin-bottom:.75rem;padding:12px;opacity:.65;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
+        +'<span style="font-size:14px;font-weight:600;color:#374151">'+paso.nombre+'</span>'
+        +'<span class="badge b-muted">Sin Cursada activa</span>'
+      +'</div>';
+    });
+  }
   c.innerHTML=html;
+}
+
+// Arma la tarjeta de Dashboard de UN Curso con Cursada activa — desglosada por Grupo si la
+// Cursada tiene varios, o como tabla plana de alumnos si es de un solo Grupo.
+function discDashboardCardHtml(paso, cursada){
+  var grupos=cursada.grupos||[];
+  var mems=(cursada.miembros||[]).map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+  var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&!r.sinEncuentro;});
+  var totalEnc=recs.length;
+  var capsUsadas=[...new Set(recs.map(function(r){return r.capitulo;}))];
+  var nivelColors={'Inicial':'#3B82F6','Intermedio':'#8B5CF6','Avanzado':'#EC4899'};
+  var nc=nivelColors[paso.nivel]||'#6B7280';
+
+  var html='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #7C3AED">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem">';
+  html+='<div>';
+  html+='<div style="display:flex;align-items:center;gap:8px">';
+  html+='<div style="font-size:16px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>';
+  html+='<span style="background:'+nc+'22;color:'+nc+';font-size:11px;padding:2px 10px;border-radius:99px;font-weight:600">'+(paso.nivel||'')+'</span>';
+  html+='</div>';
+  if(!grupos.length){
+    html+='<div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+discDiscipuladoresLabel(cursada)+'</strong></div>';
+  }
+  html+='</div>';
+  html+='<span class="badge b-ok">Activo</span>';
+  html+='</div>';
+
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:1rem">';
+  html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem">'+mems.length+'</span><span class="stat-lbl">Alumnos</span></div>';
+  html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem">'+totalEnc+'</span><span class="stat-lbl">Encuentros</span></div>';
+  html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem;color:#7C3AED">'+capsUsadas.length+'/'+paso.capitulos.length+'</span><span class="stat-lbl">Caps. dados</span></div>';
+  html+='</div>';
+
+  function filaMiembro(m, recsRef, totalEncRef){
+    var presencias=recsRef.filter(function(r){return r.asistencia&&r.asistencia[m.id]&&r.asistencia[m.id].state==='presente';}).length;
+    var pct=totalEncRef>0?Math.round(presencias/totalEncRef*100):0;
+    var barColor=pct>=75?'#16A34A':pct>=50?'#1F4E79':pct>=25?'#D97706':'#DC2626';
+    var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
+    var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
+    var completado=(paso.completados||{})[m.id]||false;
+    var row='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06);flex-wrap:wrap">';
+    row+='<span style="background:'+genBg+';color:'+genColor+';font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;flex-shrink:0">'+m.genero+'</span>';
+    row+='<span style="font-size:12px;font-weight:600;flex:1;min-width:100px">'+fullName(m)+'</span>';
+    row+='<div style="flex:2;min-width:90px">';
+    row+='<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:#6B7280">'+presencias+'/'+totalEncRef+' enc.</span><strong style="color:'+barColor+'">'+pct+'%</strong></div>';
+    row+='<div class="pbar-bg"><div style="height:5px;border-radius:999px;background:'+barColor+';width:'+pct+'%"></div></div>';
+    row+='</div>';
+    if(canAdminDisc()){
+      row+='<button onclick="discToggleCompletado('+paso.id+','+m.id+')" style="padding:3px 10px;border-radius:6px;border:none;cursor:pointer;font-size:10px;font-weight:600;flex-shrink:0;'+(completado?'background:#D1FAE5;color:#065F46':'background:#F3F4F6;color:#6B7280')+'">'+(completado?'✅ Completado':'⬜ Incompleto')+'</button>';
+    } else {
+      row+='<span style="font-size:10px;padding:3px 9px;border-radius:6px;flex-shrink:0;'+(completado?'background:#D1FAE5;color:#065F46':'background:#F3F4F6;color:#6B7280')+'">'+(completado?'✅':'Incompleto')+'</span>';
+    }
+    row+='</div>';
+    return row;
+  }
+
+  if(grupos.length){
+    var paletaGrupos=['#7C3AED','#0891B2','#16A34A','#D97706','#DB2777','#4338CA','#0D9488','#B45309'];
+    grupos.forEach(function(gr,idx){
+      var colorGrupo=paletaGrupos[idx%paletaGrupos.length];
+      var memsGrupo=(gr.miembros||[]).map(function(id){return mems.find(function(m){return m.id===id;});}).filter(Boolean);
+      var recsGrupo=recs.filter(function(r){return r.grupoId===gr.id;});
+      var totalEncGrupo=recsGrupo.length;
+      html+='<div style="border:2px solid '+colorGrupo+';border-radius:10px;padding:10px 12px;margin-bottom:10px;background:'+colorGrupo+'0D">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">';
+      html+='<span style="font-size:13px;font-weight:700;color:'+colorGrupo+'">🧑‍🤝‍🧑 '+gr.nombre+'</span>';
+      html+='<span style="font-size:11px;color:#6B7280">'+((gr.discipuladorIds||[]).length?'👤 '+discDiscipuladoresLabel(gr):'Sin discipulador')+' · '+memsGrupo.length+' alumnos · '+totalEncGrupo+' encuentros</span>';
+      html+='</div>';
+      if(memsGrupo.length){
+        memsGrupo.forEach(function(m){ html+=filaMiembro(m,recsGrupo,totalEncGrupo); });
+      } else {
+        html+='<div style="font-size:11px;color:#9CA3AF;font-style:italic">Sin integrantes todavía</div>';
+      }
+      html+='</div>';
+    });
+  } else if(mems.length){
+    html+='<div style="font-size:12px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Progreso individual</div>';
+    mems.forEach(function(m){ html+=filaMiembro(m,recs,totalEnc); });
+  }
+  html+='</div>';
+  return html;
 }
 
 async function discCheckAprobacion(pasoId, memberId){

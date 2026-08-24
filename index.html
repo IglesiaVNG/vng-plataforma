@@ -17794,6 +17794,11 @@ function discEditRecord(id){
   window._discEditId=id;
   var att=Object.entries(r.asistencia||{});
   var cursadaEdit=(S.discCursadas||[]).find(function(cu){return cu.id===r.cursadaId;});
+  if(!cursadaEdit&&r.pasoId){
+    // Respaldo: si cursadaId está roto o vacío (ej: se revirtió el inicio de la Cursada en algún
+    // momento), buscar por el Curso para poder seguir editando el Grupo igual.
+    cursadaEdit=(S.discCursadas||[]).find(function(cu){return cu.pasoId===r.pasoId;});
+  }
   var pasoEdit=cursadaEdit?S.discPasos.find(function(p){return p.id===cursadaEdit.pasoId;}):S.discPasos.find(function(p){return p.id===r.pasoId;});
   var grupoOptsEdit='';
   if(cursadaEdit&&(cursadaEdit.grupos||[]).length){
@@ -17862,10 +17867,20 @@ async function discSaveEdit(){
   var prevAsistencia=JSON.parse(JSON.stringify(r.asistencia));
   var prevGrupoId=r.grupoId;
   var prevCapitulo=r.capitulo;
+  var prevCursadaId=r.cursadaId;
   var prevTs=r._ts;
   r.fecha=nuevaFecha;
   var selGrupoEdit=document.getElementById('disc-edit-grupo');
-  if(selGrupoEdit) r.grupoId=selGrupoEdit.value?parseInt(selGrupoEdit.value):null;
+  if(selGrupoEdit){
+    r.grupoId=selGrupoEdit.value?parseInt(selGrupoEdit.value):null;
+    // Si el registro tenía cursadaId roto/vacío (ej: por un Revertir inicio anterior) pero acá
+    // pudimos mostrar el desplegable de Grupo gracias al respaldo por Curso, dejar el vínculo
+    // reparado de forma permanente para que no vuelva a fallar en Registros.
+    if(!S.discCursadas.some(function(cu){return cu.id===r.cursadaId;})&&r.pasoId){
+      var cursadaReparar=S.discCursadas.find(function(cu){return cu.pasoId===r.pasoId;});
+      if(cursadaReparar) r.cursadaId=cursadaReparar.id;
+    }
+  }
   var selCapEdit=document.getElementById('disc-edit-capitulo');
   if(selCapEdit) r.capitulo=selCapEdit.value;
   Object.keys(r.asistencia).forEach(function(k){
@@ -17881,6 +17896,7 @@ async function discSaveEdit(){
     r.asistencia=prevAsistencia;
     r.grupoId=prevGrupoId;
     r.capitulo=prevCapitulo;
+    r.cursadaId=prevCursadaId;
     r._ts=prevTs;
     await saveK(SK.discRecords,S.discRecords);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
@@ -17953,6 +17969,11 @@ function discRenderRegistrosList(){
         var discLblReg=(grupoDelReg.discipuladorIds||[]).length?discDiscipuladoresLabel(grupoDelReg):'Sin discipulador';
         grupoLbl='<span class="badge" style="background:#EEF2FF;color:#4338CA">🧑\u200d🤝\u200d🧑 '+grupoDelReg.nombre+'</span>'
           +' <span class="badge" style="background:#F5F3FF;color:#6D28D9">👤 '+discLblReg+'</span>';
+      } else {
+        // El Grupo guardado en el registro ya no existe (por ejemplo, se revirtió el inicio de
+        // la Cursada y se rearmaron los Grupos desde cero con otros IDs) — avisar en vez de
+        // quedar en silencio.
+        grupoLbl='<span class="badge b-muted" title="El Grupo que tenía este registro ya no existe — se puede corregir con ✏️ Editar">⚠️ Grupo no encontrado</span>';
       }
     } else if(cursadaDelReg&&(cursadaDelReg.grupos||[]).length){
       grupoLbl='<span class="badge b-muted" title="Este registro no tiene un Grupo asociado — se puede corregir con ✏️ Editar">⚠️ Sin Grupo</span>';

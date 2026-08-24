@@ -17925,15 +17925,24 @@ function discRenderRegistrosList(){
   var html='<div style="font-size:14px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);margin-bottom:1rem">'+recs.length+' registro'+(recs.length!==1?'s':'')+'</div>';
   recs.forEach(function(r){
     var grupoLbl='';
-    if(r.grupoId){
-      var cursadaDelReg=(S.discCursadas||[]).find(function(cu){return cu.id===r.cursadaId;});
-      var grupoDelReg=cursadaDelReg?(cursadaDelReg.grupos||[]).find(function(g){return g.id===r.grupoId;}):null;
-      if(grupoDelReg) grupoLbl='<span class="badge" style="background:#EEF2FF;color:#4338CA">🧑\u200d🤝\u200d🧑 '+grupoDelReg.nombre+'</span>';
-    } else {
-      var cursadaSinGrupo=(S.discCursadas||[]).find(function(cu){return cu.id===r.cursadaId;});
-      if(cursadaSinGrupo&&(cursadaSinGrupo.grupos||[]).length){
-        grupoLbl='<span class="badge b-muted" title="Este registro no tiene un Grupo asociado — se puede corregir con ✏️ Editar">⚠️ Sin Grupo</span>';
+    var cursadaDelReg=(S.discCursadas||[]).find(function(cu){return cu.id===r.cursadaId;});
+    if(!cursadaDelReg&&r.pasoId){
+      // Respaldo para registros muy viejos que no tengan cursadaId guardado: buscar por el Curso.
+      // Puede no ser exacto si el Curso tuvo más de una Cursada, pero es mejor que no mostrar nada.
+      cursadaDelReg=(S.discCursadas||[]).find(function(cu){return cu.pasoId===r.pasoId;});
+    }
+    if(r.grupoId&&cursadaDelReg){
+      var grupoDelReg=(cursadaDelReg.grupos||[]).find(function(g){return g.id===r.grupoId;});
+      if(grupoDelReg){
+        var discLblReg=(grupoDelReg.discipuladorIds||[]).length?discDiscipuladoresLabel(grupoDelReg):'Sin discipulador';
+        grupoLbl='<span class="badge" style="background:#EEF2FF;color:#4338CA">🧑\u200d🤝\u200d🧑 '+grupoDelReg.nombre+'</span>'
+          +' <span class="badge" style="background:#F5F3FF;color:#6D28D9">👤 '+discLblReg+'</span>';
       }
+    } else if(cursadaDelReg&&(cursadaDelReg.grupos||[]).length){
+      grupoLbl='<span class="badge b-muted" title="Este registro no tiene un Grupo asociado — se puede corregir con ✏️ Editar">⚠️ Sin Grupo</span>';
+    } else if(cursadaDelReg){
+      var discLblCursada=(cursadaDelReg.discipuladorIds||[]).length?discDiscipuladoresLabel(cursadaDelReg):'Sin discipulador';
+      grupoLbl='<span class="badge" style="background:#F5F3FF;color:#6D28D9">👤 '+discLblCursada+'</span>';
     }
     if(r.sinEncuentro){
       html+='<div class="card" style="margin-bottom:.75rem;padding:12px;opacity:.7">';

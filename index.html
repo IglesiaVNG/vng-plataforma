@@ -666,7 +666,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-a';
+const APP_VERSION = '2026-08-24-b';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -11312,10 +11312,13 @@ function gdvRenderWeeklyStatus(){
     html += '</div></div>';
   }
 
-  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:8px">';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px">';
   statusByGroup.forEach(function(item){
     var c = colores[item.status];
-    var dia = item.g.dia ? ' · ' + item.g.dia : '';
+    var dia = item.g.dia ? ' · ' + item.g.dia + (item.g.horario ? ' ' + item.g.horario : '') : '';
+    var fac1 = item.g.facId ? S.members.find(function(m){ return m.id===item.g.facId; }) : null;
+    var fac2 = item.g.facId2 ? S.members.find(function(m){ return m.id===item.g.facId2; }) : null;
+    var facTxt = fac1 ? (' · ' + fac1.nombre + (fac2 ? ' / ' + fac2.nombre : '')) : '';
     var detalle = '';
     if(item.status === 'mixto'){
       detalle = ' · ' + item.encCount + ' con asistencia · ' + item.sinEncCount + ' sin encuentro';
@@ -11325,8 +11328,8 @@ function gdvRenderWeeklyStatus(){
     html += '<div style="background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px">';
     html += '<div style="width:10px;height:10px;border-radius:50%;background:' + c.dot + ';flex-shrink:0"></div>';
     html += '<div style="flex:1;min-width:0">';
-    html += '<div style="font-size:12px;font-weight:600;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + item.g.name + '</div>';
-    html += '<div style="font-size:11px;color:#6B7280">' + c.label + detalle + dia + '</div>';
+    html += '<div style="font-size:12px;font-weight:600;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + item.g.name + '<span style="font-weight:400;color:#6B7280">' + facTxt + '</span></div>';
+    html += '<div style="font-size:11px;color:#6B7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + c.label + detalle + dia + '</div>';
     html += '</div></div>';
   });
   html += '</div>';

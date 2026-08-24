@@ -666,7 +666,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-18-a';
+const APP_VERSION = '2026-08-24-a';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -17919,13 +17919,19 @@ async function discSaveEdit(){
   var nuevaFecha=document.getElementById('disc-edit-fecha')?.value;
   if(!nuevaFecha){ alert('La fecha es obligatoria.'); return; }
   if(nuevaFecha>today()){ alert('No podés poner una fecha futura.'); return; }
-  if(nuevaFecha!==r.fecha){
+  var semanaNueva=getISOWeek(nuevaFecha);
+  var anioNueva=parseLocalDate(nuevaFecha).getFullYear();
+  var semanaOriginal=getISOWeek(r.fecha);
+  var anioOriginal=parseLocalDate(r.fecha).getFullYear();
+  var cambioDeSemana=!(semanaNueva===semanaOriginal&&anioNueva===anioOriginal);
+  if(cambioDeSemana){
     var claveGrupo=r.cursadaId||r.pasoId;
-    var semanaNueva=getISOWeek(nuevaFecha);
-    var anioNueva=parseLocalDate(nuevaFecha).getFullYear();
+    var selGrupoChk=document.getElementById('disc-edit-grupo');
+    var grupoParaChk=selGrupoChk?(selGrupoChk.value?parseInt(selGrupoChk.value):null):(r.grupoId||null);
     var yaExiste=S.discRecords.some(function(x){
       if(x.id===r.id) return false;
       if((x.cursadaId||x.pasoId)!==claveGrupo) return false;
+      if(String(grupoParaChk||'')!==String(x.grupoId||'')) return false;
       return getISOWeek(x.fecha)===semanaNueva && parseLocalDate(x.fecha).getFullYear()===anioNueva;
     });
     if(yaExiste){

@@ -13010,6 +13010,9 @@ function buildNuevosHTML(){
         <option value="">Responsables</option>
         <option value="sin-asignar">⏳ Sin asignar</option>
       </select>
+      <select id="nv-fil-origen" onchange="renderNuevos()" style="flex:0.9;min-width:0;text-overflow:ellipsis;white-space:nowrap;overflow:hidden">
+        <option value="">Todos los orígenes</option>
+      </select>
     </div>
 
     <!-- Contador -->
@@ -13373,11 +13376,23 @@ function renderNuevos(){
   const fTipoGrupo=document.getElementById('nv-fil-tipo-grupo')?.value||'';
   const fSubEstado=document.getElementById('nv-fil-subestado')?.value||'';
   const fResponsable=document.getElementById('nv-fil-responsable')?.value||'';
+  const fOrigen=document.getElementById('nv-fil-origen')?.value||'';
 
   const gsel=document.getElementById('nv-fil-grupo');
   if(gsel&&gsel.options.length<=1){
     S.groups.forEach(g=>{const o=document.createElement('option');o.value=g.id;o.textContent=g.name;gsel.appendChild(o);});
     (S.ngComunidades||[]).forEach(ng=>{const o=document.createElement('option');o.value=ng.id;o.textContent='🌱 '+ng.name;gsel.appendChild(o);});
+  }
+
+  // Origen filter: rebuild options from current Nuevos, preserving the selection
+  const osel=document.getElementById('nv-fil-origen');
+  if(osel){
+    const prevValO=osel.value;
+    const origenes=new Set();
+    S.members.filter(m=>(m.condicion==='Nuevo'||m.condicion==='Historico')&&m.origen).forEach(m=>origenes.add(m.origen));
+    osel.innerHTML='<option value="">Todos los orígenes</option>'+
+      [...origenes].sort().map(o=>`<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
+    osel.value=prevValO;
   }
 
   // Responsable filter: rebuild options from current Nuevos, preserving the selection
@@ -13418,6 +13433,7 @@ function renderNuevos(){
   if(fSubEstado) members=members.filter(m=>(m.subEstado||'Ingresado')===fSubEstado);
   if(fResponsable==='sin-asignar') members=members.filter(m=>!m.seguimientoId);
   else if(fResponsable) members=members.filter(m=>String(m.seguimientoId)===String(fResponsable));
+  if(fOrigen) members=members.filter(m=>m.origen===fOrigen);
   if(fTipoGrupo==='gdv'){
     var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
     members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});
@@ -18684,6 +18700,7 @@ function exportNuevosExcel(){
   const fTipoGrupo=document.getElementById('nv-fil-tipo-grupo')?.value||'';
   const fSubEstado=document.getElementById('nv-fil-subestado')?.value||'';
   const fResponsable=document.getElementById('nv-fil-responsable')?.value||'';
+  const fOrigen=document.getElementById('nv-fil-origen')?.value||'';
   const hoy=new Date(); hoy.setHours(0,0,0,0);
   const hace30=new Date(hoy); hace30.setDate(hace30.getDate()-30);
 
@@ -18709,6 +18726,7 @@ function exportNuevosExcel(){
   if(fSubEstado) members=members.filter(m=>(m.subEstado||'Ingresado')===fSubEstado);
   if(fResponsable==='sin-asignar') members=members.filter(m=>!m.seguimientoId);
   else if(fResponsable) members=members.filter(m=>String(m.seguimientoId)===String(fResponsable));
+  if(fOrigen) members=members.filter(m=>m.origen===fOrigen);
   if(fTipoGrupo==='gdv'){
     var gdvIds=new Set((S.groups||[]).map(function(g){return Number(g.id);}));
     members=members.filter(function(m){return m.grupoId&&gdvIds.has(Number(m.grupoId));});

@@ -175,9 +175,9 @@ tr:hover td{background:#F9FAFB}
 .enc-card{background:#F5F5F5;border:1px solid #E0E0E0;border-radius:10px;padding:10px 12px;margin-bottom:8px}
 .tema-tag{display:inline-flex;align-items:center;background:#EEEDFE;color:#3C3489;font-size:11px;padding:2px 8px;border-radius:99px;margin:2px 3px 2px 0;font-weight:500}
 .of-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:200}
-.of-modal{background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:1.5rem;width:90%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.of-modal{background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:1.5rem;width:90%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.15)}
 .of-modal h3{font-size:15px;font-weight:600;margin-bottom:12px}
-.of-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.of-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;position:sticky;bottom:-1.5rem;background:#fff;padding:10px 0 1.5rem;margin-bottom:-1.5rem}
 .field-label{font-size:12px;color:#666;display:block;margin-bottom:4px}
 .field-group{display:flex;flex-direction:column;gap:10px}
 .panel-alumno{background:#F5F5F5;border:1px solid #E0E0E0;border-radius:10px;padding:10px 12px;margin-bottom:8px}
@@ -667,7 +667,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-g';
+const APP_VERSION = '2026-08-24-h';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -12161,9 +12161,10 @@ function buildOFHTML(){
     <div class="of-tabs">
       <button class="of-tab" id="oftab-alumnos"    onclick="ofSwitchTab('alumnos',this)">👥 Alumnos</button>
       <button class="of-tab"        id="oftab-materias"   onclick="ofSwitchTab('materias',this)">📚 Materias</button>
+      <button class="of-tab"        id="oftab-cursada"   onclick="ofSwitchTab('cursada',this)">🗂 Cursada</button>
       <button class="of-tab"        id="oftab-participacion" onclick="ofSwitchTab('participacion',this)">🔄 Participación</button>
       <button class="of-tab" id="oftab-pagos" onclick="ofSwitchTab('pagos',this)">💰 Pagos</button>
-      <button class="of-tab"        id="oftab-asistencia" onclick="ofSwitchTab('asistencia',this)">✅ Asistencia</button>
+      <button class="of-tab"        id="oftab-asistencia" onclick="ofSwitchTab('asistencia',this)">✅ Cargar Asistencia</button>
     </div>
 
     <!-- ALUMNOS -->
@@ -12199,7 +12200,7 @@ function buildOFHTML(){
       </div>
     </div>
 
-    <!-- MATERIAS -->
+    <!-- MATERIAS: solo catálogo (nombre + temario) -->
     <div class="of-section" id="of-sec-materias">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
         <span style="font-weight:600;font-size:14px;color:#3C3489">Materias</span>
@@ -12229,11 +12230,27 @@ function buildOFHTML(){
       </div>
     </div>
 
-    <!-- MODAL: Cursada de una materia -->
+    <!-- CURSADA: instancias con fechas y alumnos, separado de Materias -->
+    <div class="of-section" id="of-sec-cursada">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <span style="font-weight:600;font-size:14px;color:#3C3489">Cursada</span>
+        <button class="btn-of btn-of-primary btn-of-sm" onclick="ofOpenNewCursada()">▶ Nueva Cursada</button>
+      </div>
+      <div id="of-cursadas-list"></div>
+    </div>
+
+    <!-- MODAL: Cursada -->
     <div class="of-modal-overlay" id="of-modalCursada" style="display:none">
       <div class="of-modal">
         <h3 id="of-cu-title">Nueva Cursada</h3>
         <div class="field-group">
+          <div id="of-cu-materia-wrap">
+            <label class="field-label">Materia *</label>
+            <select id="of-cu-materia" style="width:100%">
+              <option value="">— Elegir materia —</option>
+            </select>
+          </div>
+          <div id="of-cu-materia-fija" style="display:none;font-size:13px;font-weight:600;color:#3C3489"></div>
           <div><label class="field-label">Profesor</label>
             <select id="of-cu-profesor" style="width:100%">
               <option value="">— Elegir profesor —</option>
@@ -12244,12 +12261,14 @@ function buildOFHTML(){
             <div><label class="field-label">Fecha fin estimada</label><input type="date" id="of-cu-hasta" style="width:100%"></div>
           </div>
         </div>
-        <label class="field-label" style="margin-top:10px">Alumnos inscriptos en esta Cursada</label>
-        <div style="font-size:11px;color:#9CA3AF;margin-bottom:4px">La lista de abajo incluye a todos los alumnos ya cargados (de Rebaños o externos), sean o no de esta Materia — buscalos por nombre antes de cargar uno nuevo como externo.</div>
-        <input type="text" id="of-cu-buscar-alumno" placeholder="Buscar por nombre…" oninput="ofFiltrarCursadaAlumnos(this.value)" style="margin-bottom:6px">
-        <div id="of-cu-alum-list" style="max-height:220px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:10px"></div>
+        <label class="field-label" style="margin-top:10px">Alumnos inscriptos</label>
+        <div style="position:relative">
+          <input type="text" id="of-cu-buscar-alumno" placeholder="Escribí un nombre…" autocomplete="off" oninput="ofBuscarAlumnoAutocomplete(this.value)">
+          <div id="of-cu-ac-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:20;max-height:180px;overflow-y:auto"></div>
+        </div>
+        <div id="of-cu-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0"></div>
         <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:10px">
-          <div style="font-size:12px;color:#6B7280;margin-bottom:6px">¿No está en la lista? Se puede sumar como externo/invitado (no forma parte de Rebaños):</div>
+          <div style="font-size:12px;color:#6B7280;margin-bottom:6px">¿No está en la base? Se puede sumar como externo/invitado (no forma parte de Rebaños):</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <input type="text" id="of-cu-ext-nombre" placeholder="Nombre" style="flex:1;min-width:100px">
             <input type="text" id="of-cu-ext-apellido" placeholder="Apellido" style="flex:1;min-width:100px">
@@ -12407,12 +12426,13 @@ function buildOFHTML(){
 function ofSwitchTab(t,btn){
   document.querySelectorAll('.of-tab').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  ['alumnos','materias','participacion','pagos','asistencia'].forEach(s=>{
+  ['alumnos','materias','cursada','participacion','pagos','asistencia'].forEach(s=>{
     const el=document.getElementById('of-sec-'+s);
     if(el) el.classList.toggle('active',s===t);
   });
   ofCurrentTab=t;
   if(t==='materias') ofRenderMaterias();
+  if(t==='cursada') ofRenderCursadas();
 }
 
 function ofRender(){
@@ -12423,6 +12443,7 @@ function ofRender(){
   try{ofRenderPills();}catch(e){console.error('ofRenderPills',e);}
   try{ofRenderAlumnos();}catch(e){console.error('ofRenderAlumnos',e);}
   try{ofRenderMaterias();}catch(e){console.error('ofRenderMaterias',e);}
+  try{ofRenderCursadas();}catch(e){console.error('ofRenderCursadas',e);}
   try{ofRenderParticipacion();}catch(e){console.error('ofRenderParticipacion',e);}
   try{ofRenderPagos();}catch(e){console.error('ofRenderPagos',e);}
   try{ofRenderAsistencia();}catch(e){console.error('ofRenderAsistencia',e);}
@@ -12707,61 +12728,90 @@ function ofRenderMaterias(){
   }
   wrap.innerHTML=ofMaterias.map(mat=>{
     const isActivo=mat.estado==='Activo';
-    const caps=(mat.capitulos||[]).length;
-    const cursadasMateria=ofCursadas.filter(c=>c.materiaId===mat.id).sort((a,b)=>b.id-a.id);
+    const caps=mat.capitulos||[];
     const borderColor=isActivo?'#7C3AED':'#9CA3AF';
-    const cursadasHtml=cursadasMateria.map(function(cu){
-      const alums=(cu.alumnos||[]).length;
-      const cuActiva=cu.estado==='Activo';
-      return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;padding:8px 10px;background:#F9FAFB;border-radius:8px;margin-top:6px">'+
-        '<div>'+
-          '<div style="font-size:12px;font-weight:700;color:#6D28D9">🏷 '+ofCursadaLabel(cu)+'</div>'+
-          '<div style="font-size:12px;color:#4B5563;margin-top:1px">'+
-            (cu.profesor?'👤 '+ofProfesorNombre(cu.profesor)+' · ':'')+
-            '📅 '+(cu.fechaInicio?fmt(cu.fechaInicio):'—')+(cu.fechaFin?' → '+fmt(cu.fechaFin):'')+
-            ' · 👥 '+alums+' alumno'+(alums!==1?'s':'')+
-          '</div>'+
-        '</div>'+
-        '<div style="display:flex;gap:6px;align-items:center">'+
-          '<span class="badge '+(cuActiva?'b-ok':'b-muted')+'">'+(cuActiva?'Activa':'Completada')+'</span>'+
-          '<button class="btn-of btn-of-sm" onclick="ofEditCursada('+cu.id+')">👥 Inscriptos</button>'+
-          (cuActiva?'<button class="btn-of btn-of-sm btn-of-danger" onclick="ofCerrarCursada('+cu.id+')">🔒 Cerrar</button>':'')+
-        '</div></div>';
-    }).join('');
-    const tieneCursadaActiva=cursadasMateria.some(function(c){return c.estado==='Activo';});
+    const capsHtml=caps.length
+      ?'<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">'+caps.map(function(c){return '<span style="background:#F3E8FF;color:#6D28D9;font-size:11px;padding:1px 8px;border-radius:4px">'+c.nombre+'</span>';}).join('')+'</div>'
+      :'<div style="font-size:12px;color:#9CA3AF;margin-top:6px">Todavía no tiene capítulos cargados.</div>';
     return `<div class="card" style="margin-bottom:.75rem;border-left:4px solid ${borderColor}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between">
-        <div>
-          <div style="font-weight:700;font-size:14px;color:#1F2937">${mat.nombre}</div>
-          <div style="font-size:12px;color:#6B7280;margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
-            <span>📚 ${caps} cap.</span>
-            <span>🗂 ${cursadasMateria.length} cursada${cursadasMateria.length!==1?'s':''}</span>
-          </div>
-        </div>
+        <div style="font-weight:700;font-size:14px;color:#1F2937">${mat.nombre}</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <span class="badge ${isActivo?'b-ok':'b-muted'}">${isActivo?'Activo':'Archivada'}</span>
-          ${(isActivo&&!tieneCursadaActiva)?`<button class="btn-of btn-of-sm btn-of-primary" onclick="ofOpenNewCursada(${mat.id})">▶ Nueva Cursada</button>`:''}
           <button class="btn-of btn-of-sm" onclick="ofEditMateria(${mat.id})">✏️ Editar</button>
           <button class="btn-of btn-of-sm btn-of-danger" onclick="ofDeleteMateria(${mat.id})">🗑</button>
         </div>
       </div>
-      ${cursadasHtml||'<div style="font-size:12px;color:#9CA3AF;margin-top:8px">Todavía no tiene ninguna Cursada iniciada.</div>'}
+      ${capsHtml}
+    </div>`;
+  }).join('');
+}
+
+// ── CURSADA: pestaña propia, separada de Materias ──────────
+function ofRenderCursadas(){
+  const wrap=document.getElementById('of-cursadas-list');
+  if(!wrap) return;
+  if(!ofCursadas.length){
+    wrap.innerHTML='<div style="text-align:center;padding:2rem;color:#666;font-size:13px">Todavía no se inició ninguna Cursada. Usá "▶ Nueva Cursada" y elegí la Materia.</div>';
+    return;
+  }
+  const ordenadas=ofCursadas.slice().sort(function(a,b){
+    if(a.estado!==b.estado) return a.estado==='Activo'?-1:1;
+    return b.id-a.id;
+  });
+  wrap.innerHTML=ordenadas.map(function(cu){
+    const mat=ofMateriaDeCursada(cu);
+    const alums=(cu.alumnos||[]).length;
+    const cuActiva=cu.estado==='Activo';
+    const borderColor=cuActiva?'#7C3AED':'#9CA3AF';
+    return `<div class="card" style="margin-bottom:.75rem;border-left:4px solid ${borderColor}">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#6D28D9">🏷 ${ofCursadaLabel(cu)}</div>
+          <div style="font-size:12px;color:#4B5563;margin-top:2px">
+            ${mat?'📚 '+mat.nombre+' · ':''}${cu.profesor?'👤 '+ofProfesorNombre(cu.profesor)+' · ':''}
+            📅 ${cu.fechaInicio?fmt(cu.fechaInicio):'—'}${cu.fechaFin?' → '+fmt(cu.fechaFin):''}
+            · 👥 ${alums} alumno${alums!==1?'s':''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <span class="badge ${cuActiva?'b-ok':'b-muted'}">${cuActiva?'Activa':'Completada'}</span>
+          <button class="btn-of btn-of-sm" onclick="ofEditCursada(${cu.id})">👥 Inscriptos</button>
+          ${cuActiva?`<button class="btn-of btn-of-sm btn-of-danger" onclick="ofCerrarCursada(${cu.id})">🔒 Cerrar</button>`:''}
+        </div>
+      </div>
     </div>`;
   }).join('');
 }
 
 // ── CURSADAS: instancias de una Materia con fechas y alumnos propios ──
-function ofOpenNewCursada(materiaId){
+let ofCursadaSeleccionados=[]; // ids de ofAlumnos elegidos para la Cursada que se está creando/editando
+
+function ofOpenNewCursada(){
   ofEditCursadaId=null;
-  ofCursadaMateriaId=materiaId;
-  const anioPrevisto=HOY.getFullYear();
-  document.getElementById('of-cu-title').textContent='Nueva Cursada — '+ofGenLabel(materiaId,anioPrevisto);
+  ofCursadaMateriaId=null;
+  ofCursadaSeleccionados=[];
+  document.getElementById('of-cu-title').textContent='Nueva Cursada';
+  const wrapSel=document.getElementById('of-cu-materia-wrap');
+  const wrapFija=document.getElementById('of-cu-materia-fija');
+  wrapSel.style.display='block'; wrapFija.style.display='none';
+  const sel=document.getElementById('of-cu-materia');
+  const materiasSinCursadaActiva=ofMateriasActivas().filter(function(m){
+    return !ofCursadas.some(function(c){return c.materiaId===m.id&&c.estado==='Activo';});
+  });
+  sel.innerHTML='<option value="">— Elegir materia —</option>'+
+    materiasSinCursadaActiva.map(function(m){return '<option value="'+m.id+'">'+m.nombre+'</option>';}).join('');
+  if(!materiasSinCursadaActiva.length){
+    sel.innerHTML='<option value="">— No hay materias disponibles (creá una en Materias, o cerrá la Cursada activa) —</option>';
+  }
   ofPopulateSelectors();
   document.getElementById('of-cu-profesor').value='';
   document.getElementById('of-cu-desde').value='';
   document.getElementById('of-cu-hasta').value='';
+  document.getElementById('of-cu-buscar-alumno').value='';
+  document.getElementById('of-cu-ac-list').style.display='none';
   ['of-cu-ext-nombre','of-cu-ext-apellido','of-cu-ext-tel','of-cu-ext-dni'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  ofPopulateCursadaAlumnos([]);
+  ofRenderCursadaChips();
   document.getElementById('of-modalCursada').style.display='flex';
 }
 
@@ -12770,49 +12820,90 @@ function ofEditCursada(cursadaId){
   if(!cu) return;
   ofEditCursadaId=cursadaId;
   ofCursadaMateriaId=cu.materiaId;
+  ofCursadaSeleccionados=(cu.alumnos||[]).slice();
   document.getElementById('of-cu-title').textContent=(cu.estado==='Activo'?'Editar Cursada — ':'Cursada (completada) — ')+ofCursadaLabel(cu);
+  const wrapSel=document.getElementById('of-cu-materia-wrap');
+  const wrapFija=document.getElementById('of-cu-materia-fija');
+  wrapSel.style.display='none'; wrapFija.style.display='block';
+  const mat=ofMateriaDeCursada(cu);
+  wrapFija.textContent='📚 '+(mat?mat.nombre:'Materia eliminada');
   ofPopulateSelectors();
   document.getElementById('of-cu-profesor').value=cu.profesor||'';
   document.getElementById('of-cu-desde').value=cu.fechaInicio||'';
   document.getElementById('of-cu-hasta').value=cu.fechaFin||'';
+  document.getElementById('of-cu-buscar-alumno').value='';
+  document.getElementById('of-cu-ac-list').style.display='none';
   ['of-cu-ext-nombre','of-cu-ext-apellido','of-cu-ext-tel','of-cu-ext-dni'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  ofPopulateCursadaAlumnos(cu.alumnos||[]);
+  ofRenderCursadaChips();
   document.getElementById('of-modalCursada').style.display='flex';
 }
 
-function ofPopulateCursadaAlumnos(selected){
-  const wrap=document.getElementById('of-cu-alum-list');
-  if(!wrap) return;
-  wrap.innerHTML=ofAlumnos.map(a=>{
-    const checked=selected.includes(a.id);
-    return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB">
-      <input type="checkbox" class="of-cu-alum-cb" value="${a.id}" ${checked?'checked':''}
-        style="width:15px;height:15px;flex-shrink:0;cursor:pointer">
-      <span style="font-size:13px;font-weight:500">${a.nombre} ${a.apellido}${a.tipo==='externo'?' <span style=\"color:#92400E\">(externo)</span>':''}</span>
-    </label>`;
+// Autocompletar de alumnos ya cargados (miembros o externos), igual patrón que se usa en
+// Nuevas Generaciones — escribís, aparecen coincidencias, tocás una y queda inscripta.
+function ofBuscarAlumnoAutocomplete(query){
+  const dropdown=document.getElementById('of-cu-ac-list');
+  if(!dropdown) return;
+  if(query.trim().length<2){dropdown.style.display='none';return;}
+  const q=query.trim().toLowerCase();
+  const results=ofAlumnos.filter(function(a){
+    return !ofCursadaSeleccionados.includes(a.id) && (a.nombre+' '+a.apellido).toLowerCase().includes(q);
+  }).slice(0,8);
+  if(!results.length){
+    dropdown.innerHTML='<div style="padding:10px 12px;font-size:13px;color:#9CA3AF">Sin coincidencias. Si es nueva persona, agregala como externo abajo.</div>';
+    dropdown.style.display='block';
+    return;
+  }
+  dropdown.innerHTML=results.map(function(a){
+    return '<div data-id="'+a.id+'" onpointerdown="event.preventDefault();ofPickCursadaAC(this)" ontouchstart="event.preventDefault();ofPickCursadaAC(this)" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px">'+
+      a.nombre+' '+a.apellido+(a.tipo==='externo'?' <span style="color:#92400E;font-size:11px">(externo)</span>':'')+
+      '</div>';
   }).join('');
+  dropdown.style.display='block';
 }
 
-function ofFiltrarCursadaAlumnos(q){
-  const qL=q.toLowerCase();
-  document.querySelectorAll('#of-cu-alum-list label').forEach(lbl=>{
-    lbl.style.display=lbl.textContent.toLowerCase().includes(qL)?'':'none';
-  });
+function ofPickCursadaAC(el){
+  const id=parseInt(el.getAttribute('data-id'));
+  if(!ofCursadaSeleccionados.includes(id)) ofCursadaSeleccionados.push(id);
+  const inp=document.getElementById('of-cu-buscar-alumno');
+  if(inp){inp.value='';inp.blur();}
+  document.getElementById('of-cu-ac-list').style.display='none';
+  ofRenderCursadaChips();
+}
+
+function ofQuitarCursadaChip(id){
+  ofCursadaSeleccionados=ofCursadaSeleccionados.filter(function(x){return x!==id;});
+  ofRenderCursadaChips();
+}
+
+function ofRenderCursadaChips(){
+  const wrap=document.getElementById('of-cu-chips');
+  if(!wrap) return;
+  if(!ofCursadaSeleccionados.length){
+    wrap.innerHTML='<div style="font-size:12px;color:#9CA3AF">Todavía no inscribiste a nadie.</div>';
+    return;
+  }
+  wrap.innerHTML=ofCursadaSeleccionados.map(function(id){
+    const a=ofAlumnos.find(function(x){return x.id===id;});
+    if(!a) return '';
+    return '<span style="display:inline-flex;align-items:center;gap:5px;background:#EEEDFE;color:#3C3489;border-radius:999px;padding:4px 6px 4px 10px;font-size:12.5px;font-weight:500">'+
+      a.nombre+' '+a.apellido+
+      '<button onclick="ofQuitarCursadaChip('+id+')" style="background:none;border:none;color:#3C3489;cursor:pointer;font-size:13px;line-height:1;padding:0 2px">✕</button>'+
+      '</span>';
+  }).join('');
 }
 
 async function ofAgregarExternoEnCursada(){
   const n=document.getElementById('of-cu-ext-nombre').value.trim();
   const a=document.getElementById('of-cu-ext-apellido').value.trim();
   if(!n||!a){alert('Ingresá nombre y apellido');return;}
-  const yaSeleccionados=[...document.querySelectorAll('.of-cu-alum-cb:checked')].map(cb=>parseInt(cb.value));
   const similar=ofBuscarAlumnoSimilar(n,a);
   if(similar){
     if(!confirm('Ya existe un alumno con ese nombre y apellido ('+similar.nombre+' '+similar.apellido+(similar.tipo==='miembro'?', de Rebaños':', externo')+'). ¿Es la misma persona? Aceptá para inscribirlo a esta Cursada sin crear un duplicado.\n\nCancelá si en realidad es alguien distinto con el mismo nombre.')){
       return; // el usuario prefiere seguir y crear uno nuevo y distinto — sigue el flujo de abajo
     }
-    if(!yaSeleccionados.includes(similar.id)) yaSeleccionados.push(similar.id);
+    if(!ofCursadaSeleccionados.includes(similar.id)) ofCursadaSeleccionados.push(similar.id);
     ['of-cu-ext-nombre','of-cu-ext-apellido','of-cu-ext-tel','of-cu-ext-dni'].forEach(id=>{document.getElementById(id).value='';});
-    ofPopulateCursadaAlumnos(yaSeleccionados);
+    ofRenderCursadaChips();
     showToast('✅ Inscripto (ya existía): '+similar.nombre+' '+similar.apellido,'#16A34A');
     return;
   }
@@ -12832,22 +12923,23 @@ async function ofAgregarExternoEnCursada(){
     return;
   }
   ['of-cu-ext-nombre','of-cu-ext-apellido','of-cu-ext-tel','of-cu-ext-dni'].forEach(id=>{document.getElementById(id).value='';});
-  // Reconstruir la lista manteniendo lo ya tildado, y tildar al recién agregado
-  yaSeleccionados.push(nuevo.id);
-  ofPopulateCursadaAlumnos(yaSeleccionados);
+  ofCursadaSeleccionados.push(nuevo.id);
+  ofRenderCursadaChips();
   showToast('✅ Agregado e inscripto: '+n+' '+a,'#16A34A');
 }
 
 function ofCerrarModalCursada(){
   document.getElementById('of-modalCursada').style.display='none';
-  ofEditCursadaId=null; ofCursadaMateriaId=null;
+  ofEditCursadaId=null; ofCursadaMateriaId=null; ofCursadaSeleccionados=[];
 }
 
 async function ofGuardarCursada(){
+  const materiaId=ofEditCursadaId?ofCursadaMateriaId:(parseInt(document.getElementById('of-cu-materia').value)||null);
+  if(!materiaId){alert('Elegí una materia');return;}
   const profesor=document.getElementById('of-cu-profesor').value;
   const fechaInicio=document.getElementById('of-cu-desde').value;
   const fechaFin=document.getElementById('of-cu-hasta').value;
-  const alumSels=[...document.querySelectorAll('.of-cu-alum-cb:checked')].map(cb=>parseInt(cb.value));
+  const alumSels=ofCursadaSeleccionados.slice();
   var snapshot=JSON.stringify(ofCursadas);
   if(ofEditCursadaId){
     const cu=ofCursadas.find(x=>x.id===ofEditCursadaId);
@@ -12855,7 +12947,7 @@ async function ofGuardarCursada(){
   } else {
     var anio=HOY.getFullYear();
     ofCursadas.push({
-      id:Date.now(), materiaId:ofCursadaMateriaId, anio:anio, label:ofGenLabel(ofCursadaMateriaId,anio),
+      id:Date.now(), materiaId:materiaId, anio:anio, label:ofGenLabel(materiaId,anio),
       profesor, fechaInicio, fechaFin,
       estado:'Activo', alumnos:alumSels, completados:{}, _ts:Date.now()
     });
@@ -12869,7 +12961,7 @@ async function ofGuardarCursada(){
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
-  ofCerrarModalCursada(); ofRenderMaterias();
+  ofCerrarModalCursada(); ofRenderCursadas();
 }
 
 async function ofCerrarCursada(cursadaId){
@@ -12887,7 +12979,7 @@ async function ofCerrarCursada(cursadaId){
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
-  ofRenderMaterias();
+  ofRenderCursadas();
   showToast('🔒 Cursada cerrada','#6B7280');
 }
 function ofRenderStats(){
@@ -12978,28 +13070,6 @@ function ofRenderParticipacion(){
   }
 
   var html='';
-
-  // ── KPIs ──
-  var totalAlumnos=ofAlumnos.length;
-  var totalEncs=allEncs.length;
-  var materiasActivas=cursadas.length;
-  // Overall attendance %
-  var totalP=0, totalReg=0;
-  ofAlumnos.forEach(function(a){
-    allEncs.forEach(function(e){
-      var v=ofAsistencia[a.id+'_'+e.id]||'';
-      if(v) totalReg++;
-      if(v==='P') totalP++;
-    });
-  });
-  var pctGeneral=totalReg>0?Math.round(totalP/totalReg*100):0;
-
-  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:1.25rem">';
-  html+='<div class="stat"><span class="stat-val">'+totalAlumnos+'</span><span class="stat-lbl">Alumnos</span></div>';
-  html+='<div class="stat"><span class="stat-val">'+materiasActivas+'</span><span class="stat-lbl">Materias activas</span></div>';
-  html+='<div class="stat"><span class="stat-val">'+totalEncs+'</span><span class="stat-lbl">Encuentros</span></div>';
-  html+='<div class="stat"><span class="stat-val" style="color:'+(pctGeneral>=75?'#16A34A':pctGeneral>=50?'#1F4E79':'#DC2626')+'">'+pctGeneral+'%</span><span class="stat-lbl">% Asistencia</span></div>';
-  html+='</div>';
 
   // ── Por Materia (Cursada activa) ──
   if(cursadas.length){

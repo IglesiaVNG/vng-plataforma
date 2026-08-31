@@ -667,7 +667,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-i';
+const APP_VERSION = '2026-08-24-k';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -12033,6 +12033,9 @@ let ofCursadas    = gs('of5_cursadas','[]');
 
 let ofMesPart=HOY.getMonth(), ofMesPago=HOY.getMonth(), ofMesAsist=HOY.getMonth();
 let ofEditEncId=null, ofObsAid=null, ofObsMes=null, ofObsPagoAid=null, ofObsPagoMes=null;
+// Borrador de Cargar Asistencia: vive en memoria mientras se completa la planilla, y
+// recién se sube a la nube con "Guardar asistencia" — mismo criterio que GdV/Discipulado.
+let ofAsistDraft={cursadaId:null, encId:null, capitulo:'', esExamen:false, valores:{}};
 let ofEditMatId=null, ofEditCursadaId=null, ofCursadaMateriaId=null;
 let ofCurrentTab='alumnos';
 
@@ -12117,8 +12120,6 @@ function ofMigrarCursadas(){
   ofSave();
   return true;
 }
-function ofFmtDate(d){if(!d)return'';const p=d.split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:d;}
-function ofDateInput(){return today();}
 // Corrige Cursadas que quedaron sin ID/label (por ejemplo, migradas con una versión anterior
 // del código, antes de que existiera ofGenLabel) — les asigna el label correcto sin tocar nada más.
 function ofBackfillCursadaLabels(){
@@ -12321,11 +12322,37 @@ function buildOFHTML(){
 
     <!-- ASISTENCIA -->
     <div class="of-section" id="of-sec-asistencia">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-        <span style="font-size:14px;font-weight:600;color:#1F4E79">Encuentros y Asistencia</span>
-        <button class="btn btn-primary btn-sm" onclick="ofAbrirModalEnc()">+ Nuevo encuentro</button>
+      <div class="of-card">
+        <div style="font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:12px">✏️ Cargar asistencia</div>
+        <label class="field-label">Cursada</label>
+        <select id="of-asd-cursada" onchange="ofSeleccionarCursadaAsistencia()" style="margin-bottom:12px">
+          <option value="">— Elegir Cursada activa —</option>
+        </select>
+        <div id="of-asd-sin-cursadas" style="display:none;font-size:12px;color:#9CA3AF;margin:-6px 0 12px">No hay ninguna Cursada activa. Abrí una desde la pestaña Cursada.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+          <div><label class="field-label">Fecha</label>
+            <input type="date" id="of-asd-fecha" onchange="ofCargarDraftParaFecha()" style="width:100%"></div>
+          <div><label class="field-label">Capítulo</label>
+            <select id="of-asd-capitulo" style="width:100%"><option value="">— Sin capítulo —</option></select>
+          </div>
+        </div>
+        <div id="of-asd-duplicado-alert" style="display:none;background:#FEF9E7;border:1px solid #FCD34D;border-radius:8px;padding:10px;font-size:12.5px;color:#92400E;margin-bottom:10px"></div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#4B5563;margin-bottom:10px">
+          <input type="checkbox" id="of-asd-esexamen" onchange="ofToggleDraftExamen()" style="width:16px;height:16px;cursor:pointer">
+          📝 Es un examen (marcar Completado/Incompleto en vez de asistencia)
+        </label>
+        <div id="of-asd-wrap" style="display:none">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+            <button class="btn-of btn-of-sm" onclick="ofMarcarTodosPresentes()">✅ Marcar todos Presente</button>
+          </div>
+          <div id="of-asd-tabla"></div>
+          <button class="btn btn-primary" onclick="ofGuardarAsistDraft()" style="width:100%;margin-top:1rem">💾 Guardar asistencia</button>
+        </div>
       </div>
-      <!-- Filtros estilo GdV -->
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:1.5rem 0 1rem;flex-wrap:wrap;gap:8px">
+        <span style="font-size:14px;font-weight:600;color:#1F4E79">Registros anteriores</span>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
         <select id="of-asist-materia-fil" onchange="ofRenderAsistencia()" style="flex:1;min-width:150px">
           <option value="">Todas las materias</option>
@@ -12334,84 +12361,6 @@ function buildOFHTML(){
         <button class="btn btn-sm" onclick="ofClearAsistFil()">↺ Limpiar</button>
       </div>
       <div id="of-enc-lista-mes" style="margin-bottom:.5rem"></div>
-      <div id="of-asist-tabla"></div>
-      <div class="of-card" style="padding:0.75rem 1.25rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-          <span class="of-card-title" id="of-asist-title">Asistencia</span>
-          <div class="of-legend">
-            <span><span class="dot" style="background:#22c55e"></span>Presente</span>
-            <span><span class="dot" style="background:#ef4444"></span>Ausente</span>
-            <span><span class="dot" style="background:#f59e0b"></span>Tardanza</span>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;padding:0 0 6px;border-bottom:1px solid #E0E0E0;margin-bottom:4px">
-          <div style="flex:1;font-size:11px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:0.04em">Alumno</div>
-          <div style="display:flex;gap:5px" id="of-weekLabels"></div>
-          <div style="width:42px"></div>
-        </div>
-        <div id="of-asist-list"></div>
-      </div>
-    </div>
-
-    <!-- MODAL: Nuevo encuentro -->
-    <div class="of-modal-overlay" id="of-modalEnc" style="display:none">
-      <div class="of-modal">
-        <h3>Nuevo encuentro</h3>
-        <div class="field-group">
-          <div>
-            <label class="field-label">Fecha *</label>
-            <input type="date" id="of-me-fecha" style="width:100%" />
-            <div id="of-me-fecha-display" style="font-size:12px;color:#3C3489;margin-top:4px"></div>
-          </div>
-          <div>
-            <label class="field-label">Materia *</label>
-            <select id="of-me-materia" onchange="ofUpdateCapitulos()" style="width:100%">
-              <option value="">— Elegir materia activa —</option>
-            </select>
-            <div style="font-size:11px;color:#9CA3AF;margin-top:4px">Al elegirla, la fecha de arriba se ajusta sola a la primera semana pendiente sin registrar — para regularizar atrasos, cambiala manualmente si preferís otra.</div>
-          </div>
-          <div>
-            <label class="field-label">Capítulo</label>
-            <select id="of-me-capitulo" style="width:100%">
-              <option value="">— Elegir capítulo (opcional) —</option>
-            </select>
-          </div>
-        </div>
-        <div class="of-modal-actions">
-          <button class="btn-of" onclick="ofCerrarModal()">Cancelar</button>
-          <button class="btn-of btn-of-primary" onclick="ofGuardarEnc()">Guardar</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- MODAL: Editar encuentro -->
-    <div class="of-modal-overlay" id="of-modalEditEnc" style="display:none">
-      <div class="of-modal">
-        <h3>Editar encuentro</h3>
-        <div class="field-group">
-          <div>
-            <label class="field-label">Fecha</label>
-            <input type="date" id="of-me-edit-fecha" style="width:100%" />
-          </div>
-          <div>
-            <label class="field-label">Materia</label>
-            <select id="of-me-edit-materia" onchange="ofUpdateCapitulosEdit()" style="width:100%">
-              <option value="">— Sin materia —</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label">Capítulo</label>
-            <select id="of-me-edit-capitulo" style="width:100%">
-              <option value="">— Sin capítulo —</option>
-            </select>
-          </div>
-        </div>
-        <div class="of-modal-actions">
-          <button class="btn-of btn-of-danger btn-of-sm" onclick="ofEliminarEncEdit()" style="margin-right:auto">Eliminar</button>
-          <button class="btn-of" onclick="ofCerrarModalEdit()">Cancelar</button>
-          <button class="btn-of btn-of-primary" onclick="ofGuardarEdicionEnc()">Guardar</button>
-        </div>
-      </div>
     </div>
 
     <!-- MODAL: Obs participación -->
@@ -12451,6 +12400,7 @@ function ofSwitchTab(t,btn){
   ofCurrentTab=t;
   if(t==='materias') ofRenderMaterias();
   if(t==='cursada') ofRenderCursadas();
+  if(t==='asistencia') ofPopularSelectorCursadaAsistencia();
 }
 
 function ofRender(){
@@ -12464,6 +12414,7 @@ function ofRender(){
   try{ofRenderCursadas();}catch(e){console.error('ofRenderCursadas',e);}
   try{ofRenderParticipacion();}catch(e){console.error('ofRenderParticipacion',e);}
   try{ofRenderPagos();}catch(e){console.error('ofRenderPagos',e);}
+  try{ofPopularSelectorCursadaAsistencia();}catch(e){console.error('ofPopularSelectorCursadaAsistencia',e);}
   try{ofRenderAsistencia();}catch(e){console.error('ofRenderAsistencia',e);}
 }
 
@@ -12682,6 +12633,12 @@ function ofRenderCapsEditor(){
 async function ofSaveMateria(){
   const nombre=document.getElementById('of-mf-nombre').value.trim();
   if(!nombre){alert('Ingresá el nombre de la materia');return;}
+  if(!ofEditMatId){
+    const duplicada=ofMaterias.find(m=>m.nombre.trim().toLowerCase()===nombre.toLowerCase());
+    if(duplicada){
+      if(!confirm('Ya existe una Materia llamada "'+duplicada.nombre+'" (con '+(duplicada.capitulos||[]).length+' capítulo(s)). Si creás otra con el mismo nombre vas a tener dos por separado, cada una con sus propias Cursadas.\n\n¿Seguro que no querés usar "✏️ Editar" sobre la que ya existe en vez de crear una nueva?\n\nAceptá para crear igual una materia distinta y nueva.')) return;
+    }
+  }
   const data={
     nombre,
     estado:document.getElementById('of-mf-estado').value,
@@ -12979,7 +12936,7 @@ async function ofGuardarCursada(){
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
-  ofCerrarModalCursada(); ofRenderCursadas();
+  ofCerrarModalCursada(); ofRenderCursadas(); ofPopularSelectorCursadaAsistencia();
 }
 
 async function ofCerrarCursada(cursadaId){
@@ -12998,6 +12955,7 @@ async function ofCerrarCursada(cursadaId){
     return;
   }
   ofRenderCursadas();
+  ofPopularSelectorCursadaAsistencia();
   showToast('🔒 Cursada cerrada','#6B7280');
 }
 function ofRenderStats(){
@@ -13199,29 +13157,12 @@ function ofRenderPagos(){
 
 // ── ASISTENCIA ─────────────────────────────────────────────
 function ofGetEncs(mes){return ofEncuentros[`${mes}_${ANO}`]||[];}
-function ofEncKey(){return `${ofMesAsist}_${ANO}`;}
-
-function ofAbrirModalEnc(){
-  const el=document.getElementById('of-me-fecha');
-  if(el) el.value=ofDateInput();
-  ofUpdateFechaDisplay();
-  const selMat=document.getElementById('of-me-materia');
-  if(selMat){
-    selMat.innerHTML='<option value="">— Elegir materia activa —</option>'+
-      ofCursadasActivas().map(cu=>`<option value="${cu.id}">${ofCursadaLabel(cu)}</option>`).join('');
-  }
-  const selCap=document.getElementById('of-me-capitulo');
-  if(selCap) selCap.innerHTML='<option value="">— Elegir capítulo (opcional) —</option>';
-  const exChk=document.getElementById('of-me-esexamen');
-  if(exChk) exChk.checked=false;
-  ofEditEncId=null;
-  document.getElementById('of-modalEnc').style.display='flex';
-}
-
-function ofUpdateFechaDisplay(){
-  const el=document.getElementById('of-me-fecha');
-  const disp=document.getElementById('of-me-fecha-display');
-  if(el&&disp) disp.textContent=el.value?`📅 ${ofFmtDate(el.value)}`:'';
+// Guardar SIEMPRE según el mes real de la fecha del encuentro, no el mes que esté
+// seleccionado en la pantalla en ese momento — evita que un encuentro de julio quede
+// archivado bajo agosto solo porque la pantalla estaba mostrando agosto al guardarlo.
+function ofEncKeyFor(fecha){
+  const d=parseLocalDate(fecha);
+  return `${d.getMonth()}_${d.getFullYear()}`;
 }
 
 // Arma el desplegable de capítulos para una Cursada, sugiriendo el siguiente en el orden
@@ -13256,149 +13197,187 @@ function ofFechaSugeridaCursada(cursadaId){
   return sugerirFechaCarga(recs, null, lim);
 }
 
-function ofUpdateCapitulos(){
-  const cursadaId=parseInt(document.getElementById('of-me-materia')?.value)||null;
-  const sel=document.getElementById('of-me-capitulo');
-  if(sel){
-    const {capitulos, idxSugerido}=ofCapitulosConSugerido(cursadaId);
-    sel.innerHTML='<option value="">— Elegir capítulo (opcional) —</option>'+
-      capitulos.map((c,idx)=>`<option value="${c.nombre.replace(/"/g,'&quot;')}"${idx===idxSugerido?' selected':''}>${c.nombre}${idx===idxSugerido?' (sugerido)':''}</option>`).join('');
-  }
-  if(cursadaId){
-    const fechaEl=document.getElementById('of-me-fecha');
-    if(fechaEl){ fechaEl.value=ofFechaSugeridaCursada(cursadaId); ofUpdateFechaDisplay(); }
-  }
-}
-
-function ofUpdateCapitulosEdit(){
-  const cursadaId=parseInt(document.getElementById('of-me-edit-materia')?.value)||null;
-  const cu=ofCursadas.find(x=>x.id===cursadaId);
-  const mat=cu?ofMateriaDeCursada(cu):null;
-  const sel=document.getElementById('of-me-edit-capitulo');
+// Arma el selector de Cursadas de la cabecera de Cargar Asistencia (solo Activas).
+function ofPopularSelectorCursadaAsistencia(){
+  const sel=document.getElementById('of-asd-cursada');
   if(!sel) return;
-  sel.innerHTML='<option value="">— Sin capítulo —</option>'+
-    (mat?.capitulos||[]).map(c=>`<option value="${c.nombre.replace(/"/g,'&quot;')}">${c.nombre}</option>`).join('');
+  const activas=ofCursadasActivas();
+  const sinCursadas=document.getElementById('of-asd-sin-cursadas');
+  if(sinCursadas) sinCursadas.style.display=activas.length?'none':'block';
+  const valorPrevio=sel.value;
+  sel.innerHTML='<option value="">— Elegir Cursada activa —</option>'+
+    activas.map(cu=>`<option value="${cu.id}">${ofCursadaLabel(cu)}</option>`).join('');
+  if(valorPrevio&&activas.some(c=>String(c.id)===String(valorPrevio))) sel.value=valorPrevio;
 }
 
-function ofCerrarModal(){document.getElementById('of-modalEnc').style.display='none';}
+function ofSeleccionarCursadaAsistencia(){
+  const cursadaId=parseInt(document.getElementById('of-asd-cursada')?.value)||null;
+  ofAsistDraft.cursadaId=cursadaId;
+  const wrap=document.getElementById('of-asd-wrap');
+  if(!cursadaId){
+    if(wrap) wrap.style.display='none';
+    const alertEl=document.getElementById('of-asd-duplicado-alert');
+    if(alertEl) alertEl.style.display='none';
+    return;
+  }
+  const fechaEl=document.getElementById('of-asd-fecha');
+  if(fechaEl) fechaEl.value=ofFechaSugeridaCursada(cursadaId);
+  if(wrap) wrap.style.display='block';
+  ofCargarDraftParaFecha();
+}
 
-async function ofGuardarEnc(){
-  const fecha=document.getElementById('of-me-fecha').value;
-  if(!fecha){alert('Ingresá la fecha');return;}
-  const cursadaId=parseInt(document.getElementById('of-me-materia')?.value)||null;
-  if(!cursadaId){alert('Elegí una materia');return;}
-  const capitulo=document.getElementById('of-me-capitulo')?.value||'';
-  const esExamen=document.getElementById('of-me-esexamen')?.checked||false;
-  const cu=ofCursadas.find(x=>x.id===cursadaId);
-  const mat=cu?ofMateriaDeCursada(cu):null;
-  const k=ofEncKey();
-  var snapshot=JSON.stringify(ofEncuentros);
-  if(!ofEncuentros[k]) ofEncuentros[k]=[];
-  const enc={id:Date.now(),fecha,
-    materia:cursadaId, materiaId:cursadaId, materiaNombre:mat?.nombre||'',
-    capitulo, esExamen};
-  var editandoId=ofEditEncId;
-  if(editandoId){
-    const allK=Object.keys(ofEncuentros);
-    allK.forEach(key=>{
-      const idx=ofEncuentros[key].findIndex(e=>e.id===editandoId);
-      if(idx>=0) ofEncuentros[key][idx]={...ofEncuentros[key][idx],...enc,id:editandoId};
+// Al elegir Cursada o cambiar la fecha: si ya existe un encuentro para esa Cursada en esa
+// semana ISO, carga sus datos guardados (modo edición); si no, arranca un borrador nuevo
+// con todos los alumnos en "Ausente" — igual criterio que Discipulado.
+function ofCargarDraftParaFecha(){
+  const cursadaId=ofAsistDraft.cursadaId;
+  const fecha=document.getElementById('of-asd-fecha')?.value;
+  const alertEl=document.getElementById('of-asd-duplicado-alert');
+  const cu=cursadaId?ofCursadas.find(c=>c.id===cursadaId):null;
+  if(!cursadaId||!fecha||!cu){ if(alertEl) alertEl.style.display='none'; return; }
+  const semana=getISOWeek(fecha), anio=parseLocalDate(fecha).getFullYear();
+  const allEncs=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]);
+  const existente=allEncs.find(function(e){
+    return String(e.materia||e.materiaId)===String(cursadaId) && getISOWeek(e.fecha)===semana && parseLocalDate(e.fecha).getFullYear()===anio;
+  });
+  ofAsistDraft.valores={};
+  if(existente){
+    ofAsistDraft.encId=existente.id;
+    ofAsistDraft.esExamen=!!existente.esExamen;
+    (cu.alumnos||[]).forEach(function(aid){ ofAsistDraft.valores[aid]=ofAsistencia[aid+'_'+existente.id]||'A'; });
+    if(alertEl){
+      alertEl.style.display='block';
+      alertEl.innerHTML='✏️ Ya existe un registro para la <strong>Semana '+semana+'</strong> (fecha '+fmt(existente.fecha)+'). Se va a actualizar ese registro en vez de crear uno nuevo.';
+    }
+    ofRenderCapituloSelectDraft(cursadaId, existente.capitulo||'');
+  } else {
+    ofAsistDraft.encId=null;
+    ofAsistDraft.esExamen=false;
+    (cu.alumnos||[]).forEach(function(aid){ ofAsistDraft.valores[aid]='A'; });
+    if(alertEl) alertEl.style.display='none';
+    ofRenderCapituloSelectDraft(cursadaId, null);
+  }
+  const exChk=document.getElementById('of-asd-esexamen');
+  if(exChk) exChk.checked=ofAsistDraft.esExamen;
+  ofRenderAsistDraftTable();
+}
+
+function ofRenderCapituloSelectDraft(cursadaId, preseleccionado){
+  const sel=document.getElementById('of-asd-capitulo');
+  if(!sel) return;
+  const {capitulos, idxSugerido}=ofCapitulosConSugerido(cursadaId);
+  sel.innerHTML='<option value="">— Sin capítulo —</option>'+
+    capitulos.map(function(c,idx){
+      const marcado=preseleccionado?(c.nombre===preseleccionado):(idx===idxSugerido);
+      return '<option value="'+c.nombre.replace(/"/g,'&quot;')+'"'+(marcado?' selected':'')+'>'+c.nombre+((!preseleccionado&&idx===idxSugerido)?' (sugerido)':'')+'</option>';
+    }).join('');
+  ofAsistDraft.capitulo=sel.value;
+}
+
+function ofToggleDraftExamen(){
+  ofAsistDraft.esExamen=document.getElementById('of-asd-esexamen')?.checked||false;
+  ofRenderAsistDraftTable();
+}
+
+function ofToggleDraftAsist(aid){
+  const ciclo=['A','P','T'];
+  const cur=ofAsistDraft.valores[aid]||'A';
+  ofAsistDraft.valores[aid]=ciclo[(ciclo.indexOf(cur)+1)%ciclo.length];
+  ofRenderAsistDraftTable();
+}
+
+function ofMarcarTodosPresentes(){
+  Object.keys(ofAsistDraft.valores).forEach(function(aid){ ofAsistDraft.valores[aid]='P'; });
+  ofRenderAsistDraftTable();
+}
+
+function ofRenderAsistDraftTable(){
+  const wrap=document.getElementById('of-asd-tabla');
+  if(!wrap) return;
+  const cu=ofCursadas.find(c=>c.id===ofAsistDraft.cursadaId);
+  if(!cu){wrap.innerHTML='';return;}
+  const alums=(cu.alumnos||[]).map(function(id){return ofAlumnos.find(function(a){return a.id===id;});}).filter(Boolean);
+  if(!alums.length){
+    wrap.innerHTML='<div style="color:#9CA3AF;font-size:13px;padding:8px 0">No hay alumnos inscriptos en esta Cursada — andá a la pestaña Cursada para agregarlos.</div>';
+    return;
+  }
+  let html='';
+  if(ofAsistDraft.esExamen){
+    alums.forEach(function(a){
+      const comp=(cu.completados||{})[a.id]||false;
+      html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6">'+
+        '<span style="font-size:13px;font-weight:500">'+a.nombre+' '+a.apellido+'</span>'+
+        '<button onclick="ofToggleCompletado('+cu.id+','+a.id+')" style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:'+(comp?'#D1FAE5':'#F3F4F6')+';color:'+(comp?'#065F46':'#6B7280')+'">'+(comp?'✅ Completado':'⬜ Incompleto')+'</button>'+
+      '</div>';
     });
   } else {
-    ofEncuentros[k].push(enc);
+    const colors={P:'#D1FAE5',A:'#FEE2E2',T:'#FEF3C7'};
+    const tColors={P:'#065F46',A:'#991B1B',T:'#92400E'};
+    const labels={P:'Presente',A:'Ausente',T:'Tardanza'};
+    alums.forEach(function(a){
+      const v=ofAsistDraft.valores[a.id]||'A';
+      html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6">'+
+        '<span style="font-size:13px;font-weight:500">'+a.nombre+' '+a.apellido+'</span>'+
+        '<button onclick="ofToggleDraftAsist('+a.id+')" style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:'+colors[v]+';color:'+tColors[v]+'">'+labels[v]+'</button>'+
+      '</div>';
+    });
   }
-  const ok=await ofSave();
-  if(!ok){
-    ofEncuentros=JSON.parse(snapshot); ofSaveLocal();
-    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
-    return;
-  }
-  ofEditEncId=null;
-  ofCerrarModal();ofRenderAsistencia();ofRenderStats();
+  wrap.innerHTML=html;
 }
 
-function ofAbrirModalEdit(eid){
-  const enc=ofGetEncs(ofMesAsist).find(e=>e.id===eid);if(!enc)return;
-  ofEditEncId=eid;
-  document.getElementById('of-me-edit-fecha').value=enc.fecha;
-  // Para editar se muestran todas las Cursadas (activas e históricas), porque un
-  // encuentro viejo puede pertenecer a una Cursada que ya se cerró.
-  const selMat=document.getElementById('of-me-edit-materia');
-  if(selMat){
-    selMat.innerHTML='<option value="">— Sin materia —</option>'+
-      ofCursadas.map(cu=>`<option value="${cu.id}"${cu.id===enc.materiaId?' selected':''}>${ofCursadaLabel(cu)}${cu.estado!=='Activo'?' (cerrada)':''}</option>`).join('');
-    ofUpdateCapitulosEdit();
-    setTimeout(()=>{
-      const selCap=document.getElementById('of-me-edit-capitulo');
-      if(selCap&&enc.capitulo){
-        [...selCap.options].forEach(o=>{if(o.value===enc.capitulo)o.selected=true;});
-      }
-    },50);
-  }
-  document.getElementById('of-modalEditEnc').style.display='flex';
-}
-
-function ofCerrarModalEdit(){document.getElementById('of-modalEditEnc').style.display='none';ofEditEncId=null;}
-
-async function ofGuardarEdicionEnc(){
-  const k=ofEncKey();
-  const fecha=document.getElementById('of-me-edit-fecha').value;
-  const cursadaId=parseInt(document.getElementById('of-me-edit-materia')?.value)||null;
+async function ofGuardarAsistDraft(){
+  const cursadaId=ofAsistDraft.cursadaId;
+  const fecha=document.getElementById('of-asd-fecha')?.value;
+  if(!cursadaId){alert('Elegí una Cursada');return;}
+  if(!fecha){alert('Ingresá la fecha');return;}
+  const capitulo=document.getElementById('of-asd-capitulo')?.value||'';
+  const esExamen=ofAsistDraft.esExamen;
   const cu=ofCursadas.find(x=>x.id===cursadaId);
   const mat=cu?ofMateriaDeCursada(cu):null;
-  const capitulo=document.getElementById('of-me-edit-capitulo')?.value||'';
-  var snapshot=JSON.stringify(ofEncuentros);
-  var idEditado=ofEditEncId;
-  ofEncuentros[k]=(ofEncuentros[k]||[]).map(e=>e.id!==idEditado?e:
-    {...e,fecha,materia:cursadaId,materiaId:cursadaId,materiaNombre:mat?.nombre||'',capitulo});
+  var snapshotEnc=JSON.stringify(ofEncuentros);
+  var snapshotAsist=JSON.stringify(ofAsistencia);
+  var encId=ofAsistDraft.encId;
+  if(encId){
+    const allK=Object.keys(ofEncuentros);
+    allK.forEach(function(key){
+      const idx=(ofEncuentros[key]||[]).findIndex(function(e){return e.id===encId;});
+      if(idx>=0) ofEncuentros[key][idx]=Object.assign({},ofEncuentros[key][idx],{fecha,materia:cursadaId,materiaId:cursadaId,materiaNombre:mat?mat.nombre:'',capitulo,esExamen});
+    });
+  } else {
+    encId=Date.now();
+    const k=ofEncKeyFor(fecha);
+    if(!ofEncuentros[k]) ofEncuentros[k]=[];
+    ofEncuentros[k].push({id:encId,fecha,materia:cursadaId,materiaId:cursadaId,materiaNombre:mat?mat.nombre:'',capitulo,esExamen});
+  }
+  if(!esExamen){
+    Object.keys(ofAsistDraft.valores).forEach(function(aid){
+      ofAsistencia[aid+'_'+encId]=ofAsistDraft.valores[aid];
+    });
+  }
   const ok=await ofSave();
   if(!ok){
-    ofEncuentros=JSON.parse(snapshot); ofSaveLocal();
+    ofEncuentros=JSON.parse(snapshotEnc); ofAsistencia=JSON.parse(snapshotAsist); ofSaveLocal();
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
-  ofCerrarModalEdit();ofRenderAsistencia();ofRenderStats();
-}
-
-async function ofEliminarEncEdit(){
-  if(!confirm('¿Eliminar este encuentro?'))return;
-  const k=ofEncKey();
-  var snapshot=JSON.stringify(ofEncuentros);
-  var idEditado=ofEditEncId;
-  ofEncuentros[k]=(ofEncuentros[k]||[]).filter(e=>e.id!==idEditado);
-  const ok=await ofSave();
-  if(!ok){
-    ofEncuentros=JSON.parse(snapshot); ofSaveLocal();
-    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
-    return;
-  }
-  ofCerrarModalEdit();ofRenderAsistencia();ofRenderStats();
-}
-
-async function ofToggleAsist(aid,eid){
-  const k=`${aid}_${eid}`;const ciclo=['','P','A','T'];
-  var snapshot=ofAsistencia[k];
-  ofAsistencia[k]=ciclo[(ciclo.indexOf(ofAsistencia[k]||'')+1)%ciclo.length];
-  const ok=await ofSave();
-  if(!ok){
-    if(snapshot===undefined) delete ofAsistencia[k]; else ofAsistencia[k]=snapshot;
-    ofSaveLocal();
-    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
-    ofRenderAsistencia();
-    return;
-  }
-  ofRenderAsistencia();ofRenderStats();
+  ofAsistDraft.encId=encId;
+  showToast('✅ Asistencia guardada','#16A34A');
+  ofRenderAsistencia(); ofRenderStats();
 }
 
 function ofRenderAsistencia(){
   const matFil=document.getElementById('of-asist-materia-fil');
-  // Populate materia filter dynamically — se filtra por Cursada (activa o cerrada), mostrando el nombre de la materia
-  if(matFil&&matFil.options.length<=1){
+  // Reconstruir siempre el filtro de Cursada (no solo la primera vez) para que una Cursada
+  // recién creada aparezca sin tener que recargar la página — preservando la selección actual.
+  if(matFil){
+    const valorPrevio=matFil.value;
+    matFil.innerHTML='<option value="">Todas las materias</option>';
     ofCursadas.slice().sort((a,b)=>b.id-a.id).forEach(cu=>{
       const opt=document.createElement('option');
       opt.value=cu.id; opt.textContent=ofCursadaLabel(cu)+(cu.estado!=='Activo'?' (cerrada)':'');
       matFil.appendChild(opt);
     });
+    if(valorPrevio&&ofCursadas.some(c=>String(c.id)===String(valorPrevio))) matFil.value=valorPrevio;
   }
   const filterMat=matFil?.value||'';
   const filterFecha=document.getElementById('of-asist-fecha-fil')?.value||'';
@@ -13414,7 +13393,7 @@ function ofRenderAsistencia(){
 
   if(!allEncs.length){
     lista.innerHTML='<div style="text-align:center;padding:2rem;color:#9CA3AF;font-size:13px">No hay encuentros con estos filtros</div>';
-    ofRenderAsistenciaTable(null,null);return;
+    return;
   }
 
   lista.innerHTML=allEncs.map(e=>{
@@ -13425,7 +13404,7 @@ function ofRenderAsistencia(){
     const semana=getISOWeek(e.fecha);
     const isExamen=e.esExamen||false;
     return `<div class="card" style="margin-bottom:.5rem;padding:10px 14px;cursor:pointer;border-left:4px solid ${isExamen?'#DC2626':'#7C3AED'}"
-        onclick="ofSelectEnc('${e.id}','${cu?cu.id:''}')">
+        onclick="ofSelectEnc('${e.id}','${cu?cu.id:''}')" title="Tocá para editar este registro arriba">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1">
           <div style="font-size:13px;font-weight:700;color:#1F4E79">
@@ -13439,12 +13418,6 @@ function ofRenderAsistencia(){
       </div>
     </div>`;
   }).join('');
-
-  if(allEncs.length){
-    const e=allEncs[0];
-    const cu=ofCursadas.find(c=>String(c.id)===String(e.materia||e.materiaId));
-    ofSelectEnc(e.id, cu?.id);
-  }
 }
 
 function ofClearAsistFil(){
@@ -13455,61 +13428,32 @@ function ofClearAsistFil(){
   ofRenderAsistencia();
 }
 
-function ofSelectEnc(encId, matId){
-  ofRenderAsistenciaTable(encId, matId);
-}
-
-function ofRenderAsistenciaTable(encId, cursadaId){
-  const wrap=document.getElementById('of-asist-tabla');
-  if(!wrap) return;
-  if(!encId){wrap.innerHTML='';return;}
-
-  const cu=cursadaId?ofCursadas.find(c=>String(c.id)===String(cursadaId)):null;
-  const alums=cu?(cu.alumnos||[]).map(id=>ofAlumnos.find(a=>a.id===id)).filter(Boolean):ofAlumnos;
+// Tocar un Registro pasado lo carga en el formulario de arriba para poder corregirlo,
+// en vez de abrir una vista aparte de solo lectura.
+function ofSelectEnc(encId, cursadaId){
+  if(!cursadaId) return;
+  const selCu=document.getElementById('of-asd-cursada');
+  if(selCu){
+    if(![...selCu.options].some(o=>o.value===String(cursadaId))){
+      // La Cursada de este registro ya no está Activa — se agrega igual para poder editarlo.
+      const cu=ofCursadas.find(c=>c.id===parseInt(cursadaId));
+      if(cu){
+        const opt=document.createElement('option');
+        opt.value=cu.id; opt.textContent=ofCursadaLabel(cu)+' (cerrada)';
+        selCu.appendChild(opt);
+      }
+    }
+    selCu.value=cursadaId;
+  }
+  ofAsistDraft.cursadaId=parseInt(cursadaId);
   const allEncs=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]);
   const enc=allEncs.find(e=>String(e.id)===String(encId));
-  if(!enc){wrap.innerHTML='';return;}
-
-  const isExamen=enc.esExamen||false;
-
-  let html=`<div class="card" style="margin-top:.75rem;border-left:4px solid ${isExamen?'#DC2626':'#7C3AED'}">
-    <div style="font-size:13px;font-weight:700;color:#1F4E79;margin-bottom:1rem">
-      ${isExamen?'📝 Examen — marcar Completado/Incompleto':'✅ Asistencia del encuentro'}
-    </div>`;
-
-  if(!alums.length){
-    html+='<div style="color:#9CA3AF;font-size:13px">No hay alumnos inscriptos en esta Cursada. Editá "Inscriptos" desde la tab Materias para asignarlos.</div>';
-  } else {
-    alums.forEach(a=>{
-      if(isExamen){
-        // For exam: show Completado / Incompleto toggle
-        const comp=(cu?.completados||{})[a.id]||false;
-        html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6">
-          <span style="font-size:13px;font-weight:500">${a.nombre} ${a.apellido}</span>
-          <button onclick="ofToggleCompletado('${cursadaId}','${a.id}')"
-            style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;
-            background:${comp?'#D1FAE5':'#F3F4F6'};color:${comp?'#065F46':'#6B7280'}">
-            ${comp?'✅ Completado':'⬜ Incompleto'}
-          </button>
-        </div>`;
-      } else {
-        const v=ofAsistencia[`${a.id}_${enc.id}`]||'';
-        const colors={P:'#D1FAE5',A:'#FEE2E2',T:'#FEF3C7','':'#F3F4F6'};
-        const tColors={P:'#065F46',A:'#991B1B',T:'#92400E','':'#6B7280'};
-        const labels={P:'Presente',A:'Ausente',T:'Tardanza','':'Sin marcar'};
-        html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6">
-          <span style="font-size:13px;font-weight:500">${a.nombre} ${a.apellido}</span>
-          <button onclick="ofToggleAsist('${a.id}','${enc.id}')"
-            style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;
-            background:${colors[v]};color:${tColors[v]}">
-            ${labels[v]}
-          </button>
-        </div>`;
-      }
-    });
-  }
-  html+='</div>';
-  wrap.innerHTML=html;
+  const fechaEl=document.getElementById('of-asd-fecha');
+  if(fechaEl&&enc) fechaEl.value=enc.fecha;
+  const wrap=document.getElementById('of-asd-wrap');
+  if(wrap) wrap.style.display='block';
+  ofCargarDraftParaFecha();
+  document.getElementById('of-asd-cursada')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 async function ofToggleCompletado(cursadaId, alumId){
@@ -13527,10 +13471,7 @@ async function ofToggleCompletado(cursadaId, alumId){
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
-  // Re-render table
-  const allEncs=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]);
-  const examEnc=allEncs.find(e=>e.esExamen&&String(e.materia||e.materiaId)===String(cursadaId));
-  if(examEnc) ofRenderAsistenciaTable(examEnc.id, cursadaId);
+  ofRenderAsistDraftTable();
   showToast(cu.completados[alumId]?'✅ Completado':'⬜ Incompleto', cu.completados[alumId]?'#16A34A':'#6B7280');
 }
 async function ofSyncDatosDesdeRebanos(){

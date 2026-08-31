@@ -667,7 +667,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-h';
+const APP_VERSION = '2026-08-24-i';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -12083,7 +12083,7 @@ function ofGenLabel(materiaId, anio){
 function ofCursadaLabel(cu){
   if(cu&&cu.label) return cu.label;
   var mat=ofMaterias.find(function(m){return m.id===cu.materiaId;});
-  return (mat?mat.nombre:'Materia eliminada')+(cu.profesor?' — '+cu.profesor:'');
+  return (mat?mat.nombre:'Materia eliminada')+' — s/ID';
 }
 function ofMateriaDeCursada(cu){return ofMaterias.find(function(m){return m.id===(cu&&cu.materiaId);});}
 
@@ -12119,6 +12119,22 @@ function ofMigrarCursadas(){
 }
 function ofFmtDate(d){if(!d)return'';const p=d.split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:d;}
 function ofDateInput(){return today();}
+// Corrige Cursadas que quedaron sin ID/label (por ejemplo, migradas con una versión anterior
+// del código, antes de que existiera ofGenLabel) — les asigna el label correcto sin tocar nada más.
+function ofBackfillCursadaLabels(){
+  var faltantes=ofCursadas.filter(function(c){return !c.label;});
+  if(!faltantes.length) return false;
+  faltantes.sort(function(a,b){return a.id-b.id;});
+  faltantes.forEach(function(cu){
+    if(!cu.anio){
+      cu.anio=cu.fechaInicio?(parseInt(String(cu.fechaInicio).slice(0,4))||HOY.getFullYear()):HOY.getFullYear();
+    }
+    cu.label=ofGenLabel(cu.materiaId, cu.anio);
+    cu._ts=Date.now();
+  });
+  ofSave();
+  return true;
+}
 
 function openOF(){
   document.getElementById('screen-home').classList.add('hidden');
@@ -12136,6 +12152,7 @@ function openOF(){
   ofMaterias    = gs('of5_materias','[]');
   ofCursadas    = gs('of5_cursadas','[]');
   ofMigrarCursadas();
+  ofBackfillCursadaLabels();
   ofCurrentTab  = null;
   // Build HTML and render
   document.getElementById('app-content').innerHTML=buildOFHTML();
@@ -12351,6 +12368,7 @@ function buildOFHTML(){
             <select id="of-me-materia" onchange="ofUpdateCapitulos()" style="width:100%">
               <option value="">— Elegir materia activa —</option>
             </select>
+            <div style="font-size:11px;color:#9CA3AF;margin-top:4px">Al elegirla, la fecha de arriba se ajusta sola a la primera semana pendiente sin registrar — para regularizar atrasos, cambiala manualmente si preferís otra.</div>
           </div>
           <div>
             <label class="field-label">Capítulo</label>
@@ -13226,13 +13244,30 @@ function ofCapitulosConSugerido(cursadaId){
   return {capitulos, idxSugerido};
 }
 
+// Sugiere la fecha de la primera semana ISO, entre el inicio de la Cursada y hoy, que
+// todavía no tiene ningún encuentro registrado — mismo mecanismo que ya usan GdV, NG y
+// Discipulado para no tener que ir adivinando manualmente qué semana falta cargar.
+function ofFechaSugeridaCursada(cursadaId){
+  const cu=ofCursadas.find(x=>x.id===cursadaId);
+  if(!cu) return today();
+  const recs=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[])
+    .filter(function(e){return String(e.materia||e.materiaId)===String(cursadaId);});
+  const lim={min:cu.fechaInicio||today(), max:today()};
+  return sugerirFechaCarga(recs, null, lim);
+}
+
 function ofUpdateCapitulos(){
   const cursadaId=parseInt(document.getElementById('of-me-materia')?.value)||null;
   const sel=document.getElementById('of-me-capitulo');
-  if(!sel) return;
-  const {capitulos, idxSugerido}=ofCapitulosConSugerido(cursadaId);
-  sel.innerHTML='<option value="">— Elegir capítulo (opcional) —</option>'+
-    capitulos.map((c,idx)=>`<option value="${c.nombre.replace(/"/g,'&quot;')}"${idx===idxSugerido?' selected':''}>${c.nombre}${idx===idxSugerido?' (sugerido)':''}</option>`).join('');
+  if(sel){
+    const {capitulos, idxSugerido}=ofCapitulosConSugerido(cursadaId);
+    sel.innerHTML='<option value="">— Elegir capítulo (opcional) —</option>'+
+      capitulos.map((c,idx)=>`<option value="${c.nombre.replace(/"/g,'&quot;')}"${idx===idxSugerido?' selected':''}>${c.nombre}${idx===idxSugerido?' (sugerido)':''}</option>`).join('');
+  }
+  if(cursadaId){
+    const fechaEl=document.getElementById('of-me-fecha');
+    if(fechaEl){ fechaEl.value=ofFechaSugeridaCursada(cursadaId); ofUpdateFechaDisplay(); }
+  }
 }
 
 function ofUpdateCapitulosEdit(){

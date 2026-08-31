@@ -667,7 +667,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-e';
+const APP_VERSION = '2026-08-24-f';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -12073,7 +12073,15 @@ function ofIsActivo(aid,mes){return ofParticipacion[`${aid}_${mes}`]!==false;}
 function ofMateriasActivas(){return ofMaterias.filter(m=>m.estado==='Activo');}
 // Cursadas con inscripción abierta ahora mismo (para elegir en "Nuevo encuentro")
 function ofCursadasActivas(){return ofCursadas.filter(function(c){return c.estado==='Activo';});}
+// Genera el ID legible de una Cursada, igual criterio que Discipulado: "Materia — N/Año"
+// (N = cantidad de Cursadas previas de esa Materia en ese año, +1).
+function ofGenLabel(materiaId, anio){
+  var ant=ofCursadas.filter(function(c){return c.materiaId===materiaId&&c.anio===anio;}).length;
+  var mat=ofMaterias.find(function(m){return m.id===materiaId;});
+  return (mat?mat.nombre:'Materia')+' — '+(ant+1)+'/'+anio;
+}
 function ofCursadaLabel(cu){
+  if(cu&&cu.label) return cu.label;
   var mat=ofMaterias.find(function(m){return m.id===cu.materiaId;});
   return (mat?mat.nombre:'Materia eliminada')+(cu.profesor?' — '+cu.profesor:'');
 }
@@ -12096,8 +12104,9 @@ function ofMigrarCursadas(){
       return c;
     });
     nuevoCatalogo.push({id:catalogId, nombre:m.nombre, capitulos:capitulosNorm, estado:'Activo'});
+    var anioMigrado=m.desde?parseInt(String(m.desde).slice(0,4))||HOY.getFullYear():HOY.getFullYear();
     nuevasCursadas.push({
-      id:m.id, materiaId:catalogId,
+      id:m.id, materiaId:catalogId, anio:anioMigrado, label:m.nombre+' — 1/'+anioMigrado,
       profesor:m.profesor||'', fechaInicio:m.desde||'', fechaFin:m.hasta||'',
       estado:m.estado==='Activo'?'Activo':'Completado',
       alumnos:m.alumnos||[], completados:m.completados||{}, _ts:Date.now()
@@ -12703,16 +12712,15 @@ function ofRenderMaterias(){
     const borderColor=isActivo?'#7C3AED':'#9CA3AF';
     const cursadasHtml=cursadasMateria.map(function(cu){
       const alums=(cu.alumnos||[]).length;
-      const encCount=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]).filter(function(e){return String(e.materia||e.materiaId)===String(cu.id);}).length;
-      const completados=Object.values(cu.completados||{}).filter(Boolean).length;
       const cuActiva=cu.estado==='Activo';
       return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;padding:8px 10px;background:#F9FAFB;border-radius:8px;margin-top:6px">'+
-        '<div style="font-size:12px;color:#4B5563">'+
-          (cu.profesor?'👤 '+ofProfesorNombre(cu.profesor)+' · ':'')+
-          '📅 '+(cu.fechaInicio?fmt(cu.fechaInicio):'—')+(cu.fechaFin?' → '+fmt(cu.fechaFin):'')+
-          ' · 👥 '+alums+' alumno'+(alums!==1?'s':'')+
-          ' · 🗓 '+encCount+' encuentro'+(encCount!==1?'s':'')+
-          (alums?' · ✅ '+completados+'/'+alums+' completados':'')+
+        '<div>'+
+          '<div style="font-size:12px;font-weight:700;color:#6D28D9">🏷 '+ofCursadaLabel(cu)+'</div>'+
+          '<div style="font-size:12px;color:#4B5563;margin-top:1px">'+
+            (cu.profesor?'👤 '+ofProfesorNombre(cu.profesor)+' · ':'')+
+            '📅 '+(cu.fechaInicio?fmt(cu.fechaInicio):'—')+(cu.fechaFin?' → '+fmt(cu.fechaFin):'')+
+            ' · 👥 '+alums+' alumno'+(alums!==1?'s':'')+
+          '</div>'+
         '</div>'+
         '<div style="display:flex;gap:6px;align-items:center">'+
           '<span class="badge '+(cuActiva?'b-ok':'b-muted')+'">'+(cuActiva?'Activa':'Completada')+'</span>'+
@@ -12746,7 +12754,8 @@ function ofRenderMaterias(){
 function ofOpenNewCursada(materiaId){
   ofEditCursadaId=null;
   ofCursadaMateriaId=materiaId;
-  document.getElementById('of-cu-title').textContent='Nueva Cursada — '+(ofMaterias.find(m=>m.id===materiaId)?.nombre||'');
+  const anioPrevisto=HOY.getFullYear();
+  document.getElementById('of-cu-title').textContent='Nueva Cursada — '+ofGenLabel(materiaId,anioPrevisto);
   ofPopulateSelectors();
   document.getElementById('of-cu-profesor').value='';
   document.getElementById('of-cu-desde').value='';
@@ -12761,7 +12770,7 @@ function ofEditCursada(cursadaId){
   if(!cu) return;
   ofEditCursadaId=cursadaId;
   ofCursadaMateriaId=cu.materiaId;
-  document.getElementById('of-cu-title').textContent=(cu.estado==='Activo'?'Editar Cursada — ':'Cursada (completada) — ')+(ofMaterias.find(m=>m.id===cu.materiaId)?.nombre||'');
+  document.getElementById('of-cu-title').textContent=(cu.estado==='Activo'?'Editar Cursada — ':'Cursada (completada) — ')+ofCursadaLabel(cu);
   ofPopulateSelectors();
   document.getElementById('of-cu-profesor').value=cu.profesor||'';
   document.getElementById('of-cu-desde').value=cu.fechaInicio||'';
@@ -12844,8 +12853,9 @@ async function ofGuardarCursada(){
     const cu=ofCursadas.find(x=>x.id===ofEditCursadaId);
     Object.assign(cu,{profesor,fechaInicio,fechaFin,alumnos:alumSels,_ts:Date.now()});
   } else {
+    var anio=HOY.getFullYear();
     ofCursadas.push({
-      id:Date.now(), materiaId:ofCursadaMateriaId,
+      id:Date.now(), materiaId:ofCursadaMateriaId, anio:anio, label:ofGenLabel(ofCursadaMateriaId,anio),
       profesor, fechaInicio, fechaFin,
       estado:'Activo', alumnos:alumSels, completados:{}, _ts:Date.now()
     });
@@ -13304,8 +13314,7 @@ function ofRenderAsistencia(){
 
   lista.innerHTML=allEncs.map(e=>{
     const cu=ofCursadas.find(c=>String(c.id)===String(e.materia||e.materiaId));
-    const mat=cu?ofMateriaDeCursada(cu):null;
-    const nombreMostrado=mat?.nombre||e.materiaNombre||'Sin materia';
+    const nombreMostrado=cu?ofCursadaLabel(cu):(e.materiaNombre||'Sin materia');
     const alums=cu?.alumnos||[];
     const presentes=alums.filter(aid=>ofAsistencia[`${aid}_${e.id}`]==='P').length;
     const semana=getISOWeek(e.fecha);

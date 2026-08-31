@@ -667,7 +667,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-f';
+const APP_VERSION = '2026-08-24-g';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -12158,7 +12158,6 @@ function buildOFHTML(){
       </div>
       <button class="btn-of btn-of-sm btn-of-primary" onclick="ofExportar()">⬇ Exportar Excel</button>
     </div>
-    <div class="of-stats" id="of-statsGrid"></div>
     <div class="of-tabs">
       <button class="of-tab" id="oftab-alumnos"    onclick="ofSwitchTab('alumnos',this)">👥 Alumnos</button>
       <button class="of-tab"        id="oftab-materias"   onclick="ofSwitchTab('materias',this)">📚 Materias</button>
@@ -12268,6 +12267,7 @@ function buildOFHTML(){
 
     <!-- PARTICIPACIÓN -->
     <div class="of-section" id="of-sec-participacion">
+      <div class="of-stats" id="of-statsGrid"></div>
       <div id="of-dashboard-wrap"></div>
     </div>
 

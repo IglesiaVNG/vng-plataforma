@@ -412,7 +412,8 @@ const KEY_GROUPS = {
   'campanas':['_tomb_gdv_campanas','gdv_campanas'],
   'formularios': ['_tomb_gdv_formularios','gdv_formularios','_tomb_gdv_form_respuestas','gdv_form_respuestas','_tomb_gdv_form_analisis','gdv_form_analisis'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
-               'of5_part','of5_obspart','of5_obspago','of5_materias'],
+               'of5_part','of5_obspart','of5_obspago','of5_materias',
+               '_tomb_of5_cursadas','of5_cursadas'],
 };
 
 // ── Upload: one Firestore doc per group ──
@@ -438,8 +439,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -597,8 +598,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -666,7 +667,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-b';
+const APP_VERSION = '2026-08-24-e';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -12028,27 +12029,85 @@ let ofParticipacion = gs('of5_part','{}');
 let ofObsPart     = gs('of5_obspart','{}');
 let ofObsPago     = gs('of5_obspago','{}');
 let ofMaterias    = gs('of5_materias','[]');
+let ofCursadas    = gs('of5_cursadas','[]');
 
 let ofMesPart=HOY.getMonth(), ofMesPago=HOY.getMonth(), ofMesAsist=HOY.getMonth();
 let ofEditEncId=null, ofObsAid=null, ofObsMes=null, ofObsPagoAid=null, ofObsPagoMes=null;
-let ofEditMatId=null;
+let ofEditMatId=null, ofEditCursadaId=null, ofCursadaMateriaId=null;
 let ofCurrentTab='alumnos';
 
-function ofSave(){
+function ofSaveLocal(){
   ss('of5_alumnos',ofAlumnos); ss('of5_pagos',ofPagos);
   ss('of5_encuentros',ofEncuentros); ss('of5_asist',ofAsistencia);
   ss('of5_part',ofParticipacion); ss('of5_obspart',ofObsPart);
   ss('of5_obspago',ofObsPago); ss('of5_materias',ofMaterias);
-  // Trigger Firebase sync (same debounce as saveK)
-  if(window.fbReady){
-    clearTimeout(window._fbSyncTimer);
-    window._fbSyncTimer=setTimeout(function(){window.fbUpload&&window.fbUpload(false);},2000);
+  ss('of5_cursadas',ofCursadas);
+}
+// Guardado auditado (agosto 2026): antes esta función solo guardaba local y subía a
+// Firebase en segundo plano sin avisar si fallaba — un fallo de red podía perderse en
+// silencio. Ahora bloquea hasta confirmar la subida y devuelve true/false para que quien
+// llama pueda revertir el cambio en memoria y avisar con alert() si la nube no confirmó,
+// siguiendo el mismo criterio que el resto de la Plataforma (Procedimiento_Auditoria_Guardado.md).
+async function ofSave(){
+  ofSaveLocal();
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    return true;
+  }catch(e){
+    return false;
   }
+}
+// Busca un alumno ya cargado (miembro o externo) con el mismo nombre y apellido, para
+// evitar duplicar externos que ya fueron dados de alta en otra Materia — se comparten
+// entre todas las Materias/Cursadas, no hace falta re-crearlos.
+function ofBuscarAlumnoSimilar(nombre, apellido){
+  var n=(nombre||'').trim().toLowerCase(), a=(apellido||'').trim().toLowerCase();
+  if(!n||!a) return null;
+  return ofAlumnos.find(function(x){
+    return (x.nombre||'').trim().toLowerCase()===n && (x.apellido||'').trim().toLowerCase()===a;
+  })||null;
 }
 
 function ofIni(n,a){return((n||'')[0]||'').toUpperCase()+((a||'')[0]||'').toUpperCase();}
 function ofIsActivo(aid,mes){return ofParticipacion[`${aid}_${mes}`]!==false;}
 function ofMateriasActivas(){return ofMaterias.filter(m=>m.estado==='Activo');}
+// Cursadas con inscripción abierta ahora mismo (para elegir en "Nuevo encuentro")
+function ofCursadasActivas(){return ofCursadas.filter(function(c){return c.estado==='Activo';});}
+function ofCursadaLabel(cu){
+  var mat=ofMaterias.find(function(m){return m.id===cu.materiaId;});
+  return (mat?mat.nombre:'Materia eliminada')+(cu.profesor?' — '+cu.profesor:'');
+}
+function ofMateriaDeCursada(cu){return ofMaterias.find(function(m){return m.id===(cu&&cu.materiaId);});}
+
+// Migración única: el modelo viejo tenía profesor/fechas/alumnos directo en la Materia.
+// A partir de ahora eso vive en una Cursada aparte (igual que Paso/Cursada en Discipulado),
+// para poder cerrar una Materia y volver a abrirla más adelante con otro grupo de alumnos
+// sin perder el temario ni el historial. Se reutiliza el id viejo de la Materia como id de
+// la primera Cursada, así los encuentros ya cargados (que apuntaban a ese id) no quedan huérfanos.
+function ofMigrarCursadas(){
+  var necesitaMigrar=ofMaterias.some(function(m){return m.alumnos!==undefined||m.desde!==undefined||m.profesor!==undefined;});
+  if(!necesitaMigrar) return false;
+  var nuevoCatalogo=[], nuevasCursadas=[], offset=0;
+  ofMaterias.forEach(function(m){
+    offset++;
+    var catalogId=Date.now()+offset;
+    var capitulosNorm=(m.capitulos||[]).map(function(c,idx){
+      if(typeof c==='string') return {id:Date.now()+offset*1000+idx, nombre:c, links:[]};
+      return c;
+    });
+    nuevoCatalogo.push({id:catalogId, nombre:m.nombre, capitulos:capitulosNorm, estado:'Activo'});
+    nuevasCursadas.push({
+      id:m.id, materiaId:catalogId,
+      profesor:m.profesor||'', fechaInicio:m.desde||'', fechaFin:m.hasta||'',
+      estado:m.estado==='Activo'?'Activo':'Completado',
+      alumnos:m.alumnos||[], completados:m.completados||{}, _ts:Date.now()
+    });
+  });
+  ofMaterias=nuevoCatalogo;
+  ofCursadas=nuevasCursadas;
+  ofSave();
+  return true;
+}
 function ofFmtDate(d){if(!d)return'';const p=d.split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:d;}
 function ofDateInput(){return today();}
 
@@ -12066,7 +12125,9 @@ function openOF(){
   ofObsPart     = gs('of5_obspart','{}');
   ofObsPago     = gs('of5_obspago','{}');
   ofMaterias    = gs('of5_materias','[]');
-  ofCurrentTab  = 'alumnos';
+  ofCursadas    = gs('of5_cursadas','[]');
+  ofMigrarCursadas();
+  ofCurrentTab  = null;
   // Build HTML and render
   document.getElementById('app-content').innerHTML=buildOFHTML();
   ofRender();
@@ -12077,8 +12138,6 @@ function openOF(){
     var pagosSec=document.getElementById('of-sec-pagos');
     if(pagosSec) pagosSec.style.display='none';
   }
-  // Force alumnos tab explicitly after render
-  ofSwitchTab('alumnos', document.getElementById('oftab-alumnos'));
 }
 
 function buildOFHTML(){
@@ -12092,7 +12151,7 @@ function buildOFHTML(){
     </div>
     <div class="of-stats" id="of-statsGrid"></div>
     <div class="of-tabs">
-      <button class="of-tab active" id="oftab-alumnos"    onclick="ofSwitchTab('alumnos',this)">👥 Alumnos</button>
+      <button class="of-tab" id="oftab-alumnos"    onclick="ofSwitchTab('alumnos',this)">👥 Alumnos</button>
       <button class="of-tab"        id="oftab-materias"   onclick="ofSwitchTab('materias',this)">📚 Materias</button>
       <button class="of-tab"        id="oftab-participacion" onclick="ofSwitchTab('participacion',this)">🔄 Participación</button>
       <button class="of-tab" id="oftab-pagos" onclick="ofSwitchTab('pagos',this)">💰 Pagos</button>
@@ -12100,9 +12159,11 @@ function buildOFHTML(){
     </div>
 
     <!-- ALUMNOS -->
-    <div class="of-section active" id="of-sec-alumnos">
+    <div class="of-section" id="of-sec-alumnos">
       <div class="of-card">
-        <div class="of-card-header"><span class="of-card-title">Agregar alumno</span></div>
+        <div class="of-card-header"><span class="of-card-title">Agregar alumno</span>
+          <button class="btn-of btn-of-sm" onclick="ofSyncDatosDesdeRebanos()" title="Actualiza Celular y DNI de los alumnos vinculados a un miembro, tomando el dato actual de Rebaños">🔄 Sincronizar datos con Rebaños</button>
+        </div>
         <div style="font-size:13px;color:#3C3489;background:#EEEDFE;padding:8px 12px;border-radius:8px;margin-bottom:12px">
           📋 Elegí un miembro de la iglesia o creá un alumno externo/invitado
         </div>
@@ -12137,31 +12198,61 @@ function buildOFHTML(){
         <button class="btn-of btn-of-primary btn-of-sm" onclick="ofOpenNewMateria()">+ Nueva materia</button>
       </div>
       <div id="of-materias-list"></div>
-      <!-- Materia form -->
+      <!-- Materia form: nombre + temario por capítulos (uno por vez) -->
       <div id="of-materia-form" class="of-card" style="display:none;margin-top:1rem">
         <div style="font-size:14px;font-weight:600;margin-bottom:12px;color:#3C3489" id="of-mf-title">Nueva materia</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div><label class="field-label">Nombre de la materia *</label><input type="text" id="of-mf-nombre" placeholder="Ej: Comunicación en el matrimonio"></div>
           <div><label class="field-label">Estado</label>
-            <select id="of-mf-estado"><option value="Activo">Activo (en curso)</option><option value="Inactivo">Inactivo (finalizado)</option></select>
+            <select id="of-mf-estado"><option value="Activo">Activo (se puede iniciar Cursada)</option><option value="Archivada">Archivada (no se usa más)</option></select>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:10px">
-          <div><label class="field-label">Profesor *</label>
-            <select id="of-mf-profesor">
+        <label class="field-label" style="margin-top:12px">Temario — Capítulos</label>
+        <div style="font-size:11px;color:#9CA3AF;margin-bottom:6px">Se agregan de a uno, en el orden en que se van a dar. Cada capítulo puede tener uno o más PDF para que los alumnos consulten o impriman.</div>
+        <div id="of-mf-caps-list"></div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <input type="text" id="of-mf-cap-nuevo" placeholder="Nombre del nuevo capítulo (ej: Cap. 3 — Resolución de conflictos)" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();ofAgregarCapitulo();}">
+          <button class="btn-of btn-of-sm" onclick="ofAgregarCapitulo()">+ Agregar capítulo</button>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+          <button class="btn-of" onclick="ofCloseMateria()">Cancelar</button>
+          <button class="btn-of btn-of-primary" onclick="ofSaveMateria()">Guardar materia</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: Cursada de una materia -->
+    <div class="of-modal-overlay" id="of-modalCursada" style="display:none">
+      <div class="of-modal">
+        <h3 id="of-cu-title">Nueva Cursada</h3>
+        <div class="field-group">
+          <div><label class="field-label">Profesor</label>
+            <select id="of-cu-profesor" style="width:100%">
               <option value="">— Elegir profesor —</option>
             </select>
           </div>
-          <div><label class="field-label">Fecha inicio (primer encuentro)</label>
-            <input type="date" id="of-mf-desde"></div>
-          <div><label class="field-label">Fecha fin (último encuentro)</label>
-            <input type="date" id="of-mf-hasta"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div><label class="field-label">Fecha inicio (1er encuentro)</label><input type="date" id="of-cu-desde" style="width:100%"></div>
+            <div><label class="field-label">Fecha fin estimada</label><input type="date" id="of-cu-hasta" style="width:100%"></div>
+          </div>
         </div>
-        <label class="field-label" style="margin-top:10px">Temario — Capítulos (uno por línea)</label>
-        <textarea id="of-mf-temario" rows="5" placeholder="Cap. 1 — Introducción&#10;Cap. 2 — Comunicación&#10;Cap. 3 — Resolución de conflictos"></textarea>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-          <button class="btn-of" onclick="ofCloseMateria()">Cancelar</button>
-          <button class="btn-of btn-of-primary" onclick="ofSaveMateria()">Guardar materia</button>
+        <label class="field-label" style="margin-top:10px">Alumnos inscriptos en esta Cursada</label>
+        <div style="font-size:11px;color:#9CA3AF;margin-bottom:4px">La lista de abajo incluye a todos los alumnos ya cargados (de Rebaños o externos), sean o no de esta Materia — buscalos por nombre antes de cargar uno nuevo como externo.</div>
+        <input type="text" id="of-cu-buscar-alumno" placeholder="Buscar por nombre…" oninput="ofFiltrarCursadaAlumnos(this.value)" style="margin-bottom:6px">
+        <div id="of-cu-alum-list" style="max-height:220px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px;margin-bottom:10px"></div>
+        <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:10px">
+          <div style="font-size:12px;color:#6B7280;margin-bottom:6px">¿No está en la lista? Se puede sumar como externo/invitado (no forma parte de Rebaños):</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <input type="text" id="of-cu-ext-nombre" placeholder="Nombre" style="flex:1;min-width:100px">
+            <input type="text" id="of-cu-ext-apellido" placeholder="Apellido" style="flex:1;min-width:100px">
+            <input type="text" id="of-cu-ext-tel" placeholder="Teléfono" style="width:110px">
+            <input type="text" id="of-cu-ext-dni" placeholder="DNI" style="width:90px">
+            <button class="btn-of btn-of-sm" onclick="ofAgregarExternoEnCursada()">+ Agregar e inscribir</button>
+          </div>
+        </div>
+        <div class="of-modal-actions">
+          <button class="btn-of" onclick="ofCerrarModalCursada()">Cancelar</button>
+          <button class="btn-of btn-of-primary" onclick="ofGuardarCursada()">Guardar Cursada</button>
         </div>
       </div>
     </div>
@@ -12339,9 +12430,10 @@ function ofPopulateSelectors(){
         .map(m=>`<option value="${m.id}">${fullName(m)} (${m.genero==='H'?'H':'M'} · ${S.groups.find(g=>g.id===m.grupoId)?.name||'sin grupo'})</option>`)
         .join('');
   }
-  // Profesor selector in Materias form
-  const selP=document.getElementById('of-mf-profesor');
+  // Profesor selector in Cursada modal
+  const selP=document.getElementById('of-cu-profesor');
   if(selP){
+    const valorPrevio=selP.value;
     selP.innerHTML='<option value="">— Elegir profesor —</option>'+
       S.members.filter(m=>m.estado==='Activo')
         .sort((a,b)=>fullName(a).localeCompare(fullName(b)))
@@ -12351,32 +12443,43 @@ function ofPopulateSelectors(){
       ofAlumnos.filter(a=>a.tipo==='externo'||a.tipo==='invitado')
         .map(a=>`<option value="a:${a.id}">${a.nombre} ${a.apellido} (Invitado)</option>`)
         .join('');
+    if(valorPrevio) selP.value=valorPrevio;
   }
 }
 
 // ── ALUMNOS ────────────────────────────────────────────────
-function ofAgregarDesdeMiembro(){
+async function ofAgregarDesdeMiembro(){
   const sel=document.getElementById('of-sel-miembro');
   const mid=parseInt(sel.value);
   if(!mid){alert('Elegí un miembro de la lista');return;}
   const m=S.members.find(x=>x.id===mid);
   if(!m) return;
   if(ofAlumnos.find(a=>a.memberId===mid)){alert('Este miembro ya está en el curso');return;}
+  var snapshot=JSON.stringify(ofAlumnos);
   ofAlumnos.push({
     id:Date.now(), memberId:mid,
     nombre:m.nombre, apellido:m.apellido,
-    tel:m.tel||'', dni:'',
+    tel:m.tel||'', dni:m.dni||'',
     tipo:'miembro',
     desde:todayAA(),
     mesComienzo:HOY.getMonth()
   });
-  ofSave(); ofRender();
+  const ok=await ofSave();
+  if(!ok){
+    ofAlumnos=JSON.parse(snapshot); ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofRender();
 }
 
-function ofAgregarExterno(){
+async function ofAgregarExterno(){
   const n=document.getElementById('of-inp-nombre').value.trim();
   const a=document.getElementById('of-inp-apellido').value.trim();
   if(!n||!a){alert('Ingresá nombre y apellido');return;}
+  const similar=ofBuscarAlumnoSimilar(n,a);
+  if(similar && !confirm('Ya existe un alumno con ese nombre y apellido ('+similar.nombre+' '+similar.apellido+(similar.tipo==='miembro'?', de Rebaños':', externo')+'). ¿Igual querés crear uno nuevo y distinto?\n\nSi es la misma persona, cancelá esto y buscala en la lista de alumnos existentes en vez de crear un duplicado.')) return;
+  var snapshot=JSON.stringify(ofAlumnos);
   ofAlumnos.push({
     id:Date.now(), memberId:null,
     nombre:n, apellido:a,
@@ -12386,14 +12489,27 @@ function ofAgregarExterno(){
     desde:todayAA(),
     mesComienzo:HOY.getMonth()
   });
+  const ok=await ofSave();
+  if(!ok){
+    ofAlumnos=JSON.parse(snapshot); ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   ['of-inp-nombre','of-inp-apellido','of-inp-tel','of-inp-dni'].forEach(x=>{const el=document.getElementById(x);if(el)el.value='';});
-  ofSave(); ofRender();
+  ofRender();
 }
 
-function ofEliminarAlumno(id){
+async function ofEliminarAlumno(id){
   if(!confirm('¿Eliminar este alumno del curso?'))return;
+  var snapshot=JSON.stringify(ofAlumnos);
   ofAlumnos=ofAlumnos.filter(a=>a.id!==id);
-  ofSave(); ofRender();
+  const ok=await ofSave();
+  if(!ok){
+    ofAlumnos=JSON.parse(snapshot); ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofRender();
 }
 
 function ofRenderAlumnos(){
@@ -12423,17 +12539,17 @@ function ofRenderAlumnos(){
 }
 
 // ── MATERIAS ──────────────────────────────────────────────
+// ── MATERIAS: catálogo (nombre + temario) ──────────────────
+let ofTempCapitulos=[]; // capítulos en edición mientras el form de materia está abierto
+
 function ofOpenNewMateria(){
   ofEditMatId=null;
+  ofTempCapitulos=[];
   document.getElementById('of-mf-title').textContent='Nueva materia';
   document.getElementById('of-mf-nombre').value='';
   document.getElementById('of-mf-estado').value='Activo';
-  document.getElementById('of-mf-temario').value='';
-  document.getElementById('of-mf-desde').value='';
-  document.getElementById('of-mf-hasta').value='';
-  ofPopulateSelectors();
-  document.getElementById('of-mf-profesor').value='';
-  ofPopulateMatAlumnos([]);
+  document.getElementById('of-mf-cap-nuevo').value='';
+  ofRenderCapsEditor();
   document.getElementById('of-materia-form').style.display='block';
 }
 
@@ -12441,74 +12557,123 @@ function ofEditMateria(id){
   const mat=ofMaterias.find(x=>x.id===id);
   if(!mat) return;
   ofEditMatId=id;
+  ofTempCapitulos=JSON.parse(JSON.stringify(mat.capitulos||[]));
   document.getElementById('of-mf-title').textContent='Editar materia';
   document.getElementById('of-mf-nombre').value=mat.nombre;
-  document.getElementById('of-mf-estado').value=mat.estado;
-  document.getElementById('of-mf-temario').value=(mat.capitulos||[]).join('\n');
-  document.getElementById('of-mf-desde').value=mat.desde||'';
-  document.getElementById('of-mf-hasta').value=mat.hasta||'';
-  ofPopulateSelectors();
-  document.getElementById('of-mf-profesor').value=mat.profesor||'';
-  ofPopulateMatAlumnos(mat.alumnos||[]);
+  document.getElementById('of-mf-estado').value=mat.estado||'Activo';
+  document.getElementById('of-mf-cap-nuevo').value='';
+  ofRenderCapsEditor();
   document.getElementById('of-materia-form').style.display='block';
 }
 
-function ofPopulateMatAlumnos(selected){
-  const wrap=document.getElementById('of-mat-alum-list');
+function ofAgregarCapitulo(){
+  const inp=document.getElementById('of-mf-cap-nuevo');
+  const nombre=inp.value.trim();
+  if(!nombre){alert('Escribí el nombre del capítulo');return;}
+  ofTempCapitulos.push({id:Date.now(), nombre, links:[]});
+  inp.value='';
+  ofRenderCapsEditor();
+  inp.focus();
+}
+
+function ofEliminarCapitulo(capId){
+  if(!confirm('¿Quitar este capítulo del temario?')) return;
+  ofTempCapitulos=ofTempCapitulos.filter(c=>c.id!==capId);
+  ofRenderCapsEditor();
+}
+
+function ofAgregarLinkCap(capId){
+  const nombreInp=document.getElementById('of-cap-link-nombre-'+capId);
+  const urlInp=document.getElementById('of-cap-link-url-'+capId);
+  const nombre=(nombreInp.value||'').trim()||'PDF';
+  const url=(urlInp.value||'').trim();
+  if(!url){alert('Pegá el link del PDF (Google Drive, Dropbox, etc.)');return;}
+  const cap=ofTempCapitulos.find(c=>c.id===capId);
+  if(!cap) return;
+  if(!cap.links) cap.links=[];
+  cap.links.push({nombre, url});
+  ofRenderCapsEditor();
+}
+
+function ofEliminarLinkCap(capId, idx){
+  const cap=ofTempCapitulos.find(c=>c.id===capId);
+  if(!cap) return;
+  cap.links.splice(idx,1);
+  ofRenderCapsEditor();
+}
+
+function ofRenderCapsEditor(){
+  const wrap=document.getElementById('of-mf-caps-list');
   if(!wrap) return;
-  wrap.innerHTML=ofAlumnos.map(a=>{
-    const checked=selected.includes(a.id);
-    return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB">
-      <input type="checkbox" class="of-mat-alum-cb" value="${a.id}" ${checked?'checked':''}
-        style="width:15px;height:15px;flex-shrink:0;cursor:pointer">
-      <span style="font-size:13px;font-weight:500">${a.nombre} ${a.apellido}</span>
-    </label>`;
+  if(!ofTempCapitulos.length){
+    wrap.innerHTML='<div style="color:#9CA3AF;font-size:12px;padding:6px 0">Todavía no agregaste capítulos.</div>';
+    return;
+  }
+  wrap.innerHTML=ofTempCapitulos.map(function(c,idx){
+    const linksHtml=(c.links||[]).map(function(l,li){
+      return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px">'+
+        '<span>📄 <a href="'+l.url+'" target="_blank" rel="noopener" style="color:#3C3489">'+l.nombre+'</a></span>'+
+        '<button class="btn-of btn-of-sm btn-of-danger" style="padding:1px 6px" onclick="ofEliminarLinkCap('+c.id+','+li+')">✕</button>'+
+        '</div>';
+    }).join('');
+    return '<div style="border:1px solid #E5E7EB;border-radius:8px;padding:8px 10px;margin-bottom:6px;background:#FAFAFF">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<span style="font-weight:600;font-size:13px">'+(idx+1)+'. '+c.nombre+'</span>'+
+        '<button class="btn-of btn-of-sm btn-of-danger" onclick="ofEliminarCapitulo('+c.id+')">🗑</button>'+
+      '</div>'+
+      (linksHtml||'<div style="font-size:11px;color:#9CA3AF;margin-top:2px">Sin PDF adjuntos</div>')+
+      '<div style="display:flex;gap:6px;margin-top:6px">'+
+        '<input type="text" id="of-cap-link-nombre-'+c.id+'" placeholder="Nombre (ej: Guía cap. 1)" style="flex:1;font-size:12px;padding:4px 8px">'+
+        '<input type="text" id="of-cap-link-url-'+c.id+'" placeholder="Link del PDF (Drive/Dropbox)" style="flex:2;font-size:12px;padding:4px 8px">'+
+        '<button class="btn-of btn-of-sm" onclick="ofAgregarLinkCap('+c.id+')">+ PDF</button>'+
+      '</div>'+
+    '</div>';
   }).join('');
 }
 
-function ofFilterMatAlumnos(q){
-  const qL=q.toLowerCase();
-  document.querySelectorAll('#of-mat-alum-list label').forEach(lbl=>{
-    lbl.style.display=lbl.textContent.toLowerCase().includes(qL)?'':'none';
-  });
-}
-
-function ofSaveMateria(){
+async function ofSaveMateria(){
   const nombre=document.getElementById('of-mf-nombre').value.trim();
   if(!nombre){alert('Ingresá el nombre de la materia');return;}
-  const capitulos=document.getElementById('of-mf-temario').value
-    .split('\n').map(t=>t.trim()).filter(Boolean);
-  // Get alumnos selections
-  const alumSels=[...document.querySelectorAll('.of-mat-alum-cb:checked')].map(cb=>parseInt(cb.value));
   const data={
     nombre,
     estado:document.getElementById('of-mf-estado').value,
-    profesor:document.getElementById('of-mf-profesor').value,
-    desde:document.getElementById('of-mf-desde').value,
-    hasta:document.getElementById('of-mf-hasta').value,
-    capitulos,
-    alumnos:alumSels
+    capitulos:ofTempCapitulos
   };
+  var snapshot=JSON.stringify(ofMaterias);
   if(ofEditMatId){
     const mat=ofMaterias.find(x=>x.id===ofEditMatId);
-    // Preserve completados when editing
-    data.completados=mat.completados||{};
     Object.assign(mat,data);
   } else {
-    ofMaterias.push({id:Date.now(),...data,completados:{}});
+    ofMaterias.push({id:Date.now(),...data});
   }
-  ofSave(); ofCloseMateria(); ofRenderMaterias();
+  const ok=await ofSave();
+  if(!ok){
+    ofMaterias=JSON.parse(snapshot); ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofCloseMateria(); ofRenderMaterias();
 }
 
 function ofCloseMateria(){
   document.getElementById('of-materia-form').style.display='none';
   ofEditMatId=null;
+  ofTempCapitulos=[];
 }
 
-function ofDeleteMateria(id){
+async function ofDeleteMateria(id){
+  const tieneCursadas=ofCursadas.some(function(c){return c.materiaId===id;});
+  if(tieneCursadas){alert('Esta materia tiene Cursadas (activas o históricas). No se puede eliminar para no perder ese historial. Si ya no se usa, marcala como "Archivada".');return;}
   if(!confirm('¿Eliminar esta materia?')) return;
+  var snapshot=JSON.stringify(ofMaterias);
   ofMaterias=ofMaterias.filter(m=>m.id!==id);
-  ofSave(); ofRenderMaterias();
+  const ok=await ofSave();
+  if(!ok){
+    ofMaterias=JSON.parse(snapshot); ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofRenderMaterias();
 }
 
 function ofProfesorNombre(val){
@@ -12533,33 +12698,187 @@ function ofRenderMaterias(){
   }
   wrap.innerHTML=ofMaterias.map(mat=>{
     const isActivo=mat.estado==='Activo';
-    const alums=(mat.alumnos||[]).length;
-    const encCount=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]).filter(e=>String(e.materia||e.materiaId)===String(mat.id)).length;
-    const completados=Object.values(mat.completados||{}).filter(Boolean).length;
     const caps=(mat.capitulos||[]).length;
+    const cursadasMateria=ofCursadas.filter(c=>c.materiaId===mat.id).sort((a,b)=>b.id-a.id);
     const borderColor=isActivo?'#7C3AED':'#9CA3AF';
+    const cursadasHtml=cursadasMateria.map(function(cu){
+      const alums=(cu.alumnos||[]).length;
+      const encCount=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]).filter(function(e){return String(e.materia||e.materiaId)===String(cu.id);}).length;
+      const completados=Object.values(cu.completados||{}).filter(Boolean).length;
+      const cuActiva=cu.estado==='Activo';
+      return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;padding:8px 10px;background:#F9FAFB;border-radius:8px;margin-top:6px">'+
+        '<div style="font-size:12px;color:#4B5563">'+
+          (cu.profesor?'👤 '+ofProfesorNombre(cu.profesor)+' · ':'')+
+          '📅 '+(cu.fechaInicio?fmt(cu.fechaInicio):'—')+(cu.fechaFin?' → '+fmt(cu.fechaFin):'')+
+          ' · 👥 '+alums+' alumno'+(alums!==1?'s':'')+
+          ' · 🗓 '+encCount+' encuentro'+(encCount!==1?'s':'')+
+          (alums?' · ✅ '+completados+'/'+alums+' completados':'')+
+        '</div>'+
+        '<div style="display:flex;gap:6px;align-items:center">'+
+          '<span class="badge '+(cuActiva?'b-ok':'b-muted')+'">'+(cuActiva?'Activa':'Completada')+'</span>'+
+          '<button class="btn-of btn-of-sm" onclick="ofEditCursada('+cu.id+')">👥 Inscriptos</button>'+
+          (cuActiva?'<button class="btn-of btn-of-sm btn-of-danger" onclick="ofCerrarCursada('+cu.id+')">🔒 Cerrar</button>':'')+
+        '</div></div>';
+    }).join('');
+    const tieneCursadaActiva=cursadasMateria.some(function(c){return c.estado==='Activo';});
     return `<div class="card" style="margin-bottom:.75rem;border-left:4px solid ${borderColor}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between">
         <div>
           <div style="font-weight:700;font-size:14px;color:#1F2937">${mat.nombre}</div>
           <div style="font-size:12px;color:#6B7280;margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
-            ${mat.profesor?`<span>👤 ${mat.profesor}</span>`:''}
-            ${mat.desde?`<span>📅 ${fmt(mat.desde)}${mat.hasta?' → '+fmt(mat.hasta):''}</span>`:''}
             <span>📚 ${caps} cap.</span>
-            <span>👥 ${alums} alumno${alums!==1?'s':''}</span>
-            <span>🗓 ${encCount} encuentro${encCount!==1?'s':''}</span>
-            ${alums?`<span style="color:#16A34A;font-weight:600">✅ ${completados}/${alums} completados</span>`:''}
+            <span>🗂 ${cursadasMateria.length} cursada${cursadasMateria.length!==1?'s':''}</span>
           </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span class="badge ${isActivo?'b-ok':'b-muted'}">${isActivo?'Activo':'Inactivo'}</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="badge ${isActivo?'b-ok':'b-muted'}">${isActivo?'Activo':'Archivada'}</span>
+          ${(isActivo&&!tieneCursadaActiva)?`<button class="btn-of btn-of-sm btn-of-primary" onclick="ofOpenNewCursada(${mat.id})">▶ Nueva Cursada</button>`:''}
           <button class="btn-of btn-of-sm" onclick="ofEditMateria(${mat.id})">✏️ Editar</button>
           <button class="btn-of btn-of-sm btn-of-danger" onclick="ofDeleteMateria(${mat.id})">🗑</button>
         </div>
       </div>
-      ${caps?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${(mat.capitulos||[]).map((c,i)=>`<span style="background:#F3E8FF;color:#6D28D9;font-size:11px;padding:1px 8px;border-radius:4px">${c}</span>`).join('')}</div>`:''}
+      ${cursadasHtml||'<div style="font-size:12px;color:#9CA3AF;margin-top:8px">Todavía no tiene ninguna Cursada iniciada.</div>'}
     </div>`;
   }).join('');
+}
+
+// ── CURSADAS: instancias de una Materia con fechas y alumnos propios ──
+function ofOpenNewCursada(materiaId){
+  ofEditCursadaId=null;
+  ofCursadaMateriaId=materiaId;
+  document.getElementById('of-cu-title').textContent='Nueva Cursada — '+(ofMaterias.find(m=>m.id===materiaId)?.nombre||'');
+  ofPopulateSelectors();
+  document.getElementById('of-cu-profesor').value='';
+  document.getElementById('of-cu-desde').value='';
+  document.getElementById('of-cu-hasta').value='';
+  ['of-cu-ext-nombre','of-cu-ext-apellido','of-cu-ext-tel','of-cu-ext-dni'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ofPopulateCursadaAlumnos([]);
+  document.getElementById('of-modalCursada').style.display='flex';
+}
+
+function ofEditCursada(cursadaId){
+  const cu=ofCursadas.find(x=>x.id===cursadaId);
+  if(!cu) return;
+  ofEditCursadaId=cursadaId;
+  ofCursadaMateriaId=cu.materiaId;
+  document.getElementById('of-cu-title').textContent=(cu.estado==='Activo'?'Editar Cursada — ':'Cursada (completada) — ')+(ofMaterias.find(m=>m.id===cu.materiaId)?.nombre||'');
+  ofPopulateSelectors();
+  document.getElementById('of-cu-profesor').value=cu.profesor||'';
+  document.getElementById('of-cu-desde').value=cu.fechaInicio||'';
+  document.getElementById('of-cu-hasta').value=cu.fechaFin||'';
+  ['of-cu-ext-nombre','of-cu-ext-apellido','of-cu-ext-tel','of-cu-ext-dni'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ofPopulateCursadaAlumnos(cu.alumnos||[]);
+  document.getElementById('of-modalCursada').style.display='flex';
+}
+
+function ofPopulateCursadaAlumnos(selected){
+  const wrap=document.getElementById('of-cu-alum-list');
+  if(!wrap) return;
+  wrap.innerHTML=ofAlumnos.map(a=>{
+    const checked=selected.includes(a.id);
+    return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB">
+      <input type="checkbox" class="of-cu-alum-cb" value="${a.id}" ${checked?'checked':''}
+        style="width:15px;height:15px;flex-shrink:0;cursor:pointer">
+      <span style="font-size:13px;font-weight:500">${a.nombre} ${a.apellido}${a.tipo==='externo'?' <span style=\"color:#92400E\">(externo)</span>':''}</span>
+    </label>`;
+  }).join('');
+}
+
+function ofFiltrarCursadaAlumnos(q){
+  const qL=q.toLowerCase();
+  document.querySelectorAll('#of-cu-alum-list label').forEach(lbl=>{
+    lbl.style.display=lbl.textContent.toLowerCase().includes(qL)?'':'none';
+  });
+}
+
+async function ofAgregarExternoEnCursada(){
+  const n=document.getElementById('of-cu-ext-nombre').value.trim();
+  const a=document.getElementById('of-cu-ext-apellido').value.trim();
+  if(!n||!a){alert('Ingresá nombre y apellido');return;}
+  const yaSeleccionados=[...document.querySelectorAll('.of-cu-alum-cb:checked')].map(cb=>parseInt(cb.value));
+  const similar=ofBuscarAlumnoSimilar(n,a);
+  if(similar){
+    if(!confirm('Ya existe un alumno con ese nombre y apellido ('+similar.nombre+' '+similar.apellido+(similar.tipo==='miembro'?', de Rebaños':', externo')+'). ¿Es la misma persona? Aceptá para inscribirlo a esta Cursada sin crear un duplicado.\n\nCancelá si en realidad es alguien distinto con el mismo nombre.')){
+      return; // el usuario prefiere seguir y crear uno nuevo y distinto — sigue el flujo de abajo
+    }
+    if(!yaSeleccionados.includes(similar.id)) yaSeleccionados.push(similar.id);
+    ['of-cu-ext-nombre','of-cu-ext-apellido','of-cu-ext-tel','of-cu-ext-dni'].forEach(id=>{document.getElementById(id).value='';});
+    ofPopulateCursadaAlumnos(yaSeleccionados);
+    showToast('✅ Inscripto (ya existía): '+similar.nombre+' '+similar.apellido,'#16A34A');
+    return;
+  }
+  const nuevo={
+    id:Date.now(), memberId:null,
+    nombre:n, apellido:a,
+    tel:document.getElementById('of-cu-ext-tel').value.trim(),
+    dni:document.getElementById('of-cu-ext-dni').value.trim(),
+    tipo:'externo', desde:todayAA(), mesComienzo:HOY.getMonth()
+  };
+  var snapshot=JSON.stringify(ofAlumnos);
+  ofAlumnos.push(nuevo);
+  const ok=await ofSave();
+  if(!ok){
+    ofAlumnos=JSON.parse(snapshot); ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ['of-cu-ext-nombre','of-cu-ext-apellido','of-cu-ext-tel','of-cu-ext-dni'].forEach(id=>{document.getElementById(id).value='';});
+  // Reconstruir la lista manteniendo lo ya tildado, y tildar al recién agregado
+  yaSeleccionados.push(nuevo.id);
+  ofPopulateCursadaAlumnos(yaSeleccionados);
+  showToast('✅ Agregado e inscripto: '+n+' '+a,'#16A34A');
+}
+
+function ofCerrarModalCursada(){
+  document.getElementById('of-modalCursada').style.display='none';
+  ofEditCursadaId=null; ofCursadaMateriaId=null;
+}
+
+async function ofGuardarCursada(){
+  const profesor=document.getElementById('of-cu-profesor').value;
+  const fechaInicio=document.getElementById('of-cu-desde').value;
+  const fechaFin=document.getElementById('of-cu-hasta').value;
+  const alumSels=[...document.querySelectorAll('.of-cu-alum-cb:checked')].map(cb=>parseInt(cb.value));
+  var snapshot=JSON.stringify(ofCursadas);
+  if(ofEditCursadaId){
+    const cu=ofCursadas.find(x=>x.id===ofEditCursadaId);
+    Object.assign(cu,{profesor,fechaInicio,fechaFin,alumnos:alumSels,_ts:Date.now()});
+  } else {
+    ofCursadas.push({
+      id:Date.now(), materiaId:ofCursadaMateriaId,
+      profesor, fechaInicio, fechaFin,
+      estado:'Activo', alumnos:alumSels, completados:{}, _ts:Date.now()
+    });
+  }
+  await saveK('of5_cursadas', ofCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    ofCursadas=JSON.parse(snapshot);
+    await saveK('of5_cursadas', ofCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofCerrarModalCursada(); ofRenderMaterias();
+}
+
+async function ofCerrarCursada(cursadaId){
+  const cu=ofCursadas.find(x=>x.id===cursadaId);
+  if(!cu) return;
+  if(!confirm('¿Cerrar esta Cursada? Los alumnos inscriptos dejan de estar activos en esta Materia — el historial de asistencia y capítulos completados queda guardado igual. Si más adelante se vuelve a dictar, se abre una Cursada nueva.')) return;
+  var snapshot=JSON.stringify(ofCursadas);
+  cu.estado='Completado'; cu._ts=Date.now();
+  await saveK('of5_cursadas', ofCursadas);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    ofCursadas=JSON.parse(snapshot);
+    await saveK('of5_cursadas', ofCursadas);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofRenderMaterias();
+  showToast('🔒 Cursada cerrada','#6B7280');
 }
 function ofRenderStats(){
   const el=document.getElementById('of-statsGrid');
@@ -12605,20 +12924,38 @@ function ofAbrirModalObs(aid,mes){
   document.getElementById('of-modalObs').style.display='flex';
 }
 function ofCerrarModalObs(){document.getElementById('of-modalObs').style.display='none';ofObsAid=null;ofObsMes=null;}
-function ofGuardarObs(){
+async function ofGuardarObs(){
   if(ofObsAid===null)return;
-  ofObsPart[`${ofObsAid}_${ofObsMes}`]=document.getElementById('of-obs-textarea').value.trim();
-  ofSave();ofCerrarModalObs();ofRenderParticipacion();
+  var key=`${ofObsAid}_${ofObsMes}`;
+  var snapshot=ofObsPart[key];
+  ofObsPart[key]=document.getElementById('of-obs-textarea').value.trim();
+  const ok=await ofSave();
+  if(!ok){
+    if(snapshot===undefined) delete ofObsPart[key]; else ofObsPart[key]=snapshot;
+    ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofCerrarModalObs();ofRenderParticipacion();
 }
-function ofTogglePart(aid,mes,val){
-  ofParticipacion[`${aid}_${mes}`]=val;ofSave();
+async function ofTogglePart(aid,mes,val){
+  var key=`${aid}_${mes}`;
+  var snapshot=ofParticipacion[key];
+  ofParticipacion[key]=val;
+  const ok=await ofSave();
+  if(!ok){
+    if(snapshot===undefined) delete ofParticipacion[key]; else ofParticipacion[key]=snapshot;
+    ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   ofRenderParticipacion();ofRenderPagos();ofRenderAsistencia();ofRenderStats();
 }
 function ofRenderParticipacion(){
   const wrap=document.getElementById('of-dashboard-wrap');
   if(!wrap) return;
 
-  const materias=ofMateriasActivas();
+  const cursadas=ofCursadasActivas();
   // Get all encounters
   const allEncs=[];
   Object.keys(ofEncuentros).forEach(function(k){
@@ -12635,7 +12972,7 @@ function ofRenderParticipacion(){
   // ── KPIs ──
   var totalAlumnos=ofAlumnos.length;
   var totalEncs=allEncs.length;
-  var materiasActivas=materias.length;
+  var materiasActivas=cursadas.length;
   // Overall attendance %
   var totalP=0, totalReg=0;
   ofAlumnos.forEach(function(a){
@@ -12654,17 +12991,18 @@ function ofRenderParticipacion(){
   html+='<div class="stat"><span class="stat-val" style="color:'+(pctGeneral>=75?'#16A34A':pctGeneral>=50?'#1F4E79':'#DC2626')+'">'+pctGeneral+'%</span><span class="stat-lbl">% Asistencia</span></div>';
   html+='</div>';
 
-  // ── Por Materia ──
-  if(materias.length){
-    materias.forEach(function(mat){
-      var matEncs=allEncs.filter(function(e){return String(e.materia)===String(mat.id);});
+  // ── Por Materia (Cursada activa) ──
+  if(cursadas.length){
+    cursadas.forEach(function(cu){
+      var matEncs=allEncs.filter(function(e){return String(e.materia)===String(cu.id);});
       if(!matEncs.length) return;
+      var mat=ofMateriaDeCursada(cu);
 
       html+='<div class="card" style="margin-bottom:1rem;border-left:4px solid #7C3AED">';
-      html+='<div style="font-size:14px;font-weight:700;color:#1F4E79;margin-bottom:.75rem">📚 '+mat.nombre+' <span style="font-size:11px;font-weight:400;color:#6B7280">('+matEncs.length+' encuentros)</span></div>';
+      html+='<div style="font-size:14px;font-weight:700;color:#1F4E79;margin-bottom:.75rem">📚 '+(mat?.nombre||'Materia')+' <span style="font-size:11px;font-weight:400;color:#6B7280">('+matEncs.length+' encuentros)</span></div>';
 
-      // Per-alumno stats for this materia
-      var alumStats=ofAlumnos.map(function(a){
+      // Per-alumno stats: solo los inscriptos en esta Cursada
+      var alumStats=(cu.alumnos||[]).map(function(aid){return ofAlumnos.find(function(a){return a.id===aid;});}).filter(Boolean).map(function(a){
         var pres=matEncs.filter(function(e){return ofAsistencia[a.id+'_'+e.id]==='P';}).length;
         var ause=matEncs.filter(function(e){return ofAsistencia[a.id+'_'+e.id]==='A';}).length;
         var tard=matEncs.filter(function(e){return ofAsistencia[a.id+'_'+e.id]==='T';}).length;
@@ -12686,7 +13024,7 @@ function ofRenderParticipacion(){
       html+='</div>';
     });
   } else {
-    html+='<div style="text-align:center;padding:2rem;color:#9CA3AF">No hay materias activas. Agregá materias desde la tab Materias.</div>';
+    html+='<div style="text-align:center;padding:2rem;color:#9CA3AF">No hay Cursadas activas. Iniciá una desde la tab Materias.</div>';
   }
 
   wrap.innerHTML=html;
@@ -12699,15 +13037,34 @@ function ofAbrirModalObsPago(aid,mes){
   document.getElementById('of-modalObsPago').style.display='flex';
 }
 function ofCerrarModalObsPago(){document.getElementById('of-modalObsPago').style.display='none';ofObsPagoAid=null;ofObsPagoMes=null;}
-function ofGuardarObsPago(){
+async function ofGuardarObsPago(){
   if(ofObsPagoAid===null)return;
-  ofObsPago[`${ofObsPagoAid}_${ofObsPagoMes}`]=document.getElementById('of-obs-pago-textarea').value.trim();
-  ofSave();ofCerrarModalObsPago();ofRenderPagos();
+  var key=`${ofObsPagoAid}_${ofObsPagoMes}`;
+  var snapshot=ofObsPago[key];
+  ofObsPago[key]=document.getElementById('of-obs-pago-textarea').value.trim();
+  const ok=await ofSave();
+  if(!ok){
+    if(snapshot===undefined) delete ofObsPago[key]; else ofObsPago[key]=snapshot;
+    ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofCerrarModalObsPago();ofRenderPagos();
 }
-function ofSetPago(id,mes,campo,val){
+async function ofSetPago(id,mes,campo,val){
   const k=`${id}_${mes}`;
+  var snapshot=ofPagos[k]?JSON.stringify(ofPagos[k]):null;
   if(!ofPagos[k])ofPagos[k]={estado:'pendiente',monto:'',fecha:'',materia:''};
-  ofPagos[k][campo]=val;ofSave();ofRenderStats();
+  ofPagos[k][campo]=val;
+  const ok=await ofSave();
+  if(!ok){
+    if(snapshot===null) delete ofPagos[k]; else ofPagos[k]=JSON.parse(snapshot);
+    ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    ofRenderPagos();
+    return;
+  }
+  ofRenderStats();
 }
 function ofRenderPagos(){
   const el=document.getElementById('of-tbody-pagos');if(!el)return;
@@ -12753,7 +13110,7 @@ function ofAbrirModalEnc(){
   const selMat=document.getElementById('of-me-materia');
   if(selMat){
     selMat.innerHTML='<option value="">— Elegir materia activa —</option>'+
-      ofMateriasActivas().map(m=>`<option value="${m.id}">${m.nombre}</option>`).join('');
+      ofCursadasActivas().map(cu=>`<option value="${cu.id}">${ofCursadaLabel(cu)}</option>`).join('');
   }
   const selCap=document.getElementById('of-me-capitulo');
   if(selCap) selCap.innerHTML='<option value="">— Elegir capítulo (opcional) —</option>';
@@ -12769,62 +13126,92 @@ function ofUpdateFechaDisplay(){
   if(el&&disp) disp.textContent=el.value?`📅 ${ofFmtDate(el.value)}`:'';
 }
 
+// Arma el desplegable de capítulos para una Cursada, sugiriendo el siguiente en el orden
+// del temario (el que sigue al último capítulo dado en esta Cursada) — igual criterio que
+// usa Discipulado para no depender de que el profesor se acuerde manualmente por dónde iba.
+// El profesor puede igual elegir cualquier otro capítulo de la lista.
+function ofCapitulosConSugerido(cursadaId){
+  const cu=ofCursadas.find(x=>x.id===cursadaId);
+  const mat=cu?ofMateriaDeCursada(cu):null;
+  const capitulos=mat?.capitulos||[];
+  if(!capitulos.length) return {capitulos:[], idxSugerido:-1};
+  const encsRelevantes=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[])
+    .filter(function(e){return String(e.materia||e.materiaId)===String(cursadaId)&&e.capitulo;});
+  var idxSugerido=0;
+  if(encsRelevantes.length){
+    const ultimo=encsRelevantes.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})[0];
+    const idxUltimo=capitulos.findIndex(function(c){return c.nombre===ultimo.capitulo;});
+    idxSugerido=idxUltimo===-1?0:Math.min(idxUltimo+1,capitulos.length-1);
+  }
+  return {capitulos, idxSugerido};
+}
+
 function ofUpdateCapitulos(){
-  const matId=parseInt(document.getElementById('of-me-materia')?.value)||null;
-  const mat=ofMaterias.find(x=>x.id===matId);
+  const cursadaId=parseInt(document.getElementById('of-me-materia')?.value)||null;
   const sel=document.getElementById('of-me-capitulo');
   if(!sel) return;
+  const {capitulos, idxSugerido}=ofCapitulosConSugerido(cursadaId);
   sel.innerHTML='<option value="">— Elegir capítulo (opcional) —</option>'+
-    (mat?.capitulos||[]).map(c=>`<option value="${c}">${c}</option>`).join('');
+    capitulos.map((c,idx)=>`<option value="${c.nombre.replace(/"/g,'&quot;')}"${idx===idxSugerido?' selected':''}>${c.nombre}${idx===idxSugerido?' (sugerido)':''}</option>`).join('');
 }
 
 function ofUpdateCapitulosEdit(){
-  const matId=parseInt(document.getElementById('of-me-edit-materia')?.value)||null;
-  const mat=ofMaterias.find(x=>x.id===matId);
+  const cursadaId=parseInt(document.getElementById('of-me-edit-materia')?.value)||null;
+  const cu=ofCursadas.find(x=>x.id===cursadaId);
+  const mat=cu?ofMateriaDeCursada(cu):null;
   const sel=document.getElementById('of-me-edit-capitulo');
   if(!sel) return;
   sel.innerHTML='<option value="">— Sin capítulo —</option>'+
-    (mat?.capitulos||[]).map(c=>`<option value="${c}">${c}</option>`).join('');
+    (mat?.capitulos||[]).map(c=>`<option value="${c.nombre.replace(/"/g,'&quot;')}">${c.nombre}</option>`).join('');
 }
 
 function ofCerrarModal(){document.getElementById('of-modalEnc').style.display='none';}
 
-function ofGuardarEnc(){
+async function ofGuardarEnc(){
   const fecha=document.getElementById('of-me-fecha').value;
   if(!fecha){alert('Ingresá la fecha');return;}
-  const matId=parseInt(document.getElementById('of-me-materia')?.value)||null;
-  if(!matId){alert('Elegí una materia');return;}
+  const cursadaId=parseInt(document.getElementById('of-me-materia')?.value)||null;
+  if(!cursadaId){alert('Elegí una materia');return;}
   const capitulo=document.getElementById('of-me-capitulo')?.value||'';
   const esExamen=document.getElementById('of-me-esexamen')?.checked||false;
-  const mat=ofMaterias.find(x=>x.id===matId);
+  const cu=ofCursadas.find(x=>x.id===cursadaId);
+  const mat=cu?ofMateriaDeCursada(cu):null;
   const k=ofEncKey();
+  var snapshot=JSON.stringify(ofEncuentros);
   if(!ofEncuentros[k]) ofEncuentros[k]=[];
   const enc={id:Date.now(),fecha,
-    materia:matId, materiaId:matId, materiaNombre:mat?.nombre||'',
+    materia:cursadaId, materiaId:cursadaId, materiaNombre:mat?.nombre||'',
     capitulo, esExamen};
-  if(ofEditEncId){
+  var editandoId=ofEditEncId;
+  if(editandoId){
     const allK=Object.keys(ofEncuentros);
     allK.forEach(key=>{
-      const idx=ofEncuentros[key].findIndex(e=>e.id===ofEditEncId);
-      if(idx>=0) ofEncuentros[key][idx]={...ofEncuentros[key][idx],...enc,id:ofEditEncId};
+      const idx=ofEncuentros[key].findIndex(e=>e.id===editandoId);
+      if(idx>=0) ofEncuentros[key][idx]={...ofEncuentros[key][idx],...enc,id:editandoId};
     });
-    ofEditEncId=null;
   } else {
-    if(!ofEncuentros[k]) ofEncuentros[k]=[];
     ofEncuentros[k].push(enc);
   }
-  ofCerrarModal();ofSave();ofRenderAsistencia();ofRenderStats();
+  const ok=await ofSave();
+  if(!ok){
+    ofEncuentros=JSON.parse(snapshot); ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofEditEncId=null;
+  ofCerrarModal();ofRenderAsistencia();ofRenderStats();
 }
 
 function ofAbrirModalEdit(eid){
   const enc=ofGetEncs(ofMesAsist).find(e=>e.id===eid);if(!enc)return;
   ofEditEncId=eid;
   document.getElementById('of-me-edit-fecha').value=enc.fecha;
-  // Populate all materias for edit
+  // Para editar se muestran todas las Cursadas (activas e históricas), porque un
+  // encuentro viejo puede pertenecer a una Cursada que ya se cerró.
   const selMat=document.getElementById('of-me-edit-materia');
   if(selMat){
     selMat.innerHTML='<option value="">— Sin materia —</option>'+
-      ofMaterias.map(m=>`<option value="${m.id}"${m.id===enc.materiaId?' selected':''}>${m.nombre}${m.estado==='Inactivo'?' (inactiva)':''}</option>`).join('');
+      ofCursadas.map(cu=>`<option value="${cu.id}"${cu.id===enc.materiaId?' selected':''}>${ofCursadaLabel(cu)}${cu.estado!=='Activo'?' (cerrada)':''}</option>`).join('');
     ofUpdateCapitulosEdit();
     setTimeout(()=>{
       const selCap=document.getElementById('of-me-edit-capitulo');
@@ -12838,37 +13225,63 @@ function ofAbrirModalEdit(eid){
 
 function ofCerrarModalEdit(){document.getElementById('of-modalEditEnc').style.display='none';ofEditEncId=null;}
 
-function ofGuardarEdicionEnc(){
+async function ofGuardarEdicionEnc(){
   const k=ofEncKey();
   const fecha=document.getElementById('of-me-edit-fecha').value;
-  const matId=parseInt(document.getElementById('of-me-edit-materia')?.value)||null;
-  const mat=ofMaterias.find(x=>x.id===matId);
+  const cursadaId=parseInt(document.getElementById('of-me-edit-materia')?.value)||null;
+  const cu=ofCursadas.find(x=>x.id===cursadaId);
+  const mat=cu?ofMateriaDeCursada(cu):null;
   const capitulo=document.getElementById('of-me-edit-capitulo')?.value||'';
-  ofEncuentros[k]=(ofEncuentros[k]||[]).map(e=>e.id!==ofEditEncId?e:
-    {...e,fecha,materiaId:matId,materiaNombre:mat?.nombre||'',capitulo});
-  ofCerrarModalEdit();ofSave();ofRenderAsistencia();ofRenderStats();
+  var snapshot=JSON.stringify(ofEncuentros);
+  var idEditado=ofEditEncId;
+  ofEncuentros[k]=(ofEncuentros[k]||[]).map(e=>e.id!==idEditado?e:
+    {...e,fecha,materia:cursadaId,materiaId:cursadaId,materiaNombre:mat?.nombre||'',capitulo});
+  const ok=await ofSave();
+  if(!ok){
+    ofEncuentros=JSON.parse(snapshot); ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofCerrarModalEdit();ofRenderAsistencia();ofRenderStats();
 }
 
-function ofEliminarEncEdit(){
+async function ofEliminarEncEdit(){
   if(!confirm('¿Eliminar este encuentro?'))return;
   const k=ofEncKey();
-  ofEncuentros[k]=(ofEncuentros[k]||[]).filter(e=>e.id!==ofEditEncId);
-  ofCerrarModalEdit();ofSave();ofRenderAsistencia();ofRenderStats();
+  var snapshot=JSON.stringify(ofEncuentros);
+  var idEditado=ofEditEncId;
+  ofEncuentros[k]=(ofEncuentros[k]||[]).filter(e=>e.id!==idEditado);
+  const ok=await ofSave();
+  if(!ok){
+    ofEncuentros=JSON.parse(snapshot); ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofCerrarModalEdit();ofRenderAsistencia();ofRenderStats();
 }
 
-function ofToggleAsist(aid,eid){
+async function ofToggleAsist(aid,eid){
   const k=`${aid}_${eid}`;const ciclo=['','P','A','T'];
+  var snapshot=ofAsistencia[k];
   ofAsistencia[k]=ciclo[(ciclo.indexOf(ofAsistencia[k]||'')+1)%ciclo.length];
-  ofSave();ofRenderAsistencia();ofRenderStats();
+  const ok=await ofSave();
+  if(!ok){
+    if(snapshot===undefined) delete ofAsistencia[k]; else ofAsistencia[k]=snapshot;
+    ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    ofRenderAsistencia();
+    return;
+  }
+  ofRenderAsistencia();ofRenderStats();
 }
 
 function ofRenderAsistencia(){
   const matFil=document.getElementById('of-asist-materia-fil');
-  // Populate materia filter dynamically
+  // Populate materia filter dynamically — se filtra por Cursada (activa o cerrada), mostrando el nombre de la materia
   if(matFil&&matFil.options.length<=1){
-    ofMateriasActivas().forEach(m=>{
+    ofCursadas.slice().sort((a,b)=>b.id-a.id).forEach(cu=>{
       const opt=document.createElement('option');
-      opt.value=m.id; opt.textContent=m.nombre;
+      opt.value=cu.id; opt.textContent=ofCursadaLabel(cu)+(cu.estado!=='Activo'?' (cerrada)':'');
       matFil.appendChild(opt);
     });
   }
@@ -12890,17 +13303,19 @@ function ofRenderAsistencia(){
   }
 
   lista.innerHTML=allEncs.map(e=>{
-    const mat=ofMaterias.find(m=>String(m.id)===String(e.materia||e.materiaId))||{nombre:'Sin materia',alumnos:[]};
-    const alums=mat.alumnos||[];
+    const cu=ofCursadas.find(c=>String(c.id)===String(e.materia||e.materiaId));
+    const mat=cu?ofMateriaDeCursada(cu):null;
+    const nombreMostrado=mat?.nombre||e.materiaNombre||'Sin materia';
+    const alums=cu?.alumnos||[];
     const presentes=alums.filter(aid=>ofAsistencia[`${aid}_${e.id}`]==='P').length;
     const semana=getISOWeek(e.fecha);
     const isExamen=e.esExamen||false;
     return `<div class="card" style="margin-bottom:.5rem;padding:10px 14px;cursor:pointer;border-left:4px solid ${isExamen?'#DC2626':'#7C3AED'}"
-        onclick="ofSelectEnc('${e.id}','${mat.id}')">
+        onclick="ofSelectEnc('${e.id}','${cu?cu.id:''}')">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1">
           <div style="font-size:13px;font-weight:700;color:#1F4E79">
-            ${isExamen?'📝 EXAMEN — ':''}${mat.nombre}
+            ${isExamen?'📝 EXAMEN — ':''}${nombreMostrado}
           </div>
           <div style="font-size:12px;color:#6B7280;margin-top:2px">
             ${fmt(e.fecha)} · Semana ${semana}${e.capitulo?' · '+e.capitulo:''}
@@ -12913,8 +13328,8 @@ function ofRenderAsistencia(){
 
   if(allEncs.length){
     const e=allEncs[0];
-    const mat=ofMaterias.find(m=>String(m.id)===String(e.materia||e.materiaId));
-    ofSelectEnc(e.id, mat?.id);
+    const cu=ofCursadas.find(c=>String(c.id)===String(e.materia||e.materiaId));
+    ofSelectEnc(e.id, cu?.id);
   }
 }
 
@@ -12930,13 +13345,13 @@ function ofSelectEnc(encId, matId){
   ofRenderAsistenciaTable(encId, matId);
 }
 
-function ofRenderAsistenciaTable(encId, matId){
+function ofRenderAsistenciaTable(encId, cursadaId){
   const wrap=document.getElementById('of-asist-tabla');
   if(!wrap) return;
   if(!encId){wrap.innerHTML='';return;}
 
-  const mat=matId?ofMaterias.find(m=>String(m.id)===String(matId)):null;
-  const alums=mat?(mat.alumnos||[]).map(id=>ofAlumnos.find(a=>a.id===id)).filter(Boolean):ofAlumnos;
+  const cu=cursadaId?ofCursadas.find(c=>String(c.id)===String(cursadaId)):null;
+  const alums=cu?(cu.alumnos||[]).map(id=>ofAlumnos.find(a=>a.id===id)).filter(Boolean):ofAlumnos;
   const allEncs=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]);
   const enc=allEncs.find(e=>String(e.id)===String(encId));
   if(!enc){wrap.innerHTML='';return;}
@@ -12949,15 +13364,15 @@ function ofRenderAsistenciaTable(encId, matId){
     </div>`;
 
   if(!alums.length){
-    html+='<div style="color:#9CA3AF;font-size:13px">No hay alumnos asignados a esta materia. Editá la materia para asignarlos.</div>';
+    html+='<div style="color:#9CA3AF;font-size:13px">No hay alumnos inscriptos en esta Cursada. Editá "Inscriptos" desde la tab Materias para asignarlos.</div>';
   } else {
     alums.forEach(a=>{
       if(isExamen){
         // For exam: show Completado / Incompleto toggle
-        const comp=(mat?.completados||{})[a.id]||false;
+        const comp=(cu?.completados||{})[a.id]||false;
         html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6">
           <span style="font-size:13px;font-weight:500">${a.nombre} ${a.apellido}</span>
-          <button onclick="ofToggleCompletado('${matId}','${a.id}')"
+          <button onclick="ofToggleCompletado('${cursadaId}','${a.id}')"
             style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;
             background:${comp?'#D1FAE5':'#F3F4F6'};color:${comp?'#065F46':'#6B7280'}">
             ${comp?'✅ Completado':'⬜ Incompleto'}
@@ -12983,18 +13398,55 @@ function ofRenderAsistenciaTable(encId, matId){
   wrap.innerHTML=html;
 }
 
-function ofToggleCompletado(matId, alumId){
-  const mat=ofMaterias.find(m=>String(m.id)===String(matId));
-  if(!mat) return;
-  if(!mat.completados) mat.completados={};
-  mat.completados[alumId]=!mat.completados[alumId];
-  ofSave();
+async function ofToggleCompletado(cursadaId, alumId){
+  const cu=ofCursadas.find(c=>String(c.id)===String(cursadaId));
+  if(!cu) return;
+  if(!cu.completados) cu.completados={};
+  var snapshotTs=cu._ts;
+  var valorPrevio=cu.completados[alumId];
+  cu.completados[alumId]=!cu.completados[alumId];
+  cu._ts=Date.now();
+  const ok=await ofSave();
+  if(!ok){
+    cu.completados[alumId]=valorPrevio; cu._ts=snapshotTs;
+    ofSaveLocal();
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
   // Re-render table
   const allEncs=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]);
-  const examEnc=allEncs.find(e=>e.esExamen&&String(e.materia||e.materiaId)===String(matId));
-  if(examEnc) ofRenderAsistenciaTable(examEnc.id, matId);
-  showToast(mat.completados[alumId]?'✅ Completado':'⬜ Incompleto', mat.completados[alumId]?'#16A34A':'#6B7280');
+  const examEnc=allEncs.find(e=>e.esExamen&&String(e.materia||e.materiaId)===String(cursadaId));
+  if(examEnc) ofRenderAsistenciaTable(examEnc.id, cursadaId);
+  showToast(cu.completados[alumId]?'✅ Completado':'⬜ Incompleto', cu.completados[alumId]?'#16A34A':'#6B7280');
 }
+async function ofSyncDatosDesdeRebanos(){
+  var actualizados=0;
+  var snapshot=JSON.stringify(ofAlumnos);
+  ofAlumnos.forEach(function(a){
+    if(!a.memberId) return;
+    var m=S.members.find(function(x){return x.id===a.memberId;});
+    if(!m) return;
+    var nuevoTel=m.tel||'';
+    var nuevoDni=m.dni||'';
+    if(nuevoTel!==a.tel || nuevoDni!==a.dni){
+      a.tel=nuevoTel; a.dni=nuevoDni;
+      actualizados++;
+    }
+  });
+  if(!actualizados){ alert('Ya están todos los datos al día con Rebaños.'); return; }
+  await saveK('of5_alumnos',ofAlumnos);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    ofAlumnos=JSON.parse(snapshot);
+    await saveK('of5_alumnos',ofAlumnos);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ofRenderAlumnos();
+  showToast('✅ '+actualizados+' alumno'+(actualizados!==1?'s':'')+' actualizado'+(actualizados!==1?'s':'')+' con datos de Rebaños','#16A34A');
+}
+
 function ofExportar(){
   alert(`Datos actuales:\n• Alumnos: ${ofAlumnos.length}\n• Materias: ${ofMaterias.length}\n\nUsá el botón 💾 Exportar del inicio para guardar todos los datos.`);
 }
@@ -18978,6 +19430,7 @@ async function exportarTodo(){
       obsPart:      ofObsPart,
       obsPago:      ofObsPago,
       materias:     ofMaterias,
+      cursadas:     ofCursadas,
     }
   };
   const json = JSON.stringify(backup, null, 2);
@@ -19029,7 +19482,8 @@ async function importarTodo(event){
       ofObsPart       = backup.of.obsPart       || {};
       ofObsPago       = backup.of.obsPago       || {};
       ofMaterias      = backup.of.materias      || [];
-      ofSave();
+      ofCursadas      = backup.of.cursadas      || [];
+      ofSaveLocal();
       input.value='';
       // Sync to Firebase after import — bloquear si falla, NO recargar con datos sin confirmar
       try{

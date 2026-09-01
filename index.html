@@ -413,7 +413,8 @@ const KEY_GROUPS = {
   'formularios': ['_tomb_gdv_formularios','gdv_formularios','_tomb_gdv_form_respuestas','gdv_form_respuestas','_tomb_gdv_form_analisis','gdv_form_analisis'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
                'of5_part','of5_obspart','of5_obspago','of5_materias',
-               '_tomb_of5_cursadas','of5_cursadas'],
+               '_tomb_of5_cursadas','of5_cursadas',
+               'of5_tarea_entregada','of5_tarea_comentario'],
 };
 
 // ── Upload: one Firestore doc per group ──
@@ -667,7 +668,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-k';
+const APP_VERSION = '2026-08-24-n';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -12029,13 +12030,18 @@ let ofParticipacion = gs('of5_part','{}');
 let ofObsPart     = gs('of5_obspart','{}');
 let ofObsPago     = gs('of5_obspago','{}');
 let ofMaterias    = gs('of5_materias','[]');
+// Tarea semanal por Cursada — piloto: la carga Secretaría/Maestra desde acá, todavía no
+// hay nada público para que el alumno la complete solo. Ni la entrega ni el comentario
+// del maestro son obligatorios para poder guardar la asistencia del encuentro.
+let ofTareaEntregada  = gs('of5_tarea_entregada','{}');   // clave `${alumnoId}_${encId}` → 'SI'|'NO'
+let ofTareaComentario = gs('of5_tarea_comentario','{}');  // clave `${alumnoId}_${encId}` → texto libre
 let ofCursadas    = gs('of5_cursadas','[]');
 
 let ofMesPart=HOY.getMonth(), ofMesPago=HOY.getMonth(), ofMesAsist=HOY.getMonth();
 let ofEditEncId=null, ofObsAid=null, ofObsMes=null, ofObsPagoAid=null, ofObsPagoMes=null;
 // Borrador de Cargar Asistencia: vive en memoria mientras se completa la planilla, y
 // recién se sube a la nube con "Guardar asistencia" — mismo criterio que GdV/Discipulado.
-let ofAsistDraft={cursadaId:null, encId:null, capitulo:'', esExamen:false, valores:{}};
+let ofAsistDraft={cursadaId:null, encId:null, capitulo:'', esExamen:false, valores:{}, tarea:{}, comentarios:{}};
 let ofEditMatId=null, ofEditCursadaId=null, ofCursadaMateriaId=null;
 let ofCurrentTab='alumnos';
 
@@ -12045,6 +12051,7 @@ function ofSaveLocal(){
   ss('of5_part',ofParticipacion); ss('of5_obspart',ofObsPart);
   ss('of5_obspago',ofObsPago); ss('of5_materias',ofMaterias);
   ss('of5_cursadas',ofCursadas);
+  ss('of5_tarea_entregada',ofTareaEntregada); ss('of5_tarea_comentario',ofTareaComentario);
 }
 // Guardado auditado (agosto 2026): antes esta función solo guardaba local y subía a
 // Firebase en segundo plano sin avisar si fallaba — un fallo de red podía perderse en
@@ -12183,6 +12190,7 @@ function buildOFHTML(){
       <button class="of-tab"        id="oftab-participacion" onclick="ofSwitchTab('participacion',this)">🔄 Participación</button>
       <button class="of-tab" id="oftab-pagos" onclick="ofSwitchTab('pagos',this)">💰 Pagos</button>
       <button class="of-tab"        id="oftab-asistencia" onclick="ofSwitchTab('asistencia',this)">✅ Cargar Asistencia</button>
+      <button class="of-tab"        id="oftab-registros" onclick="ofSwitchTab('registros',this)">📄 Registros</button>
     </div>
 
     <!-- ALUMNOS -->
@@ -12320,7 +12328,7 @@ function buildOFHTML(){
       </div>
     </div>
 
-    <!-- ASISTENCIA -->
+    <!-- CARGAR ASISTENCIA -->
     <div class="of-section" id="of-sec-asistencia">
       <div class="of-card">
         <div style="font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:12px">✏️ Cargar asistencia</div>
@@ -12349,15 +12357,16 @@ function buildOFHTML(){
           <button class="btn btn-primary" onclick="ofGuardarAsistDraft()" style="width:100%;margin-top:1rem">💾 Guardar asistencia</button>
         </div>
       </div>
+    </div>
 
-      <div style="display:flex;justify-content:space-between;align-items:center;margin:1.5rem 0 1rem;flex-wrap:wrap;gap:8px">
-        <span style="font-size:14px;font-weight:600;color:#1F4E79">Registros anteriores</span>
-      </div>
+    <!-- REGISTROS -->
+    <div class="of-section" id="of-sec-registros">
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
-        <select id="of-asist-materia-fil" onchange="ofRenderAsistencia()" style="flex:1;min-width:150px">
+        <select id="of-asist-materia-fil" onchange="ofRenderRegistros()" style="flex:1;min-width:150px">
           <option value="">Todas las materias</option>
         </select>
-        <input type="date" id="of-asist-fecha-fil" onchange="ofRenderAsistencia()" style="flex:1;min-width:130px">
+        <input type="date" id="of-asist-desde-fil" onchange="ofRenderRegistros()" title="Desde" style="flex:1;min-width:120px">
+        <input type="date" id="of-asist-hasta-fil" onchange="ofRenderRegistros()" title="Hasta" style="flex:1;min-width:120px">
         <button class="btn btn-sm" onclick="ofClearAsistFil()">↺ Limpiar</button>
       </div>
       <div id="of-enc-lista-mes" style="margin-bottom:.5rem"></div>
@@ -12393,7 +12402,7 @@ function buildOFHTML(){
 function ofSwitchTab(t,btn){
   document.querySelectorAll('.of-tab').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  ['alumnos','materias','cursada','participacion','pagos','asistencia'].forEach(s=>{
+  ['alumnos','materias','cursada','participacion','pagos','asistencia','registros'].forEach(s=>{
     const el=document.getElementById('of-sec-'+s);
     if(el) el.classList.toggle('active',s===t);
   });
@@ -12401,6 +12410,7 @@ function ofSwitchTab(t,btn){
   if(t==='materias') ofRenderMaterias();
   if(t==='cursada') ofRenderCursadas();
   if(t==='asistencia') ofPopularSelectorCursadaAsistencia();
+  if(t==='registros') ofRenderRegistros();
 }
 
 function ofRender(){
@@ -12415,7 +12425,7 @@ function ofRender(){
   try{ofRenderParticipacion();}catch(e){console.error('ofRenderParticipacion',e);}
   try{ofRenderPagos();}catch(e){console.error('ofRenderPagos',e);}
   try{ofPopularSelectorCursadaAsistencia();}catch(e){console.error('ofPopularSelectorCursadaAsistencia',e);}
-  try{ofRenderAsistencia();}catch(e){console.error('ofRenderAsistencia',e);}
+  try{ofRenderRegistros();}catch(e){console.error('ofRenderAsistencia',e);}
 }
 
 function ofPopulateSelectors(){
@@ -12991,7 +13001,7 @@ function ofRenderPills(){
 }
 function ofSelPart(m){ofMesPart=m;ofRenderPills();ofRenderParticipacion();ofRenderStats();}
 function ofSelPago(m){ofMesPago=m;ofRenderPills();ofRenderPagos();ofRenderStats();}
-function ofSelAsist(m){ofMesAsist=m;ofRenderPills();ofRenderAsistencia();ofRenderStats();}
+function ofSelAsist(m){ofMesAsist=m;ofRenderPills();ofRenderRegistros();ofRenderStats();}
 
 // ── PARTICIPACIÓN ──────────────────────────────────────────
 function ofAbrirModalObs(aid,mes){
@@ -13027,7 +13037,7 @@ async function ofTogglePart(aid,mes,val){
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
-  ofRenderParticipacion();ofRenderPagos();ofRenderAsistencia();ofRenderStats();
+  ofRenderParticipacion();ofRenderPagos();ofRenderRegistros();ofRenderStats();
 }
 function ofRenderParticipacion(){
   const wrap=document.getElementById('of-dashboard-wrap');
@@ -13240,11 +13250,15 @@ function ofCargarDraftParaFecha(){
   const existente=allEncs.find(function(e){
     return String(e.materia||e.materiaId)===String(cursadaId) && getISOWeek(e.fecha)===semana && parseLocalDate(e.fecha).getFullYear()===anio;
   });
-  ofAsistDraft.valores={};
+  ofAsistDraft.valores={}; ofAsistDraft.tarea={}; ofAsistDraft.comentarios={};
   if(existente){
     ofAsistDraft.encId=existente.id;
     ofAsistDraft.esExamen=!!existente.esExamen;
-    (cu.alumnos||[]).forEach(function(aid){ ofAsistDraft.valores[aid]=ofAsistencia[aid+'_'+existente.id]||'A'; });
+    (cu.alumnos||[]).forEach(function(aid){
+      ofAsistDraft.valores[aid]=ofAsistencia[aid+'_'+existente.id]||'A';
+      ofAsistDraft.tarea[aid]=ofTareaEntregada[aid+'_'+existente.id]||'';
+      ofAsistDraft.comentarios[aid]=ofTareaComentario[aid+'_'+existente.id]||'';
+    });
     if(alertEl){
       alertEl.style.display='block';
       alertEl.innerHTML='✏️ Ya existe un registro para la <strong>Semana '+semana+'</strong> (fecha '+fmt(existente.fecha)+'). Se va a actualizar ese registro en vez de crear uno nuevo.';
@@ -13253,7 +13267,7 @@ function ofCargarDraftParaFecha(){
   } else {
     ofAsistDraft.encId=null;
     ofAsistDraft.esExamen=false;
-    (cu.alumnos||[]).forEach(function(aid){ ofAsistDraft.valores[aid]='A'; });
+    (cu.alumnos||[]).forEach(function(aid){ ofAsistDraft.valores[aid]='A'; ofAsistDraft.tarea[aid]=''; ofAsistDraft.comentarios[aid]=''; });
     if(alertEl) alertEl.style.display='none';
     ofRenderCapituloSelectDraft(cursadaId, null);
   }
@@ -13286,6 +13300,24 @@ function ofToggleDraftAsist(aid){
   ofRenderAsistDraftTable();
 }
 
+// Tarea de la semana — piloto: la carga Secretaría/Maestra, no es obligatoria para
+// poder guardar la asistencia (arranca en "—", no en Ausente/No entregada).
+function ofToggleDraftTarea(aid){
+  const ciclo=['','SI','NO'];
+  const cur=ofAsistDraft.tarea[aid]||'';
+  ofAsistDraft.tarea[aid]=ciclo[(ciclo.indexOf(cur)+1)%ciclo.length];
+  ofRenderAsistDraftTable();
+}
+
+function ofToggleComentarioBox(aid){
+  const el=document.getElementById('of-asd-coment-'+aid);
+  if(el) el.style.display=(el.style.display==='none')?'block':'none';
+}
+
+function ofSetDraftComentario(aid, valor){
+  ofAsistDraft.comentarios[aid]=valor;
+}
+
 function ofMarcarTodosPresentes(){
   Object.keys(ofAsistDraft.valores).forEach(function(aid){ ofAsistDraft.valores[aid]='P'; });
   ofRenderAsistDraftTable();
@@ -13314,11 +13346,25 @@ function ofRenderAsistDraftTable(){
     const colors={P:'#D1FAE5',A:'#FEE2E2',T:'#FEF3C7'};
     const tColors={P:'#065F46',A:'#991B1B',T:'#92400E'};
     const labels={P:'Presente',A:'Ausente',T:'Tardanza'};
+    const tareaColors={SI:'#D1FAE5','':'#F3F4F6',NO:'#FEE2E2'};
+    const tareaTColors={SI:'#065F46','':'#9CA3AF',NO:'#991B1B'};
+    const tareaLabels={SI:'✔ Tarea SI','':'Tarea —',NO:'✘ Tarea NO'};
     alums.forEach(function(a){
       const v=ofAsistDraft.valores[a.id]||'A';
-      html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6">'+
-        '<span style="font-size:13px;font-weight:500">'+a.nombre+' '+a.apellido+'</span>'+
-        '<button onclick="ofToggleDraftAsist('+a.id+')" style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:'+colors[v]+';color:'+tColors[v]+'">'+labels[v]+'</button>'+
+      const tv=ofAsistDraft.tarea[a.id]||'';
+      const comentario=ofAsistDraft.comentarios[a.id]||'';
+      html+='<div style="padding:8px 0;border-bottom:1px solid #F3F4F6">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+
+          '<span style="font-size:13px;font-weight:500;flex:1;min-width:0">'+a.nombre+' '+a.apellido+'</span>'+
+          '<button onclick="ofToggleDraftAsist('+a.id+')" style="padding:5px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:'+colors[v]+';color:'+tColors[v]+';flex-shrink:0">'+labels[v]+'</button>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:5px">'+
+          '<button onclick="ofToggleDraftTarea('+a.id+')" style="padding:3px 10px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600;background:'+tareaColors[tv]+';color:'+tareaTColors[tv]+'">'+tareaLabels[tv]+'</button>'+
+          '<button onclick="ofToggleComentarioBox('+a.id+')" style="padding:3px 9px;border-radius:6px;border:1px dashed #C7C3E8;background:#fff;cursor:pointer;font-size:11px;color:#3C3489">💬'+(comentario?' •':'')+'</button>'+
+        '</div>'+
+        '<div id="of-asd-coment-'+a.id+'" style="display:'+(comentario?'block':'none')+';margin-top:6px">'+
+          '<textarea oninput="ofSetDraftComentario('+a.id+',this.value)" placeholder="Comentario del maestro sobre la Tarea (opcional)" rows="2" style="font-size:12px;width:100%;box-sizing:border-box">'+comentario+'</textarea>'+
+        '</div>'+
       '</div>';
     });
   }
@@ -13336,6 +13382,8 @@ async function ofGuardarAsistDraft(){
   const mat=cu?ofMateriaDeCursada(cu):null;
   var snapshotEnc=JSON.stringify(ofEncuentros);
   var snapshotAsist=JSON.stringify(ofAsistencia);
+  var snapshotTarea=JSON.stringify(ofTareaEntregada);
+  var snapshotComent=JSON.stringify(ofTareaComentario);
   var encId=ofAsistDraft.encId;
   if(encId){
     const allK=Object.keys(ofEncuentros);
@@ -13353,19 +13401,29 @@ async function ofGuardarAsistDraft(){
     Object.keys(ofAsistDraft.valores).forEach(function(aid){
       ofAsistencia[aid+'_'+encId]=ofAsistDraft.valores[aid];
     });
+    // Tarea y comentario del maestro: opcionales — se guardan tal cual estén (aunque
+    // queden vacíos), nunca frenan el guardado de la asistencia del encuentro.
+    Object.keys(ofAsistDraft.tarea).forEach(function(aid){
+      ofTareaEntregada[aid+'_'+encId]=ofAsistDraft.tarea[aid]||'';
+    });
+    Object.keys(ofAsistDraft.comentarios).forEach(function(aid){
+      ofTareaComentario[aid+'_'+encId]=ofAsistDraft.comentarios[aid]||'';
+    });
   }
   const ok=await ofSave();
   if(!ok){
-    ofEncuentros=JSON.parse(snapshotEnc); ofAsistencia=JSON.parse(snapshotAsist); ofSaveLocal();
+    ofEncuentros=JSON.parse(snapshotEnc); ofAsistencia=JSON.parse(snapshotAsist);
+    ofTareaEntregada=JSON.parse(snapshotTarea); ofTareaComentario=JSON.parse(snapshotComent);
+    ofSaveLocal();
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
   ofAsistDraft.encId=encId;
   showToast('✅ Asistencia guardada','#16A34A');
-  ofRenderAsistencia(); ofRenderStats();
+  ofRenderRegistros(); ofRenderStats();
 }
 
-function ofRenderAsistencia(){
+function ofRenderRegistros(){
   const matFil=document.getElementById('of-asist-materia-fil');
   // Reconstruir siempre el filtro de Cursada (no solo la primera vez) para que una Cursada
   // recién creada aparezca sin tener que recargar la página — preservando la selección actual.
@@ -13380,12 +13438,14 @@ function ofRenderAsistencia(){
     if(valorPrevio&&ofCursadas.some(c=>String(c.id)===String(valorPrevio))) matFil.value=valorPrevio;
   }
   const filterMat=matFil?.value||'';
-  const filterFecha=document.getElementById('of-asist-fecha-fil')?.value||'';
+  const filterDesde=document.getElementById('of-asist-desde-fil')?.value||'';
+  const filterHasta=document.getElementById('of-asist-hasta-fil')?.value||'';
 
   // Get all encounters
   let allEncs=Object.values(ofEncuentros||{}).reduce(function(acc,v){return acc.concat(v||[]);},[]);
   if(filterMat) allEncs=allEncs.filter(e=>String(e.materia||e.materiaId)===String(filterMat));
-  if(filterFecha) allEncs=allEncs.filter(e=>e.fecha===filterFecha);
+  if(filterDesde) allEncs=allEncs.filter(e=>e.fecha>=filterDesde);
+  if(filterHasta) allEncs=allEncs.filter(e=>e.fecha<=filterHasta);
   allEncs.sort((a,b)=>b.fecha.localeCompare(a.fecha));
 
   const lista=document.getElementById('of-enc-lista-mes');
@@ -13396,7 +13456,16 @@ function ofRenderAsistencia(){
     return;
   }
 
-  lista.innerHTML=allEncs.map(e=>{
+  // Sin filtros activos: mostrar solo los últimos 3, para no abrumar — usá los filtros de
+  // arriba para ver el historial completo.
+  const sinFiltros=!filterMat&&!filterDesde&&!filterHasta;
+  const aMostrar=sinFiltros?allEncs.slice(0,3):allEncs;
+  let html='';
+  if(sinFiltros&&allEncs.length>3){
+    html+='<div style="font-size:12px;color:#9CA3AF;margin-bottom:8px">Mostrando los últimos 3 de '+allEncs.length+' — usá los filtros de arriba para ver más.</div>';
+  }
+
+  html+=aMostrar.map(e=>{
     const cu=ofCursadas.find(c=>String(c.id)===String(e.materia||e.materiaId));
     const nombreMostrado=cu?ofCursadaLabel(cu):(e.materiaNombre||'Sin materia');
     const alums=cu?.alumnos||[];
@@ -13404,7 +13473,7 @@ function ofRenderAsistencia(){
     const semana=getISOWeek(e.fecha);
     const isExamen=e.esExamen||false;
     return `<div class="card" style="margin-bottom:.5rem;padding:10px 14px;cursor:pointer;border-left:4px solid ${isExamen?'#DC2626':'#7C3AED'}"
-        onclick="ofSelectEnc('${e.id}','${cu?cu.id:''}')" title="Tocá para editar este registro arriba">
+        onclick="ofSelectEnc('${e.id}','${cu?cu.id:''}')" title="Tocá para editar este registro en Cargar Asistencia">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1">
           <div style="font-size:13px;font-weight:700;color:#1F4E79">
@@ -13418,20 +13487,25 @@ function ofRenderAsistencia(){
       </div>
     </div>`;
   }).join('');
+  lista.innerHTML=html;
 }
 
 function ofClearAsistFil(){
   const mf=document.getElementById('of-asist-materia-fil');
-  const ff=document.getElementById('of-asist-fecha-fil');
+  const fd=document.getElementById('of-asist-desde-fil');
+  const fh=document.getElementById('of-asist-hasta-fil');
   if(mf){mf.innerHTML='<option value="">Todas las materias</option>';mf.value='';}
-  if(ff) ff.value='';
-  ofRenderAsistencia();
+  if(fd) fd.value='';
+  if(fh) fh.value='';
+  ofRenderRegistros();
 }
 
 // Tocar un Registro pasado lo carga en el formulario de arriba para poder corregirlo,
 // en vez de abrir una vista aparte de solo lectura.
 function ofSelectEnc(encId, cursadaId){
   if(!cursadaId) return;
+  ofSwitchTab('asistencia', document.getElementById('oftab-asistencia'));
+  ofPopularSelectorCursadaAsistencia();
   const selCu=document.getElementById('of-asd-cursada');
   if(selCu){
     if(![...selCu.options].some(o=>o.value===String(cursadaId))){
@@ -16658,6 +16732,58 @@ function discTab(tab, btn){
   else if(tab==='registros') discRenderRegistros(c);else if(tab==='historico') discRenderHistorico(c);
 }
 
+// Filtros compartidos entre Indicadores y Detallada — mismo criterio que Grupos de Vida:
+// Desde/Hasta acota qué encuentros cuentan para "Participando", Sexo y Grupo (de Vida o
+// Nuevas Generaciones, comparten el campo m.grupoId) acotan qué inscriptos se muestran.
+let discFilDesde='', discFilHasta='', discFilSexo='', discFilGrupo='';
+let discDashView='indicadores';
+
+function discResolveGrupoLabel(grupoId){
+  if(!grupoId) return null;
+  var g=S.groups.find(function(x){return Number(x.id)===Number(grupoId);});
+  if(g) return {icon:'🏘', nombre:g.name};
+  var ng=(S.ngComunidades||[]).find(function(x){return Number(x.id)===Number(grupoId);});
+  if(ng) return {icon:'🌿', nombre:ng.name};
+  return null;
+}
+
+function discMiembroPasaFiltroSexoGrupo(m){
+  if(discFilSexo && m.genero!==discFilSexo) return false;
+  if(discFilGrupo){
+    var gid=Number(discFilGrupo);
+    var tieneGrupo=Number(m.grupoId)===gid || (m.grupoIds||[]).map(Number).includes(gid);
+    if(!tieneGrupo) return false;
+  }
+  return true;
+}
+
+// ¿Tuvo al menos un encuentro "presente" de esta Cursada dentro del rango Desde/Hasta?
+// Mismo criterio que usa Grupos de Vida para definir "participando" en un período.
+function discParticipoEnRango(memberId, cursadaId){
+  return S.discRecords.some(function(r){
+    if(r.cursadaId!==cursadaId||r.sinEncuentro) return false;
+    if(discFilDesde&&r.fecha<discFilDesde) return false;
+    if(discFilHasta&&r.fecha>discFilHasta) return false;
+    return r.asistencia&&r.asistencia[memberId]&&r.asistencia[memberId].state==='presente';
+  });
+}
+
+function discAplicarFiltrosDash(){
+  discFilDesde=document.getElementById('disc-fil-desde')?.value||'';
+  discFilHasta=document.getElementById('disc-fil-hasta')?.value||'';
+  discFilSexo=document.getElementById('disc-fil-sexo')?.value||'';
+  discFilGrupo=document.getElementById('disc-fil-grupo')?.value||'';
+  discRenderDashboard(document.getElementById('disc-content'));
+}
+function discLimpiarFiltrosDash(){
+  discFilDesde=''; discFilHasta=''; discFilSexo=''; discFilGrupo='';
+  discRenderDashboard(document.getElementById('disc-content'));
+}
+function discSetDashView(v){
+  discDashView=v;
+  discRenderDashboard(document.getElementById('disc-content'));
+}
+
 function discRenderDashboard(c){
   // Determine which pasos to show
   var pasosToShow;
@@ -16690,12 +16816,44 @@ function discRenderDashboard(c){
     else inactivos.push(paso);
   });
 
+  var gdvOpts=S.groups.slice().sort(function(a,b){return a.name.localeCompare(b.name);})
+    .map(function(g){return '<option value="'+g.id+'"'+(String(discFilGrupo)===String(g.id)?' selected':'')+'>'+g.name+'</option>';}).join('');
+  var ngOpts=(S.ngComunidades||[]).slice().sort(function(a,b){return a.name.localeCompare(b.name);})
+    .map(function(g){return '<option value="'+g.id+'"'+(String(discFilGrupo)===String(g.id)?' selected':'')+'>'+g.name+'</option>';}).join('');
+
+  var filtrosHtml='<div class="card" style="margin-bottom:1rem;padding:12px 14px">'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+    +'<button class="btn btn-sm '+(discDashView==='indicadores'?'btn-primary':'')+'" onclick="discSetDashView(\'indicadores\')">📊 Indicadores</button>'
+    +'<button class="btn btn-sm '+(discDashView==='detallada'?'btn-primary':'')+'" onclick="discSetDashView(\'detallada\')">📋 Detallada</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
+    +'<div><label class="field-label">Desde</label><input type="date" id="disc-fil-desde" value="'+discFilDesde+'" onchange="discAplicarFiltrosDash()"></div>'
+    +'<div><label class="field-label">Hasta</label><input type="date" id="disc-fil-hasta" value="'+discFilHasta+'" onchange="discAplicarFiltrosDash()"></div>'
+    +'<div><label class="field-label">Sexo</label><select id="disc-fil-sexo" onchange="discAplicarFiltrosDash()">'
+      +'<option value="">Todos</option>'
+      +'<option value="H"'+(discFilSexo==='H'?' selected':'')+'>Hombres</option>'
+      +'<option value="M"'+(discFilSexo==='M'?' selected':'')+'>Mujeres</option>'
+    +'</select></div>'
+    +'<div style="flex:1;min-width:170px"><label class="field-label">Grupo</label><select id="disc-fil-grupo" onchange="discAplicarFiltrosDash()" style="width:100%">'
+      +'<option value="">Todos</option>'
+      +'<optgroup label="Grupos de Vida">'+gdvOpts+'</optgroup>'
+      +'<optgroup label="Nuevas Generaciones">'+ngOpts+'</optgroup>'
+    +'</select></div>'
+    +'<button class="btn btn-sm" onclick="discLimpiarFiltrosDash()">↺ Limpiar</button>'
+    +'</div></div>'
+    +'<div id="disc-dash-body"></div>';
+  c.innerHTML=filtrosHtml;
+
+  var body=document.getElementById('disc-dash-body');
   var html='';
-  activos.forEach(function(item){
-    html+=discDashboardCardHtml(item.paso,item.cursada);
-  });
+  if(discDashView==='detallada'){
+    activos.forEach(function(item){ html+=discDashboardCardHtml(item.paso,item.cursada); });
+  } else {
+    if(!activos.length) html='<div class="empty">No hay Cursadas activas</div>';
+    activos.forEach(function(item){ html+=discIndicadoresCardHtml(item.paso,item.cursada); });
+  }
   if(inactivos.length){
-    html+='<div style="font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);text-transform:uppercase;letter-spacing:.05em;margin:1.5rem 0 .75rem">Sin Cursada activa ahora mismo</div>';
+    html+='<div style="font-size:12px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin:1.5rem 0 .75rem">Sin Cursada activa ahora mismo</div>';
     inactivos.forEach(function(paso){
       html+='<div class="card" style="margin-bottom:.75rem;padding:12px;opacity:.65;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
         +'<span style="font-size:14px;font-weight:600;color:#374151">'+paso.nombre+'</span>'
@@ -16703,7 +16861,77 @@ function discRenderDashboard(c){
       +'</div>';
     });
   }
-  c.innerHTML=html;
+  body.innerHTML=html;
+}
+
+// Vista "Indicadores" — foto global de una Cursada: Inscriptos vs Participando (en el
+// rango Desde/Hasta elegido), Hombres/Mujeres, dónde se reúnen (Grupo de Vida / NG), y un
+// vistazo rápido de cada Grupo que compone la Cursada. Complementa a "Detallada", que
+// sigue mostrando el detalle alumno por alumno.
+function discIndicadoresCardHtml(paso, cursada){
+  var grupos=cursada.grupos||[];
+  var todosMems=(cursada.miembros||[]).map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+  var mems=todosMems.filter(discMiembroPasaFiltroSexoGrupo);
+  var inscriptos=mems.length;
+  var participando=mems.filter(function(m){return discParticipoEnRango(m.id,cursada.id);}).length;
+  var pctPart=inscriptos>0?Math.round(participando/inscriptos*100):0;
+  var hombres=mems.filter(function(m){return m.genero==='H';}).length;
+  var mujeres=mems.filter(function(m){return m.genero==='M';}).length;
+  var pctH=inscriptos>0?Math.round(hombres/inscriptos*100):0;
+  var pctM=inscriptos>0?Math.round(mujeres/inscriptos*100):0;
+  var nivelColors={'Inicial':'#3B82F6','Intermedio':'#8B5CF6','Avanzado':'#EC4899'};
+  var nc=nivelColors[paso.nivel]||'#6B7280';
+
+  var porGrupo={};
+  mems.forEach(function(m){
+    var lbl=m.grupoId?discResolveGrupoLabel(m.grupoId):null;
+    var key=lbl?(lbl.icon+' '+lbl.nombre):'Sin grupo asignado';
+    porGrupo[key]=(porGrupo[key]||0)+1;
+  });
+  var gruposOrdenados=Object.entries(porGrupo).sort(function(a,b){return b[1]-a[1];});
+
+  var html='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #7C3AED">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem">';
+  html+='<div style="display:flex;align-items:center;gap:8px"><div style="font-size:16px;font-weight:700;color:#1F4E79">'+paso.nombre+'</div>';
+  html+='<span style="background:'+nc+'22;color:'+nc+';font-size:11px;padding:2px 10px;border-radius:99px;font-weight:600">'+(paso.nivel||'')+'</span></div>';
+  html+='<span class="badge b-ok">Activo</span></div>';
+
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:1rem">';
+  html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.5rem">'+inscriptos+'</span><span class="stat-lbl">Inscriptos</span></div>';
+  html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.3rem;color:'+(pctPart>=75?'#16A34A':pctPart>=50?'#1F4E79':'#DC2626')+'">'+participando+' ('+pctPart+'%)</span><span class="stat-lbl">Participando</span></div>';
+  html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.2rem;color:#1E40AF">'+hombres+' ('+pctH+'%)</span><span class="stat-lbl">Hombres</span></div>';
+  html+='<div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.2rem;color:#9D174D">'+mujeres+' ('+pctM+'%)</span><span class="stat-lbl">Mujeres</span></div>';
+  html+='</div>';
+
+  if(gruposOrdenados.length){
+    html+='<div style="margin-bottom:1rem">';
+    html+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Dónde se reúnen (Grupo de Vida / Nuevas Generaciones)</div>';
+    gruposOrdenados.forEach(function(entry){
+      var nombre=entry[0], cant=entry[1];
+      var pct=inscriptos>0?Math.round(cant/inscriptos*100):0;
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;border-bottom:1px solid #F3F4F6">'
+        +'<span style="flex:1">'+nombre+'</span><span style="color:#6B7280;font-weight:600">'+cant+' ('+pct+'%)</span></div>';
+    });
+    html+='</div>';
+  }
+
+  if(grupos.length){
+    html+='<div style="font-size:12px;font-weight:600;color:#374151;margin:12px 0 6px">Grupos que componen esta Cursada</div>';
+    var paletaGrupos=['#7C3AED','#0891B2','#16A34A','#D97706','#DB2777','#4338CA','#0D9488','#B45309'];
+    grupos.forEach(function(gr,idx){
+      var colorGrupo=paletaGrupos[idx%paletaGrupos.length];
+      var memsGrupo=mems.filter(function(m){return (gr.miembros||[]).includes(m.id);});
+      var inscGrupo=memsGrupo.length;
+      var partGrupo=memsGrupo.filter(function(m){return discParticipoEnRango(m.id,cursada.id);}).length;
+      var pctGrupo=inscGrupo>0?Math.round(partGrupo/inscGrupo*100):0;
+      html+='<div style="border:2px solid '+colorGrupo+';border-radius:10px;padding:10px 12px;margin-bottom:8px;background:'+colorGrupo+'0D;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'
+        +'<span style="font-size:13px;font-weight:700;color:'+colorGrupo+'">🧑‍🤝‍🧑 '+gr.nombre+'</span>'
+        +'<span style="font-size:12px;color:#374151">👥 '+inscGrupo+' inscriptos · ✅ '+partGrupo+' participando ('+pctGrupo+'%)</span>'
+      +'</div>';
+    });
+  }
+  html+='</div>';
+  return html;
 }
 
 // Arma la tarjeta de Dashboard de UN Curso con Cursada activa — desglosada por Grupo si la
@@ -16711,7 +16939,10 @@ function discRenderDashboard(c){
 function discDashboardCardHtml(paso, cursada){
   var grupos=cursada.grupos||[];
   var mems=(cursada.miembros||[]).map(function(id){return S.members.find(function(m){return m.id===id;});}).filter(Boolean);
+  mems=mems.filter(discMiembroPasaFiltroSexoGrupo);
   var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&!r.sinEncuentro;});
+  if(discFilDesde) recs=recs.filter(function(r){return r.fecha>=discFilDesde;});
+  if(discFilHasta) recs=recs.filter(function(r){return r.fecha<=discFilHasta;});
   var totalEnc=recs.length;
   var capsUsadas=[...new Set(recs.map(function(r){return r.capitulo;}))];
   var nivelColors={'Inicial':'#3B82F6','Intermedio':'#8B5CF6','Avanzado':'#EC4899'};
@@ -19486,6 +19717,8 @@ async function exportarTodo(){
       obsPago:      ofObsPago,
       materias:     ofMaterias,
       cursadas:     ofCursadas,
+      tareaEntregada: ofTareaEntregada,
+      tareaComentario: ofTareaComentario,
     }
   };
   const json = JSON.stringify(backup, null, 2);
@@ -19538,6 +19771,8 @@ async function importarTodo(event){
       ofObsPago       = backup.of.obsPago       || {};
       ofMaterias      = backup.of.materias      || [];
       ofCursadas      = backup.of.cursadas      || [];
+      ofTareaEntregada  = backup.of.tareaEntregada  || {};
+      ofTareaComentario = backup.of.tareaComentario || {};
       ofSaveLocal();
       input.value='';
       // Sync to Firebase after import — bloquear si falla, NO recargar con datos sin confirmar

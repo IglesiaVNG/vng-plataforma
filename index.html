@@ -668,7 +668,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-n';
+const APP_VERSION = '2026-08-24-o';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -9945,8 +9945,8 @@ function buildGdVHTML(){
       <div class="nav" style="margin:.5rem 0 .75rem">
         <button class="nav-btn active" onclick="gdvDashTab('semanas',this)">📋 Semanas</button>
         <button class="nav-btn" onclick="gdvDashTab('evolucion',this)">📈 Evolución</button>
-        <button class="nav-btn" onclick="gdvDashTab('ranking',this)">🏆 Ranking</button>
-        <button class="nav-btn" onclick="gdvDashTab('asistencia',this)">👤 % Asistencia</button>
+        <button class="nav-btn" onclick="gdvDashTab('ranking',this)">🏆 Asistencia</button>
+        <button class="nav-btn" onclick="gdvDashTab('asistencia',this)">👤 Promedios</button>
         <button class="nav-btn" onclick="gdvDashTab('miembros',this)">🙋 Asistencia por Miembros</button>
         <button class="nav-btn" onclick="gdvDashTab('nuevos',this)">🌱 Nuevos</button>
       </div>
@@ -9965,12 +9965,12 @@ function buildGdVHTML(){
       </div>
       <!-- PANEL RANKING -->
       <div id="gdv-panel-ranking" class="gdv-dash-panel" style="display:none">
-        <div class="card"><div class="card-title">🏆 Ranking — Promedio de presentes por encuentro</div><div id="gdv-ranking"></div></div>
+        <div class="card"><div class="card-title">🏆 Asistencia — Promedio de presentes por encuentro</div><div id="gdv-ranking"></div></div>
       </div><!-- end panel-ranking -->
 
       <!-- PANEL ASISTENCIA -->
       <div id="gdv-panel-asistencia" class="gdv-dash-panel" style="display:none">
-        <div class="card"><div class="card-title">📊 % Asistencia por grupo</div><div id="gdv-bars"></div></div>
+        <div class="card"><div class="card-title">📊 Promedios por grupo</div><div id="gdv-bars"></div></div>
     </div><!-- end panel-asistencia -->
 
       <!-- PANEL ASISTENCIA POR MIEMBROS -->
@@ -16822,9 +16822,12 @@ function discRenderDashboard(c){
     .map(function(g){return '<option value="'+g.id+'"'+(String(discFilGrupo)===String(g.id)?' selected':'')+'>'+g.name+'</option>';}).join('');
 
   var filtrosHtml='<div class="card" style="margin-bottom:1rem;padding:12px 14px">'
-    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
     +'<button class="btn btn-sm '+(discDashView==='indicadores'?'btn-primary':'')+'" onclick="discSetDashView(\'indicadores\')">📊 Indicadores</button>'
     +'<button class="btn btn-sm '+(discDashView==='detallada'?'btn-primary':'')+'" onclick="discSetDashView(\'detallada\')">📋 Detallada</button>'
+    +'<button class="btn btn-sm '+(discDashView==='evolucion'?'btn-primary':'')+'" onclick="discSetDashView(\'evolucion\')">📈 Evolución</button>'
+    +'<button class="btn btn-sm '+(discDashView==='asistencia'?'btn-primary':'')+'" onclick="discSetDashView(\'asistencia\')">🏆 Asistencia</button>'
+    +'<button class="btn btn-sm '+(discDashView==='promedios'?'btn-primary':'')+'" onclick="discSetDashView(\'promedios\')">📊 Promedios</button>'
     +'</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
     +'<div><label class="field-label">Desde</label><input type="date" id="disc-fil-desde" value="'+discFilDesde+'" onchange="discAplicarFiltrosDash()"></div>'
@@ -16848,6 +16851,12 @@ function discRenderDashboard(c){
   var html='';
   if(discDashView==='detallada'){
     activos.forEach(function(item){ html+=discDashboardCardHtml(item.paso,item.cursada); });
+  } else if(discDashView==='evolucion'){
+    html='<div class="card"><div class="card-title">📈 Evolución — Presentes por fecha</div><div style="height:220px"><canvas id="disc-chart-evol" style="height:200px"></canvas></div></div>';
+  } else if(discDashView==='asistencia'){
+    html='<div class="card"><div class="card-title">🏆 Asistencia — Promedio de presentes por encuentro</div><div id="disc-ranking"></div></div>';
+  } else if(discDashView==='promedios'){
+    html='<div class="card"><div class="card-title">📊 Promedios por Grupo</div><div id="disc-bars"></div></div>';
   } else {
     if(!activos.length) html='<div class="empty">No hay Cursadas activas</div>';
     activos.forEach(function(item){ html+=discIndicadoresCardHtml(item.paso,item.cursada); });
@@ -16862,6 +16871,158 @@ function discRenderDashboard(c){
     });
   }
   body.innerHTML=html;
+  if(discDashView==='evolucion') discRenderEvolucionChart(pasosToShow);
+  if(discDashView==='asistencia') discRenderAsistenciaRanking(pasosToShow);
+  if(discDashView==='promedios') discRenderPromediosBars(pasosToShow);
+}
+
+// Un encuentro de Discipulado guarda genero embebido en cada entrada de asistencia (igual
+// que GdV) — Sexo se filtra directo ahí; Grupo (de Vida/NG) requiere resolver el miembro,
+// porque es un dato de Rebaños, no del encuentro en sí.
+function discEntradaPasaFiltro(mid, v){
+  if(discFilSexo && v.genero!==discFilSexo) return false;
+  if(discFilGrupo){
+    var m=S.members.find(function(x){return x.id===Number(mid);});
+    if(!m) return false;
+    var gid=Number(discFilGrupo);
+    if(!(Number(m.grupoId)===gid || (m.grupoIds||[]).map(Number).includes(gid))) return false;
+  }
+  return true;
+}
+
+// Todos los discRecords de las Cursadas activas visibles, ya recortados por Desde/Hasta.
+function discGetRecsFiltrados(pasosToShow){
+  var out=[];
+  pasosToShow.forEach(function(paso){
+    var cursada=(S.discCursadas||[]).find(function(cu){return cu.pasoId===paso.id&&cu.estado==='Activo';});
+    if(!cursada) return;
+    var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&!r.sinEncuentro;});
+    if(discFilDesde) recs=recs.filter(function(r){return r.fecha>=discFilDesde;});
+    if(discFilHasta) recs=recs.filter(function(r){return r.fecha<=discFilHasta;});
+    recs.forEach(function(r){ out.push(r); });
+  });
+  return out;
+}
+
+// Una fila por cada Grupo de cada Cursada activa (o la Cursada entera si no tiene Grupos
+// propios) — es el desglose que pidió Marito para Asistencia y Promedios, igual criterio
+// que Grupos de Vida pero a nivel de los Grupos que componen cada Curso de Discipulado.
+function discGetFilasPorGrupo(pasosToShow){
+  var filas=[];
+  var cursosConActiva=pasosToShow.filter(function(p){return (S.discCursadas||[]).some(function(cu){return cu.pasoId===p.id&&cu.estado==='Activo';});});
+  var multiplesCursos=cursosConActiva.length>1;
+  pasosToShow.forEach(function(paso){
+    var cursada=(S.discCursadas||[]).find(function(cu){return cu.pasoId===paso.id&&cu.estado==='Activo';});
+    if(!cursada) return;
+    var recsCursada=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&!r.sinEncuentro;});
+    if(discFilDesde) recsCursada=recsCursada.filter(function(r){return r.fecha>=discFilDesde;});
+    if(discFilHasta) recsCursada=recsCursada.filter(function(r){return r.fecha<=discFilHasta;});
+    var grupos=(cursada.grupos&&cursada.grupos.length)?cursada.grupos:[{id:null,nombre:paso.nombre}];
+    grupos.forEach(function(gr){
+      var recsGrupo=gr.id?recsCursada.filter(function(r){return r.grupoId===gr.id;}):recsCursada;
+      var nombreGrupo=(cursada.grupos&&cursada.grupos.length)?gr.nombre:paso.nombre;
+      filas.push({label: multiplesCursos?(paso.nombre+' — '+nombreGrupo):nombreGrupo, recs:recsGrupo});
+    });
+  });
+  return filas;
+}
+
+function discRenderEvolucionChart(pasosToShow){
+  var canvas=document.getElementById('disc-chart-evol');
+  if(!canvas) return;
+  var recs=discGetRecsFiltrados(pasosToShow);
+  var byWeek={};
+  recs.forEach(function(r){
+    var semana=getISOWeek(r.fecha), anio=r.fecha.substring(0,4);
+    var key=anio+'-S'+String(semana).padStart(2,'0');
+    if(!byWeek[key]) byWeek[key]={h:0,m:0,semana:semana};
+    Object.entries(r.asistencia||{}).forEach(function(entry){
+      var mid=entry[0], v=entry[1];
+      if(!v||v.state!=='presente') return;
+      if(!discEntradaPasaFiltro(mid,v)) return;
+      if(v.genero==='H') byWeek[key].h++; else byWeek[key].m++;
+    });
+  });
+  var sorted=Object.keys(byWeek).sort();
+  var existing=Chart.getChart?Chart.getChart('disc-chart-evol'):null;
+  if(existing) existing.destroy();
+  if(!sorted.length){
+    canvas.parentElement.innerHTML='<div style="height:200px;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:13px">Sin datos para el período/filtros seleccionados</div>';
+    return;
+  }
+  var labels=sorted.map(function(k){return 'Semana '+byWeek[k].semana;});
+  var datasets=[];
+  if(!discFilSexo||discFilSexo==='H') datasets.push({label:'Hombres',data:sorted.map(function(k){return byWeek[k].h;}),borderColor:'#1565C0',backgroundColor:'rgba(21,101,192,0.1)',tension:0.3,fill:true,pointRadius:5});
+  if(!discFilSexo||discFilSexo==='M') datasets.push({label:'Mujeres',data:sorted.map(function(k){return byWeek[k].m;}),borderColor:'#C0006A',backgroundColor:'rgba(192,0,106,0.1)',tension:0.3,fill:true,pointRadius:5});
+  new Chart(canvas,{type:'line',data:{labels:labels,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{precision:0}}},plugins:{legend:{position:'top',labels:{font:{size:11},boxWidth:20}}}}});
+}
+
+function discRenderAsistenciaRanking(pasosToShow){
+  var wrap=document.getElementById('disc-ranking');
+  if(!wrap) return;
+  var filas=discGetFilasPorGrupo(pasosToShow);
+  var data=filas.map(function(f){
+    if(!f.recs.length) return null;
+    var total=0;
+    f.recs.forEach(function(r){
+      Object.entries(r.asistencia||{}).forEach(function(entry){
+        var mid=entry[0], v=entry[1];
+        if(!v||v.state!=='presente') return;
+        if(!discEntradaPasaFiltro(mid,v)) return;
+        total++;
+      });
+    });
+    return {name:f.label, avg:total/f.recs.length, encuentros:f.recs.length, total:total};
+  }).filter(Boolean).sort(function(a,b){return b.avg-a.avg;});
+
+  if(!data.length){ wrap.innerHTML='<div class="empty">Sin datos para el período/filtros seleccionados</div>'; return; }
+  var maxAvg=data[0].avg||1;
+  wrap.innerHTML=data.map(function(d,i){
+    var pctv=Math.round(d.avg/maxAvg*100);
+    var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    var barColor=i===0?'#F59E0B':i===1?'#9CA3AF':i===2?'#CD7C2F':'#1F4E79';
+    return '<div style="margin-bottom:12px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+      +'<span style="font-size:13px;font-weight:600">'+medal+' #'+(i+1)+' '+d.name+'</span>'
+      +'<span style="font-size:13px;color:#6B7280"><strong style="color:#1F4E79">'+d.avg.toFixed(1)+'</strong> prom · '+d.encuentros+' encuentro'+(d.encuentros!==1?'s':'')+' · '+d.total+' presentes</span>'
+      +'</div>'
+      +'<div class="pbar-bg"><div style="height:8px;border-radius:999px;background:'+barColor+';width:'+pctv+'%;transition:width .3s"></div></div>'
+      +'</div>';
+  }).join('');
+}
+
+function discRenderPromediosBars(pasosToShow){
+  var wrap=document.getElementById('disc-bars');
+  if(!wrap) return;
+  var filas=discGetFilasPorGrupo(pasosToShow);
+  var data=filas.map(function(f){
+    if(!f.recs.length) return null;
+    var totalPre=0, totalPosibles=0;
+    f.recs.forEach(function(r){
+      Object.entries(r.asistencia||{}).forEach(function(entry){
+        var mid=entry[0], v=entry[1];
+        if(!v) return;
+        if(!discEntradaPasaFiltro(mid,v)) return;
+        totalPosibles++;
+        if(v.state==='presente') totalPre++;
+      });
+    });
+    var p=totalPosibles>0?Math.round(totalPre/totalPosibles*100):0;
+    var avgPre=f.recs.length>0?(totalPre/f.recs.length).toFixed(1):0;
+    return {name:f.label, pre:totalPre, tot:totalPosibles, p:p, avgPre:avgPre, encuentros:f.recs.length};
+  }).filter(Boolean).sort(function(a,b){return b.p-a.p;});
+
+  if(!data.length){ wrap.innerHTML='<div class="empty">Sin datos para el período/filtros seleccionados</div>'; return; }
+  wrap.innerHTML='<div style="font-size:11px;color:#6B7280;margin-bottom:12px;padding:6px 8px;background:#F9FAFB;border-radius:6px">📊 Promedio del período ('+(discFilDesde?fmt(discFilDesde):'inicio')+' → '+(discFilHasta?fmt(discFilHasta):'hoy')+') — presentes acumulados / posibles</div>'
+    +data.map(function(r){
+      return '<div style="margin-bottom:10px">'
+        +'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;flex-wrap:wrap;gap:4px">'
+        +'<span style="font-weight:500">'+r.name+'</span>'
+        +'<span style="color:#6B7280">'+r.pre+'/'+r.tot+' — <strong style="color:#1F4E79">'+r.p+'%</strong><span style="font-size:11px;color:#9CA3AF"> · prom '+r.avgPre+'/enc · '+r.encuentros+' enc.</span></span>'
+        +'</div>'
+        +'<div class="pbar-bg"><div class="pbar-fill" style="width:'+r.p+'%;background:'+(r.p>=75?'#16A34A':r.p>=50?'#1F4E79':'#DC2626')+'"></div></div>'
+        +'</div>';
+    }).join('');
 }
 
 // Vista "Indicadores" — foto global de una Cursada: Inscriptos vs Participando (en el

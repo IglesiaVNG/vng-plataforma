@@ -668,7 +668,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-q';
+const APP_VERSION = '2026-08-24-r';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -13601,14 +13601,59 @@ function ofExportar(){
 // NUEVOS CONTACTOS MODULE
 // ════════════════════════════════════════════════════════════
 function openNuevos(){
-  nvFiltro='ultimos30'; // reset to default on every open
+  nvFiltro='nuevos'; // reset to default on every open
   document.getElementById('screen-home').classList.add('hidden');
   document.getElementById('screen-app').classList.add('show');
   document.getElementById('app-topbar-title').textContent='🌱 Nuevos Contactos';
   document.getElementById('app-topbar-user').textContent=currentUser.name;
   document.getElementById('app-content').innerHTML=buildNuevosHTML();
+  var rd=nvRangoDefault();
+  var elD=document.getElementById('nv-fil-desde'); if(elD) elD.value=rd.desde;
+  var elH=document.getElementById('nv-fil-hasta'); if(elH) elH.value=rd.hasta;
   renderNuevos();
   setTimeout(nvCumplesBanner, 100);
+}
+
+// Rango por defecto de Nuevos Contactos: la semana ISO en curso + las dos anteriores
+// (3 semanas en total) — mismo criterio que la ventana de carga del resto de la app.
+function nvRangoDefault(){
+  var hoy=new Date(); hoy.setHours(0,0,0,0);
+  var dow=hoy.getDay();
+  var diffALunes=(dow===0?-6:1-dow);
+  var lunesEstaSemana=new Date(hoy); lunesEstaSemana.setDate(hoy.getDate()+diffALunes);
+  var lunesLimite=new Date(lunesEstaSemana); lunesLimite.setDate(lunesEstaSemana.getDate()-14);
+  return {desde:dateToStr(lunesLimite), hasta:dateToStr(hoy)};
+}
+
+function nvVerTodos(){
+  var d=document.getElementById('nv-fil-desde'); if(d) d.value='';
+  var h=document.getElementById('nv-fil-hasta'); if(h) h.value='';
+  renderNuevos();
+}
+
+function nvResetRango(){
+  var rd=nvRangoDefault();
+  var d=document.getElementById('nv-fil-desde'); if(d) d.value=rd.desde;
+  var h=document.getElementById('nv-fil-hasta'); if(h) h.value=rd.hasta;
+  renderNuevos();
+}
+
+// Filtra por fechaRegistro (guardada como DD/MM/AAAA) contra el rango Desde/Hasta elegido.
+// Sin fechas cargadas en ninguno de los dos campos = "Todos", no filtra nada.
+function nvFiltraPorFecha(members){
+  var desdeStr=document.getElementById('nv-fil-desde')?.value||'';
+  var hastaStr=document.getElementById('nv-fil-hasta')?.value||'';
+  if(!desdeStr&&!hastaStr) return members;
+  var desdeD=desdeStr?parseLocalDate(desdeStr):null;
+  var hastaD=hastaStr?parseLocalDate(hastaStr):null;
+  if(hastaD) hastaD.setHours(23,59,59,999);
+  return members.filter(function(m){
+    var fReg=nvFechaRegDate(m);
+    if(!fReg) return true; // sin fecha o inválida → mostrar siempre
+    if(desdeD&&fReg<desdeD) return false;
+    if(hastaD&&fReg>hastaD) return false;
+    return true;
+  });
 }
 
 function buildNuevosHTML(){
@@ -13621,14 +13666,19 @@ function buildNuevosHTML(){
 
     <!-- Filtros -->
     <div class="nav" style="margin-bottom:.75rem">
-      <button class="nav-btn active" id="nv-btn-u30" onclick="nvSetFiltro('ultimos30',this)">📅 Últimos 30 días</button>
-      <button class="nav-btn" id="nv-btn-m30" onclick="nvSetFiltro('mas30',this)">🕐 Más de 30 días</button>
+      <button class="nav-btn active" id="nv-btn-nuevos" onclick="nvSetFiltro('nuevos',this)">🌱 Nuevos</button>
       <button class="nav-btn" id="nv-btn-hist" onclick="nvSetFiltro('historico',this)">📁 Histórico</button>
       <button class="nav-btn" id="nv-btn-dash" onclick="nvSetFiltro('dashboard',this)">📊 Dashboard</button>
       <button class="nav-btn" id="nv-btn-camp" onclick="nvSetFiltro('campana',this)">🌳 Campaña</button>
     </div>
 
     <div id="nv-list-section">
+    <div style="display:flex;gap:8px;margin-bottom:1rem;align-items:flex-end;flex-wrap:wrap">
+      <div><label class="field-label">Desde</label><input type="date" id="nv-fil-desde" onchange="renderNuevos()"></div>
+      <div><label class="field-label">Hasta</label><input type="date" id="nv-fil-hasta" onchange="renderNuevos()"></div>
+      <button class="btn btn-sm" onclick="nvVerTodos()" title="Ignora las fechas y muestra todos los Nuevos Contactos">Todos</button>
+      <button class="btn btn-sm" onclick="nvResetRango()" title="Volver a las últimas 3 semanas">🔄</button>
+    </div>
     <div style="display:flex;gap:6px;margin-bottom:1rem;align-items:center;flex-wrap:nowrap">
       <input type="text" id="nv-search" placeholder="Buscar..." onkeyup="renderNuevos()" style="flex:1.4;min-width:0">
       <select id="nv-fil-gen" onchange="renderNuevos()" style="flex:0 0 62px;padding-left:4px;padding-right:2px">
@@ -13946,7 +13996,7 @@ function buildNuevosHTML(){
 }
 
 let nvSelectedId=null;
-let nvFiltro='ultimos30'; // 'ultimos30' | 'mas30' | 'historico'
+let nvFiltro='nuevos'; // 'nuevos' | 'historico'
 let nvDraftSeguimientoId=null, nvDraftSeguimientoNombre=null, nvDraftSeguimientoSet=false;
 const NV_SUBESTADO_ORDEN={Ingresado:0,Contactado:1,Participando:2};
 
@@ -14047,24 +14097,13 @@ function renderNuevos(){
     rsel.value=prevVal;
   }
 
-  const hoy=new Date(); hoy.setHours(0,0,0,0);
-  const hace30=new Date(hoy); hace30.setDate(hace30.getDate()-30);
-
   let members;
   if(nvFiltro==='historico'){
     // Include both new-style (condicion='Historico') and old-style (estado='Baja') contacts
     members=S.members.filter(m=>m.condicion==='Historico'||m.estado==='Baja');
   } else {
     members=S.members.filter(m=>m.condicion==='Nuevo'&&m.estado!=='Baja');
-    members=members.filter(m=>{
-      const partes=(m.fechaRegistro||'').split('/');
-      if(partes.length<3) return true; // sin fecha → mostrar siempre
-      let yy=parseInt(partes[2]);
-      if(yy<100) yy+=2000; // handle 2-digit year
-      const fReg=new Date(yy,+partes[1]-1,+partes[0]);
-      if(isNaN(fReg.getTime())) return true; // fecha inválida → mostrar siempre
-      return nvFiltro==='ultimos30' ? fReg>=hace30 : fReg<hace30;
-    });
+    members=nvFiltraPorFecha(members);
   }
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);
@@ -19751,24 +19790,13 @@ function exportNuevosExcel(){
   const fSubEstado=document.getElementById('nv-fil-subestado')?.value||'';
   const fResponsable=document.getElementById('nv-fil-responsable')?.value||'';
   const fOrigen=document.getElementById('nv-fil-origen')?.value||'';
-  const hoy=new Date(); hoy.setHours(0,0,0,0);
-  const hace30=new Date(hoy); hace30.setDate(hace30.getDate()-30);
-
   let members;
   if(nvFiltro==='historico'){
     // Include both new-style (condicion='Historico') and old-style (estado='Baja') contacts
     members=S.members.filter(m=>m.condicion==='Historico'||m.estado==='Baja');
   } else {
     members=S.members.filter(m=>m.condicion==='Nuevo'&&m.estado!=='Baja');
-    members=members.filter(m=>{
-      const partes=(m.fechaRegistro||'').split('/');
-      if(partes.length<3) return true; // sin fecha → mostrar siempre
-      let yy=parseInt(partes[2]);
-      if(yy<100) yy+=2000; // handle 2-digit year
-      const fReg=new Date(yy,+partes[1]-1,+partes[0]);
-      if(isNaN(fReg.getTime())) return true; // fecha inválida → mostrar siempre
-      return nvFiltro==='ultimos30' ? fReg>=hace30 : fReg<hace30;
-    });
+    members=nvFiltraPorFecha(members);
   }
   if(search) members=members.filter(m=>fullName(m).toLowerCase().includes(search));
   if(fGrupo) members=members.filter(m=>m.grupoId===fGrupo);

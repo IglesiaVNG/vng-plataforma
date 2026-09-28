@@ -668,7 +668,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-o';
+const APP_VERSION = '2026-08-24-q';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -11388,6 +11388,21 @@ function gdvRenderAdmChartFiltered(recs){
     borderColor:'#C0006A',backgroundColor:'rgba(192,0,106,0.1)',tension:0.3,fill:true,pointRadius:5
   });
 
+  // Línea de referencia: promedio de presentes por semana en TODO el período consultado
+  // (suma Hombres+Mujeres salvo que haya un filtro de Sexo activo, en cuyo caso promedia
+  // solo esa serie) — una línea plana punteada, no un dato más de la evolución semana a semana.
+  var totalesPorSemana=sorted.map(function(k){
+    if(gdvFilSexo==='H') return byWeek[k].h;
+    if(gdvFilSexo==='M') return byWeek[k].m;
+    return byWeek[k].h+byWeek[k].m;
+  });
+  var promedioPeriodo=totalesPorSemana.length?(totalesPorSemana.reduce(function(a,b){return a+b;},0)/totalesPorSemana.length):0;
+  datasets.push({
+    label:'Promedio del período ('+promedioPeriodo.toFixed(1)+')',
+    data:labels.map(function(){return promedioPeriodo;}),
+    borderColor:'#6B7280',borderDash:[6,4],borderWidth:2,fill:false,pointRadius:0,tension:0
+  });
+
   gdvCharts.adm=new Chart(canvas,{
     type:'line',
     data:{labels:labels,datasets:datasets},
@@ -16954,6 +16969,13 @@ function discRenderEvolucionChart(pasosToShow){
   var datasets=[];
   if(!discFilSexo||discFilSexo==='H') datasets.push({label:'Hombres',data:sorted.map(function(k){return byWeek[k].h;}),borderColor:'#1565C0',backgroundColor:'rgba(21,101,192,0.1)',tension:0.3,fill:true,pointRadius:5});
   if(!discFilSexo||discFilSexo==='M') datasets.push({label:'Mujeres',data:sorted.map(function(k){return byWeek[k].m;}),borderColor:'#C0006A',backgroundColor:'rgba(192,0,106,0.1)',tension:0.3,fill:true,pointRadius:5});
+  var totalesPorSemana=sorted.map(function(k){
+    if(discFilSexo==='H') return byWeek[k].h;
+    if(discFilSexo==='M') return byWeek[k].m;
+    return byWeek[k].h+byWeek[k].m;
+  });
+  var promedioPeriodo=totalesPorSemana.length?(totalesPorSemana.reduce(function(a,b){return a+b;},0)/totalesPorSemana.length):0;
+  datasets.push({label:'Promedio del período ('+promedioPeriodo.toFixed(1)+')',data:labels.map(function(){return promedioPeriodo;}),borderColor:'#6B7280',borderDash:[6,4],borderWidth:2,fill:false,pointRadius:0,tension:0});
   new Chart(canvas,{type:'line',data:{labels:labels,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{precision:0}}},plugins:{legend:{position:'top',labels:{font:{size:11},boxWidth:20}}}}});
 }
 
@@ -18892,7 +18914,9 @@ function discRenderRegistros(c){
     '<div class="card" style="margin-bottom:1rem">'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
         +'<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Curso</label>'
-          +'<select id="disc-rf-paso" onchange="discRenderRegistrosList()" style="min-width:170px">'+pasoOpts+'</select></div>'
+          +'<select id="disc-rf-paso" onchange="discPopularFiltroGrupoRegistros();discRenderRegistrosList()" style="min-width:170px">'+pasoOpts+'</select></div>'
+        +'<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Grupo</label>'
+          +'<select id="disc-rf-grupo" onchange="discRenderRegistrosList()" style="min-width:160px" disabled><option value="">Todos</option></select></div>'
         +'<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Desde</label>'
           +'<input type="date" id="disc-rf-desde" onchange="discRenderRegistrosList()"></div>'
         +'<div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Hasta</label>'
@@ -18904,7 +18928,31 @@ function discRenderRegistros(c){
   var rd=registrosRangoDefault();
   var elD=document.getElementById('disc-rf-desde'); if(elD) elD.value=rd.desde;
   var elH=document.getElementById('disc-rf-hasta'); if(elH) elH.value=rd.hasta;
+  discPopularFiltroGrupoRegistros();
   discRenderRegistrosList();
+}
+
+// El desplegable de Grupo depende del Curso elegido: toma los Grupos de la Cursada ACTIVA
+// de ese Curso (si tiene varios funcionando en paralelo, como "Una Vida con Propósito" con
+// sus 5 Grupos). Con "Todos" los Cursos no tiene sentido — queda deshabilitado.
+function discPopularFiltroGrupoRegistros(){
+  var selGrupo=document.getElementById('disc-rf-grupo');
+  if(!selGrupo) return;
+  var valorPrevio=selGrupo.value;
+  var fp=document.getElementById('disc-rf-paso')?.value||'';
+  var cursadaActiva=fp?(S.discCursadas||[]).find(function(cu){return String(cu.pasoId)===fp&&cu.estado==='Activo';}):null;
+  var grupos=cursadaActiva?(cursadaActiva.grupos||[]):[];
+  if(!fp||!grupos.length){
+    selGrupo.innerHTML='<option value="">Todos</option>';
+    selGrupo.disabled=true;
+    selGrupo.value='';
+    return;
+  }
+  selGrupo.disabled=false;
+  selGrupo.innerHTML='<option value="">Todos los Grupos</option>'+grupos.map(function(g){
+    return '<option value="'+g.id+'">'+g.nombre+'</option>';
+  }).join('');
+  if(valorPrevio&&grupos.some(function(g){return String(g.id)===valorPrevio;})) selGrupo.value=valorPrevio;
 }
 
 function discResetRegFiltros(){
@@ -18913,6 +18961,7 @@ function discResetRegFiltros(){
   if((el=document.getElementById('disc-rf-paso'))) el.value='';
   if((el=document.getElementById('disc-rf-desde'))) el.value=rd.desde;
   if((el=document.getElementById('disc-rf-hasta'))) el.value=rd.hasta;
+  discPopularFiltroGrupoRegistros();
   discRenderRegistrosList();
 }
 
@@ -18920,10 +18969,12 @@ function discRenderRegistrosList(){
   var wrap=document.getElementById('disc-registros-lista');
   if(!wrap) return;
   var fp=document.getElementById('disc-rf-paso')?.value||'';
+  var fg=document.getElementById('disc-rf-grupo')?.value||'';
   var fd=document.getElementById('disc-rf-desde')?.value||'';
   var fh=document.getElementById('disc-rf-hasta')?.value||'';
   var recs=(S.discRecords||[]).filter(function(r){
     if(fp&&String(r.pasoId)!==fp) return false;
+    if(fg&&String(r.grupoId||'')!==fg) return false;
     if(fd&&r.fecha<fd) return false;
     if(fh&&r.fecha>fh) return false;
     return true;

@@ -668,7 +668,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-s';
+const APP_VERSION = '2026-08-24-t';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -11300,7 +11300,7 @@ function gdvRenderWeeklyStatus(){
 
   // Por cada Grupo × Semana: 'completo' (hubo encuentro con asistencia) | 'sin-encuentro'
   // (se marcó explícitamente sin encuentro) | 'pendiente' (ya pasó la semana y no se cargó
-  // nada) | 'futuro' (la semana todavía no llegó — no cuenta como pendiente)
+  // nada) | 'en-curso' (la semana todavía no terminó — no cuenta como pendiente)
   var matriz = grupos.map(function(g){
     var celdas = semanas.map(function(sem){
       var recs = S.records.filter(function(r){ return r.grupoId===g.id && r.fecha>=sem.desde && r.fecha<=sem.hasta; });
@@ -11308,20 +11308,17 @@ function gdvRenderWeeklyStatus(){
       var tieneSinEnc = recs.some(function(r){ return r.sinEncuentro; });
       if(tieneEnc) return 'completo';
       if(tieneSinEnc) return 'sin-encuentro';
-      return sem.hasta > hoy ? 'futuro' : 'pendiente';
+      return sem.hasta > hoy ? 'en-curso' : 'pendiente';
     });
-    var faltan = celdas.filter(function(e){ return e==='pendiente'; }).length;
-    return {g:g, celdas:celdas, faltan:faltan};
+    return {g:g, celdas:celdas};
   });
 
   var coloresCelda = {
     completo:       {bg:'#DCFCE7', color:'#166534', label:'Completo'},
     'sin-encuentro':{bg:'#EDE9FE', color:'#5B21B6', label:'Sin Enc.'},
     pendiente:      {bg:'#FEE2E2', color:'#991B1B', label:'Pendiente'},
-    futuro:         {bg:'#F3F4F6', color:'#9CA3AF', label:'—'}
+    'en-curso':     {bg:'#F3F4F6', color:'#9CA3AF', label:'En Curso'}
   };
-
-  var totalFaltan = matriz.reduce(function(a,x){ return a+x.faltan; }, 0);
 
   var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">';
   html += '<div>';
@@ -11330,7 +11327,7 @@ function gdvRenderWeeklyStatus(){
   html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#16A34A;vertical-align:middle;margin-right:4px"></span>Completo</span>';
   html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#7C3AED;vertical-align:middle;margin-right:4px"></span>Sin Encuentro</span>';
   html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#DC2626;vertical-align:middle;margin-right:4px"></span>Pendiente</span>';
-  html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#D1D5DB;vertical-align:middle;margin-right:4px"></span>Todavía no llega</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#D1D5DB;vertical-align:middle;margin-right:4px"></span>En Curso</span>';
   html += '</div></div>';
   html += '<div style="font-size:12px;color:#9CA3AF;font-style:italic">Cambiá las fechas arriba para filtrar</div>';
   html += '</div>';
@@ -11340,13 +11337,12 @@ function gdvRenderWeeklyStatus(){
   html += '<thead><tr>';
   html += '<th style="text-align:left;padding:7px 12px;background:#1F4E79;color:#fff;position:sticky;left:0;z-index:1">Grupo</th>';
   semanas.forEach(function(sem){
-    html += '<th style="padding:7px 6px;background:#1F4E79;color:#fff;text-align:center;min-width:66px">S'+sem.n+'<div style="font-size:10px;font-weight:400;opacity:.85">'+fmtDDMM(sem.desde)+' al '+fmtDDMM(sem.hasta)+'</div></th>';
+    html += '<th style="padding:7px 6px;background:#1F4E79;color:#fff;text-align:center;min-width:66px">Sem. '+getISOWeek(sem.desde)+'<div style="font-size:10px;font-weight:400;opacity:.85">'+fmtDDMM(sem.desde)+' al '+fmtDDMM(sem.hasta)+'</div></th>';
   });
-  html += '<th style="padding:7px 10px;background:#374151;color:#fff;text-align:center;min-width:56px">Faltan</th>';
   html += '</tr></thead><tbody>';
 
   if(!matriz.length){
-    html += '<tr><td colspan="'+(semanas.length+2)+'" style="padding:1.5rem;text-align:center;color:#9CA3AF">No hay Grupos que coincidan con el filtro</td></tr>';
+    html += '<tr><td colspan="'+(semanas.length+1)+'" style="padding:1.5rem;text-align:center;color:#9CA3AF">No hay Grupos que coincidan con el filtro</td></tr>';
   }
 
   matriz.forEach(function(fila,i){
@@ -11357,9 +11353,6 @@ function gdvRenderWeeklyStatus(){
       var c = coloresCelda[estado];
       html += '<td style="padding:4px"><div style="padding:4px 4px;border-radius:5px;background:'+c.bg+';color:'+c.color+';font-weight:600;font-size:10.5px;text-align:center">'+c.label+'</div></td>';
     });
-    var faltanColor = fila.faltan===0 ? '#DCFCE7' : fila.faltan<=2 ? '#FEF3C7' : '#FEE2E2';
-    var faltanTexto = fila.faltan===0 ? '#166534' : fila.faltan<=2 ? '#92400E' : '#991B1B';
-    html += '<td style="padding:4px;text-align:center"><span style="display:inline-block;min-width:22px;padding:3px 8px;border-radius:5px;background:'+faltanColor+';color:'+faltanTexto+';font-weight:700">'+fila.faltan+'</span></td>';
     html += '</tr>';
   });
 
@@ -11370,7 +11363,6 @@ function gdvRenderWeeklyStatus(){
       var pend = matriz.reduce(function(a,fila){ return a + (fila.celdas[idx]==='pendiente'?1:0); }, 0);
       html += '<td style="padding:4px;text-align:center;color:#374151">'+pend+'</td>';
     });
-    html += '<td style="padding:4px;text-align:center;color:#374151">'+totalFaltan+'</td>';
     html += '</tr>';
   }
 

@@ -668,7 +668,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-t';
+const APP_VERSION = '2026-08-24-u';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -1745,54 +1745,90 @@ function ngRenderDashStats(){
 function ngRenderSemanas(){
   var p=document.getElementById('ng-panel-semanas');
   if(!p) return;
-  var recs=ngGetFilteredRecords().sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
+
+  var startStr = ngFilDesde || dateToStr(getWeekDates(0).start);
+  var endStr   = ngFilHasta || dateToStr(getWeekDates(0).end);
+  var periodoLabel = fmt(startStr) + ' al ' + fmt(endStr);
+  var hoy = today();
+
   var comsActivas=(S.ngComunidades||[]).filter(function(c){return c.estado!=='Inactivo';});
-  var coms=(ngFilComunidad?comsActivas.filter(function(c){return Number(c.id)===Number(ngFilComunidad);}):comsActivas);
-  if(!coms.length||!recs.length){p.innerHTML='<div class="empty">Sin datos</div>';return;}
-  // Get unique weeks
-  var weeks=[];
-  var weekSet={};
-  recs.forEach(function(r){var w=getWeekKey(r.fecha);if(!weekSet[w]){weekSet[w]=true;weeks.push(w);}});
-  weeks.sort(function(a,b){return b.localeCompare(a);});
-  var html='<div class="card"><div class="card-title">📋 Estado por semana</div>';
-  weeks.forEach(function(wk){
-    html+='<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:8px;border-bottom:1px solid #F3F4F6;padding-bottom:4px">Semana del '+wk+'</div>';
-    coms.forEach(function(com){
-      var comRecs=recs.filter(function(r){return Number(r.comunidadId)===Number(com.id)&&getWeekKey(r.fecha)===wk;});
-      if(!comRecs.length){
-        html+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0">'+
-          '<span style="font-size:13px;font-weight:600;flex:1">'+com.name+'</span>'+
-          '<span style="font-size:12px;color:#9CA3AF;background:#F3F4F6;padding:3px 10px;border-radius:6px">Sin registro</span>'+
-        '</div>';
-        return;
-      }
-      comRecs.forEach(function(r){
-        if(r.sinEncuentro){
-          html+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0">'+
-            '<span style="font-size:13px;font-weight:600;flex:1">'+com.name+(r.encuentroNum===2?' (2°)':'')+'</span>'+
-            '<span style="font-size:12px;color:#92400E;background:#FEF3C7;padding:3px 10px;border-radius:6px">Sin encuentro</span>'+
-          '</div>';
-          return;
-        }
-        var att=Object.values(r.asistencia||{});
-        var main=att.filter(ngMatchesSexoFilter);
-        var pres=main.filter(function(a){return a.state==='presente';}).length;
-        var tot=main.length;
-        var pct=tot?Math.round(pres/tot*100):0;
-        var col=pct>=75?'#16A34A':pct>=50?'#D97706':'#DC2626';
-        var bg=pct>=75?'#DCFCE7':pct>=50?'#FEF3C7':'#FEE2E2';
-        html+='<div style="padding:6px 0">'+
-          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">'+
-            '<span style="font-size:13px;font-weight:600;flex:1">'+com.name+(r.encuentroNum===2?' (2°)':'')+'</span>'+
-            '<span style="font-size:12px;font-weight:700;color:'+col+';background:'+bg+';padding:3px 10px;border-radius:6px">'+pres+'/'+tot+' — '+pct+'%</span>'+
-          '</div>'+
-          '<div style="height:6px;background:#F3F4F6;border-radius:4px"><div style="height:6px;background:'+col+';border-radius:4px;width:'+pct+'%"></div></div>'+
-        '</div>';
-      });
+  var coms = ngFilComunidad ? comsActivas.filter(function(c){return Number(c.id)===Number(ngFilComunidad);}) : comsActivas;
+
+  var semanas = gdvEnumerarSemanas(startStr, endStr);
+  var demasiadas = semanas.length > 12;
+  if(demasiadas) semanas = semanas.slice(-12); // últimas 12 columnas, para que la grilla siga siendo legible
+
+  // Por cada Comunidad × Semana: 'completo' (hubo encuentro con asistencia) | 'sin-encuentro'
+  // (se marcó explícitamente sin encuentro) | 'pendiente' (ya pasó la semana y no se cargó
+  // nada) | 'en-curso' (la semana todavía no terminó — no cuenta como pendiente)
+  var matriz = coms.map(function(com){
+    var celdas = semanas.map(function(sem){
+      var recs = (S.ngRecords||[]).filter(function(r){ return Number(r.comunidadId)===Number(com.id) && r.fecha>=sem.desde && r.fecha<=sem.hasta; });
+      var tieneEnc = recs.some(function(r){ return !r.sinEncuentro; });
+      var tieneSinEnc = recs.some(function(r){ return r.sinEncuentro; });
+      if(tieneEnc) return 'completo';
+      if(tieneSinEnc) return 'sin-encuentro';
+      return sem.hasta > hoy ? 'en-curso' : 'pendiente';
     });
-    html+='</div>';
+    return {com:com, celdas:celdas};
   });
-  html+='</div>';
+
+  var coloresCelda = {
+    completo:       {bg:'#DCFCE7', color:'#166534', label:'Completo'},
+    'sin-encuentro':{bg:'#EDE9FE', color:'#5B21B6', label:'Sin Enc.'},
+    pendiente:      {bg:'#FEE2E2', color:'#991B1B', label:'Pendiente'},
+    'en-curso':     {bg:'#F3F4F6', color:'#9CA3AF', label:'En Curso'}
+  };
+
+  var html='<div class="card"><div class="card-title">📋 Estado por semana</div>';
+
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">';
+  html += '<div>';
+  html += '<div style="font-size:14px;font-weight:600;color:#1F4E79">Período: ' + periodoLabel + (demasiadas?' <span style="font-weight:400;color:#9CA3AF">(mostrando las últimas 12 semanas)</span>':'') + '</div>';
+  html += '<div style="font-size:12px;color:#6B7280;margin-top:5px;display:flex;gap:12px;flex-wrap:wrap">';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#16A34A;vertical-align:middle;margin-right:4px"></span>Completo</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#7C3AED;vertical-align:middle;margin-right:4px"></span>Sin Encuentro</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#DC2626;vertical-align:middle;margin-right:4px"></span>Pendiente</span>';
+  html += '<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#D1D5DB;vertical-align:middle;margin-right:4px"></span>En Curso</span>';
+  html += '</div></div>';
+  html += '<div style="font-size:12px;color:#9CA3AF;font-style:italic">Cambiá las fechas arriba para filtrar</div>';
+  html += '</div>';
+
+  html += '<div style="overflow-x:auto">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap">';
+  html += '<thead><tr>';
+  html += '<th style="text-align:left;padding:7px 12px;background:#1F4E79;color:#fff;position:sticky;left:0;z-index:1">Comunidad</th>';
+  semanas.forEach(function(sem){
+    html += '<th style="padding:7px 6px;background:#1F4E79;color:#fff;text-align:center;min-width:66px">Sem. '+getISOWeek(sem.desde)+'<div style="font-size:10px;font-weight:400;opacity:.85">'+fmtDDMM(sem.desde)+' al '+fmtDDMM(sem.hasta)+'</div></th>';
+  });
+  html += '</tr></thead><tbody>';
+
+  if(!matriz.length){
+    html += '<tr><td colspan="'+(semanas.length+1)+'" style="padding:1.5rem;text-align:center;color:#9CA3AF">No hay Comunidades que coincidan con el filtro</td></tr>';
+  }
+
+  matriz.forEach(function(fila,i){
+    var bgFila = i%2===0 ? '#fff' : '#F9FAFB';
+    html += '<tr style="background:'+bgFila+'">';
+    html += '<td style="padding:6px 12px;font-weight:600;color:#1F2937;position:sticky;left:0;background:'+bgFila+'">'+fila.com.name+'</td>';
+    fila.celdas.forEach(function(estado){
+      var c = coloresCelda[estado];
+      html += '<td style="padding:4px"><div style="padding:4px 4px;border-radius:5px;background:'+c.bg+';color:'+c.color+';font-weight:600;font-size:10.5px;text-align:center">'+c.label+'</div></td>';
+    });
+    html += '</tr>';
+  });
+
+  if(matriz.length){
+    html += '<tr style="background:#E5E7EB;font-weight:700">';
+    html += '<td style="padding:6px 12px;color:#374151;position:sticky;left:0;background:#E5E7EB">Pendientes por semana</td>';
+    semanas.forEach(function(sem,idx){
+      var pend = matriz.reduce(function(a,fila){ return a + (fila.celdas[idx]==='pendiente'?1:0); }, 0);
+      html += '<td style="padding:4px;text-align:center;color:#374151">'+pend+'</td>';
+    });
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div></div>';
   p.innerHTML=html;
 }
 

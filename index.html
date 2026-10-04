@@ -668,7 +668,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-z';
+const APP_VERSION = '2026-08-24-zb';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -797,7 +797,11 @@ const MODULES_PERM=[
     {key:'miembros_editar',label:'Editar y agregar miembros'},
   ]},
   {key:'nuevos', label:'Nuevos Contactos', icon:'🌱', screens:[
-    {key:'nuevos', label:'Gestión de nuevos contactos'},
+    {key:'nuevos', label:'Acceso a Nuevos Contactos (Ejecuta: además puede comentar cualquier contacto)'},
+    {key:'nuevos_editar',    label:'Editar los datos de un contacto'},
+    {key:'nuevos_contactar', label:'Contactar (registrar el primer contacto y autoasignarse seguimiento)'},
+    {key:'nuevos_gestionar', label:'Gestionar (cambiar condición, asignar seguimiento y grupo)'},
+    {key:'nuevos_eliminar',  label:'Eliminar contactos (definitivo, no se puede deshacer)'},
     {key:'nuevos_mensaje_wa', label:'Editar el mensaje de WhatsApp'},
   ]},
   {key:'of', label:'Orientación Familiar', icon:'👨‍👩‍👧', screens:[
@@ -836,7 +840,7 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',formularios_todos:'ejecuta'},
+  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',formularios_todos:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_editar:'ejecuta'},
   lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
@@ -845,7 +849,7 @@ const DEFAULT_PERMISOS={
   disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
-  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'}
+  contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_contactar:'ejecuta',nuevos_gestionar:'ninguno',nuevos_eliminar:'ninguno'}
 };
 
 let PERMISOS={};
@@ -952,6 +956,16 @@ function loadPermisos(){
 // un dispositivo atrasado) no deje a nadie sin un acceso que ya tenía por defecto.
 function permisosCompletarFaltantes(){
   var needsSave=false;
+  // Casilleros que nacen de PARTIR uno existente (hoy: Contactar/Gestionar salen de "Ejecuta" en
+  // Nuevos Contactos). Al crearse heredan ese valor, así al publicar NADIE gana ni pierde un
+  // acceso que ya tenía. Un valor explícito en DEFAULT_PERMISOS para esa Función tiene prioridad.
+  // 'si' = valores del casillero original que alcanzan para heredar "Ejecuta" en el nuevo.
+  var HEREDA_DE={
+    nuevos_contactar:{de:'nuevos', si:['ejecuta']},
+    nuevos_gestionar:{de:'nuevos', si:['ejecuta']},
+    // Editar no tenía permiso propio: lo podía hacer cualquiera con acceso al módulo (Ver o Ejecuta)
+    nuevos_editar:   {de:'nuevos', si:['consulta','ejecuta']}
+  };
   // Add any DEFAULT roles missing from PERMISOS
   // Solo agregar roles completamente nuevos que no existen en absoluto
   // NUNCA modificar permisos existentes — el Super Admin tiene control total
@@ -969,7 +983,11 @@ function permisosCompletarFaltantes(){
         var key=s.key||s;
         if(!(key in PERMISOS[role.id])){
           var def=DEFAULT_PERMISOS[role.id];
-          PERMISOS[role.id][key]=(def&&def[key])?def[key]:'ninguno';
+          var valorInicial;
+          if(def&&def[key]) valorInicial=def[key];
+          else if(HEREDA_DE[key]&&HEREDA_DE[key].si.indexOf(PERMISOS[role.id][HEREDA_DE[key].de])>=0) valorInicial='ejecuta';
+          else valorInicial='ninguno';
+          PERMISOS[role.id][key]=valorInicial;
           needsSave=true;
         }
       });
@@ -2808,9 +2826,21 @@ function canAccessGdV(){
 function isSuperAdmin(){
   return currentUser && currentUser.role==='super_admin';
 }
+// Nuevos Contactos: tres acciones, cada una configurable por Función (matriz de Permisos).
+// Antes "Ejecuta" en nuevos las daba todas juntas, y Eliminar estaba fijo solo para Super Admin.
 function canGestionarNuevos(){
-  // Configurable: ejecuta on nuevos means full management
-  return isSuperAdmin() || canEjecutar('nuevos');
+  return isSuperAdmin() || canEjecutar('nuevos_gestionar');
+}
+function canContactarNuevos(){
+  // isContactar() (rol de login 'contactar') se conserva solo acá, para no cortarle Contactar
+  // a quien ya lo usa; ya NO le muestra Gestionar (eso es nuevos_gestionar).
+  return isSuperAdmin() || canEjecutar('nuevos_contactar') || isContactar();
+}
+function canEliminarNuevos(){
+  return isSuperAdmin() || canEjecutar('nuevos_eliminar');
+}
+function canEditarNuevos(){
+  return isSuperAdmin() || canEjecutar('nuevos_editar');
 }
 function isContactar(){
   return currentUser && currentUser.role==='contactar';
@@ -14297,14 +14327,14 @@ function nvOpenActions(id){
   if(nameEl) nameEl.textContent=fullName(m);
   const esNuevo=nvFiltro!=='historico'&&m.condicion==='Nuevo';
   let btns='';
-  btns+=`<button class="btn btn-sm" style="width:100%;text-align:left" onclick="nvCloseActions();nvAbrirEditar(${m.id})">✏️ Editar</button>`;
-  if(esNuevo&&(m.subEstado||'Ingresado')==='Ingresado'&&(canGestionarNuevos()||isContactar())){
+  if(canEditarNuevos()) btns+=`<button class="btn btn-sm" style="width:100%;text-align:left" onclick="nvCloseActions();nvAbrirEditar(${m.id})">✏️ Editar</button>`;
+  if(esNuevo&&(m.subEstado||'Ingresado')==='Ingresado'&&canContactarNuevos()){
     btns+=`<button class="btn btn-sm" style="width:100%;text-align:left;background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvCloseActions();nvOpenContactar(${m.id})">📞 Contactar</button>`;
   }
-  if(canGestionarNuevos()||isContactar()){
+  if(canGestionarNuevos()){
     btns+=`<button class="btn btn-sm btn-primary" style="width:100%;text-align:left" onclick="nvCloseActions();nvOpenPromote(${m.id})">Gestionar →</button>`;
   }
-  if(isSuperAdmin()){
+  if(canEliminarNuevos()){
     btns+=`<button class="btn btn-sm" style="width:100%;text-align:left;color:#DC2626;border-color:#FECACA" onclick="nvCloseActions();nvEliminarContacto(${m.id})">🗑️ Eliminar</button>`;
   }
   const btnsEl=document.getElementById('nv-actions-buttons');
@@ -14324,10 +14354,10 @@ function nvCampAbrirAcciones(id){
   const nameEl=document.getElementById('nv-actions-name');
   if(nameEl) nameEl.textContent=fullName(m);
   let btns='';
-  btns+=`<button class="btn btn-sm" style="width:100%;text-align:left" onclick="nvCloseActions();nvAbrirEditar(${m.id})">✏️ Editar</button>`;
+  if(canEditarNuevos()) btns+=`<button class="btn btn-sm" style="width:100%;text-align:left" onclick="nvCloseActions();nvAbrirEditar(${m.id})">✏️ Editar</button>`;
   btns+=`<button class="btn btn-sm" style="width:100%;text-align:left" onclick="nvCloseActions();nvCampAbrirComentario(${m.id})">💬 Comentarios</button>`;
   btns+=`<button class="btn btn-sm" style="width:100%;text-align:left;background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvCloseActions();nvAbrirGraduar(${m.id})">🎓 Graduar</button>`;
-  if(isSuperAdmin()){
+  if(canEliminarNuevos()){
     btns+=`<button class="btn btn-sm" style="width:100%;text-align:left;color:#DC2626;border-color:#FECACA" onclick="nvCloseActions();nvEliminarContacto(${m.id})">🗑️ Eliminar</button>`;
   }
   const btnsEl=document.getElementById('nv-actions-buttons');
@@ -14717,6 +14747,7 @@ async function nvDarDeBaja(){
 }
 
 async function nvEliminarContacto(id){
+  if(!canEliminarNuevos()){ alert('No tenés permiso para eliminar contactos.'); return; }
   var m=S.members.find(function(x){return Number(x.id)===Number(id);});
   if(!m) return;
   // Only allow deletion of Nuevo, Historico, Campaña, or Estado Baja
@@ -14745,6 +14776,7 @@ async function nvEliminarContacto(id){
 }
 
 function nvAbrirEditar(id){
+  if(!canEditarNuevos()){ alert('No tenés permiso para editar contactos.'); return; }
   const m=S.members.find(x=>x.id===id);
   if(!m) return;
   nvSelectedId=id;
@@ -14784,6 +14816,7 @@ function nvCerrarEditar(){
   document.getElementById('nv-edit-overlay').style.display='none';
 }
 async function nvGuardarEditar(){
+  if(!canEditarNuevos()){ alert('No tenés permiso para editar contactos.'); return; }
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
   var snapshot=Object.assign({},m);

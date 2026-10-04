@@ -668,7 +668,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-u';
+const APP_VERSION = '2026-08-24-z';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -789,7 +789,7 @@ const MODULES_PERM=[
     {key:'ng_dashboard',   label:'Dashboard y estadísticas'},
     {key:'ng_cargar',      label:'Cargar Asistencia'},
     {key:'ng_registros',   label:'Ver registros'},
-    {key:'ng_scope_grupo', label:'🌱 Limitar a su comunidad'},
+    {key:'ng_ver_todas', label:'🌱 Ver todas las comunidades (sin esto, solo las que lidera o colabora)'},
     {key:'ng_fecha_libre', label:'🗓 Fecha Libre al cargar (no limitada a la ventana de semanas)'},
   ]},
   {key:'miembros', label:'Rebaños', icon:'👥', screens:[
@@ -798,6 +798,7 @@ const MODULES_PERM=[
   ]},
   {key:'nuevos', label:'Nuevos Contactos', icon:'🌱', screens:[
     {key:'nuevos', label:'Gestión de nuevos contactos'},
+    {key:'nuevos_mensaje_wa', label:'Editar el mensaje de WhatsApp'},
   ]},
   {key:'of', label:'Orientación Familiar', icon:'👨‍👩‍👧', screens:[
     {key:'of', label:'Módulo completo'},
@@ -816,14 +817,17 @@ const MODULES_PERM=[
   {key:'agenda', label:'Agenda Ministerial', icon:'📅', screens:[
     {key:'agenda_ver',   label:'Ver agenda y eventos'},
     {key:'agenda_crear', label:'Crear y editar eventos'},
+    {key:'agenda_mensaje_externo', label:'Agregar personas externas al Mensaje'},
   ]},
   {key:'equipo', label:'Trabajo en Equipo', icon:'🤝', screens:[
     {key:'equipo_ver',   label:'Ver checklists (los propios: coordinador/colaborador/asignado)'},
     {key:'equipo_crear', label:'Ver todos los checklists y crear checklists nuevos desde un evento'},
+    {key:'equipo_admin', label:'Administrar tareas y equipo de cualquier checklist'},
   ]},
   {key:'formularios', label:'Formularios de Trabajo', icon:'📝', screens:[
     {key:'formularios_ver',   label:'Ver Activos e Histórico'},
     {key:'formularios_crear', label:'Crear formularios, revisar respuestas y Análisis App (Super Admin)'},
+    {key:'formularios_todos', label:'Ver todos los Formularios y revisar su Análisis'},
   ]},
 ];
 
@@ -832,7 +836,7 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',formularios_todos:'ejecuta'},
   lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
@@ -938,9 +942,15 @@ function loadPermisos(){
     console.log('[PERMISOS] ⚠️ error parse - usando DEFAULT:', e.message);
     PERMISOS=JSON.parse(JSON.stringify(DEFAULT_PERMISOS));
   }
+  try{ permisosCompletarFaltantes(); }catch(e){ console.log('[PERMISOS] completar faltantes:', e.message); }
 }
 
-async function migratePermisos(){
+// Completa EN MEMORIA lo que falte en PERMISOS (Funciones nuevas o casilleros nuevos de la
+// matriz) con su valor por defecto — sin pisar nunca lo que el Super Admin ya configuró.
+// Se llama al arrancar (migratePermisos) y TAMBIÉN cada vez que se cargan los permisos, para
+// que una matriz guardada antes de que existiera un casillero nuevo (ej: bajada de la nube por
+// un dispositivo atrasado) no deje a nadie sin un acceso que ya tenía por defecto.
+function permisosCompletarFaltantes(){
   var needsSave=false;
   // Add any DEFAULT roles missing from PERMISOS
   // Solo agregar roles completamente nuevos que no existen en absoluto
@@ -965,7 +975,11 @@ async function migratePermisos(){
       });
     }
   });
-  if(needsSave) await saveK('gdv_permisos', PERMISOS);
+  return needsSave;
+}
+
+async function migratePermisos(){
+  if(permisosCompletarFaltantes()) await saveK('gdv_permisos', PERMISOS);
 }
 
 async function savePermisos(){
@@ -1568,8 +1582,12 @@ function ngIsLiderOColab(){
   });
 }
 
+// Comunidades que esta persona puede ver al cargar asistencia / en el desplegable de Registros.
+// Por defecto: solo donde figura como líder o colaborador. El permiso "Ver todas las comunidades"
+// (matriz de Permisos) las habilita todas — como las Funciones solo suman, alcanza con que UNA
+// de las Funciones de la persona lo tenga.
 function ngGetMisComunidades(){
-  if(isSuperAdmin()) return (S.ngComunidades||[]).filter(function(ng){return ng.estado!=='Inactivo';});
+  if(isSuperAdmin()||canEjecutar('ng_ver_todas')) return (S.ngComunidades||[]).filter(function(ng){return ng.estado!=='Inactivo';});
   var linked=getLinkedMember();
   if(!linked) return [];
   return (S.ngComunidades||[]).filter(function(ng){
@@ -2526,7 +2544,7 @@ function ngRenderRegistros(c){
   if(!c) c=document.getElementById('ng-tab-content');
   var hoy=today();
   var d2w=registrosRangoDefault().desde;
-  var coms=isSuperAdmin()?(S.ngComunidades||[]).filter(function(ng){return ng.estado!=='Inactivo';}):ngGetMisComunidades();
+  var coms=ngGetMisComunidades();
   var comOpts=coms.map(function(ng){return '<option value="'+ng.id+'">'+ng.name+'</option>';}).join('');
   c.innerHTML=
     '<div class="card" style="margin-bottom:1rem">'+
@@ -2833,13 +2851,13 @@ function agendaEsResponsableDe(checklist){
 }
 // Crear/editar/eliminar tareas, y mover Completada <-> Finalizada/Pendiente
 function agendaPuedeAdminTareas(checklist){
-  return agendaEsCoordinadorDe(checklist)||agendaEsResponsableDe(checklist)||hasRole('pastor');
+  return agendaEsCoordinadorDe(checklist)||agendaEsResponsableDe(checklist)||canEjecutar('equipo_admin');
 }
 // Editar equipo (Coordinadores/Colaboradores) del Checklist — a propósito MÁS restrictivo que
 // agendaPuedeAdminTareas: solo Responsable de la Actividad, Pastor o Super Admin. Ni Coordinadores
 // ni Colaboradores pueden tocar quién integra el equipo, aunque sí puedan administrar tareas.
 function agendaPuedeEditarEquipoChecklist(checklist){
-  return isSuperAdmin() || hasRole('pastor') || agendaEsResponsableDe(checklist);
+  return canEjecutar('equipo_admin') || agendaEsResponsableDe(checklist);
 }
 // Está asignado a alguna tarea de este checklist (aunque no sea Coordinador/Colaborador formal)
 function agendaEsAsignadoEnChecklist(checklist){
@@ -4288,7 +4306,7 @@ function configTab(sub, btn){
   } else if(sub==='roles'){
     wrap.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <span style="font-size:14px;font-weight:600;color:#1F4E79">Funciones del sistema</span>
+        <span style="font-size:14px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6)">Funciones del sistema</span>
         <button class="btn btn-primary btn-sm" onclick="cfgOpenNewRole()">+ Nueva función</button>
       </div>
       <div id="cfg-roles-list"></div>
@@ -6322,7 +6340,7 @@ function formSemanasDelRango(fechaDesde, fechaHasta){
 // Pastor y Super Admin ven todo. El resto de los roles con formularios_ver otorgado
 // pero que no lideran ningún Propósito no ven ningún Formulario (aunque tengan la pantalla habilitada).
 function formPuedeVerTodos(){
-  return isSuperAdmin()||hasRole('pastor');
+  return canEjecutar('formularios_todos');
 }
 
 function formPropositosLiderados(){
@@ -6689,7 +6707,7 @@ function formCancelarEdicionAnalisis(key, formularioId, semanaISO, anio){
 // Puede marcar el Análisis como Revisado: Super Admin, Pastor, o el Líder del Propósito
 // asignado a este Formulario (mismo criterio que ya usamos para el scope de Activos/Histórico).
 function formPuedeRevisarAnalisis(f){
-  if(isSuperAdmin()||hasRole('pastor')) return true;
+  if(canEjecutar('formularios_todos')) return true;
   if(!f||!f.propositoId) return false;
   return formPropositosLiderados().map(Number).includes(Number(f.propositoId));
 }
@@ -7433,7 +7451,7 @@ function agendaPickMensajeEl(el){
   var box=document.getElementById('agenda-f-msg-results'); if(box) box.style.display='none';
 }
 function agendaAgregarMensajeExterno(){
-  if(!(isSuperAdmin()||hasRole('pastor'))) return;
+  if(!canEjecutar('agenda_mensaje_externo')) return;
   if(agendaSelectedMensaje.length>=2){ showToast('Máximo 2 personas en Mensaje','#D97706'); return; }
   var nombre=prompt('Nombre de la persona (fuera de Rebaños):');
   if(!nombre||!nombre.trim()) return;
@@ -7608,7 +7626,7 @@ function agendaAbrirForm(eventoId, fechaPrefill, fechaOcurrencia){
   var msgResults=document.getElementById('agenda-f-msg-results');
   if(msgResults) msgResults.style.display='none';
   var msgExternoWrap=document.getElementById('agenda-f-msg-externo-wrap');
-  if(msgExternoWrap) msgExternoWrap.style.display=(isSuperAdmin()||hasRole('pastor'))?'block':'none';
+  if(msgExternoWrap) msgExternoWrap.style.display=canEjecutar('agenda_mensaje_externo')?'block':'none';
 
   // Ministerio: cada opción es Nombre + Área
   var minSel=document.getElementById('agenda-f-ministerio');
@@ -15251,7 +15269,7 @@ function nvExportarCampanaExcel(){
 // demás) solo lo ve y lo puede copiar — evita que alguien lo pise sin querer mientras otro lo
 // está usando para mandar los mensajes del día.
 function nvPuedeEditarMensajeWA(){
-  return isSuperAdmin()||hasRole('pastor');
+  return canEjecutar('nuevos_mensaje_wa');
 }
 function nvCopiarMensajeWA(){
   var msgEl=document.getElementById('nv-camp-msg-wa');
@@ -16206,7 +16224,7 @@ function showRoleMembers(roleId, roleName){
         <span style="background:${genBg};color:${genColor};font-size:11px;padding:2px 7px;border-radius:4px;font-weight:600;flex-shrink:0">${m.genero}</span>
         <div style="flex:1">
           <div style="font-size:13px;font-weight:600">${fullName(m)}</div>
-          <div style="font-size:11px;color:#6B7280">${g?g.name:'Sin grupo'}</div>
+          <div style="font-size:11px;color:#6B7280">${memberGroups.length?memberGroups.map(function(x){return x.name;}).join(' · '):'Sin grupo'}</div>
         </div>
         <span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}" style="font-size:10px">${m.estado||'Activo'}</span>
       </div>`;
@@ -16821,6 +16839,30 @@ let discEditingPasoId=null;
 let discAsignandoPasoId=null;
 let discAsignandoCursadaId=null;
 
+// Principio general de Funciones (igual que ya tiene Grupos de Vida con tieneAccesoSinScope):
+// las Funciones SOLO SUMAN. Si CUALQUIERA de las Funciones de la persona le da acceso a esta
+// acción SIN "Limitar a sus Cursadas asignadas", esa Función más amplia gana — otra Función
+// más acotada (ej: Discipulador de un grupo puntual) no puede quitárselo. Se evalúa por
+// acción porque el Dashboard alcanza con "Ver", pero Cargar Asistencia necesita "Ejecuta".
+function discTieneAccesoSinScope(accionKey, nivelMin){
+  var orden={ninguno:0,consulta:1,ejecuta:2};
+  var roles=userRoles();
+  var sr=currentUser&&currentUser.role;
+  var todos=sr?[sr].concat(roles):roles;
+  return todos.some(function(r){
+    if(!PERMISOS[r]) return false;
+    var scope=PERMISOS[r].disc_scope_cursada||'ninguno';
+    var accion=PERMISOS[r][accionKey]||'ninguno';
+    return scope==='ninguno' && (orden[accion]||0)>=(orden[nivelMin]||0);
+  });
+}
+// ¿Esta persona queda limitada a SUS Cursadas/Grupos para esta acción?
+function discQuedaLimitada(accionKey, nivelMin){
+  if(isSuperAdmin()) return false;
+  if(!canEjecutar('disc_scope_cursada')) return false; // ninguna de sus Funciones la limita
+  return !discTieneAccesoSinScope(accionKey, nivelMin);
+}
+
 // Devuelve el/los nombres de Discipulador(es) de un Paso o Cursada, separados por coma
 // ¿Esta persona es Discipulador de esta Cursada? Chequea tanto el Discipulador a nivel de toda
 // la Cursada, como el de cada Grupo individual dentro de ella — una Cursada con varios Grupos
@@ -16909,9 +16951,10 @@ function discSetDashView(v){
 function discRenderDashboard(c){
   // Determine which pasos to show
   var pasosToShow;
-  if(isSuperAdmin()||!canEjecutar('disc_scope_cursada')){
+  if(!discQuedaLimitada('disc_dashboard','consulta')){
     // Ver todos — cualquier Función sin "Limitar a sus Cursadas asignadas" ve el panorama
     // completo, siempre que tenga algún nivel de acceso a Dashboard (ya filtrado por canAccessDisc).
+    // Si tiene VARIAS Funciones, alcanza con que UNA le dé acceso amplio para no quedar limitada.
     pasosToShow=S.discPasos;
   } else {
     // "Limitar a sus Cursadas asignadas" en Ejecuta: solo ve el/los Curso(s) cuya Cursada
@@ -18505,7 +18548,7 @@ function discRenderCargar(c){
   // Si la Función tiene "Limitar a sus Cursadas asignadas" en Ejecuta, solo ve las Cursadas
   // donde ella misma está asignada como Discipulador — configurable desde Configuración →
   // Permisos, no hardcodeado. Super Admin siempre ve todo.
-  if(!isSuperAdmin()&&canEjecutar('disc_scope_cursada')){
+  if(discQuedaLimitada('disc_cargar','ejecuta')){
     var linkedDisc=getLinkedMember();
     cursadasActivas=cursadasActivas.filter(function(cu){
       return discEsDiscipuladorDeCursada(cu,linkedDisc&&linkedDisc.id);
@@ -18621,7 +18664,7 @@ function discLoadPasoForm(){
   var grupoWrap=document.getElementById('disc-sel-grupo-wrap');
   var grupoSel=document.getElementById('disc-sel-grupo');
   var grupos=(cursada&&cursada.grupos)||[];
-  if(!isSuperAdmin()&&canEjecutar('disc_scope_cursada')){
+  if(discQuedaLimitada('disc_cargar','ejecuta')){
     var linkedDiscG=getLinkedMember();
     var linkedIdG=linkedDiscG?Number(linkedDiscG.id):null;
     grupos=grupos.filter(function(g){ return linkedIdG&&(g.discipuladorIds||[]).map(Number).includes(linkedIdG); });

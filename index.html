@@ -669,7 +669,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zj';
+const APP_VERSION = '2026-08-24-zn';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -832,7 +832,8 @@ const MODULES_PERM=[
     {key:'equipo_admin', label:'Administrar tareas y equipo de cualquier checklist'},
   ]},
   {key:'oracion', label:'Motivos de Oración', icon:'🙏', screens:[
-    {key:'oracion_ver',    label:'Acceder al módulo (los Líderes de Propósito ya acceden y ven solo los suyos)'},
+    {key:'oracion_ver',    label:'Acceder al módulo y ver los Motivos propios'},
+    {key:'oracion_crear',  label:'Crear Motivos (y escribir en los propios)'},
     {key:'oracion_todos',  label:'Ver todos los Motivos y escribir en cualquiera'},
     {key:'oracion_cerrar', label:'Cerrar y reabrir Motivos'},
   ]},
@@ -848,9 +849,9 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',oracion_ver:'ejecuta',oracion_todos:'ejecuta',oracion_cerrar:'ejecuta',formularios_todos:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_editar:'ejecuta'},
-  lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
-  facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  pastor      : {oracion_crear:'ejecuta',gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',oracion_ver:'ejecuta',oracion_todos:'ejecuta',oracion_cerrar:'ejecuta',formularios_todos:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_editar:'ejecuta'},
+  lider       : {oracion_ver:'consulta',oracion_crear:'ejecuta',gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  facilitador : {oracion_ver:'consulta',oracion_crear:'ejecuta',gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   admin_disc  : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ejecuta',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ejecuta',disc_inscripciones:'ejecuta',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   admin_of    : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ejecuta',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
@@ -2956,6 +2957,17 @@ var FUNC_AUTO_FAC='facilitador';
 var FUNC_AUTO_LIDER_NG='lider';
 var FUNC_AUTO_COLAB_NG='colaborador1783645248659';
 var FUNC_AUTO_IDS=[FUNC_AUTO_FAC,FUNC_AUTO_LIDER_NG,FUNC_AUTO_COLAB_NG];
+// "Líder Propósito": Función creada desde Configuración (id generado), se identifica por su nombre.
+// La tienen automáticamente quienes figuran como Líder de un Propósito (Propósito) activo.
+function funcLiderPropositoId(){
+  var r=(S.roles||[]).find(function(x){var n=normName(x.name);return n.indexOf('lider')===0&&n.indexOf('proposito')>0;});
+  return r?r.id:null;
+}
+function funcAutoIds(){
+  var ids=FUNC_AUTO_IDS.slice(), lp=funcLiderPropositoId();
+  if(lp!==null&&!ids.includes(lp)) ids.push(lp);
+  return ids;
+}
 
 function _funcAutoMiembros(memberIds){
   var vistos={}, out=[];
@@ -2979,6 +2991,11 @@ function funcionesAutoDeseadas(memberId){
     if(ng.estado==='Inactivo') return;
     if((ng.liderIds||[]).some(function(x){return String(x)===k;})) out.add(FUNC_AUTO_LIDER_NG);
     if((ng.colaboradorIds||[]).some(function(x){return String(x)===k;})) out.add(FUNC_AUTO_COLAB_NG);
+  });
+  var lp=funcLiderPropositoId();
+  if(lp!==null) (S.ministerios||[]).forEach(function(mn){
+    if(mn.estado==='Inactivo') return;
+    if((mn.liderIds||[]).some(function(x){return String(x)===k;})) out.add(lp);
   });
   return out;
 }
@@ -3006,7 +3023,7 @@ function funcionesAutoAdoptar(memberIds){
   _funcAutoMiembros(memberIds).forEach(function(m){
     var deseadas=funcionesAutoDeseadas(m.id);
     var auto=(m.rolesAuto||[]).slice(), manuales=m.rolesManuales||[], cambio=false;
-    FUNC_AUTO_IDS.forEach(function(r){
+    funcAutoIds().forEach(function(r){
       if(!(m.roles||[]).includes(r)||!deseadas.has(r)||manuales.includes(r)||auto.includes(r)) return;
       auto.push(r); cambio=true;
     });
@@ -3021,7 +3038,7 @@ function funcionesAutoReconciliar(memberIds){
   _funcAutoMiembros(memberIds).forEach(function(m){
     var deseadas=funcionesAutoDeseadas(m.id);
     var roles=(m.roles||[]).slice(), auto=(m.rolesAuto||[]).slice(), manuales=m.rolesManuales||[], cambio=false;
-    FUNC_AUTO_IDS.forEach(function(r){
+    funcAutoIds().forEach(function(r){
       var tiene=roles.includes(r);
       if(deseadas.has(r)){
         if(!tiene){ roles.push(r); cambio=true; }
@@ -3042,7 +3059,7 @@ function funcionesAutoDiferencias(){
   (S.members||[]).forEach(function(m){
     var deseadas=funcionesAutoDeseadas(m.id);
     var roles=m.roles||[], auto=m.rolesAuto||[], manuales=m.rolesManuales||[];
-    FUNC_AUTO_IDS.forEach(function(r){
+    funcAutoIds().forEach(function(r){
       var tiene=roles.includes(r), des=deseadas.has(r), man=manuales.includes(r);
       if(des&&!tiene) agregar.push({m:m,r:r});
       else if(!des&&tiene&&!man) pegadas.push({m:m,r:r});
@@ -3079,7 +3096,7 @@ function cfgAbrirRevisionFuncionesAuto(){
   window._faRevision=d;
   var total=d.agregar.length+d.pegadas.length+d.adoptar.length;
   var h='<div style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:4px">🔄 Funciones automáticas — revisión</div>'
-    +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:14px;line-height:1.5">Facilitador, Líder NG y Colaborador NG se tienen <strong>mientras haya una asignación activa</strong> (Grupo o Comunidad) y se pierden solas al terminar. Acá se compara lo que hay hoy con las asignaciones reales. <strong>No se cambia nada hasta que toques "Aplicar".</strong></div>';
+    +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:14px;line-height:1.5">Facilitador, Líder NG, Colaborador NG y Líder Propósito se tienen <strong>mientras haya una asignación activa</strong> (Grupo, Comunidad o Propósito) y se pierden solas al terminar. Acá se compara lo que hay hoy con las asignaciones reales. <strong>No se cambia nada hasta que toques "Aplicar".</strong></div>';
   if(!total) h+='<div style="padding:1.25rem;text-align:center;color:#16A34A;font-weight:600">✅ Todo al día — no hay nada para revisar.</div>';
   if(d.pegadas.length){
     h+='<div style="font-size:13px;font-weight:700;color:#B91C1C;margin:10px 0 6px">⚠️ Tienen la Función pero NO una asignación activa ('+d.pegadas.length+')</div>'
@@ -3198,10 +3215,67 @@ function isGdVFacilitador(){
 // ════════════════════════════════════════════════════════════
 // AUTH
 // ════════════════════════════════════════════════════════════
-(function(){if(typeof _isProd!=='undefined'&&!_isProd){document.addEventListener('DOMContentLoaded',function(){var b=document.getElementById('dev-banner');if(b){b.style.display='block';document.body.style.paddingTop='32px';}});}})();function doLogin(){
+// ════════════════════════════════════════════════════════════════
+// CONTRASEÑAS — se guardan como hash PBKDF2-SHA256 con sal propia (u.passHash); nunca en claro.
+// Un usuario viejo con u.pass en claro sigue pudiendo ingresar hasta que el Super Admin entra y se
+// migran todos (pwMigrarUsuarios). Si el navegador no tiene WebCrypto (no-HTTPS) se mantiene el modo viejo.
+// ════════════════════════════════════════════════════════════════
+var PW_ITER=150000;
+function pwDisponible(){ try{ return !!(window.crypto&&window.crypto.subtle&&window.crypto.subtle.importKey); }catch(e){ return false; } }
+function _pwB64(buf){ var b=new Uint8Array(buf),t=''; for(var i=0;i<b.length;i++) t+=String.fromCharCode(b[i]); return btoa(t); }
+function _pwUnB64(str){ var t=atob(str),a=new Uint8Array(t.length); for(var i=0;i<t.length;i++) a[i]=t.charCodeAt(i); return a; }
+async function _pwDerive(pass,salt,iter){
+  var k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveBits']);
+  return crypto.subtle.deriveBits({name:'PBKDF2',salt:salt,iterations:iter,hash:'SHA-256'},k,256);
+}
+async function pwHash(pass){
+  var salt=crypto.getRandomValues(new Uint8Array(16));
+  var bits=await _pwDerive(pass,salt,PW_ITER);
+  return 'pbkdf2$'+PW_ITER+'$'+_pwB64(salt)+'$'+_pwB64(bits);
+}
+async function pwVerify(pass,stored){
+  var p=String(stored||'').split('$');
+  if(p.length!==4||p[0]!=='pbkdf2') return false;
+  var bits=await _pwDerive(pass,_pwUnB64(p[2]),parseInt(p[1]));
+  return _pwB64(bits)===p[3];
+}
+async function pwCoincide(u,pass){
+  if(u.passHash) return pwDisponible()?await pwVerify(pass,u.passHash):false;
+  return u.pass!==undefined&&u.pass===pass;
+}
+async function pwAsignar(u,pass){
+  if(pwDisponible()){ u.passHash=await pwHash(pass); delete u.pass; }
+  else { u.pass=pass; delete u.passHash; }
+}
+function pwRestaurar(target,snap){
+  Object.keys(target).forEach(function(k){ if(!(k in snap)) delete target[k]; });
+  Object.assign(target,snap);
+}
+// Pasa a hash todas las contraseñas que aún estén en claro. Si falla la nube, vuelve todo atrás.
+async function pwMigrarUsuarios(){
+  if(!pwDisponible()) return false;
+  var pend=(S.users||[]).filter(function(u){return u.passHash===undefined&&u.pass!==undefined&&u.pass!=='';});
+  if(!pend.length) return false;
+  var snap=pend.map(function(u){return {u:u,pass:u.pass};});
+  for(var i=0;i<pend.length;i++){ pend[i].passHash=await pwHash(pend[i].pass); delete pend[i].pass; }
+  await saveK(SK.users,S.users);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    snap.forEach(function(x){ x.u.pass=x.pass; delete x.u.passHash; });
+    await saveK(SK.users,S.users);
+    console.warn('No se pudieron proteger las contraseñas (sin conexión). Se reintenta en el próximo ingreso del Super Admin.');
+    return false;
+  }
+  return true;
+}
+
+(function(){if(typeof _isProd!=='undefined'&&!_isProd){document.addEventListener('DOMContentLoaded',function(){var b=document.getElementById('dev-banner');if(b){b.style.display='block';document.body.style.paddingTop='32px';}});}})();async function doLogin(){
   const u=document.getElementById('inp-user').value.trim();
   const p=document.getElementById('inp-pass').value;
-  const found=S.users.find(x=>x.user===u&&x.pass===p);
+  var found=null;
+  var candidatos=S.users.filter(function(x){return x.user===u;});
+  for(var ci=0;ci<candidatos.length;ci++){ if(await pwCoincide(candidatos[ci],p)){ found=candidatos[ci]; break; } }
   const al=document.getElementById('login-alert');
   if(!found){al.textContent='Usuario o contraseña incorrectos';return;}
   al.textContent='';
@@ -3212,6 +3286,7 @@ function isGdVFacilitador(){
   document.getElementById('screen-login').style.display='none';
   resetInactivityTimer();
   showHome();
+  if(isSuperAdmin()){ pwMigrarUsuarios().then(function(ok){ if(ok) showToast('🔒 Contraseñas protegidas','#16A34A'); }).catch(function(){}); }
 }
 
 function doLogout(){
@@ -3267,7 +3342,7 @@ const DEFAULT_MODULES = [
   {key:'ng',         icon:'🌿',  name:'Nuevas Generaciones',   desc:'Gestión de comunidades juveniles, adolescentes, niños y preadolescentes.',            tag:'Módulo activo', tagClass:'tag-green',  action:'openNG', activo:true},
   {key:'disc',       icon:'📖',  name:'Discipulado',           desc:'Seguimiento de niveles de discipulado. Pasos N1, N2 y N3 con asistencia y capítulos.', tag:'Módulo activo', tagClass:'tag-green',  action:'openDiscipulado', activo:true},
   {key:'of',         icon:'👨‍👩‍👧',  name:'Orientación Familiar', desc:'Gestión de alumnos, asistencia, pagos y participación del curso.',                 tag:'Módulo activo', tagClass:'tag-purple', action:'openOF', activo:true},
-  {key:'agenda',     icon:'📅',  name:'Agenda Ministerial',   desc:'Calendario de eventos y actividades por Servicio/Ministerio, con recurrencia semanal o mensual.', tag:'Módulo activo', tagClass:'tag-blue', action:'openAgenda', activo:false},
+  {key:'agenda',     icon:'📅',  name:'Agenda Ministerial',   desc:'Calendario de eventos y actividades por Propósito, con recurrencia semanal o mensual.', tag:'Módulo activo', tagClass:'tag-blue', action:'openAgenda', activo:false},
   {key:'equipo',     icon:'🤝',  name:'Trabajo en Equipo',    desc:'Checklists colaborativos para organizar actividades: coordinadores, colaboradores y tareas asignadas.', tag:'Módulo activo', tagClass:'tag-purple', action:'openEquipo', activo:false},
   {key:'oracion',    icon:'🙏',  name:'Motivos de Oración',   desc:'Motivos de oración de los Líderes de Propósito con los Pastores: conversación por motivo hasta cerrarlo.', tag:'Módulo activo', tagClass:'tag-purple', action:'openOracion', activo:false},
   {key:'formularios',icon:'📝',  name:'Formularios de Trabajo',desc:'Formularios semanales para Grupos de Vida, Nuevas Generaciones y Discipulado, con seguimiento por unidad y análisis.', tag:'Módulo activo', tagClass:'tag-purple', action:'openFormularios', activo:false},
@@ -3544,7 +3619,7 @@ function buildMiembrosHTML(){
         <input type="text" id="sa-mf-dir" placeholder="Barrio y número"></div>
       <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Funciones asignadas <span style="font-weight:400;color:#9CA3AF">(solo lectura)</span></label>
       <div class="role-selector" id="sa-mf-roles"></div>
-      <div style="font-size:11px;color:#9CA3AF;margin-top:4px">Se asignan desde Configuración → Usuarios, Grupos, Nuevas Generaciones o Servicios/Ministerios según corresponda.</div>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:4px">Se asignan desde Configuración → Usuarios, Grupos, Nuevas Generaciones o Propósitos según corresponda.</div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
         <button class="btn" onclick="saCloseMemberForm()">Cancelar</button>
         <button class="btn btn-primary" onclick="saSaveMember()">Guardar</button>
@@ -3968,7 +4043,7 @@ function saDetailTab(tab,btn){
   });
 }
 
-// Ministerios donde participa un Miembro — se calcula solo desde Servicios/Ministerios,
+// Ministerios donde participa un Miembro — se calcula solo desde Propósitos,
 // igual que los Grupos: se asigna una sola vez ahí y se ve automáticamente acá.
 function getMinisteriosDeMiembro(memberId){
   var id=Number(memberId);
@@ -4072,7 +4147,7 @@ function saShowDetail(id,event){
           ministerioNivelBadge(ms.nivel)+
         '</div>';
       }).join('')
-    : '<div class="empty" style="padding:1.5rem 0">Sin Servicios/Ministerios asignados</div>';
+    : '<div class="empty" style="padding:1.5rem 0">Sin Propósitos asignados</div>';
   document.getElementById('sa-detail-historial').innerHTML='<div class="empty" style="padding:1.5rem 0">📜 Historial — 🚧 Próximamente</div>';
 
   // Reset to first tab
@@ -4446,7 +4521,7 @@ function buildConfigHTML(){
     <div style="display:flex;gap:8px;margin-bottom:1.5rem;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" id="cfg-tab-grupos" onclick="configTab('grupos',this)">🏘 Grupos</button>
       <button class="btn btn-sm" id="cfg-tab-ng" onclick="configTab('ng',this)">🌱 Nuevas Generaciones</button>
-      <button class="btn btn-sm" id="cfg-tab-ministerios" onclick="configTab('ministerios',this)">🤝 Servicios/Ministerios</button>
+      <button class="btn btn-sm" id="cfg-tab-ministerios" onclick="configTab('ministerios',this)">🤝 Propósitos</button>
       <button class="btn btn-sm" id="cfg-tab-campanas" onclick="configTab('campanas',this)">🌳 Campañas</button>
       <button class="btn btn-sm" id="cfg-tab-modulos" onclick="configTab('modulos',this)">📱 Módulos</button>
       <button class="btn btn-sm" id="cfg-tab-home" onclick="configTab('home',this)">🏠 Home</button>
@@ -4490,8 +4565,8 @@ function configTab(sub, btn){
   } else if(sub==='ministerios'){
     wrap.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <span style="font-size:14px;font-weight:600;color:#1F4E79">🤝 Servicios/Ministerios</span>
-        <button class="btn btn-primary btn-sm" onclick="ministerioOpenForm()">+ Servicio/Ministerio</button>
+        <span style="font-size:14px;font-weight:600;color:#1F4E79">🤝 Propósitos</span>
+        <button class="btn btn-primary btn-sm" onclick="ministerioOpenForm()">+ Propósito</button>
       </div>
       <div style="font-size:12px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#F9FAFB;border-radius:8px">
         Un mismo Ministerio puede tener varias Áreas — creá una fila por cada combinación (ej: "Alabanza" / "Coro", "Alabanza" / "Sonido"), o dejá el Área en blanco si no aplica.
@@ -4525,6 +4600,10 @@ function configTab(sub, btn){
       <div id="cfg-user-form" class="card" style="display:none;margin-bottom:1rem">
         <div class="card-title" id="cfg-uf-title">Nuevo usuario</div>
         <div class="form-row">
+          <div id="cfg-uf-sistema-row" style="grid-column:1/-1;display:none;background:#FEF3C7;border-radius:8px;padding:8px 12px;margin-bottom:8px">
+            <label style="font-size:13px;color:#92400E;cursor:pointer"><input type="checkbox" id="cfg-uf-sistema" onchange="cfgToggleSistema()" style="margin-right:6px">Cuenta de sistema (sin Miembro) — para el Dueño del Producto</label>
+            <input type="text" id="cfg-uf-sys-name" placeholder="Nombre de la cuenta, ej: Dueño del Producto" style="display:none;width:100%;box-sizing:border-box;margin-top:6px">
+          </div>
           <div style="grid-column:1/-1">
             <label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Miembro asociado *</label>
             <div style="font-size:12px;color:#6B7280;margin-bottom:6px">El usuario debe ser un miembro existente en la base</div>
@@ -4537,7 +4616,7 @@ function configTab(sub, btn){
         </div>
         <div id="cfg-uf-info" style="display:none;background:#EFF6FF;border-radius:8px;padding:8px 12px;font-size:13px;color:#1E40AF;margin-top:8px"></div>
         <div class="form-row" style="margin-top:10px">
-          <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Contraseña</label><input type="password" id="cfg-uf-pass"></div>
+          <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Contraseña</label><input type="password" id="cfg-uf-pass" autocomplete="new-password"></div>
           <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Función de acceso</label>
             <select id="cfg-uf-role">
               <option value="">— Seleccioná una función —</option>
@@ -5107,7 +5186,7 @@ function ministerioRenderList(){
   const c=document.getElementById('ministerios-list');
   if(!c) return;
   if(!S.ministerios.length){
-    c.innerHTML='<p style="color:#9CA3AF;font-size:13px;text-align:center;padding:24px">Sin Servicios/Ministerios cargados</p>';
+    c.innerHTML='<p style="color:#9CA3AF;font-size:13px;text-align:center;padding:24px">Sin Propósitos cargados</p>';
     return;
   }
   // Agrupar filas por Nombre para que las distintas Áreas queden juntas
@@ -5169,7 +5248,7 @@ function ministerioOpenForm(id){
   document.getElementById('cfg-ministerio-overlay').innerHTML=
     '<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">'+
-      '<div style="font-size:15px;font-weight:700;color:#1F4E79">'+(id?'Editar':'Nuevo')+' Servicio/Ministerio</div>'+
+      '<div style="font-size:15px;font-weight:700;color:#1F4E79">'+(id?'Editar':'Nuevo')+' Propósito</div>'+
       '<button class="btn btn-sm" onclick="ministerioCloseForm()">✕</button>'+
     '</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+
@@ -5220,12 +5299,20 @@ function ministerioCloseForm(){
 
 async function ministerioSaveMinisterio(){
   const nombre=(document.getElementById('min-f-nombre')?.value||'').trim();
-  if(!nombre){ alert('Ingresá el Nombre del Servicio/Ministerio'); return; }
+  if(!nombre){ alert('Ingresá el Nombre del Propósito'); return; }
   const area=(document.getElementById('min-f-area')?.value||'').trim();
   var liderIds=[...document.querySelectorAll('.min-lider-cb:checked')].map(function(cb){return parseInt(cb.value);});
   var coordinadorIds=[...document.querySelectorAll('.min-coord-cb:checked')].map(function(cb){return parseInt(cb.value);});
   var colaboradorIds=[...document.querySelectorAll('.min-colab-cb:checked')].map(function(cb){return parseInt(cb.value);});
   var snapshotMin=null, esNuevoMin=false, nuevoMinRef=null, min;
+  // Función "Líder Propósito" (automática): personas afectadas = líderes de antes y de ahora
+  var involucradosMin=liderIds.slice();
+  if(ministerioEditingId){
+    var minPrevFn=S.ministerios.find(function(x){return Number(x.id)===Number(ministerioEditingId);});
+    if(minPrevFn) involucradosMin=involucradosMin.concat(minPrevFn.liderIds||[]);
+  }
+  var snapFuncMin=funcionesAutoSnapshot(involucradosMin);
+  funcionesAutoAdoptar(involucradosMin);
   if(ministerioEditingId){
     min=S.ministerios.find(function(x){return Number(x.id)===Number(ministerioEditingId);});
     if(min){ snapshotMin=Object.assign({},min); Object.assign(min,{nombre,area,liderIds,coordinadorIds,colaboradorIds}); }
@@ -5234,7 +5321,9 @@ async function ministerioSaveMinisterio(){
     nuevoMinRef={id:Date.now(),nombre,area,liderIds,coordinadorIds,colaboradorIds,estado:'Activo'};
     S.ministerios.push(nuevoMinRef);
   }
+  funcionesAutoReconciliar(involucradosMin);
   await saveK(SK.ministerios,S.ministerios);
+  await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
@@ -5243,13 +5332,15 @@ async function ministerioSaveMinisterio(){
     } else if(min&&snapshotMin){
       Object.assign(min,snapshotMin);
     }
+    funcionesAutoRevertir(snapFuncMin);
     await saveK(SK.ministerios,S.ministerios);
+    await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
   ministerioCloseForm();
   ministerioRenderList();
-  showToast('✅ Servicio/Ministerio guardado','#16A34A');
+  showToast('✅ Propósito guardado','#16A34A');
 }
 
 async function ministerioDeleteMinisterio(id){
@@ -5257,19 +5348,25 @@ async function ministerioDeleteMinisterio(id){
   if(!min) return;
   var enUso=S.eventos.filter(function(e){return Number(e.ministerioId)===Number(id);});
   if(enUso.length>0){
-    alert('Este Servicio/Ministerio tiene '+enUso.length+' evento'+(enUso.length>1?'s':'')+' asociado'+(enUso.length>1?'s':'')+'. Reasigná o eliminá esos eventos antes de borrarlo.');
+    alert('Este Propósito tiene '+enUso.length+' evento'+(enUso.length>1?'s':'')+' asociado'+(enUso.length>1?'s':'')+'. Reasigná o eliminá esos eventos antes de borrarlo.');
     return;
   }
   if(!confirm('¿Eliminar "'+min.nombre+(min.area?' / '+min.area:'')+'"? Esta acción no se puede deshacer.')) return;
+  var snapFuncDel=funcionesAutoSnapshot(min.liderIds||[]);
+  funcionesAutoAdoptar(min.liderIds||[]);
   S.ministerios=S.ministerios.filter(function(x){return Number(x.id)!==Number(id);});
+  funcionesAutoReconciliar(min.liderIds||[]);
   try{
     await saveK(SK.ministerios,S.ministerios);
+    await saveK(SK.members,S.members);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
     ministerioRenderList();
     showToast('✅ Eliminado','#16A34A');
   }catch(e){
     S.ministerios.push(min);
+    funcionesAutoRevertir(snapFuncDel);
     await saveK(SK.ministerios,S.ministerios);
+    await saveK(SK.members,S.members);
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
 }
@@ -5798,11 +5895,11 @@ function canAccessFormularios(){
 // MOTIVOS DE ORACIÓN — hilo de mensajes entre Líderes de Propósito y Pastores
 // • Motivo = S.oracionMotivos  ·  cada mensaje = un registro propio en S.oracionMensajes
 //   (así dos personas escribiendo a la vez nunca se pisan: se mergea por id).
-// • Líder de Propósito = figura en liderIds de un Servicio/Ministerio (Configuración).
+// • Quién crea Motivos y quién los ve se define en Configuración → Permisos (oracion_ver / crear / todos / cerrar).
 // • Ve todos: permiso oracion_todos. Sin él, solo los Motivos que creó.
 // • Cerrar / Reabrir: permiso oracion_cerrar (por defecto Pastor).
 // ══════════════════════════════════════════════════════════════════
-var orVista={id:null,tab:'abiertos',filtroProp:'',creando:false};
+var orVista={id:null,tab:'abiertos',filtroProp:'',creando:false,q:'',orden:'desc'};
 function orEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function orPropositosLiderados(){
   var linked=getLinkedMember();
@@ -5814,9 +5911,9 @@ function orPropositosLiderados(){
 function orEsLider(){ return orPropositosLiderados().length>0; }
 function orVerTodos(){ return isSuperAdmin()||canEjecutar('oracion_todos'); }
 function orPuedeCerrar(){ return isSuperAdmin()||canEjecutar('oracion_cerrar'); }
-function orPuedeCrear(){ return orVerTodos()||orEsLider(); }
+function orPuedeCrear(){ return orVerTodos()||canEjecutar('oracion_crear'); }
 function canAccessOracion(){
-  return isSuperAdmin()||canScreen('oracion_ver')||canScreen('oracion_todos')||orEsLider();
+  return isSuperAdmin()||canScreen('oracion_ver')||canScreen('oracion_todos')||canScreen('oracion_crear');
 }
 function orEsMio(mot){
   var linked=getLinkedMember();
@@ -5872,7 +5969,7 @@ function openOracion(){
   document.getElementById('screen-app').classList.add('show');
   document.getElementById('app-topbar-title').textContent='🙏 Motivos de Oración';
   document.getElementById('app-topbar-user').textContent=currentUser.name;
-  orVista={id:null,tab:'abiertos',filtroProp:'',creando:false};
+  orVista={id:null,tab:'abiertos',filtroProp:'',creando:false,q:'',orden:'desc'};
   orRender();
 }
 function orRender(){
@@ -5885,7 +5982,7 @@ function orRender(){
   c.innerHTML=h;
   if(orVista.id!=null){
     orMarcarLeido(orVista.id);
-    var th=document.getElementById('or-hilo'); if(th) th.scrollTop=th.scrollHeight;
+    var th=document.getElementById('or-hilo'); if(th) th.scrollTop=(orVista.orden==='asc')?th.scrollHeight:0;
   }
 }
 function orHtmlLista(){
@@ -5893,13 +5990,8 @@ function orHtmlLista(){
   var verTodos=orVerTodos();
   var abiertos=todos.filter(function(m){return m.estado!=='Cerrado';});
   var cerrados=todos.filter(function(m){return m.estado==='Cerrado';});
-  var lista=orVista.tab==='cerrados'?cerrados:abiertos;
-  if(verTodos&&orVista.filtroProp) lista=lista.filter(function(m){var ids=(m.propositoIds&&m.propositoIds.length)?m.propositoIds:(m.propositoId?[m.propositoId]:[]);return ids.map(String).indexOf(String(orVista.filtroProp))>=0;});
-  lista=lista.slice().sort(function(a,b){
-    var ua=(orMensajesDe(a.id).slice(-1)[0]||{ts:a.creadoTs}).ts, ub=(orMensajesDe(b.id).slice(-1)[0]||{ts:b.creadoTs}).ts;
-    return (ub||0)-(ua||0);
-  });
-  var h='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
+  var h='<input id="or-buscar" type="text" autocomplete="off" value="'+orEsc(orVista.q||'')+'" placeholder="🔍 Buscar por Motivo o miembro…" oninput="orBuscar(this.value)" style="width:100%;box-sizing:border-box;margin-bottom:10px;padding:8px 10px;font-size:13px;border:1px solid #D1D5DB;border-radius:8px">';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
     +'<div style="display:flex;gap:6px">'
     +'<button class="btn btn-sm'+(orVista.tab==='abiertos'?' btn-primary':'')+'" onclick="orVista.tab=\'abiertos\';orRender()">Abiertos ('+abiertos.length+')</button>'
     +'<button class="btn btn-sm'+(orVista.tab==='cerrados'?' btn-primary':'')+'" onclick="orVista.tab=\'cerrados\';orRender()">Cerrados ('+cerrados.length+')</button></div>';
@@ -5910,22 +6002,42 @@ function orHtmlLista(){
     h+='<select onchange="orVista.filtroProp=this.value;orRender()" style="width:100%;margin-bottom:10px;padding:7px 9px;font-size:13px"><option value="">Todos los Propósitos</option>'
       +props.map(function(p){return '<option value="'+p.id+'"'+(String(orVista.filtroProp)===String(p.id)?' selected':'')+'>'+orEsc(p.nombre)+'</option>';}).join('')+'</select>';
   }
-  if(!lista.length){
-    h+='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem;text-align:center;color:#9CA3AF;font-size:13px">'
-      +(orVista.tab==='cerrados'?'No hay Motivos cerrados.':'No hay Motivos abiertos.'+(orPuedeCrear()?' Creá el primero con “➕ Nuevo Motivo”.':''))+'</div>';
-    return h;
-  }
-  lista.forEach(function(m){
-    var ms=orMensajesDe(m.id), u=ms[ms.length-1];
-    h+='<div onclick="orVista.id='+m.id+';orRender()" style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:pointer">'
-      +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">'
-      +'<div style="font-size:14px;font-weight:600;color:#1F4E79">'+orEsc(m.titulo)+'</div>'
-      +(orSinLeer(m)?'<span class="badge b-danger" style="font-size:10px;flex-shrink:0">● Nuevo</span>':'')+'</div>'
-      +'<div style="font-size:11.5px;color:#6B7280;margin-top:2px">'+(orNombresProposito(m)?orEsc(orNombresProposito(m))+' · ':'')+orEsc(m.creadoPorNombre||'')+'</div>'
-      +'<div style="font-size:11px;color:#9CA3AF;margin-top:4px">💬 '+ms.length+' mensaje'+(ms.length!==1?'s':'')
-      +(u?' · Último: '+orEsc(u.autor)+' · '+agendaFmtFechaHora(u.ts):'')+'</div></div>';
-  });
+  h+='<div id="or-lista-items">'+orHtmlItems()+'</div>';
   return h;
+}
+function orBuscar(v){
+  orVista.q=v||'';
+  var el=document.getElementById('or-lista-items');
+  if(el) el.innerHTML=orHtmlItems();
+}
+// Tarjetas: 2 líneas. 1) Motivo (negrita) + fecha/hora de creación · 2) quién lo creó (izq.) + último mensaje (der.)
+function orHtmlItems(){
+  var lista=(S.oracionMotivos||[]).filter(orVisible).filter(function(m){
+    return orVista.tab==='cerrados'?m.estado==='Cerrado':m.estado!=='Cerrado';
+  });
+  if(orVerTodos()&&orVista.filtroProp) lista=lista.filter(function(m){var ids=(m.propositoIds&&m.propositoIds.length)?m.propositoIds:(m.propositoId?[m.propositoId]:[]);return ids.map(String).indexOf(String(orVista.filtroProp))>=0;});
+  var q=normName(orVista.q||'');
+  if(q) lista=lista.filter(function(m){return normName(m.titulo||'').indexOf(q)>=0||normName(m.creadoPorNombre||'').indexOf(q)>=0;});
+  lista=lista.slice().sort(function(a,b){
+    var ua=(orMensajesDe(a.id).slice(-1)[0]||{ts:a.creadoTs}).ts, ub=(orMensajesDe(b.id).slice(-1)[0]||{ts:b.creadoTs}).ts;
+    return (ub||0)-(ua||0);
+  });
+  if(!lista.length){
+    return '<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem;text-align:center;color:#9CA3AF;font-size:13px">'
+      +(q?'Sin resultados para la búsqueda.':(orVista.tab==='cerrados'?'No hay Motivos cerrados.':'No hay Motivos abiertos.'+(orPuedeCrear()?' Creá el primero con “➕ Nuevo Motivo”.':'')))+'</div>';
+  }
+  return lista.map(function(m){
+    var ms=orMensajesDe(m.id), u=ms[ms.length-1];
+    return '<div onclick="orVista.id='+m.id+';orVista.orden=\'desc\';orRender()" style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:9px 12px;margin-bottom:8px;cursor:pointer">'
+      +'<div style="display:flex;align-items:baseline;gap:8px;min-width:0">'
+      +'<span style="font-size:14px;font-weight:700;color:#1F4E79;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+orEsc(m.titulo)+'</span>'
+      +'<span style="font-size:11px;color:#6B7280;white-space:nowrap;flex-shrink:0">'+agendaFmtFechaHora(m.creadoTs)+'</span>'
+      +(orSinLeer(m)?'<span class="badge b-danger" style="font-size:10px;flex-shrink:0;margin-left:auto">● Nuevo</span>':'')+'</div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:3px;min-width:0">'
+      +'<span style="font-size:12px;color:#6B7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1">'+orEsc(m.creadoPorNombre||'')+'</span>'
+      +'<span style="font-size:11px;color:#9CA3AF;white-space:nowrap;flex-shrink:0">💬 '+ms.filter(function(x){return x.tipo==='msg';}).length+'</span>'
+      +'<span style="font-size:11px;color:#9CA3AF;white-space:nowrap;flex-shrink:0">'+(u?'Último: '+orEsc(u.autor)+' · '+agendaFmtFechaHora(u.ts):'')+'</span></div></div>';
+  }).join('');
 }
 function orHtmlNuevo(){
   return '<button class="btn btn-sm" onclick="orVista.creando=false;orRender()" style="margin-bottom:10px">← Volver</button>'
@@ -5948,15 +6060,32 @@ function orHtmlDetalle(id){
   var m=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(id);});
   if(!m||!orVisible(m)) return '<button class="btn btn-sm" onclick="orVista.id=null;orRender()">← Volver</button><div class="empty" style="padding:2rem;text-align:center;color:#9CA3AF">Motivo no disponible.</div>';
   var cerrado=m.estado==='Cerrado';
-  var ms=orMensajesDe(m.id);
-  var h='<button class="btn btn-sm" onclick="orVista.id=null;orRender()" style="margin-bottom:10px">← Volver</button>'
+  var desc=orVista.orden!=='asc';
+  var ms=orMensajesDe(m.id); if(desc) ms=ms.slice().reverse();
+  var h='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px">'
+    +'<button class="btn btn-sm" onclick="orVista.id=null;orRender()">← Volver</button>';
+  if(orPuedeCerrar()){
+    h+=cerrado?'<button class="btn btn-sm" onclick="orReabrir('+m.id+')">🔓 Reabrir Motivo</button>'
+              :'<button class="btn btn-sm btn-danger" onclick="orPedirCierre('+m.id+')">🔒 Cerrar Motivo</button>';
+  }
+  h+='</div>'
     +'<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:12px 14px;margin-bottom:10px">'
     +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="font-size:15px;font-weight:600;color:#1F4E79">'+orEsc(m.titulo)+'</div>'
     +'<span class="badge '+(cerrado?'b-muted':'b-ok')+'" style="font-size:10px;flex-shrink:0">'+(cerrado?'Cerrado':'Abierto')+'</span></div>'
     +'<div style="font-size:11.5px;color:#6B7280;margin-top:3px">'+(orNombresProposito(m)?orEsc(orNombresProposito(m))+' · ':'')+'Creado por '+orEsc(m.creadoPorNombre||'')+' · '+agendaFmtFechaHora(m.creadoTs)+'</div>'
-    +(cerrado?'<div style="font-size:12px;color:#6B7280;margin-top:6px;background:#F3F4F6;border-radius:8px;padding:6px 9px">🔒 Cerrado por '+orEsc(m.cerradoPor||'')+' · '+agendaFmtFechaHora(m.cerradoTs)+(m.notaCierre?'<br>Nota: '+orEsc(m.notaCierre):'')+'</div>':'')
+    +(cerrado?'<div style="font-size:12px;color:#6B7280;margin-top:6px;background:#F3F4F6;border-radius:8px;padding:6px 9px">🔒 Cerrado por '+orEsc(m.cerradoPor||'')+' · '+agendaFmtFechaHora(m.cerradoTs)+(m.notaCierre?'<br>Descripción de cierre: '+orEsc(m.notaCierre):'')+'</div>':'')
     +'</div>';
-  h+='<div id="or-hilo" style="display:flex;flex-direction:column;gap:7px;max-height:50vh;overflow-y:auto;padding:2px">';
+  var caja='';
+  if(!cerrado){
+    caja='<div style="display:flex;gap:6px;margin:10px 0;align-items:flex-end">'
+      +'<textarea id="or-msg" rows="2" placeholder="Escribí un mensaje…" style="flex:1;padding:7px 9px;font-family:inherit;font-size:13px"></textarea>'
+      +'<button class="btn btn-sm btn-primary" onclick="orEnviar('+m.id+')">Enviar</button></div>';
+  }
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+    +'<span style="font-size:12px;color:#6B7280">💬 '+ms.filter(function(x){return x.tipo==='msg';}).length+' mensaje'+(ms.filter(function(x){return x.tipo==='msg';}).length!==1?'s':'')+'</span>'
+    +'<button class="btn btn-sm" onclick="orVista.orden=\''+(desc?'asc':'desc')+'\';orRender()">'+(desc?'↓ Más recientes primero':'↑ Más antiguos primero')+'</button></div>';
+  if(desc) h+=caja;
+  h+='<div id="or-hilo" style="display:flex;flex-direction:column;gap:7px;max-height:60vh;overflow-y:auto;padding:2px">';
   ms.forEach(function(x){
     if(x.tipo==='cierre'||x.tipo==='reapertura'){
       h+='<div style="text-align:center;font-size:11px;color:#6B7280;background:#F3F4F6;border-radius:8px;padding:5px 8px">'+(x.tipo==='cierre'?'🔒 Cerrado':'🔓 Reabierto')+' por '+orEsc(x.autor)+' · '+agendaFmtFechaHora(x.ts)+(x.texto?'<br>'+orEsc(x.texto):'')+'</div>';
@@ -5967,19 +6096,40 @@ function orHtmlDetalle(id){
     }
   });
   h+='</div>';
-  if(!cerrado){
-    h+='<div style="display:flex;gap:6px;margin-top:10px;align-items:flex-end">'
-      +'<textarea id="or-msg" rows="2" placeholder="Escribí un mensaje…" style="flex:1;padding:7px 9px;font-family:inherit;font-size:13px"></textarea>'
-      +'<button class="btn btn-sm btn-primary" onclick="orEnviar('+m.id+')">Enviar</button></div>';
-    if(orPuedeCerrar()){
-      h+='<div style="display:flex;gap:6px;margin-top:12px;align-items:center;border-top:1px solid #F3F4F6;padding-top:10px">'
-        +'<input id="or-nota" type="text" maxlength="160" placeholder="Nota de cierre (opcional)" style="flex:1;padding:6px 9px;font-size:12.5px">'
-        +'<button class="btn btn-sm btn-danger" onclick="orCerrar('+m.id+')">🔒 Cerrar Motivo</button></div>';
-    }
-  } else if(orPuedeCerrar()){
-    h+='<div style="margin-top:12px;text-align:right"><button class="btn btn-sm" onclick="orReabrir('+m.id+')">🔓 Reabrir Motivo</button></div>';
-  }
+  if(!desc) h+=caja;
   return h;
+}
+// Cerrar: pide una Descripción de cierre obligatoria (mínimo 10 caracteres)
+var OR_MIN_CIERRE=10;
+function orPedirCierre(motivoId){
+  if(!orPuedeCerrar()){ alert('No tenés permiso para cerrar Motivos.'); return; }
+  var ov=document.createElement('div');
+  ov.id='or-cierre-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:1.2rem;width:100%;max-width:420px;box-shadow:0 12px 40px rgba(0,0,0,.2)">'
+    +'<div style="font-size:15px;font-weight:600;color:#1F4E79;margin-bottom:4px">🔒 Cerrar Motivo</div>'
+    +'<div style="font-size:12px;color:#6B7280;margin-bottom:8px">Ya no se podrán agregar mensajes (podés reabrirlo después).</div>'
+    +'<label style="font-size:12px;color:#6B7280">Descripción de cierre (obligatoria, mínimo '+OR_MIN_CIERRE+' caracteres)</label>'
+    +'<textarea id="or-cierre-txt" rows="4" oninput="orActualizarContadorCierre()" style="width:100%;box-sizing:border-box;margin:4px 0;padding:7px 9px;font-family:inherit;font-size:13px"></textarea>'
+    +'<div id="or-cierre-cnt" style="font-size:11px;color:#DC2626;margin-bottom:10px">0 / '+OR_MIN_CIERRE+'</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" onclick="orCancelarCierre()">Cancelar</button>'
+    +'<button class="btn btn-sm btn-danger" onclick="orConfirmarCierre('+motivoId+')">Cerrar Motivo</button></div></div>';
+  document.body.appendChild(ov);
+  var t=document.getElementById('or-cierre-txt'); if(t) t.focus();
+}
+function orActualizarContadorCierre(){
+  var t=document.getElementById('or-cierre-txt'), c=document.getElementById('or-cierre-cnt');
+  if(!t||!c) return;
+  var n=t.value.trim().length;
+  c.textContent=n+' / '+OR_MIN_CIERRE; c.style.color=n>=OR_MIN_CIERRE?'#16A34A':'#DC2626';
+}
+function orCancelarCierre(){ var ov=document.getElementById('or-cierre-overlay'); if(ov) ov.remove(); }
+async function orConfirmarCierre(motivoId){
+  var t=document.getElementById('or-cierre-txt');
+  var nota=(t&&t.value||'').trim();
+  if(nota.length<OR_MIN_CIERRE){ alert('La descripción de cierre es obligatoria (mínimo '+OR_MIN_CIERRE+' caracteres).'); return; }
+  var ok=await orCerrar(motivoId,nota);
+  if(ok) orCancelarCierre();
 }
 async function orCrearMotivo(){
   if(!orPuedeCrear()){ alert('No tenés permiso para crear Motivos.'); return; }
@@ -6019,12 +6169,12 @@ async function orEnviar(motivoId){
   if(!ok){ orRender(); return; }
   orRender();
 }
-async function orCerrar(motivoId){
-  if(!orPuedeCerrar()){ alert('No tenés permiso para cerrar Motivos.'); return; }
+async function orCerrar(motivoId,nota){
+  if(!orPuedeCerrar()){ alert('No tenés permiso para cerrar Motivos.'); return false; }
   var m=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(motivoId);});
-  if(!m||m.estado==='Cerrado') return;
-  var nota=((document.getElementById('or-nota')||{}).value||'').trim();
-  if(!confirm('¿Cerrar este Motivo? Ya no se podrán agregar mensajes (podés reabrirlo después).')) return;
+  if(!m||m.estado==='Cerrado') return false;
+  nota=(nota||'').trim();
+  if(nota.length<OR_MIN_CIERRE){ alert('La descripción de cierre es obligatoria (mínimo '+OR_MIN_CIERRE+' caracteres).'); return false; }
   var ahora=Date.now();
   var prev={estado:m.estado,cerradoTs:m.cerradoTs,cerradoPor:m.cerradoPor,notaCierre:m.notaCierre,_ts:m._ts};
   var msg={id:orNuevoId(S.oracionMensajes),motivoId:m.id,texto:nota,tipo:'cierre',
@@ -6034,6 +6184,7 @@ async function orCerrar(motivoId){
   var ok=await orPersistir(function(){ Object.assign(m,prev); S.oracionMensajes=S.oracionMensajes.filter(function(x){return x!==msg;}); });
   orRender();
   if(ok) showToast('🔒 Motivo cerrado','#6B7280');
+  return ok;
 }
 async function orReabrir(motivoId){
   if(!orPuedeCerrar()){ alert('No tenés permiso para reabrir Motivos.'); return; }
@@ -10245,11 +10396,27 @@ function funcionBaseSiVacio(m){
   if(b&&m&&!(m.roles||[]).length){ m.roles=[b]; m._ts=Date.now(); return true; }
   return false;
 }
+function cfgToggleSistema(){
+  var chk=document.getElementById('cfg-uf-sistema'); if(!chk) return;
+  cfgSistemaUI(chk.checked,null);
+  if(chk.checked){ var r=document.getElementById('cfg-uf-role'); if(r) r.value='super_admin'; }
+}
+function cfgSistemaUI(activa,nombre){
+  var row=document.getElementById('cfg-uf-sistema-row'), chk=document.getElementById('cfg-uf-sistema');
+  var nm=document.getElementById('cfg-uf-sys-name'), sel=document.getElementById('cfg-uf-member');
+  if(row) row.style.display=isSuperAdmin()?'block':'none';
+  if(chk) chk.checked=!!activa;
+  if(nm){ nm.style.display=activa?'block':'none'; if(nombre!==null&&nombre!==undefined) nm.value=nombre; else if(!activa) nm.value=''; }
+  if(sel&&activa){ sel.disabled=true; sel.value=''; sel.style.opacity='.5'; }
+  else if(sel){ sel.style.opacity=''; }
+}
 function cfgOpenNewUser(){
   cfgEditingUserId=null;
   const mSelNew=document.getElementById('cfg-uf-member');
   if(mSelNew){mSelNew.disabled=false;mSelNew.style.background='';mSelNew.style.color='';}
   document.getElementById('cfg-uf-title').textContent='Nuevo usuario';
+  cfgSistemaUI(false,'');
+  var _pw0=document.getElementById('cfg-uf-pass'); if(_pw0) _pw0.placeholder='';
   ['cfg-uf-name','cfg-uf-user','cfg-uf-pass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   var _baseId=funcionBaseId();
   document.getElementById('cfg-uf-role').value=_baseId||'facilitador';
@@ -10264,7 +10431,8 @@ function cfgEditUser(id){
   document.getElementById('cfg-uf-title').textContent='Editar usuario';
   document.getElementById('cfg-uf-name').value=u.name;
   document.getElementById('cfg-uf-user').value=u.user;
-  document.getElementById('cfg-uf-pass').value=u.pass;
+  document.getElementById('cfg-uf-pass').value='';
+  document.getElementById('cfg-uf-pass').placeholder='Dejar vacío para no cambiarla';
   document.getElementById('cfg-uf-role').value=u.role;
   cfgToggleGroupSel();
   const ugSel=document.getElementById('cfg-uf-group');
@@ -10296,6 +10464,7 @@ function cfgEditUser(id){
       mSel.style.color='';
     }
   }
+  cfgSistemaUI(!!u.cuentaSistema,u.cuentaSistema?u.name:'');
   document.getElementById('cfg-user-form').style.display='block';
   document.getElementById('cfg-user-form').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -10303,14 +10472,23 @@ function cfgToggleGroupSel(){
   // Group row removed - members have their group assigned already
 }
 async function cfgSaveUser(){
-  const name=document.getElementById('cfg-uf-name').value.trim();
+  const sysChk=document.getElementById('cfg-uf-sistema');
+  const esSistema=!!(sysChk&&sysChk.checked&&isSuperAdmin());
+  const name=esSistema?(document.getElementById('cfg-uf-sys-name').value||'').trim():document.getElementById('cfg-uf-name').value.trim();
   const user=document.getElementById('cfg-uf-user').value.trim();
   const pass=document.getElementById('cfg-uf-pass').value;
   const role=document.getElementById('cfg-uf-role').value;
   const groupId=parseInt(document.getElementById('cfg-uf-group')?.value)||null;
-  const memberIdVal=parseInt(document.getElementById('cfg-uf-member')?.value)||null;
-  if(!name||!user||!pass){alert('Completá todos los campos');return;}
+  const memberIdVal=esSistema?null:(parseInt(document.getElementById('cfg-uf-member')?.value)||null);
   var esNuevo=!cfgEditingUserId;
+  // Al editar, la contraseña vacía significa "no cambiarla"
+  if(!name||!user||!role||(esNuevo&&!pass)){alert('Completá todos los campos');return;}
+  if(esSistema&&S.members.some(function(m){return normName(fullName(m))===normName(name);})){
+    alert('El nombre de una cuenta de sistema no puede coincidir con el de un Miembro (se vincularía a esa persona). Usá por ejemplo "Dueño del Producto".');return;
+  }
+  if(S.users.some(function(x){return x.user===user&&(esNuevo||Number(x.id)!==Number(cfgEditingUserId));})){
+    alert('Ya existe un usuario con ese nombre de login. Elegí otro.');return;
+  }
   var snapshotExisting=null, snapshotMemberRoles=null, memberIdTocado=null;
   if(cfgEditingUserId){
     const existing=S.users.find(x=>Number(x.id)===Number(cfgEditingUserId));
@@ -10319,8 +10497,10 @@ async function cfgSaveUser(){
     // Keep existing memberId when editing (member is read-only)
     // Also try reading selector directly in case memberId was never saved
     var selectorMemberId=parseInt(document.getElementById('cfg-uf-member')?.value)||null;
-    var resolvedMemberId=existing.memberId||memberIdVal||selectorMemberId;
-    Object.assign(existing,{name,user,pass,role,groupId,memberId:resolvedMemberId});
+    var resolvedMemberId=esSistema?null:(existing.memberId||memberIdVal||selectorMemberId);
+    Object.assign(existing,{name,user,role,groupId,memberId:resolvedMemberId});
+    if(esSistema) existing.cuentaSistema=true; else delete existing.cuentaSistema;
+    if(pass) await pwAsignar(existing,pass);
     // Sincronizar función con S.members para que se vea en Rebaños
     var memberId=resolvedMemberId;
     if(memberId){
@@ -10335,7 +10515,9 @@ async function cfgSaveUser(){
       }
     }
   } else {
-    var newUser={id:Date.now(),name,user,pass,role,groupId,memberId:memberIdVal};
+    var newUser={id:Date.now(),name,user,role,groupId,memberId:memberIdVal};
+    if(esSistema) newUser.cuentaSistema=true;
+    await pwAsignar(newUser,pass);
     S.users.push(newUser);
     // Sincronizar función con S.members para que se vea en Rebaños
     if(memberIdVal){
@@ -10355,7 +10537,7 @@ async function cfgSaveUser(){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     if(esNuevo){ S.users=S.users.filter(function(u){return u.id!==newUser.id;}); }
-    else { var ex2=S.users.find(function(u){return Number(u.id)===Number(cfgEditingUserId);}); if(ex2&&snapshotExisting) Object.assign(ex2,snapshotExisting); }
+    else { var ex2=S.users.find(function(u){return Number(u.id)===Number(cfgEditingUserId);}); if(ex2&&snapshotExisting) pwRestaurar(ex2,snapshotExisting); }
     if(memberIdTocado!==null&&snapshotMemberRoles){
       var mem2=S.members.find(function(m){return Number(m.id)===Number(memberIdTocado);});
       if(mem2) mem2.roles=snapshotMemberRoles;
@@ -10684,7 +10866,7 @@ function buildGdVHTML(){
         <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-mf-nombre"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Apellido</label><input type="text" id="gdv-mf-apellido"></div></div>
         <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Género</label><select id="gdv-mf-genero"><option value="H">Hombre</option><option value="M">Mujer</option></select></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label><select id="gdv-mf-grupo"></select></div></div>
         <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label><input type="tel" id="gdv-mf-tel"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Estado</label><select id="gdv-mf-estado"><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option></select></div></div>
-        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función <span style="font-weight:400;color:#9CA3AF">(solo lectura)</span></label><div class="role-selector" id="gdv-mf-roles"></div><div style="font-size:11px;color:#9CA3AF;margin-top:4px">Se asigna desde Configuración → Usuarios, Grupos, Nuevas Generaciones o Servicios/Ministerios según corresponda.</div>
+        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función <span style="font-weight:400;color:#9CA3AF">(solo lectura)</span></label><div class="role-selector" id="gdv-mf-roles"></div><div style="font-size:11px;color:#9CA3AF;margin-top:4px">Se asigna desde Configuración → Usuarios, Grupos, Nuevas Generaciones o Propósitos según corresponda.</div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" onclick="gdvCloseMemberForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveMember()">Guardar</button></div>
       </div>
     </div>
@@ -10777,7 +10959,7 @@ function gdvMiembrosHTML(){return `
     <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-mf-nombre"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Apellido</label><input type="text" id="gdv-mf-apellido"></div></div>
     <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Género</label><select id="gdv-mf-genero"><option value="H">Hombre</option><option value="M">Mujer</option></select></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label><select id="gdv-mf-grupo"></select></div></div>
     <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label><input type="tel" id="gdv-mf-tel"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Estado</label><select id="gdv-mf-estado"><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option></select></div></div>
-    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función <span style="font-weight:400;color:#9CA3AF">(solo lectura)</span></label><div class="role-selector" id="gdv-mf-roles"></div><div style="font-size:11px;color:#9CA3AF;margin-top:4px">Se asigna desde Configuración → Usuarios, Grupos, Nuevas Generaciones o Servicios/Ministerios según corresponda.</div>
+    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función <span style="font-weight:400;color:#9CA3AF">(solo lectura)</span></label><div class="role-selector" id="gdv-mf-roles"></div><div style="font-size:11px;color:#9CA3AF;margin-top:4px">Se asigna desde Configuración → Usuarios, Grupos, Nuevas Generaciones o Propósitos según corresponda.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" onclick="gdvCloseMemberForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveMember()">Guardar</button></div>
   </div>`;}
 
@@ -12529,7 +12711,8 @@ function gdvEditUser(id){
   document.getElementById('gdv-uf-title').textContent='Editar usuario';
   document.getElementById('gdv-uf-name').value=u.name;
   document.getElementById('gdv-uf-user').value=u.user;
-  document.getElementById('gdv-uf-pass').value=u.pass;
+  document.getElementById('gdv-uf-pass').value='';
+  document.getElementById('gdv-uf-pass').placeholder='Dejar vacío para no cambiarla';
   document.getElementById('gdv-uf-role').value=u.role;
   document.getElementById('gdv-uf-group').value=u.groupId||'';
   gdvToggleGroupSel();
@@ -12545,23 +12728,26 @@ async function gdvSaveUser(){
   const pass=document.getElementById('gdv-uf-pass').value;
   const role=document.getElementById('gdv-uf-role').value;
   const groupId=parseInt(document.getElementById('gdv-uf-group').value)||null;
-  if(!name||!user||!pass){alert('Completá todos los campos');return;}
+  if(!name||!user||(!gdvEditingUserId&&!pass)){alert('Completá todos los campos');return;}
   var esNuevo=!gdvEditingUserId;
   var snapshot=null, nuevoId=null;
   if(gdvEditingUserId){
     var existing=S.users.find(x=>x.id===gdvEditingUserId);
     snapshot=Object.assign({},existing);
-    Object.assign(existing,{name,user,pass,role,groupId});
+    Object.assign(existing,{name,user,role,groupId});
+    if(pass) await pwAsignar(existing,pass);
   } else {
     nuevoId=Date.now();
-    S.users.push({id:nuevoId,name,user,pass,role,groupId});
+    var nuG={id:nuevoId,name,user,role,groupId};
+    await pwAsignar(nuG,pass);
+    S.users.push(nuG);
   }
   await saveK(SK.users,S.users);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     if(esNuevo){ S.users=S.users.filter(function(u){return u.id!==nuevoId;}); }
-    else { var ex2=S.users.find(function(u){return u.id===gdvEditingUserId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
+    else { var ex2=S.users.find(function(u){return u.id===gdvEditingUserId;}); if(ex2&&snapshot) pwRestaurar(ex2,snapshot); }
     await saveK(SK.users,S.users);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -16751,7 +16937,7 @@ async function saveRoleModal(){
 
 var _rmRoleId=null, _rmRoleName='';
 function _rmPuedeEditar(roleId){
-  if(FUNC_AUTO_IDS.includes(roleId)) return false; // se asignan solas desde Grupos / Comunidades
+  if(funcAutoIds().includes(roleId)) return false; // se asignan solas desde Grupos / Comunidades / Propósitos
   return isSuperAdmin()||canEjecutar('config');
 }
 function showRoleMembers(roleId, roleName){
@@ -16761,8 +16947,8 @@ function showRoleMembers(roleId, roleName){
   document.getElementById('role-members-title').textContent=`${roleName} — ${members.length} miembro${members.length!==1?'s':''}`;
   const list=document.getElementById('role-members-list');
   var html='';
-  if(FUNC_AUTO_IDS.includes(roleId)){
-    html+='<div style="font-size:12px;color:#6B7280;background:#F3F4F6;border-radius:8px;padding:8px 10px;margin-bottom:10px">Esta Función se asigna sola según el Grupo / Comunidad donde la persona figura. Para cambiarla, editá el Grupo o la Comunidad.</div>';
+  if(funcAutoIds().includes(roleId)){
+    html+='<div style="font-size:12px;color:#6B7280;background:#F3F4F6;border-radius:8px;padding:8px 10px;margin-bottom:10px">Esta Función se asigna sola según el Grupo, Comunidad o Propósito donde la persona figura. Para cambiarla, editá ese Grupo, Comunidad o Propósito.</div>';
   }
   if(editable){
     html+='<div style="position:relative;margin-bottom:10px">'

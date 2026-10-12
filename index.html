@@ -410,6 +410,7 @@ const KEY_GROUPS = {
   'homeConfig': ['gdv_home_config'],
   'agenda':  ['gdv_ministerios','_tomb_gdv_eventos','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas','_tomb_gdv_checklist_secciones','gdv_checklist_secciones'],
   'campanas':['_tomb_gdv_campanas','gdv_campanas'],
+  'oracion': ['_tomb_gdv_oracion_motivos','gdv_oracion_motivos','_tomb_gdv_oracion_mensajes','gdv_oracion_mensajes'],
   'formularios': ['_tomb_gdv_formularios','gdv_formularios','_tomb_gdv_form_respuestas','gdv_form_respuestas','_tomb_gdv_form_analisis','gdv_form_analisis'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
                'of5_part','of5_obspart','of5_obspago','of5_materias',
@@ -440,8 +441,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -599,8 +600,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -668,7 +669,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zf';
+const APP_VERSION = '2026-08-24-zj';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -757,6 +758,8 @@ window.fbDownload().then(function(hasData) {
         S.formularios    = _ld('gdv_formularios',     S.formularios    ||[]);
         S.formRespuestas = _ld('gdv_form_respuestas', S.formRespuestas ||[]);
         S.formAnalisis   = _ld('gdv_form_analisis',   S.formAnalisis   ||[]);
+        S.oracionMotivos = _ld('gdv_oracion_motivos', S.oracionMotivos ||[]);
+        S.oracionMensajes= _ld('gdv_oracion_mensajes',S.oracionMensajes||[]);
         S.homeConfig     = _ld('gdv_home_config',     S.homeConfig     ||{});
       }
       // Load permisos from Firebase if this device has none configured
@@ -828,6 +831,11 @@ const MODULES_PERM=[
     {key:'equipo_crear', label:'Ver todos los checklists y crear checklists nuevos desde un evento'},
     {key:'equipo_admin', label:'Administrar tareas y equipo de cualquier checklist'},
   ]},
+  {key:'oracion', label:'Motivos de Oración', icon:'🙏', screens:[
+    {key:'oracion_ver',    label:'Acceder al módulo (los Líderes de Propósito ya acceden y ven solo los suyos)'},
+    {key:'oracion_todos',  label:'Ver todos los Motivos y escribir en cualquiera'},
+    {key:'oracion_cerrar', label:'Cerrar y reabrir Motivos'},
+  ]},
   {key:'formularios', label:'Formularios de Trabajo', icon:'📝', screens:[
     {key:'formularios_ver',   label:'Ver Activos e Histórico'},
     {key:'formularios_crear', label:'Crear formularios, revisar respuestas y Análisis App (Super Admin)'},
@@ -840,7 +848,7 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',formularios_todos:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_editar:'ejecuta'},
+  pastor      : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',oracion_ver:'ejecuta',oracion_todos:'ejecuta',oracion_cerrar:'ejecuta',formularios_todos:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_editar:'ejecuta'},
   lider       : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   facilitador : {gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
@@ -1138,6 +1146,7 @@ const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles
   campanas:'gdv_campanas',
   checklists:'gdv_checklists',checklistTareas:'gdv_checklist_tareas',checklistSecciones:'gdv_checklist_secciones',
   formularios:'gdv_formularios',formRespuestas:'gdv_form_respuestas',formAnalisis:'gdv_form_analisis',
+  oracionMotivos:'gdv_oracion_motivos',oracionMensajes:'gdv_oracion_mensajes',
   homeConfig:'gdv_home_config'};
 
 const DEFAULT_DISC_PASOS=[
@@ -1371,7 +1380,7 @@ const DEFAULT_USERS=[
 // ════════════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════════════
-let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],discInscripciones:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[],checklistSecciones:[],formularios:[],formRespuestas:[],formAnalisis:[],homeConfig:{}};
+let S={users:[],groups:[],records:[],members:[],roles:[],discPasos:[],discRecords:[],discCursadas:[],discInscripciones:[],ngComunidades:[],ngRecords:[],modulesConfig:[],ministerios:[],eventos:[],campanas:[],checklists:[],checklistTareas:[],checklistSecciones:[],formularios:[],formRespuestas:[],formAnalisis:[],oracionMotivos:[],oracionMensajes:[],homeConfig:{}};
 let currentUser=null;
 let gdvCharts={};
 let ngCharts={};
@@ -1421,6 +1430,8 @@ async function initStorage(){
   S.formularios    =load(SK.formularios,    []);
   S.formRespuestas =load(SK.formRespuestas, []);
   S.formAnalisis   =load(SK.formAnalisis,   []);
+  S.oracionMotivos =load(SK.oracionMotivos, []);
+  S.oracionMensajes=load(SK.oracionMensajes,[]);
   S.homeConfig     =load(SK.homeConfig,     {});
   await cleanMembers();
   loadPermisos();
@@ -1640,8 +1651,20 @@ function ngGetFilteredRecords(){
 // del dashboard NG (incluye el caso especial "Líderes y Colabs"). Usado por todas las
 // pestañas del dashboard (Semanas, Evolución, Ranking, % Asistencia, tarjetas) para que
 // el filtro se aplique de forma consistente en todos lados.
-function ngMatchesSexoFilter(a){
-  var esLC=!!(a&&(a.esLider||a.esColab));
+// ¿Esta persona es Líder/Colaborador de la Comunidad? La marca guardada en el registro (esLider /
+// esColab) manda; solo en registros VIEJOS, que no la tienen (undefined), se mira el rol actual.
+function ngEsLiderColabEnRegistro(a,mid,r){
+  if(!a) return false;
+  if(a.esLider===true||a.esColab===true) return true;
+  if(a.esLider===false) return false;
+  if(mid===null||mid===undefined||!r) return false;
+  var ng=(S.ngComunidades||[]).find(function(x){return Number(x.id)===Number(r.comunidadId);});
+  if(!ng) return false;
+  var n=Number(mid);
+  return (ng.liderIds||[]).map(Number).includes(n)||(ng.colaboradorIds||[]).map(Number).includes(n);
+}
+function ngMatchesSexoFilter(a,mid,r){
+  var esLC=ngEsLiderColabEnRegistro(a,mid,r);
   if(ngFilSexo==='lideres') return esLC;
   if(esLC) return false;
   if(ngFilSexo && a.genero!==ngFilSexo) return false;
@@ -1743,7 +1766,7 @@ function ngGetStatData(){
     if(!porCategoria[cat]) porCategoria[cat]={pres:0,nuevos:0};
     Object.entries(r.asistencia||{}).forEach(function(entry){
       var mid=entry[0], a=entry[1];
-      if(!ngMatchesSexoFilter(a)) return;
+      if(!ngMatchesSexoFilter(a,mid,r)) return;
       if(a.state!=='presente') return;
       presTotal++;
       porCategoria[cat].pres++;
@@ -1883,7 +1906,7 @@ function ngRenderEvolucion(){
     if(!byWeek[key]) byWeek[key]={h:0,m:0,semana:semana,anio:anio,new:0};
     Object.entries(r.asistencia||{}).forEach(function(entry){
       var mid=entry[0], a=entry[1];
-      if(!ngMatchesSexoFilter(a)) return;
+      if(!ngMatchesSexoFilter(a,mid,r)) return;
       if(a.state!=='presente') return;
       if(a.genero==='H') byWeek[key].h++;
       else if(a.genero==='M') byWeek[key].m++;
@@ -1943,8 +1966,9 @@ function ngRenderRanking(){
     var comRecs=recs.filter(function(r){return Number(r.comunidadId)===Number(com.id);});
     var pres=0,tot=0;
     comRecs.forEach(function(r){
-      Object.values(r.asistencia||{}).forEach(function(a){
-        if(!ngMatchesSexoFilter(a)) return;
+      Object.entries(r.asistencia||{}).forEach(function(e){
+        var a=e[1];
+        if(!ngMatchesSexoFilter(a,e[0],r)) return;
         tot++;if(a.state==='presente') pres++;
       });
     });
@@ -1983,8 +2007,9 @@ function ngRenderPctAsist(){
     var comRecs=recs.filter(function(r){return Number(r.comunidadId)===Number(com.id);});
     var pres=0,aus=0;
     comRecs.forEach(function(r){
-      Object.values(r.asistencia||{}).forEach(function(a){
-        if(!ngMatchesSexoFilter(a)) return;
+      Object.entries(r.asistencia||{}).forEach(function(e){
+        var a=e[1];
+        if(!ngMatchesSexoFilter(a,e[0],r)) return;
         if(a.state==='presente') pres++;else aus++;
       });
     });
@@ -2085,7 +2110,8 @@ function ngRenderNuevosPanel(){
   // cruzando todo su historial de GdV y NG, sin depender de por qué camino se los dio de alta.
   var recsConNuevos=recsBase.map(function(r){
     var nuevosIds=Object.keys(r.asistencia||{}).filter(function(mid){
-      return r.asistencia[mid].state==='presente' && mapaPrimerasFechasNg[mid]===r.fecha;
+      return r.asistencia[mid].state==='presente' && mapaPrimerasFechasNg[mid]===r.fecha &&
+        ngFilSexo!=='lideres' && ngMatchesSexoFilter(r.asistencia[mid],mid,r);
     });
     return {r:r, nuevosIds:nuevosIds};
   }).filter(function(x){return x.nuevosIds.length>0;})
@@ -3005,7 +3031,7 @@ function funcionesAutoReconciliar(memberIds){
         auto=auto.filter(function(x){return x!==r;}); cambio=true;
       }
     });
-    if(cambio){ m.roles=roles; m.rolesAuto=auto; m._ts=Date.now(); }
+    if(cambio){ m.roles=roles; m.rolesAuto=auto; m._ts=Date.now(); funcionBaseSiVacio(m); }
   });
 }
 
@@ -3041,7 +3067,7 @@ function funcionesAutoAplicarRevision(d, decisiones){
   d.pegadas.forEach(function(x,i){
     var m=x.m;
     if(decisiones[i]==='manual'){ marcar(m,'rolesManuales',x.r); desmarcar(m,'rolesAuto',x.r); }
-    else { m.roles=(m.roles||[]).filter(function(r){return r!==x.r;}); desmarcar(m,'rolesAuto',x.r); desmarcar(m,'rolesManuales',x.r); }
+    else { m.roles=(m.roles||[]).filter(function(r){return r!==x.r;}); desmarcar(m,'rolesAuto',x.r); desmarcar(m,'rolesManuales',x.r); funcionBaseSiVacio(m); }
     m._ts=ahora;
   });
 }
@@ -3243,6 +3269,7 @@ const DEFAULT_MODULES = [
   {key:'of',         icon:'👨‍👩‍👧',  name:'Orientación Familiar', desc:'Gestión de alumnos, asistencia, pagos y participación del curso.',                 tag:'Módulo activo', tagClass:'tag-purple', action:'openOF', activo:true},
   {key:'agenda',     icon:'📅',  name:'Agenda Ministerial',   desc:'Calendario de eventos y actividades por Servicio/Ministerio, con recurrencia semanal o mensual.', tag:'Módulo activo', tagClass:'tag-blue', action:'openAgenda', activo:false},
   {key:'equipo',     icon:'🤝',  name:'Trabajo en Equipo',    desc:'Checklists colaborativos para organizar actividades: coordinadores, colaboradores y tareas asignadas.', tag:'Módulo activo', tagClass:'tag-purple', action:'openEquipo', activo:false},
+  {key:'oracion',    icon:'🙏',  name:'Motivos de Oración',   desc:'Motivos de oración de los Líderes de Propósito con los Pastores: conversación por motivo hasta cerrarlo.', tag:'Módulo activo', tagClass:'tag-purple', action:'openOracion', activo:false},
   {key:'formularios',icon:'📝',  name:'Formularios de Trabajo',desc:'Formularios semanales para Grupos de Vida, Nuevas Generaciones y Discipulado, con seguimiento por unidad y análisis.', tag:'Módulo activo', tagClass:'tag-purple', action:'openFormularios', activo:false},
   {key:'config',     icon:'⚙️',  name:'Configuración',         desc:'Gestión de grupos, usuarios del sistema y roles. Solo accesible para Super Admin.',   tag:'Solo Super Admin', tagClass:'tag-green', action:'openConfig', activo:true},
 ];
@@ -3282,7 +3309,7 @@ function renderModulesGrid(){
     miembros:canAccessMiembros(), nuevos:canAccessNuevos(),
     gdv:canAccessGdV(), ng:canAccessNG(),
     disc:canAccessDisc(), of:canAccessOF(), config:canAccessConfig(),
-    agenda:canAccessAgenda(), equipo:canAccessEquipo(), formularios:canAccessFormularios()
+    agenda:canAccessAgenda(), equipo:canAccessEquipo(), oracion:canAccessOracion(), formularios:canAccessFormularios()
   };
   allMods.forEach(function(mod){
     var tienePermiso=accessMap[mod.key];
@@ -5765,6 +5792,263 @@ function canEjecutarEquipo(){
 // ══════════════════════════════════════════════════════════════════
 function canAccessFormularios(){
   return isSuperAdmin() || canScreen('formularios_ver') || canEjecutar('formularios_crear');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MOTIVOS DE ORACIÓN — hilo de mensajes entre Líderes de Propósito y Pastores
+// • Motivo = S.oracionMotivos  ·  cada mensaje = un registro propio en S.oracionMensajes
+//   (así dos personas escribiendo a la vez nunca se pisan: se mergea por id).
+// • Líder de Propósito = figura en liderIds de un Servicio/Ministerio (Configuración).
+// • Ve todos: permiso oracion_todos. Sin él, solo los Motivos que creó.
+// • Cerrar / Reabrir: permiso oracion_cerrar (por defecto Pastor).
+// ══════════════════════════════════════════════════════════════════
+var orVista={id:null,tab:'abiertos',filtroProp:'',creando:false};
+function orEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function orPropositosLiderados(){
+  var linked=getLinkedMember();
+  if(!linked) return [];
+  return (S.ministerios||[]).filter(function(m){
+    return (m.estado||'Activo')!=='Inactivo'&&(m.liderIds||[]).map(Number).includes(Number(linked.id));
+  });
+}
+function orEsLider(){ return orPropositosLiderados().length>0; }
+function orVerTodos(){ return isSuperAdmin()||canEjecutar('oracion_todos'); }
+function orPuedeCerrar(){ return isSuperAdmin()||canEjecutar('oracion_cerrar'); }
+function orPuedeCrear(){ return orVerTodos()||orEsLider(); }
+function canAccessOracion(){
+  return isSuperAdmin()||canScreen('oracion_ver')||canScreen('oracion_todos')||orEsLider();
+}
+function orEsMio(mot){
+  var linked=getLinkedMember();
+  if(linked&&mot.creadoMemberId!=null&&Number(mot.creadoMemberId)===Number(linked.id)) return true;
+  return !!(currentUser&&mot.creadoUserId!=null&&Number(mot.creadoUserId)===Number(currentUser.id));
+}
+function orVisible(mot){ return !!mot&&(orVerTodos()||orEsMio(mot)); }
+function orMensajesDe(motivoId){
+  return (S.oracionMensajes||[]).filter(function(m){return Number(m.motivoId)===Number(motivoId);})
+    .sort(function(a,b){return (a.ts||0)-(b.ts||0)||(a.id||0)-(b.id||0);});
+}
+function orLeidos(){
+  try{ return JSON.parse(localStorage.getItem('or_leido_'+(currentUser?currentUser.id:''))||'{}'); }catch(e){ return {}; }
+}
+function orMarcarLeido(motivoId){
+  try{
+    var l=orLeidos(); var ms=orMensajesDe(motivoId);
+    l[motivoId]=ms.length?ms[ms.length-1].ts:Date.now();
+    localStorage.setItem('or_leido_'+(currentUser?currentUser.id:''),JSON.stringify(l));
+  }catch(e){}
+}
+function orSinLeer(mot){
+  var ms=orMensajesDe(mot.id); if(!ms.length) return false;
+  var u=ms[ms.length-1];
+  if(Number(u.autorUserId)===Number(currentUser&&currentUser.id)) return false;
+  var l=orLeidos();
+  return (u.ts||0)>(l[mot.id]||0);
+}
+function orNuevoId(lista){
+  var id=Date.now();
+  while((lista||[]).some(function(x){return Number(x.id)===id;})) id++;
+  return id;
+}
+async function orPersistir(rollbackFn){
+  await saveK(SK.oracionMotivos,S.oracionMotivos);
+  await saveK(SK.oracionMensajes,S.oracionMensajes);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    rollbackFn();
+    await saveK(SK.oracionMotivos,S.oracionMotivos);
+    await saveK(SK.oracionMensajes,S.oracionMensajes);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return false;
+  }
+  try{if(typeof window.syncNow==="function")window.syncNow();}catch(_e){}
+  return true;
+}
+
+function openOracion(){
+  if(!canAccessOracion()){ alert('No tenés acceso a este módulo.'); return; }
+  document.getElementById('screen-home').classList.add('hidden');
+  document.getElementById('screen-app').classList.add('show');
+  document.getElementById('app-topbar-title').textContent='🙏 Motivos de Oración';
+  document.getElementById('app-topbar-user').textContent=currentUser.name;
+  orVista={id:null,tab:'abiertos',filtroProp:'',creando:false};
+  orRender();
+}
+function orRender(){
+  var c=document.getElementById('app-content'); if(!c) return;
+  var h='<div class="gdv-app" id="or-root">';
+  if(orVista.id!=null) h+=orHtmlDetalle(orVista.id);
+  else if(orVista.creando) h+=orHtmlNuevo();
+  else h+=orHtmlLista();
+  h+='</div>';
+  c.innerHTML=h;
+  if(orVista.id!=null){
+    orMarcarLeido(orVista.id);
+    var th=document.getElementById('or-hilo'); if(th) th.scrollTop=th.scrollHeight;
+  }
+}
+function orHtmlLista(){
+  var todos=(S.oracionMotivos||[]).filter(orVisible);
+  var verTodos=orVerTodos();
+  var abiertos=todos.filter(function(m){return m.estado!=='Cerrado';});
+  var cerrados=todos.filter(function(m){return m.estado==='Cerrado';});
+  var lista=orVista.tab==='cerrados'?cerrados:abiertos;
+  if(verTodos&&orVista.filtroProp) lista=lista.filter(function(m){var ids=(m.propositoIds&&m.propositoIds.length)?m.propositoIds:(m.propositoId?[m.propositoId]:[]);return ids.map(String).indexOf(String(orVista.filtroProp))>=0;});
+  lista=lista.slice().sort(function(a,b){
+    var ua=(orMensajesDe(a.id).slice(-1)[0]||{ts:a.creadoTs}).ts, ub=(orMensajesDe(b.id).slice(-1)[0]||{ts:b.creadoTs}).ts;
+    return (ub||0)-(ua||0);
+  });
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
+    +'<div style="display:flex;gap:6px">'
+    +'<button class="btn btn-sm'+(orVista.tab==='abiertos'?' btn-primary':'')+'" onclick="orVista.tab=\'abiertos\';orRender()">Abiertos ('+abiertos.length+')</button>'
+    +'<button class="btn btn-sm'+(orVista.tab==='cerrados'?' btn-primary':'')+'" onclick="orVista.tab=\'cerrados\';orRender()">Cerrados ('+cerrados.length+')</button></div>';
+  if(orPuedeCrear()) h+='<button class="btn btn-sm btn-primary" onclick="orVista.creando=true;orRender()">➕ Nuevo Motivo</button>';
+  h+='</div>';
+  if(verTodos){
+    var props=(S.ministerios||[]).slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);});
+    h+='<select onchange="orVista.filtroProp=this.value;orRender()" style="width:100%;margin-bottom:10px;padding:7px 9px;font-size:13px"><option value="">Todos los Propósitos</option>'
+      +props.map(function(p){return '<option value="'+p.id+'"'+(String(orVista.filtroProp)===String(p.id)?' selected':'')+'>'+orEsc(p.nombre)+'</option>';}).join('')+'</select>';
+  }
+  if(!lista.length){
+    h+='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem;text-align:center;color:#9CA3AF;font-size:13px">'
+      +(orVista.tab==='cerrados'?'No hay Motivos cerrados.':'No hay Motivos abiertos.'+(orPuedeCrear()?' Creá el primero con “➕ Nuevo Motivo”.':''))+'</div>';
+    return h;
+  }
+  lista.forEach(function(m){
+    var ms=orMensajesDe(m.id), u=ms[ms.length-1];
+    h+='<div onclick="orVista.id='+m.id+';orRender()" style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:pointer">'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">'
+      +'<div style="font-size:14px;font-weight:600;color:#1F4E79">'+orEsc(m.titulo)+'</div>'
+      +(orSinLeer(m)?'<span class="badge b-danger" style="font-size:10px;flex-shrink:0">● Nuevo</span>':'')+'</div>'
+      +'<div style="font-size:11.5px;color:#6B7280;margin-top:2px">'+(orNombresProposito(m)?orEsc(orNombresProposito(m))+' · ':'')+orEsc(m.creadoPorNombre||'')+'</div>'
+      +'<div style="font-size:11px;color:#9CA3AF;margin-top:4px">💬 '+ms.length+' mensaje'+(ms.length!==1?'s':'')
+      +(u?' · Último: '+orEsc(u.autor)+' · '+agendaFmtFechaHora(u.ts):'')+'</div></div>';
+  });
+  return h;
+}
+function orHtmlNuevo(){
+  return '<button class="btn btn-sm" onclick="orVista.creando=false;orRender()" style="margin-bottom:10px">← Volver</button>'
+    +'<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:14px">'
+    +'<div style="font-size:15px;font-weight:600;color:#1F4E79;margin-bottom:10px">🙏 Nuevo Motivo de Oración</div>'
+    +'<label style="font-size:12px;color:#6B7280">Motivo</label>'
+    +'<input id="or-f-titulo" type="text" maxlength="120" placeholder="Ej: Por la salud de..." style="width:100%;box-sizing:border-box;margin:3px 0 10px;padding:7px 9px">'
+    +'<label style="font-size:12px;color:#6B7280">Detalle del pedido</label>'
+    +'<textarea id="or-f-detalle" rows="5" style="width:100%;box-sizing:border-box;margin:3px 0 12px;padding:7px 9px;font-family:inherit"></textarea>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" onclick="orVista.creando=false;orRender()">Cancelar</button>'
+    +'<button class="btn btn-sm btn-primary" onclick="orCrearMotivo()">Guardar Motivo</button></div></div>';
+}
+// Propósitos de un Motivo (se toman de los que lidera su creador al crearlo; solo informativo)
+function orNombresProposito(m){
+  var ids=(m.propositoIds&&m.propositoIds.length)?m.propositoIds:(m.propositoId?[m.propositoId]:[]);
+  var nombres=ids.map(function(id){var p=(S.ministerios||[]).find(function(x){return Number(x.id)===Number(id);});return p?p.nombre:null;}).filter(Boolean);
+  return nombres.join(', ');
+}
+function orHtmlDetalle(id){
+  var m=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(id);});
+  if(!m||!orVisible(m)) return '<button class="btn btn-sm" onclick="orVista.id=null;orRender()">← Volver</button><div class="empty" style="padding:2rem;text-align:center;color:#9CA3AF">Motivo no disponible.</div>';
+  var cerrado=m.estado==='Cerrado';
+  var ms=orMensajesDe(m.id);
+  var h='<button class="btn btn-sm" onclick="orVista.id=null;orRender()" style="margin-bottom:10px">← Volver</button>'
+    +'<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:12px 14px;margin-bottom:10px">'
+    +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="font-size:15px;font-weight:600;color:#1F4E79">'+orEsc(m.titulo)+'</div>'
+    +'<span class="badge '+(cerrado?'b-muted':'b-ok')+'" style="font-size:10px;flex-shrink:0">'+(cerrado?'Cerrado':'Abierto')+'</span></div>'
+    +'<div style="font-size:11.5px;color:#6B7280;margin-top:3px">'+(orNombresProposito(m)?orEsc(orNombresProposito(m))+' · ':'')+'Creado por '+orEsc(m.creadoPorNombre||'')+' · '+agendaFmtFechaHora(m.creadoTs)+'</div>'
+    +(cerrado?'<div style="font-size:12px;color:#6B7280;margin-top:6px;background:#F3F4F6;border-radius:8px;padding:6px 9px">🔒 Cerrado por '+orEsc(m.cerradoPor||'')+' · '+agendaFmtFechaHora(m.cerradoTs)+(m.notaCierre?'<br>Nota: '+orEsc(m.notaCierre):'')+'</div>':'')
+    +'</div>';
+  h+='<div id="or-hilo" style="display:flex;flex-direction:column;gap:7px;max-height:50vh;overflow-y:auto;padding:2px">';
+  ms.forEach(function(x){
+    if(x.tipo==='cierre'||x.tipo==='reapertura'){
+      h+='<div style="text-align:center;font-size:11px;color:#6B7280;background:#F3F4F6;border-radius:8px;padding:5px 8px">'+(x.tipo==='cierre'?'🔒 Cerrado':'🔓 Reabierto')+' por '+orEsc(x.autor)+' · '+agendaFmtFechaHora(x.ts)+(x.texto?'<br>'+orEsc(x.texto):'')+'</div>';
+    } else {
+      var mio=Number(x.autorUserId)===Number(currentUser&&currentUser.id);
+      h+='<div style="align-self:'+(mio?'flex-end':'flex-start')+';max-width:88%;background:'+(mio?'#E0ECF8':'#F7F3E9')+';border-radius:10px;padding:7px 10px;font-size:13px;color:#2B2620;white-space:pre-wrap;word-break:break-word">'
+        +orEsc(x.texto)+'<div style="color:#9CA3AF;font-size:10.5px;margin-top:3px;white-space:normal">'+orEsc(x.autor)+' · '+agendaFmtFechaHora(x.ts)+'</div></div>';
+    }
+  });
+  h+='</div>';
+  if(!cerrado){
+    h+='<div style="display:flex;gap:6px;margin-top:10px;align-items:flex-end">'
+      +'<textarea id="or-msg" rows="2" placeholder="Escribí un mensaje…" style="flex:1;padding:7px 9px;font-family:inherit;font-size:13px"></textarea>'
+      +'<button class="btn btn-sm btn-primary" onclick="orEnviar('+m.id+')">Enviar</button></div>';
+    if(orPuedeCerrar()){
+      h+='<div style="display:flex;gap:6px;margin-top:12px;align-items:center;border-top:1px solid #F3F4F6;padding-top:10px">'
+        +'<input id="or-nota" type="text" maxlength="160" placeholder="Nota de cierre (opcional)" style="flex:1;padding:6px 9px;font-size:12.5px">'
+        +'<button class="btn btn-sm btn-danger" onclick="orCerrar('+m.id+')">🔒 Cerrar Motivo</button></div>';
+    }
+  } else if(orPuedeCerrar()){
+    h+='<div style="margin-top:12px;text-align:right"><button class="btn btn-sm" onclick="orReabrir('+m.id+')">🔓 Reabrir Motivo</button></div>';
+  }
+  return h;
+}
+async function orCrearMotivo(){
+  if(!orPuedeCrear()){ alert('No tenés permiso para crear Motivos.'); return; }
+  var titulo=(document.getElementById('or-f-titulo').value||'').trim();
+  var detalle=(document.getElementById('or-f-detalle').value||'').trim();
+  if(!titulo){ alert('Escribí el Motivo.'); return; }
+  if(!detalle){ alert('Escribí el detalle del pedido.'); return; }
+  var propIds=orPropositosLiderados().map(function(p){return p.id;});
+  var linked=getLinkedMember();
+  var ahora=Date.now();
+  var motivo={id:orNuevoId(S.oracionMotivos),titulo:titulo,propositoIds:propIds,propositoId:propIds.length===1?propIds[0]:null,
+    creadoUserId:currentUser.id,creadoMemberId:linked?linked.id:null,creadoPorNombre:currentUser.name,
+    creadoTs:ahora,estado:'Abierto',_ts:ahora};
+  var msg={id:orNuevoId(S.oracionMensajes),motivoId:motivo.id,texto:detalle,tipo:'msg',
+    autor:currentUser.name,autorUserId:currentUser.id,ts:ahora,_ts:ahora};
+  S.oracionMotivos.push(motivo); S.oracionMensajes.push(msg);
+  var ok=await orPersistir(function(){
+    S.oracionMotivos=S.oracionMotivos.filter(function(x){return x!==motivo;});
+    S.oracionMensajes=S.oracionMensajes.filter(function(x){return x!==msg;});
+  });
+  if(!ok) return;
+  orVista.creando=false; orVista.id=motivo.id; orVista.tab='abiertos';
+  orRender(); showToast('🙏 Motivo creado','#16A34A');
+}
+async function orEnviar(motivoId){
+  var m=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(motivoId);});
+  if(!m||!orVisible(m)){ alert('No tenés acceso a este Motivo.'); return; }
+  if(m.estado==='Cerrado'){ alert('El Motivo está cerrado.'); return; }
+  var inp=document.getElementById('or-msg');
+  var texto=(inp&&inp.value||'').trim();
+  if(!texto){ showToast('Escribí un mensaje primero','#D97706'); return; }
+  var ahora=Date.now();
+  var msg={id:orNuevoId(S.oracionMensajes),motivoId:m.id,texto:texto,tipo:'msg',
+    autor:currentUser.name,autorUserId:currentUser.id,ts:ahora,_ts:ahora};
+  S.oracionMensajes.push(msg);
+  var ok=await orPersistir(function(){ S.oracionMensajes=S.oracionMensajes.filter(function(x){return x!==msg;}); });
+  if(!ok){ orRender(); return; }
+  orRender();
+}
+async function orCerrar(motivoId){
+  if(!orPuedeCerrar()){ alert('No tenés permiso para cerrar Motivos.'); return; }
+  var m=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(motivoId);});
+  if(!m||m.estado==='Cerrado') return;
+  var nota=((document.getElementById('or-nota')||{}).value||'').trim();
+  if(!confirm('¿Cerrar este Motivo? Ya no se podrán agregar mensajes (podés reabrirlo después).')) return;
+  var ahora=Date.now();
+  var prev={estado:m.estado,cerradoTs:m.cerradoTs,cerradoPor:m.cerradoPor,notaCierre:m.notaCierre,_ts:m._ts};
+  var msg={id:orNuevoId(S.oracionMensajes),motivoId:m.id,texto:nota,tipo:'cierre',
+    autor:currentUser.name,autorUserId:currentUser.id,ts:ahora,_ts:ahora};
+  Object.assign(m,{estado:'Cerrado',cerradoTs:ahora,cerradoPor:currentUser.name,notaCierre:nota,_ts:ahora});
+  S.oracionMensajes.push(msg);
+  var ok=await orPersistir(function(){ Object.assign(m,prev); S.oracionMensajes=S.oracionMensajes.filter(function(x){return x!==msg;}); });
+  orRender();
+  if(ok) showToast('🔒 Motivo cerrado','#6B7280');
+}
+async function orReabrir(motivoId){
+  if(!orPuedeCerrar()){ alert('No tenés permiso para reabrir Motivos.'); return; }
+  var m=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(motivoId);});
+  if(!m||m.estado!=='Cerrado') return;
+  if(!confirm('¿Reabrir este Motivo?')) return;
+  var ahora=Date.now();
+  var prev={estado:m.estado,cerradoTs:m.cerradoTs,cerradoPor:m.cerradoPor,notaCierre:m.notaCierre,_ts:m._ts};
+  var msg={id:orNuevoId(S.oracionMensajes),motivoId:m.id,texto:'',tipo:'reapertura',
+    autor:currentUser.name,autorUserId:currentUser.id,ts:ahora,_ts:ahora};
+  Object.assign(m,{estado:'Abierto',cerradoTs:null,cerradoPor:null,notaCierre:null,_ts:ahora});
+  S.oracionMensajes.push(msg);
+  var ok=await orPersistir(function(){ Object.assign(m,prev); S.oracionMensajes=S.oracionMensajes.filter(function(x){return x!==msg;}); });
+  orRender();
+  if(ok) showToast('🔓 Motivo reabierto','#16A34A');
 }
 
 function openEquipo(){
@@ -9955,6 +10239,12 @@ function funcionBaseId(){
   var r=(S.roles||[]).find(function(x){return String(x.id).toLowerCase()==='base'||normName(x.name)==='base'||normName(x.name)==='funcion base';});
   return r?r.id:null;
 }
+// Si una persona se queda sin ninguna Función, vuelve a tener la Base
+function funcionBaseSiVacio(m){
+  var b=funcionBaseId();
+  if(b&&m&&!(m.roles||[]).length){ m.roles=[b]; m._ts=Date.now(); return true; }
+  return false;
+}
 function cfgOpenNewUser(){
   cfgEditingUserId=null;
   const mSelNew=document.getElementById('cfg-uf-member');
@@ -10159,7 +10449,7 @@ async function cfgDeleteRole(id){
   var role=S.roles.find(function(r){return r.id===id;});
   var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
   S.roles=S.roles.filter(r=>r.id!==id);
-  S.members.forEach(m=>{m.roles=(m.roles||[]).filter(rid=>rid!==id);});
+  S.members.forEach(m=>{ if((m.roles||[]).includes(id)){ m.roles=m.roles.filter(rid=>rid!==id); funcionBaseSiVacio(m); } });
   await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -12352,7 +12642,7 @@ async function gdvDeleteRole(id){
   var role=S.roles.find(function(r){return r.id===id;});
   var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
   S.roles=S.roles.filter(r=>r.id!==id);
-  S.members.forEach(m=>{m.roles=(m.roles||[]).filter(rid=>rid!==id);});
+  S.members.forEach(m=>{ if((m.roles||[]).includes(id)){ m.roles=m.roles.filter(rid=>rid!==id); funcionBaseSiVacio(m); } });
   await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -16495,7 +16785,7 @@ function showRoleMembers(roleId, roleName){
           <div style="font-size:11px;color:#6B7280">${memberGroups.length?memberGroups.map(function(x){return x.name;}).join(' · '):'Sin grupo'}</div>
         </div>
         <span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}" style="font-size:10px">${m.estado||'Activo'}</span>
-        ${editable?`<button class="btn btn-sm btn-danger" title="Quitar esta Función" onclick="rmCambiar(${m.id},false)">✕</button>`:''}
+        ${(editable&&!(roleId===funcionBaseId()&&(m.roles||[]).length<=1))?`<button class="btn btn-sm btn-danger" title="Quitar esta Función" onclick="rmCambiar(${m.id},false)">✕</button>`:''}
       </div>`;
     }).join('');
   }
@@ -16526,6 +16816,7 @@ async function rmCambiar(memberId,agregar){
   if(agregar){ if(!roles.includes(roleId)) roles.push(roleId); }
   else roles=roles.filter(function(r){return r!==roleId;});
   m.roles=roles; m._ts=Date.now();
+  if(!agregar) funcionBaseSiVacio(m);
   await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -16547,7 +16838,7 @@ async function deleteRoleGlobal(id, callback){
   if(!confirm(`¿Eliminar el rol "${r?.name}"? Se quitará de todos los miembros.`)) return;
   var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
   S.roles=S.roles.filter(x=>x.id!==id);
-  S.members.forEach(m=>{m.roles=(m.roles||[]).filter(rid=>rid!==id);});
+  S.members.forEach(m=>{ if((m.roles||[]).includes(id)){ m.roles=m.roles.filter(rid=>rid!==id); funcionBaseSiVacio(m); } });
   await saveK(SK.roles,S.roles);
   await saveK(SK.members,S.members);
   try{

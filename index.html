@@ -668,7 +668,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-ze';
+const APP_VERSION = '2026-08-24-zf';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -16459,17 +16459,33 @@ async function saveRoleModal(){
   if(roleModalCallback) roleModalCallback();
 }
 
+var _rmRoleId=null, _rmRoleName='';
+function _rmPuedeEditar(roleId){
+  if(FUNC_AUTO_IDS.includes(roleId)) return false; // se asignan solas desde Grupos / Comunidades
+  return isSuperAdmin()||canEjecutar('config');
+}
 function showRoleMembers(roleId, roleName){
+  _rmRoleId=roleId; _rmRoleName=roleName;
+  var editable=_rmPuedeEditar(roleId);
   const members=S.members.filter(m=>(m.roles||[]).includes(roleId));
   document.getElementById('role-members-title').textContent=`${roleName} — ${members.length} miembro${members.length!==1?'s':''}`;
   const list=document.getElementById('role-members-list');
+  var html='';
+  if(FUNC_AUTO_IDS.includes(roleId)){
+    html+='<div style="font-size:12px;color:#6B7280;background:#F3F4F6;border-radius:8px;padding:8px 10px;margin-bottom:10px">Esta Función se asigna sola según el Grupo / Comunidad donde la persona figura. Para cambiarla, editá el Grupo o la Comunidad.</div>';
+  }
+  if(editable){
+    html+='<div style="position:relative;margin-bottom:10px">'
+      +'<input id="rm-add-input" type="text" autocomplete="off" placeholder="➕ Agregar persona (buscar por nombre)…" oninput="rmBuscar(this.value)" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:13px">'
+      +'<div id="rm-add-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:5;background:#fff;border:1px solid #D1D5DB;border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 6px 18px rgba(0,0,0,.12)"></div></div>';
+  }
   if(!members.length){
-    list.innerHTML='<div style="text-align:center;padding:1.5rem;color:#9CA3AF;font-size:13px">Ninguna persona tiene esta función asignada.</div>';
+    html+='<div style="text-align:center;padding:1.5rem;color:#9CA3AF;font-size:13px">Ninguna persona tiene esta función asignada.</div>';
   } else {
-    list.innerHTML=members.map(m=>{
-      const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
     const allAvailableGroups=[...(S.groups||[]),...(S.ngComunidades||[]).map(function(ng){return {id:ng.id,name:'🌱 '+ng.name};})];
-    const memberGroups=allGids.map(gid=>allAvailableGroups.find(x=>Number(x.id)===gid)).filter(Boolean);
+    html+=members.map(m=>{
+      const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
+      const memberGroups=allGids.map(gid=>allAvailableGroups.find(x=>Number(x.id)===gid)).filter(Boolean);
       const genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
       const genColor=m.genero==='H'?'#1E40AF':'#9D174D';
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F3F4F6">
@@ -16479,10 +16495,51 @@ function showRoleMembers(roleId, roleName){
           <div style="font-size:11px;color:#6B7280">${memberGroups.length?memberGroups.map(function(x){return x.name;}).join(' · '):'Sin grupo'}</div>
         </div>
         <span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}" style="font-size:10px">${m.estado||'Activo'}</span>
+        ${editable?`<button class="btn btn-sm btn-danger" title="Quitar esta Función" onclick="rmCambiar(${m.id},false)">✕</button>`:''}
       </div>`;
     }).join('');
   }
+  list.innerHTML=html;
   document.getElementById('role-members-overlay').style.display='flex';
+}
+function rmBuscar(q){
+  var box=document.getElementById('rm-add-results'); if(!box) return;
+  var t=normName(q||'');
+  if(t.length<1){box.style.display='none';return;}
+  var res=S.members.filter(function(m){
+    return m.estado!=='Baja'&&!(m.roles||[]).includes(_rmRoleId)&&normName(fullName(m)).indexOf(t)>=0;
+  }).slice(0,15);
+  box.innerHTML=res.length?res.map(function(m){
+    return '<div style="padding:7px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid #F3F4F6" onmousedown="rmCambiar('+m.id+',true)">'+fullName(m)+'</div>';
+  }).join(''):'<div style="padding:8px 10px;font-size:12px;color:#9CA3AF">Sin resultados</div>';
+  box.style.display='block';
+}
+// Agrega (agregar=true) o quita la Función a una persona. Guarda en la nube y revierte si falla.
+async function rmCambiar(memberId,agregar){
+  var roleId=_rmRoleId;
+  if(!_rmPuedeEditar(roleId)) return;
+  var m=S.members.find(function(x){return Number(x.id)===Number(memberId);});
+  if(!m) return;
+  if(!agregar&&!confirm('¿Quitar la Función "'+_rmRoleName+'" a '+fullName(m)+'?')) return;
+  var snap={roles:(m.roles||[]).slice(),rolesManuales:m.rolesManuales?m.rolesManuales.slice():null,_ts:m._ts};
+  var roles=(m.roles||[]).slice();
+  if(agregar){ if(!roles.includes(roleId)) roles.push(roleId); }
+  else roles=roles.filter(function(r){return r!==roleId;});
+  m.roles=roles; m._ts=Date.now();
+  await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    m.roles=snap.roles; m._ts=snap._ts;
+    if(snap.rolesManuales===null) delete m.rolesManuales; else m.rolesManuales=snap.rolesManuales;
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    showRoleMembers(roleId,_rmRoleName);
+    return;
+  }
+  try{if(typeof window.syncNow==="function")window.syncNow();}catch(_e){}
+  showRoleMembers(roleId,_rmRoleName);
+  try{ if(typeof cfgRenderRoles==='function') cfgRenderRoles(); }catch(_e){}
 }
 
 async function deleteRoleGlobal(id, callback){

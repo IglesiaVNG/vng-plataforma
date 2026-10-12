@@ -668,7 +668,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zb';
+const APP_VERSION = '2026-08-24-ze';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -2918,6 +2918,198 @@ function getLinkedMember(){
   return S.members.find(function(m){return normName(fullName(m))===normName(currentUser.name);})||null;
 }
 
+// ════════════════════════════════════════════════════════════════
+// FUNCIONES AUTOMÁTICAS (por asignación)
+// ════════════════════════════════════════════════════════════════
+// Facilitador, Líder NG y Colaborador NG no se "dan" ni se "quitan" a mano: la persona las tiene
+// MIENTRAS esté asignada a un Grupo / Comunidad ACTIVO, y las pierde sola cuando deja de estarlo.
+// Si facilita dos Grupos, sigue siendo Facilitador hasta dejar los dos. El sistema solo retira las
+// que ÉL otorgó (m.rolesAuto): una Función dada a mano por la pastoral — o marcada "dejar como
+// manual" en la revisión (m.rolesManuales) — nunca se retira sola.
+var FUNC_AUTO_FAC='facilitador';
+var FUNC_AUTO_LIDER_NG='lider';
+var FUNC_AUTO_COLAB_NG='colaborador1783645248659';
+var FUNC_AUTO_IDS=[FUNC_AUTO_FAC,FUNC_AUTO_LIDER_NG,FUNC_AUTO_COLAB_NG];
+
+function _funcAutoMiembros(memberIds){
+  var vistos={}, out=[];
+  (memberIds||[]).forEach(function(mid){
+    if(mid===null||mid===undefined||mid==='') return;
+    var k=String(mid); if(vistos[k]) return; vistos[k]=1;
+    var m=S.members.find(function(x){return String(x.id)===k;});
+    if(m) out.push(m);
+  });
+  return out;
+}
+
+// Funciones automáticas que esta persona debería tener AHORA, según sus asignaciones activas.
+function funcionesAutoDeseadas(memberId){
+  var k=String(memberId), out=new Set();
+  (S.groups||[]).forEach(function(g){
+    if(g.estado==='Inactivo') return;
+    if(String(g.facId)===k||String(g.facId2)===k) out.add(FUNC_AUTO_FAC);
+  });
+  (S.ngComunidades||[]).forEach(function(ng){
+    if(ng.estado==='Inactivo') return;
+    if((ng.liderIds||[]).some(function(x){return String(x)===k;})) out.add(FUNC_AUTO_LIDER_NG);
+    if((ng.colaboradorIds||[]).some(function(x){return String(x)===k;})) out.add(FUNC_AUTO_COLAB_NG);
+  });
+  return out;
+}
+
+// Foto del estado de estas personas, para poder revertir si falla el guardado en la nube.
+function funcionesAutoSnapshot(memberIds){
+  return _funcAutoMiembros(memberIds).map(function(m){
+    return {m:m, roles:(m.roles||[]).slice(), rolesAuto:m.rolesAuto?m.rolesAuto.slice():null,
+            rolesManuales:m.rolesManuales?m.rolesManuales.slice():null, _ts:m._ts};
+  });
+}
+function funcionesAutoRevertir(snaps){
+  (snaps||[]).forEach(function(s2){
+    s2.m.roles=s2.roles; s2.m._ts=s2._ts;
+    if(s2.rolesAuto===null) delete s2.m.rolesAuto; else s2.m.rolesAuto=s2.rolesAuto;
+    if(s2.rolesManuales===null) delete s2.m.rolesManuales; else s2.m.rolesManuales=s2.rolesManuales;
+  });
+}
+
+// ANTES de cambiar una asignación: marca como "automáticas" las Funciones que la persona YA tiene y
+// que hoy están justificadas por una asignación activa (incluye las que venían de la sincronización
+// anterior, que no dejaba marca) — así el sistema puede retirárselas sola cuando esa asignación
+// termine. No toca las que la pastoral dejó como manuales.
+function funcionesAutoAdoptar(memberIds){
+  _funcAutoMiembros(memberIds).forEach(function(m){
+    var deseadas=funcionesAutoDeseadas(m.id);
+    var auto=(m.rolesAuto||[]).slice(), manuales=m.rolesManuales||[], cambio=false;
+    FUNC_AUTO_IDS.forEach(function(r){
+      if(!(m.roles||[]).includes(r)||!deseadas.has(r)||manuales.includes(r)||auto.includes(r)) return;
+      auto.push(r); cambio=true;
+    });
+    if(cambio){ m.rolesAuto=auto; m._ts=Date.now(); }
+  });
+}
+
+// DESPUÉS de cambiar una asignación: deja las Funciones automáticas de estas personas exactamente
+// como corresponden ahora. Agrega las que les faltan; retira SOLO las que el sistema les dio y ya no
+// tienen asignación activa. Es idempotente: correrla dos veces no cambia nada la segunda.
+function funcionesAutoReconciliar(memberIds){
+  _funcAutoMiembros(memberIds).forEach(function(m){
+    var deseadas=funcionesAutoDeseadas(m.id);
+    var roles=(m.roles||[]).slice(), auto=(m.rolesAuto||[]).slice(), manuales=m.rolesManuales||[], cambio=false;
+    FUNC_AUTO_IDS.forEach(function(r){
+      var tiene=roles.includes(r);
+      if(deseadas.has(r)){
+        if(!tiene){ roles.push(r); cambio=true; }
+        if(!manuales.includes(r)&&!auto.includes(r)){ auto.push(r); cambio=true; }
+      } else if(auto.includes(r)&&!manuales.includes(r)){
+        if(tiene) roles=roles.filter(function(x){return x!==r;});
+        auto=auto.filter(function(x){return x!==r;}); cambio=true;
+      }
+    });
+    if(cambio){ m.roles=roles; m.rolesAuto=auto; m._ts=Date.now(); }
+  });
+}
+
+// Revisión global (para la pantalla de Configuración → Funciones): qué hay que agregar, qué quedó
+// "pegado" sin asignación activa, y qué ya está bien y pasa a ser administrado por el sistema.
+function funcionesAutoDiferencias(){
+  var agregar=[], pegadas=[], adoptar=[];
+  (S.members||[]).forEach(function(m){
+    var deseadas=funcionesAutoDeseadas(m.id);
+    var roles=m.roles||[], auto=m.rolesAuto||[], manuales=m.rolesManuales||[];
+    FUNC_AUTO_IDS.forEach(function(r){
+      var tiene=roles.includes(r), des=deseadas.has(r), man=manuales.includes(r);
+      if(des&&!tiene) agregar.push({m:m,r:r});
+      else if(!des&&tiene&&!man) pegadas.push({m:m,r:r});
+      else if(des&&tiene&&!man&&!auto.includes(r)) adoptar.push({m:m,r:r});
+    });
+  });
+  return {agregar:agregar, pegadas:pegadas, adoptar:adoptar};
+}
+
+// Aplica lo decidido en la revisión. "decisiones" tiene una entrada por cada Función "pegada":
+// 'quitar' (la persona ya no tiene esa asignación) o 'manual' (la pastoral quiere que la conserve
+// aunque no tenga asignación; el sistema ya no la retirará sola).
+function funcionesAutoAplicarRevision(d, decisiones){
+  var ahora=Date.now();
+  function marcar(m,campo,r){ var a=(m[campo]||[]).slice(); if(a.indexOf(r)<0) a.push(r); m[campo]=a; }
+  function desmarcar(m,campo,r){ if(m[campo]) m[campo]=m[campo].filter(function(x){return x!==r;}); }
+  d.agregar.forEach(function(x){
+    var m=x.m; if(!(m.roles||[]).includes(x.r)) m.roles=(m.roles||[]).concat([x.r]);
+    marcar(m,'rolesAuto',x.r); m._ts=ahora;
+  });
+  d.adoptar.forEach(function(x){ marcar(x.m,'rolesAuto',x.r); x.m._ts=ahora; });
+  d.pegadas.forEach(function(x,i){
+    var m=x.m;
+    if(decisiones[i]==='manual'){ marcar(m,'rolesManuales',x.r); desmarcar(m,'rolesAuto',x.r); }
+    else { m.roles=(m.roles||[]).filter(function(r){return r!==x.r;}); desmarcar(m,'rolesAuto',x.r); desmarcar(m,'rolesManuales',x.r); }
+    m._ts=ahora;
+  });
+}
+
+function _faNombreFuncion(id){ var r=(S.roles||[]).find(function(x){return x.id===id;}); return r?r.name:id; }
+
+function cfgAbrirRevisionFuncionesAuto(){
+  var d=funcionesAutoDiferencias();
+  window._faRevision=d;
+  var total=d.agregar.length+d.pegadas.length+d.adoptar.length;
+  var h='<div style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:4px">🔄 Funciones automáticas — revisión</div>'
+    +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:14px;line-height:1.5">Facilitador, Líder NG y Colaborador NG se tienen <strong>mientras haya una asignación activa</strong> (Grupo o Comunidad) y se pierden solas al terminar. Acá se compara lo que hay hoy con las asignaciones reales. <strong>No se cambia nada hasta que toques "Aplicar".</strong></div>';
+  if(!total) h+='<div style="padding:1.25rem;text-align:center;color:#16A34A;font-weight:600">✅ Todo al día — no hay nada para revisar.</div>';
+  if(d.pegadas.length){
+    h+='<div style="font-size:13px;font-weight:700;color:#B91C1C;margin:10px 0 6px">⚠️ Tienen la Función pero NO una asignación activa ('+d.pegadas.length+')</div>'
+      +'<div style="font-size:12px;color:#6B7280;margin-bottom:8px">Elegí qué hacer con cada una. Por defecto se quita.</div>';
+    d.pegadas.forEach(function(x,i){
+      var conCuenta=(S.users||[]).some(function(u){return String(u.memberId)===String(x.m.id)&&u.role===x.r;});
+      h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid #F3F4F6">'
+        +'<div style="flex:1;min-width:170px"><div style="font-size:13px;font-weight:600">'+fullName(x.m)+'</div>'
+        +'<div style="font-size:11.5px;color:#6B7280">'+_faNombreFuncion(x.r)+(conCuenta?' · su cuenta de ingreso tiene este rol':'')+'</div></div>'
+        +'<select id="fa-sel-'+i+'" style="font-size:12.5px;padding:5px 8px"><option value="quitar">Quitar la Función</option><option value="manual">Dejar como manual</option></select></div>';
+    });
+  }
+  if(d.agregar.length){
+    h+='<div style="font-size:13px;font-weight:700;color:#1D4ED8;margin:14px 0 6px">➕ Tienen una asignación activa y les falta la Función ('+d.agregar.length+')</div>'
+      +'<div style="font-size:12px;color:#6B7280;margin-bottom:6px">Se les va a agregar.</div>';
+    d.agregar.forEach(function(x){
+      h+='<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #F3F4F6"><strong>'+fullName(x.m)+'</strong> <span style="color:#6B7280">— '+_faNombreFuncion(x.r)+'</span></div>';
+    });
+  }
+  if(d.adoptar.length){
+    h+='<div style="font-size:12.5px;color:#374151;margin:14px 0 4px;padding:8px 10px;background:#F0FDF4;border-radius:8px">✅ <strong>'+d.adoptar.length+'</strong> Función'+(d.adoptar.length!==1?'es ya están':' ya está')+' bien (tienen la Función y su asignación). El sistema pasa a administrarlas: se retirarán solas cuando la asignación termine.</div>';
+  }
+  h+='<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
+    +'<button class="btn btn-sm" onclick="cfgCerrarRevisionFuncionesAuto()">Cancelar</button>'
+    +(total?'<button class="btn btn-primary btn-sm" onclick="cfgAplicarRevisionFuncionesAuto()">Aplicar</button>':'')
+    +'</div>';
+  var ov=document.getElementById('fa-overlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='fa-overlay'; document.body.appendChild(ov); }
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem';
+  ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:640px;width:100%;max-height:88vh;overflow-y:auto;padding:1.25rem">'+h+'</div>';
+}
+function cfgCerrarRevisionFuncionesAuto(){
+  var ov=document.getElementById('fa-overlay'); if(ov) ov.remove();
+  window._faRevision=null;
+}
+async function cfgAplicarRevisionFuncionesAuto(){
+  var d=window._faRevision; if(!d) return;
+  var decisiones=d.pegadas.map(function(x,i){ var el=document.getElementById('fa-sel-'+i); return el?el.value:'quitar'; });
+  var ids=[].concat(d.agregar,d.pegadas,d.adoptar).map(function(x){return x.m.id;});
+  var snaps=funcionesAutoSnapshot(ids);
+  funcionesAutoAplicarRevision(d,decisiones);
+  await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    funcionesAutoRevertir(snaps);
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  cfgCerrarRevisionFuncionesAuto();
+  if(typeof cfgRenderRoles==='function') cfgRenderRoles();
+  var quitadas=decisiones.filter(function(x){return x==='quitar';}).length;
+  showToast('✅ Funciones revisadas: '+quitadas+' quitada'+(quitadas!==1?'s':'')+', '+d.agregar.length+' agregada'+(d.agregar.length!==1?'s':''),'#16A34A');
+}
+
 function getFacilitadorGroupIds(){
   // Returns ALL group ids this user is responsible for (can be more than one)
   const ids=new Set();
@@ -2930,7 +3122,7 @@ function getFacilitadorGroupIds(){
     if(linked.grupoId) ids.add(Number(linked.grupoId));
     (linked.grupoIds||[]).forEach(g=>ids.add(Number(g)));
     // Any group where this member is the assigned Facilitador
-    S.groups.forEach(g=>{ if(Number(g.facId)===Number(linked.id)) ids.add(Number(g.id)); });
+    S.groups.forEach(g=>{ if(Number(g.facId)===Number(linked.id)||Number(g.facId2)===Number(linked.id)) ids.add(Number(g.id)); });
   }
   return [...ids];
 }
@@ -4337,7 +4529,10 @@ function configTab(sub, btn){
     wrap.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
         <span style="font-size:14px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6)">Funciones del sistema</span>
-        <button class="btn btn-primary btn-sm" onclick="cfgOpenNewRole()">+ Nueva función</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="cfgAbrirRevisionFuncionesAuto()" title="Compara las Funciones de Facilitador y Líder/Colaborador NG con las asignaciones reales">🔄 Revisar Funciones automáticas</button>
+          <button class="btn btn-primary btn-sm" onclick="cfgOpenNewRole()">+ Nueva función</button>
+        </div>
       </div>
       <div id="cfg-roles-list"></div>
       <div id="cfg-role-form" class="card hidden">
@@ -4654,8 +4849,14 @@ async function ngToggleComunidadActiva(id){
   var prevEstado=ng.estado;
   var prevTs=ng._ts;
   var nuevoEstado=ng.estado==='Inactivo'?'Activo':'Inactivo';
+  // Una Comunidad desactivada no cuenta como asignación: sus líderes/colaboradores pierden la Función
+  // (salvo que estén en otra Comunidad activa) y la recuperan solos al reactivarla.
+  var involucradosFn=(ng.liderIds||[]).concat(ng.colaboradorIds||[]);
+  var snapFunciones=funcionesAutoSnapshot(involucradosFn);
+  funcionesAutoAdoptar(involucradosFn);
   ng.estado=nuevoEstado;
   ng._ts=Date.now();
+  funcionesAutoReconciliar(involucradosFn);
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
   var tocoEventos=agendaSincronizarActividadOrigen('ng',ng.id,{
     nombre:ng.name,dia:ng.dia,horario:ng.horario,
@@ -4663,14 +4864,17 @@ async function ngToggleComunidadActiva(id){
     activo:nuevoEstado!=='Inactivo'
   });
   await saveK(SK.ngComunidades,S.ngComunidades);
+  await saveK(SK.members,S.members);
   if(tocoEventos) await saveK(SK.eventos,S.eventos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     ng.estado=prevEstado;
     ng._ts=prevTs;
+    funcionesAutoRevertir(snapFunciones);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades,S.ngComunidades);
+    await saveK(SK.members,S.members);
     if(tocoEventos) await saveK(SK.eventos,S.eventos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -4775,7 +4979,16 @@ async function ngSaveComunidad(){
 
   // Snapshot para poder revertir todo (Comunidad + roles de miembros) si falla la nube
   var snapshotNgComunidades=JSON.parse(JSON.stringify(S.ngComunidades));
-  var snapshotRoles=S.members.map(function(m){return {m:m,roles:[...(m.roles||[])],_ts:m._ts};});
+  var snapshotRoles=S.members.map(function(m){return {m:m,roles:[...(m.roles||[])],rolesAuto:m.rolesAuto?m.rolesAuto.slice():null,rolesManuales:m.rolesManuales?m.rolesManuales.slice():null,_ts:m._ts};});
+
+  // Funciones automáticas (Líder NG / Colaborador NG): personas afectadas por este cambio (las de
+  // antes y las de ahora). Se adopta con la asignación ANTERIOR, antes de modificarla.
+  var involucradosNg=liderIds.concat(colaboradorIds);
+  if(ngEditingId){
+    var ngPrevFn=S.ngComunidades.find(function(x){return Number(x.id)===Number(ngEditingId);});
+    if(ngPrevFn) involucradosNg=involucradosNg.concat(ngPrevFn.liderIds||[],ngPrevFn.colaboradorIds||[]);
+  }
+  funcionesAutoAdoptar(involucradosNg);
 
   var ngRef;
   if(ngEditingId){
@@ -4785,37 +4998,10 @@ async function ngSaveComunidad(){
     ngRef={id:Date.now(),name:nombre,tipo,dia,horario,liderIds,colaboradorIds,estado:estado,_ts:Date.now()};
     S.ngComunidades.push(ngRef);
   }
-  // Sincronizar funciones NG con S.members para que se vean en Rebaños
-  console.log('[NG SYNC] Iniciando sincronización de funciones NG→Rebaños');
-  // El rol 'lider' = 'Líder NG' en el sistema
-  // Recolectar todos los ids de líderes y colaboradores actuales en NG
-  // Usar strings para evitar problemas de precisión con IDs grandes
-  var NG_ROL_LIDER='lider';
-  var NG_ROL_COLAB='colaborador1783645248659';
-  var ngLiderIds=new Set();
-  var ngColabIds=new Set();
-  S.ngComunidades.forEach(function(ng){
-    (ng.liderIds||[]).forEach(function(id){ ngLiderIds.add(String(id)); });
-    (ng.colaboradorIds||[]).forEach(function(id){ ngColabIds.add(String(id)); });
-  });
-  // Quitar funciones NG previas de todos los miembros
-  S.members.forEach(function(m){
-    if(!m.roles) return;
-    var tieneUserLider=S.users.some(function(u){return String(u.memberId)===String(m.id) && u.role===NG_ROL_LIDER;});
-    if(!tieneUserLider) m.roles=m.roles.filter(function(r){return r!==NG_ROL_LIDER;});
-    m.roles=m.roles.filter(function(r){return r!==NG_ROL_COLAB;});
-  });
-  // Asignar función correcta según rol en NG
-  S.members.forEach(function(m){
-    if(!m.roles) m.roles=[];
-    var id=String(m.id);
-    if(ngLiderIds.has(id)){
-      if(!m.roles.includes(NG_ROL_LIDER)){ m.roles.push(NG_ROL_LIDER); m._ts=Date.now(); }
-    }
-    if(ngColabIds.has(id)){
-      if(!m.roles.includes(NG_ROL_COLAB)){ m.roles.push(NG_ROL_COLAB); m._ts=Date.now(); }
-    }
-  });
+  // Funciones NG: Líder NG / Colaborador NG las tienen quienes figuran en una Comunidad ACTIVA, y las
+  // pierden solas al dejar de figurar. Ya NO se borran y rearman las de todos (eso pisaba las dadas
+  // a mano): solo se recalculan las de las personas afectadas por este cambio.
+  funcionesAutoReconciliar(involucradosNg);
   // Sincronizar con Agenda: esta Comunidad pasa a tener (o actualizar) su propia Actividad Habitual
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
   var tocoEventos=agendaSincronizarActividadOrigen('ng',ngRef.id,{
@@ -4831,7 +5017,11 @@ async function ngSaveComunidad(){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     S.ngComunidades=snapshotNgComunidades;
-    snapshotRoles.forEach(function(s){ s.m.roles=s.roles; s.m._ts=s._ts; });
+    snapshotRoles.forEach(function(s){
+      s.m.roles=s.roles; s.m._ts=s._ts;
+      if(s.rolesAuto===null) delete s.m.rolesAuto; else s.m.rolesAuto=s.rolesAuto;
+      if(s.rolesManuales===null) delete s.m.rolesManuales; else s.m.rolesManuales=s.rolesManuales;
+    });
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades, S.ngComunidades);
     await saveK(SK.members, S.members);
@@ -4856,20 +5046,28 @@ async function ngDeleteComunidad(id){
     return;
   }
   if(!confirm('¿Eliminar la comunidad "'+ng.name+'"? Esta acción no se puede deshacer.')) return;
+  // Quienes lideraban o colaboraban en esta Comunidad pierden la Función NG (si no están en otra activa)
+  var involucradosFn=(ng.liderIds||[]).concat(ng.colaboradorIds||[]);
+  var snapFunciones=funcionesAutoSnapshot(involucradosFn);
+  funcionesAutoAdoptar(involucradosFn);
   S.ngComunidades=S.ngComunidades.filter(function(x){return Number(x.id)!==Number(id);});
+  funcionesAutoReconciliar(involucradosFn);
   addTombstone(SK.ngComunidades,id);
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
   var tocoEventos=agendaSincronizarActividadOrigen('ng',id,{activo:false});
   try{
     await saveK(SK.ngComunidades,S.ngComunidades);
+    await saveK(SK.members,S.members);
     if(tocoEventos) await saveK(SK.eventos,S.eventos);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
     ngRenderList();
     showToast('✅ Comunidad eliminada','#16A34A');
   }catch(e){
     S.ngComunidades.push(ng);
+    funcionesAutoRevertir(snapFunciones);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades,S.ngComunidades);
+    await saveK(SK.members,S.members);
     if(tocoEventos) await saveK(SK.eventos,S.eventos);
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
@@ -5547,7 +5745,16 @@ function buildAgendaHTML(){
 // eventoId — eso no cambió, solo dónde se accede a la lista).
 // ══════════════════════════════════════════════════════════════════
 function canAccessEquipo(){
-  return isSuperAdmin() || canScreen('equipo_ver') || canEjecutar('equipo_crear');
+  return isSuperAdmin() || canScreen('equipo_ver') || canEjecutar('equipo_crear') || equipoTengoAlgoAsignado();
+}
+// Aparece "Trabajo en Equipo" solo si tiene algo asignado (coordinador/colaborador/responsable/tarea) en un checklist ACTIVO
+function equipoTengoAlgoAsignado(){
+  try{
+    return (S.checklists||[]).some(function(c){
+      return c&&c.estado==='Activo'&&(agendaEsColaboradorDe(c)||agendaEsAsignadoEnChecklist(c)||
+        (!isSuperAdmin()&&(agendaEsCoordinadorDe(c)||agendaEsResponsableDe(c))));
+    });
+  }catch(e){return false;}
 }
 function canEjecutarEquipo(){
   return isSuperAdmin() || canEjecutar('equipo_crear');
@@ -9531,7 +9738,13 @@ async function cfgToggleGrupoActivo(id){
   var nuevoEstado=g.estado==='Inactivo'?'Activo':'Inactivo';
   if(!confirm((nuevoEstado==='Inactivo'?'¿Deshabilitar':'¿Habilitar')+' el Grupo "'+g.name+'"?'+(nuevoEstado==='Inactivo'?'\nSu actividad en Agenda deja de repetirse hacia adelante (el historial no se toca).':'\nSu actividad en Agenda vuelve a repetirse en Agenda.'))) return;
   var estadoAnterior=g.estado;
+  // Un Grupo deshabilitado no cuenta como asignación: sus facilitadores pierden la Función
+  // (salvo que facilitem otro Grupo activo) y la recuperan solos al volver a habilitarlo.
+  var involucradosFn=[g.facId,g.facId2];
+  var snapFunciones=funcionesAutoSnapshot(involucradosFn);
+  funcionesAutoAdoptar(involucradosFn);
   g.estado=nuevoEstado;
+  funcionesAutoReconciliar(involucradosFn);
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
   var tocoEventos=agendaSincronizarActividadOrigen('gdv',g.id,{
     nombre:g.name,dia:g.dia,horario:g.horario,
@@ -9539,13 +9752,16 @@ async function cfgToggleGrupoActivo(id){
     activo:nuevoEstado!=='Inactivo'
   });
   await saveK(SK.groups,S.groups);
+  await saveK(SK.members,S.members);
   if(tocoEventos) await saveK(SK.eventos,S.eventos);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     g.estado=estadoAnterior;
+    funcionesAutoRevertir(snapFunciones);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.groups,S.groups);
+    await saveK(SK.members,S.members);
     if(tocoEventos) await saveK(SK.eventos,S.eventos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -9601,16 +9817,18 @@ async function cfgSaveGroup(){
   var snapshotGrupo=null;
   var esNuevoGrupo=false;
   var nuevoGrupoRef=null;
-  var facAnteriorRoles=null;
   var g;
+  // Funciones automáticas: personas afectadas por este cambio (las de antes y las de ahora)
+  var involucradosFn=[facId,facId2];
+  if(cfgEditingGroupId){
+    var gPrevFn=S.groups.find(x=>x.id===cfgEditingGroupId);
+    if(gPrevFn) involucradosFn.push(gPrevFn.facId,gPrevFn.facId2);
+  }
+  var snapFunciones=funcionesAutoSnapshot(involucradosFn);
+  funcionesAutoAdoptar(involucradosFn); // con la asignación ANTERIOR, para poder retirar sola la que corresponda
   if(cfgEditingGroupId){
     g=S.groups.find(x=>x.id===cfgEditingGroupId);
     snapshotGrupo=Object.assign({},g);
-    // If facilitador changed, remove 'facilitador' role from old one
-    if(g.facId && g.facId!==facId){
-      const oldFac=S.members.find(m=>m.id===g.facId);
-      if(oldFac){ facAnteriorRoles={member:oldFac,roles:[...(oldFac.roles||[])]}; oldFac.roles=(oldFac.roles||[]).filter(r=>r!=='facilitador'); }
-    }
     Object.assign(g,{name,type,facId,facId2,dia,horario});
   } else {
     esNuevoGrupo=true;
@@ -9619,15 +9837,9 @@ async function cfgSaveGroup(){
     g=nuevoGrupoRef;
   }
 
-  // Assign 'facilitador' role to selected member
-  var facRolAgregado=null;
-  if(facId){
-    const fac=S.members.find(m=>m.id===facId);
-    if(fac && !(fac.roles||[]).includes('facilitador')){
-      fac.roles=[...(fac.roles||[]),'facilitador'];
-      facRolAgregado=fac;
-    }
-  }
+  // Función 'facilitador': la tienen quienes figuran como facilitador 1 o 2 de un Grupo ACTIVO, y la
+  // pierde sola quien deja de figurar — salvo que siga en otro Grupo.
+  funcionesAutoReconciliar(involucradosFn);
 
   // Sincronizar con Agenda: este Grupo pasa a tener (o actualizar) su propia Actividad Habitual
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
@@ -9650,8 +9862,7 @@ async function cfgSaveGroup(){
       const gr=S.groups.find(x=>x.id===cfgEditingGroupId);
       if(gr) Object.assign(gr,snapshotGrupo);
     }
-    if(facAnteriorRoles){ facAnteriorRoles.member.roles=facAnteriorRoles.roles; }
-    if(facRolAgregado){ facRolAgregado.roles=(facRolAgregado.roles||[]).filter(r=>r!=='facilitador'); }
+    funcionesAutoRevertir(snapFunciones);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.groups, S.groups);
     await saveK(SK.members, S.members);
@@ -9739,13 +9950,20 @@ function cfgUserMemberSelected(){
   }
 }
 
+// Función Base: la que toma por defecto un usuario al darse de alta (se busca por nombre "Base")
+function funcionBaseId(){
+  var r=(S.roles||[]).find(function(x){return String(x.id).toLowerCase()==='base'||normName(x.name)==='base'||normName(x.name)==='funcion base';});
+  return r?r.id:null;
+}
 function cfgOpenNewUser(){
   cfgEditingUserId=null;
   const mSelNew=document.getElementById('cfg-uf-member');
   if(mSelNew){mSelNew.disabled=false;mSelNew.style.background='';mSelNew.style.color='';}
   document.getElementById('cfg-uf-title').textContent='Nuevo usuario';
   ['cfg-uf-name','cfg-uf-user','cfg-uf-pass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('cfg-uf-role').value='facilitador';
+  var _baseId=funcionBaseId();
+  document.getElementById('cfg-uf-role').value=_baseId||'facilitador';
+  if(!_baseId) console.warn('No existe la Función "Base": se usa Facilitador por defecto');
   document.getElementById('cfg-user-form').style.display='block';
   document.getElementById('cfg-user-form').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -9821,6 +10039,7 @@ async function cfgSaveUser(){
         memberIdTocado=memberId;
         snapshotMemberRoles=(mem.roles||[]).slice();
         if(!mem.roles) mem.roles=[];
+        // Las Funciones conviven: cambiar la de la cuenta SUMA, nunca quita las otras
         if(!mem.roles.includes(role)) mem.roles.push(role);
         mem._ts=Date.now();
       }

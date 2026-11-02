@@ -282,6 +282,7 @@ window.markFieldError = function(el, msg){
         <div class="home-greeting-name" id="home-name">—</div>
         <div id="home-roles" style="margin-top:3px"></div>
       </div>
+      <button class="btn btn-sm" onclick="pwAbrirCambio({forzado:false,pedirActual:true})" title="Cambiar mi contraseña">🔑</button>
       <button class="btn btn-sm" onclick="doLogout()">Salir</button>
     </div>
     <!-- PRÓXIMOS CUMPLEAÑOS -->
@@ -669,7 +670,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zn';
+const APP_VERSION = '2026-08-24-zq';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -3257,17 +3258,83 @@ async function pwMigrarUsuarios(){
   var pend=(S.users||[]).filter(function(u){return u.passHash===undefined&&u.pass!==undefined&&u.pass!=='';});
   if(!pend.length) return false;
   var snap=pend.map(function(u){return {u:u,pass:u.pass};});
-  for(var i=0;i<pend.length;i++){ pend[i].passHash=await pwHash(pend[i].pass); delete pend[i].pass; }
+  for(var i=0;i<pend.length;i++){ pend[i].passHash=await pwHash(pend[i].pass); delete pend[i].pass; if(!currentUser||Number(pend[i].id)!==Number(currentUser.id)) pend[i].debeCambiarPass=true; }
   await saveK(SK.users,S.users);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    snap.forEach(function(x){ x.u.pass=x.pass; delete x.u.passHash; });
+    snap.forEach(function(x){ x.u.pass=x.pass; delete x.u.passHash; delete x.u.debeCambiarPass; });
     await saveK(SK.users,S.users);
     console.warn('No se pudieron proteger las contraseñas (sin conexión). Se reintenta en el próximo ingreso del Super Admin.');
     return false;
   }
   return true;
+}
+
+
+// ── Cambio de contraseña por la propia persona ──
+// Se exige (forzado) cuando la clave la puso el administrador (debeCambiarPass) o todavía está en claro.
+var PW_MIN=8;
+function pwUsuarioActual(){ return currentUser?(S.users||[]).find(function(x){return Number(x.id)===Number(currentUser.id);}):null; }
+function pwDebeCambiar(u){ return !!u&&(u.debeCambiarPass===true||u.pass!==undefined); }
+// Devuelve el texto del error, o null si todo está bien.
+async function pwValidarCambio(u,actual,nueva,repetir,pedirActual){
+  if(pedirActual&&!(await pwCoincide(u,actual||''))) return 'La contraseña actual no es correcta.';
+  if(!nueva||nueva.length<PW_MIN) return 'La nueva contraseña debe tener al menos '+PW_MIN+' caracteres.';
+  if(!/\p{L}/u.test(nueva)||!/\d/.test(nueva)) return 'La contraseña debe tener al menos 1 letra y al menos 1 número.';
+  if(nueva!==repetir) return 'Las dos contraseñas nuevas no coinciden.';
+  if(await pwCoincide(u,nueva)) return 'La nueva contraseña tiene que ser distinta de la actual.';
+  return null;
+}
+var _pwCambioOpts=null;
+function pwAbrirCambio(opts){
+  _pwCambioOpts=opts||{};
+  var ov=document.getElementById('pw-cambio-overlay'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='pw-cambio-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:900;display:flex;align-items:center;justify-content:center;padding:1rem';
+  var ped=_pwCambioOpts.pedirActual!==false;
+  var inp='width:100%;box-sizing:border-box;margin:3px 0 10px;padding:8px 10px;font-size:14px';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:1.3rem;width:100%;max-width:380px;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
+    +'<div style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:4px">🔑 '+(_pwCambioOpts.forzado?'Elegí tu contraseña':'Cambiar mi contraseña')+'</div>'
+    +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:12px">'+(_pwCambioOpts.forzado?'Por seguridad, tu contraseña tiene que ser solo tuya. ':'')+'Mínimo '+PW_MIN+' caracteres, con al menos 1 letra y 1 número. Solo vos la vas a conocer.</div>'
+    +(ped?'<label style="font-size:12px;color:#6B7280">Contraseña actual</label><input type="password" id="pw-actual" autocomplete="current-password" style="'+inp+'">':'')
+    +'<label style="font-size:12px;color:#6B7280">Nueva contraseña</label><input type="password" id="pw-nueva" autocomplete="new-password" style="'+inp+'">'
+    +'<label style="font-size:12px;color:#6B7280">Repetir nueva contraseña</label><input type="password" id="pw-repetir" autocomplete="new-password" style="'+inp+'">'
+    +'<div id="pw-error" style="display:none;font-size:12.5px;color:#DC2626;margin-bottom:8px"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" onclick="pwCancelarCambio()">'+(_pwCambioOpts.forzado?'Salir':'Cancelar')+'</button>'
+    +'<button class="btn btn-sm btn-primary" id="pw-guardar" onclick="pwGuardarCambio()">Guardar</button></div></div>';
+  document.body.appendChild(ov);
+  var f=document.getElementById(ped?'pw-actual':'pw-nueva'); if(f) f.focus();
+}
+function pwCancelarCambio(){
+  var ov=document.getElementById('pw-cambio-overlay'); if(ov) ov.remove();
+  if(_pwCambioOpts&&_pwCambioOpts.forzado) doLogout();
+}
+function _pwError(msg){ var e=document.getElementById('pw-error'); if(e){ e.textContent=msg; e.style.display=msg?'block':'none'; } }
+async function pwGuardarCambio(){
+  var o=_pwCambioOpts||{}, ped=o.pedirActual!==false;
+  var u=pwUsuarioActual(); if(!u){ _pwError('No se encontró tu usuario. Volvé a ingresar.'); return; }
+  var actual=ped?(document.getElementById('pw-actual').value):o.actualConocida;
+  var nueva=document.getElementById('pw-nueva').value, rep=document.getElementById('pw-repetir').value;
+  var btn=document.getElementById('pw-guardar'); if(btn) btn.disabled=true;
+  var err=await pwValidarCambio(u,actual,nueva,rep,true);
+  if(err){ _pwError(err); if(btn) btn.disabled=false; return; }
+  var snap=Object.assign({},u);
+  await pwAsignar(u,nueva); delete u.debeCambiarPass;
+  await saveK(SK.users,S.users);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    pwRestaurar(u,snap); await saveK(SK.users,S.users);
+    _pwError('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.'); if(btn) btn.disabled=false; return;
+  }
+  var ov=document.getElementById('pw-cambio-overlay'); if(ov) ov.remove();
+  showToast('🔑 Contraseña actualizada','#16A34A');
+  if(o.alTerminar) o.alTerminar();
+}
+function pwForzarSiCorresponde(){
+  var u=pwUsuarioActual();
+  if(pwDebeCambiar(u)) pwAbrirCambio({forzado:true,pedirActual:true});
 }
 
 (function(){if(typeof _isProd!=='undefined'&&!_isProd){document.addEventListener('DOMContentLoaded',function(){var b=document.getElementById('dev-banner');if(b){b.style.display='block';document.body.style.paddingTop='32px';}});}})();async function doLogin(){
@@ -3283,10 +3350,14 @@ async function pwMigrarUsuarios(){
   var sess=JSON.stringify(currentUser);
   try{localStorage.setItem('vng_cu',sess);}catch(e){}
   try{sessionStorage.setItem('vng_cu',sess);}catch(e){}
-  document.getElementById('screen-login').style.display='none';
-  resetInactivityTimer();
-  showHome();
-  if(isSuperAdmin()){ pwMigrarUsuarios().then(function(ok){ if(ok) showToast('🔒 Contraseñas protegidas','#16A34A'); }).catch(function(){}); }
+  var seguir=function(){
+    document.getElementById('screen-login').style.display='none';
+    resetInactivityTimer();
+    showHome();
+    if(isSuperAdmin()){ pwMigrarUsuarios().then(function(ok){ if(ok) showToast('🔒 Contraseñas protegidas','#16A34A'); }).catch(function(){}); }
+  };
+  if(pwDebeCambiar(found)) pwAbrirCambio({forzado:true,pedirActual:false,actualConocida:p,alTerminar:seguir});
+  else seguir();
 }
 
 function doLogout(){
@@ -4368,6 +4439,7 @@ async function saSaveMember(){
     if(target){ snapshotPrevio=Object.assign({},target); Object.assign(target,data); } // Estado no se toca acá — se cambia solo con Dar de baja/Reactivar
   } else {
     esNuevo=true;
+    if(!nvConfirmarAltaSiHayParecido(nombre,apellido,data.tel)) return;
     target={id:Date.now(),estado:'Activo',...data};
     S.members.push(target);
   }
@@ -10500,7 +10572,7 @@ async function cfgSaveUser(){
     var resolvedMemberId=esSistema?null:(existing.memberId||memberIdVal||selectorMemberId);
     Object.assign(existing,{name,user,role,groupId,memberId:resolvedMemberId});
     if(esSistema) existing.cuentaSistema=true; else delete existing.cuentaSistema;
-    if(pass) await pwAsignar(existing,pass);
+    if(pass){ await pwAsignar(existing,pass); if(currentUser&&Number(existing.id)===Number(currentUser.id)) delete existing.debeCambiarPass; else existing.debeCambiarPass=true; }
     // Sincronizar función con S.members para que se vea en Rebaños
     var memberId=resolvedMemberId;
     if(memberId){
@@ -10517,7 +10589,7 @@ async function cfgSaveUser(){
   } else {
     var newUser={id:Date.now(),name,user,role,groupId,memberId:memberIdVal};
     if(esSistema) newUser.cuentaSistema=true;
-    await pwAsignar(newUser,pass);
+    await pwAsignar(newUser,pass); newUser.debeCambiarPass=true;
     S.users.push(newUser);
     // Sincronizar función con S.members para que se vea en Rebaños
     if(memberIdVal){
@@ -12578,6 +12650,7 @@ async function gdvSaveMember(){
     snapshot=Object.assign({},existing);
     Object.assign(existing,data);
   } else {
+    if(!nvConfirmarAltaSiHayParecido(nombre,apellido,data.tel)) return;
     nuevoId=Date.now();
     S.members.push({id:nuevoId,...data});
   }
@@ -12735,11 +12808,11 @@ async function gdvSaveUser(){
     var existing=S.users.find(x=>x.id===gdvEditingUserId);
     snapshot=Object.assign({},existing);
     Object.assign(existing,{name,user,role,groupId});
-    if(pass) await pwAsignar(existing,pass);
+    if(pass){ await pwAsignar(existing,pass); if(currentUser&&Number(existing.id)===Number(currentUser.id)) delete existing.debeCambiarPass; else existing.debeCambiarPass=true; }
   } else {
     nuevoId=Date.now();
     var nuG={id:nuevoId,name,user,role,groupId};
-    await pwAsignar(nuG,pass);
+    await pwAsignar(nuG,pass); nuG.debeCambiarPass=true;
     S.users.push(nuG);
   }
   await saveK(SK.users,S.users);
@@ -16413,10 +16486,24 @@ function nvNormalizarTexto(s){
 
 // ¿Una persona candidata (nombre/apellido/celular) coincide con un miembro ya cargado en al
 // menos 2 de estos 3 datos?: Nombre, Apellido, últimos 4 dígitos del celular.
+// Conjunto ordenado de palabras del nombre completo — así "Candia Patricia" y "Patricia Candia"
+// (nombre y apellido cargados al revés, o con espacios/tildes distintos) cuentan como la misma persona.
+function nvTokensNombre(nombre, apellido){
+  var t=(nvNormalizarTexto(nombre)+' '+nvNormalizarTexto(apellido)).split(/[^a-z0-9ñ]+/).filter(Boolean);
+  var u=[]; t.forEach(function(x){ if(u.indexOf(x)<0) u.push(x); });
+  return u.sort().join(' ');
+}
 function nvCoincide2de3(nombre, apellido, tel, m){
   var coincidencias=0;
-  if(nvNormalizarTexto(nombre)&&nvNormalizarTexto(nombre)===nvNormalizarTexto(m.nombre)) coincidencias++;
-  if(nvNormalizarTexto(apellido)&&nvNormalizarTexto(apellido)===nvNormalizarTexto(m.apellido)) coincidencias++;
+  var tk=nvTokensNombre(nombre,apellido);
+  if(tk&&tk===nvTokensNombre(m.nombre,m.apellido)){
+    coincidencias+=2; // mismo nombre completo (en cualquier orden) = coinciden Nombre y Apellido
+  } else {
+    // alguna palabra en común (en cualquier posición) = 1 coincidencia de nombre
+    var a1=tk?tk.split(' '):[], a2=nvTokensNombre(m.nombre,m.apellido).split(' ');
+    var comunes=a1.filter(function(w){return w&&a2.indexOf(w)>=0;}).length;
+    if(comunes>=2) coincidencias+=2; else if(comunes===1) coincidencias++;
+  }
   var telNorm=(tel||'').replace(/\D/g,'').slice(-4);
   var mTelNorm=(m.tel||'').replace(/\D/g,'').slice(-4);
   if(telNorm.length===4&&telNorm===mTelNorm) coincidencias++;
@@ -16430,7 +16517,23 @@ function nvBuscarPosibleDuplicado(nombre, apellido, tel){
   });
 }
 
+// Para las altas que no usan el diálogo de Nuevos (Grupos de Vida, Miembros, QR interno):
+// devuelve true si se puede seguir con el alta.
+function nvConfirmarAltaSiHayParecido(nombre, apellido, tel){
+  var d=nvBuscarPosibleDuplicado(nombre,apellido,tel);
+  if(!d) return true;
+  var g='sin grupo';
+  if(d.grupoId){
+    var gG=(S.groups||[]).find(function(x){return Number(x.id)===Number(d.grupoId);});
+    var gNg=(S.ngComunidades||[]).find(function(x){return Number(x.id)===Number(d.grupoId);});
+    g=gG?gG.name:(gNg?gNg.name:'Grupo/Comunidad');
+  }
+  return confirm('⚠️ Ya existe alguien parecido:\n\n'+fullName(d)+'\nCondición: '+(d.condicion||'—')+' · '+g+(d.tel?'\nCel: '+d.tel:'')+'\n\nSi es la misma persona, tocá CANCELAR y buscala en la lista en vez de crear un duplicado.\n\nTocá ACEPTAR solo si es una persona distinta.');
+}
+
+var nvAltaEnCurso=false; // evita doble clic mientras se guarda en la nube
 async function nvSaveInlineForm(){
+  if(nvAltaEnCurso) return;
   try{
     const nombre=(document.getElementById('nv-mf-nombre')?.value||'').trim();
     const apellido=(document.getElementById('nv-mf-apellido')?.value||'').trim();
@@ -16469,6 +16572,8 @@ async function nvSaveInlineForm(){
 }
 
 async function nvCrearContactoDesdeInline(datos){
+  if(nvAltaEnCurso) return;
+  nvAltaEnCurso=true;
   try{
     const {nombre,apellido,cel,genero,barrio,fnac,edadDeclarada,como,motivo,segId,segLabel,dni}=datos;
     var origenLabel=nvInlineOrigenModulo==='gdv'?'Grupos de Vida':nvInlineOrigenModulo==='ng'?'Nuevas Generaciones':'Web Nuevos Contactos';
@@ -16506,6 +16611,8 @@ async function nvCrearContactoDesdeInline(datos){
     console.error('nvCrearContactoDesdeInline error:',e);
     const stack=(e.stack||'').split('\n').slice(0,6).join('\n');
     alert('Error: '+e.message+'\n\nDónde:\n'+stack);
+  } finally {
+    nvAltaEnCurso=false;
   }
 }
 
@@ -17406,6 +17513,7 @@ function enviarForm(){
     return;
   }
   err.style.display='none';
+  if(!nvConfirmarAltaSiHayParecido(n,a,cel)) return;
   // Save using S.members + saveK so _local_ts_ is updated and Firebase can't overwrite
   try{
     var nuevo={
@@ -21027,6 +21135,7 @@ function tryRestoreSession(){
       document.getElementById('screen-login').style.display='none';
       resetInactivityTimer();
       showHome();
+      pwForzarSiCorresponde();
     }
   }catch(e){
     localStorage.removeItem('vng_cu');

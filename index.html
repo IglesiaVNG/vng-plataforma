@@ -670,7 +670,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zq';
+const APP_VERSION = '2026-08-24-zr';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -21136,6 +21136,13 @@ function tryRestoreSession(){
       resetInactivityTimer();
       showHome();
       pwForzarSiCorresponde();
+      // Si el Super Admin entra con una sesión ya guardada (sin pasar por el login), también hay que
+      // proteger las contraseñas pendientes. Se espera unos segundos a que termine la descarga de la nube.
+      setTimeout(function(){
+        try{
+          if(currentUser&&isSuperAdmin()) pwMigrarUsuarios().then(function(ok){ if(ok) showToast('🔒 Contraseñas protegidas','#16A34A'); }).catch(function(){});
+        }catch(e){}
+      },4000);
     }
   }catch(e){
     localStorage.removeItem('vng_cu');

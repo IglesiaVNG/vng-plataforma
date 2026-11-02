@@ -670,7 +670,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zr';
+const APP_VERSION = '2026-08-24-zs';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -3265,12 +3265,51 @@ async function pwMigrarUsuarios(){
   }catch(e){
     snap.forEach(function(x){ x.u.pass=x.pass; delete x.u.passHash; delete x.u.debeCambiarPass; });
     await saveK(SK.users,S.users);
-    console.warn('No se pudieron proteger las contraseñas (sin conexión). Se reintenta en el próximo ingreso del Super Admin.');
+    window._pwUltimoError=(e&&e.message)?e.message:String(e);
+    console.warn('No se pudieron proteger las contraseñas:',e);
     return false;
   }
   return true;
 }
 
+
+// ── Revisión manual (Super Admin): muestra el estado real y permite proteger / exigir el cambio ──
+function pwContar(){
+  var us=S.users||[];
+  return {
+    total:us.length,
+    claro:us.filter(function(u){return u.pass!==undefined&&u.pass!=='';}).length,
+    hash:us.filter(function(u){return u.passHash!==undefined;}).length,
+    deben:us.filter(function(u){return u.debeCambiarPass===true;}).length
+  };
+}
+async function pwRevisarContrasenas(){
+  if(!isSuperAdmin()) return;
+  if(!pwDisponible()){ alert('Este navegador no permite proteger contraseñas (hace falta entrar por la dirección https oficial de la app).'); return; }
+  var c=pwContar();
+  if(c.claro>0){
+    if(!confirm('Estado de contraseñas:\n• Usuarios: '+c.total+'\n• Sin proteger (texto plano): '+c.claro+'\n• Protegidas: '+c.hash+'\n• Con cambio obligatorio pendiente: '+c.deben+'\n\n¿Proteger ahora las '+c.claro+' contraseñas sin proteger?')) return;
+    var ok=await pwMigrarUsuarios();
+    if(!ok){ alert('❌ No se pudieron proteger las contraseñas.\n\nMotivo: '+(window._pwUltimoError||'sin detalle')+'\n\nNo se cambió nada. Verificá tu conexión e intentá de nuevo.'); return; }
+    c=pwContar();
+  }
+  var us=S.users||[];
+  var sin=us.filter(function(u){return u.passHash!==undefined&&u.debeCambiarPass!==true&&(!currentUser||Number(u.id)!==Number(currentUser.id));});
+  if(!sin.length){ alert('✅ Todo en orden.\n\n• Usuarios: '+c.total+'\n• Protegidas: '+c.hash+'\n• Sin proteger: '+c.claro+'\n• Con cambio obligatorio pendiente: '+c.deben); return; }
+  if(!confirm('Contraseñas protegidas: '+c.hash+' de '+c.total+'.\n\n'+sin.length+' usuario(s) (sin contarte a vos) todavía NO tienen que cambiar su clave.\n\n¿Exigirles que elijan una nueva en su próximo ingreso?')) return;
+  var antes=sin.map(function(u){return {u:u,v:u.debeCambiarPass};});
+  sin.forEach(function(u){ u.debeCambiarPass=true; });
+  await saveK(SK.users,S.users);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    antes.forEach(function(x){ if(x.v===undefined) delete x.u.debeCambiarPass; else x.u.debeCambiarPass=x.v; });
+    await saveK(SK.users,S.users);
+    alert('❌ No se pudo guardar en la nube: '+((e&&e.message)||e)+'\n\nNo se cambió nada.');
+    return;
+  }
+  alert('✅ Listo. '+sin.length+' usuario(s) deberán elegir una nueva contraseña la próxima vez que ingresen.');
+}
 
 // ── Cambio de contraseña por la propia persona ──
 // Se exige (forzado) cuando la clave la puso el administrador (debeCambiarPass) o todavía está en claro.
@@ -4664,7 +4703,7 @@ function configTab(sub, btn){
     wrap.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
         <span style="font-size:14px;font-weight:600;color:#1F4E79">Usuarios del sistema</span>
-        <button class="btn btn-primary btn-sm" onclick="cfgOpenNewUser()">+ Nuevo usuario</button>
+        <span style="display:flex;gap:8px">${isSuperAdmin()?'<button class="btn btn-sm" onclick="pwRevisarContrasenas()" title="Ver el estado real de las contraseñas y exigir el cambio">🔒 Revisar contraseñas</button>':''}<button class="btn btn-primary btn-sm" onclick="cfgOpenNewUser()">+ Nuevo usuario</button></span>
       </div>
       <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 14px;font-size:13px;color:#1E40AF;margin-bottom:1rem">
         ℹ️ <strong>Usuarios</strong> son las cuentas de login (usuario + contraseña + acceso al sistema). Son diferentes a los <strong>Rebaños</strong>, que son las personas de la iglesia.

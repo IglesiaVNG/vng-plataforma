@@ -450,7 +450,7 @@ window.fbUpload = async function(force) {
     localStorage.setItem('_vng_last_upload', String(uploadTs));
     const promises = Object.entries(KEY_GROUPS).map(async ([docName, keys]) => {
       const docRef = doc(db, VNG_COL, docName);
-      const needsMerge = keys.some(function(k){ return MERGE_KEYS.includes(k) || TOMB_KEYS.includes(k); });
+      const needsMerge = keys.includes('gdv_u5') || keys.some(function(k){ return MERGE_KEYS.includes(k) || TOMB_KEYS.includes(k); });
       if(needsMerge){
         await runTransaction(db, async (transaction) => {
           const snap = await transaction.get(docRef);
@@ -466,6 +466,9 @@ window.fbUpload = async function(force) {
               localStorage.setItem(k, mergeByTs(localStorage.getItem(k), cloudData[k], TOMB_MAP[k]));
             }
           });
+          if(keys.includes('gdv_u5') && cloudData['gdv_u5']!==undefined){
+            localStorage.setItem('gdv_u5', mergeUsersCif(localStorage.getItem('gdv_u5'), cloudData['gdv_u5']));
+          }
           const data = { _ts: uploadTs };
           keys.forEach(function(k){ localStorage.setItem('_local_ts_'+k, String(uploadTs)); });
           keys.forEach(k => {
@@ -534,6 +537,25 @@ function mergeByTs(localStr, cloudStr, tombKey){
 }
 
 // Mezcla dos listas de tombstones (ids eliminados), quedándose con el más reciente por id
+// Usuarios: la lista se sube/baja completa, pero las LLAVES DE CIFRADO nunca deben perderse por una
+// copia vieja. Se conserva el bloque de llaves más reciente (cifGen / cifReset) de cada usuario.
+function mergeUsersCif(baseStr, otherStr){
+  try{
+    if(!baseStr) return otherStr;
+    const base=JSON.parse(baseStr||'[]'), other=JSON.parse(otherStr||'[]');
+    const om={}; other.forEach(function(u){ om[u.id]=u; });
+    const CIF=['cifPub','cifPriv','cifSalt','cifIter','cifGen','cifReset'];
+    const score=function(u){ return Math.max(parseInt(u&&u.cifGen||0),parseInt(u&&u.cifReset||0)); };
+    base.forEach(function(b){
+      const o=om[b.id]; if(!o) return;
+      if(score(o)>score(b)){
+        CIF.forEach(function(k){ delete b[k]; });
+        CIF.forEach(function(k){ if(o[k]!==undefined) b[k]=o[k]; });
+      }
+    });
+    return JSON.stringify(base);
+  }catch(e){ return baseStr; }
+}
 function mergeTombstones(localStr, cloudStr){
   try{
     const local=JSON.parse(localStr||'[]');
@@ -611,6 +633,8 @@ window.fbDownload = async function() {
               } else if(MERGE_KEYS.includes(k)){
                 // Siempre mergear por id+ts, independientemente del timestamp del documento
                 localStorage.setItem(k, mergeByTs(localStorage.getItem(k), data[k], TOMB_MAP[k]));
+              } else if(k==='gdv_u5'){
+                localStorage.setItem(k, fbTs>=localTs ? mergeUsersCif(data[k], localStorage.getItem(k)) : mergeUsersCif(localStorage.getItem(k), data[k]));
               } else if(fbTs>=localTs){
                 localStorage.setItem(k, data[k]);
               }
@@ -657,6 +681,30 @@ window.fbSavePermisos = async function(permisosStr) {
   await setDoc(doc(db,VNG_COL,'config'), {gdv_permisos: permisosStr, gdv_permisos_ts: ts}, {merge:true});
   return ts;
 };
+// Cambia SOLO campos de UN usuario directamente en la nube (transacción), sin tocar a los demás.
+// valor null = borrar el campo. Falla (lanza error) si la nube no responde — nunca en silencio.
+window.fbPatchUsuario = async function(userId, fields) {
+  const docRef = doc(db, VNG_COL, 'config');
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(docRef);
+    const cloud = snap.exists() ? snap.data() : {};
+    let arr; try{ arr = JSON.parse(cloud['gdv_u5'] || '[]'); }catch(e){ throw new Error('La lista de usuarios de la nube no se pudo leer'); }
+    const u = arr.find(function(x){ return Number(x.id) === Number(userId); });
+    if(!u) throw new Error('No se encontró el usuario en la nube');
+    Object.keys(fields).forEach(function(k){ if(fields[k] === null) delete u[k]; else u[k] = fields[k]; });
+    const ts = Date.now();
+    const json = JSON.stringify(arr);
+    transaction.set(docRef, { _ts: ts, gdv_u5: json }, { merge: true });
+    localStorage.setItem('gdv_u5', json);
+    localStorage.setItem('_local_ts_gdv_u5', String(ts));
+  });
+};
+// Lee la lista de usuarios directo de la nube (para ver las llaves públicas vigentes)
+window.fbLeerUsuarios = async function() {
+  const snap = await getDoc(doc(db, VNG_COL, 'config'));
+  if(!snap.exists() || !snap.data()['gdv_u5']) throw new Error('No hay lista de usuarios en la nube');
+  return JSON.parse(snap.data()['gdv_u5']);
+};
 window.fbLoadPermisos = async function() {
   try {
     const snap = await getDoc(doc(db,VNG_COL,'config'));
@@ -670,7 +718,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zs';
+const APP_VERSION = '2026-08-24-zv';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -3273,6 +3321,164 @@ async function pwMigrarUsuarios(){
 }
 
 
+// ════════════════════════════════════════════════════════════════
+// CIFRADO DE EXTREMO A EXTREMO (Motivos de Oración)
+// • Cada usuario tiene un par de llaves (RSA-OAEP). La llave privada se guarda en la nube
+//   SOLO cifrada con una clave derivada de SU contraseña de login — nadie más puede abrirla.
+// • Cada Motivo tiene su propia llave AES-GCM, "envuelta" (cifrada) para cada persona con acceso:
+//   quien lo creó y los Pastores (permiso oracion_todos de la matriz de Permisos).
+// • Quien no tiene su sobre en `claves` no puede leer el Motivo, ni siquiera un administrador.
+// • Si un administrador resetea una contraseña, las llaves de esa persona se invalidan (no hay forma
+//   de recuperarlas): un Pastor tiene que volver a darle acceso, a mano.
+// ════════════════════════════════════════════════════════════════
+var CIF_ITER=250000;
+var _cifPriv=null, _cifUid=null;
+function cifDisponible(){ try{ return pwDisponible()&&!!window.crypto.subtle.generateKey; }catch(e){ return false; } }
+function cifListo(){ return !!_cifPriv&&!!currentUser&&Number(_cifUid)===Number(currentUser.id); }
+function cifCerrarSesion(){ _cifPriv=null; _cifUid=null; try{ orKeys={}; orTxt={}; }catch(e){} }
+function _cifBytes(s){ return new TextEncoder().encode(s); }
+async function _cifClaveDesde(pass,salt,iter){
+  var base=await crypto.subtle.importKey('raw',_cifBytes(pass),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+// Sello AES-GCM: "kv.iv.ct" (kv = versión de la llave usada)
+async function cifSellar(clave,obj,kv){
+  var iv=crypto.getRandomValues(new Uint8Array(12));
+  var ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},clave,_cifBytes(JSON.stringify(obj)));
+  return (kv||1)+'.'+_pwB64(iv)+'.'+_pwB64(ct);
+}
+function cifKvDe(sello){ var p=String(sello||'').split('.'); return p.length===3?parseInt(p[0])||1:null; }
+async function cifAbrirSello(clave,sello){
+  var p=String(sello||'').split('.'); if(p.length!==3) throw new Error('formato inválido');
+  var pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:_pwUnB64(p[1])},clave,_pwUnB64(p[2]));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+async function _cifSellarBytes(clave,bytes){
+  var iv=crypto.getRandomValues(new Uint8Array(12));
+  var ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},clave,bytes);
+  return _pwB64(iv)+'.'+_pwB64(ct);
+}
+async function _cifAbrirBytes(clave,txt){
+  var p=String(txt).split('.'); if(p.length!==2) throw new Error('formato inválido');
+  return crypto.subtle.decrypt({name:'AES-GCM',iv:_pwUnB64(p[0])},clave,_pwUnB64(p[1]));
+}
+// Envuelve la llave privada (bytes pkcs8) con la contraseña. Devuelve los campos a guardar en el usuario.
+async function cifEnvolverPriv(pubBuf,privBuf,pass){
+  var salt=crypto.getRandomValues(new Uint8Array(16));
+  var k=await _cifClaveDesde(pass,salt,CIF_ITER);
+  var o={cifSalt:_pwB64(salt),cifIter:CIF_ITER,cifPriv:await _cifSellarBytes(k,privBuf)};
+  if(pubBuf) o.cifPub=_pwB64(pubBuf);
+  return o;
+}
+async function cifNuevoPar(pass){
+  var par=await crypto.subtle.generateKey({name:'RSA-OAEP',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['encrypt','decrypt']);
+  var pub=await crypto.subtle.exportKey('spki',par.publicKey);
+  var priv=await crypto.subtle.exportKey('pkcs8',par.privateKey);
+  var o=await cifEnvolverPriv(pub,priv,pass);
+  o.cifGen=Date.now();
+  return o;
+}
+async function cifPrivBytes(u,pass){
+  var k=await _cifClaveDesde(pass,_pwUnB64(u.cifSalt),u.cifIter||CIF_ITER);
+  return _cifAbrirBytes(k,u.cifPriv);
+}
+function cifImportarPriv(bytes){ return crypto.subtle.importKey('pkcs8',bytes,{name:'RSA-OAEP',hash:'SHA-256'},false,['decrypt']); }
+function cifImportarPub(pubB64){ return crypto.subtle.importKey('spki',_pwUnB64(pubB64),{name:'RSA-OAEP',hash:'SHA-256'},false,['encrypt']); }
+// Huella corta de una llave pública (identifica "quién es" esa llave)
+async function cifHuella(pubB64){
+  var h=await crypto.subtle.digest('SHA-256',_pwUnB64(pubB64));
+  return _pwB64(h).slice(0,16);
+}
+function cifRecargarUsuarios(){ try{ S.users=JSON.parse(localStorage.getItem(SK.users)||'[]'); }catch(e){} }
+var CIF_CAMPOS=['cifPub','cifPriv','cifSalt','cifIter','cifGen','cifReset'];
+// Un administrador resetea la clave de alguien: sus llaves quedan inservibles (se marca cifReset para
+// que la sincronización no las "resucite" desde una copia vieja).
+function cifInvalidarLocal(u){
+  if(!u||!u.cifPub) return;
+  CIF_CAMPOS.forEach(function(k){ delete u[k]; });
+  u.cifReset=Date.now();
+  if(currentUser&&Number(u.id)===Number(currentUser.id)){ _cifPriv=null; _cifUid=null; }
+}
+// Con la contraseña en la mano (login o desbloqueo): abre las llaves del usuario, o las crea si no tiene.
+async function cifAsegurarLlaves(pass){
+  var u=pwUsuarioActual(); if(!u||!cifDisponible()) return 'no';
+  if(u.cifPub&&u.cifPriv){
+    try{ _cifPriv=await cifImportarPriv(await cifPrivBytes(u,pass)); _cifUid=u.id; return 'abierta'; }catch(e){ /* no abre: se regeneran */ }
+  }
+  var o=await cifNuevoPar(pass);
+  var regen=!!u.cifPub;
+  await window.fbPatchUsuario(u.id,o);
+  cifRecargarUsuarios();
+  var u2=pwUsuarioActual();
+  _cifPriv=await cifImportarPriv(await cifPrivBytes(u2,pass)); _cifUid=u2.id;
+  return regen?'regenerada':'creada';
+}
+function cifIntentar(pass){
+  return cifAsegurarLlaves(pass).catch(function(e){
+    console.error('Llaves de cifrado:',e);
+    showToast('⚠️ No se pudieron preparar tus llaves de cifrado: '+((e&&e.message)||e),'#DC2626');
+  });
+}
+// Campos a guardar junto con un cambio de contraseña (re-envuelve la llave privada con la nueva clave)
+async function cifCamposTrasCambio(u,actual,nueva){
+  if(!cifDisponible()) return {};
+  if(u.cifPub&&u.cifPriv&&actual){
+    try{ return await cifEnvolverPriv(null,await cifPrivBytes(u,actual),nueva); }catch(e){ /* no abre: se regeneran */ }
+  }
+  return cifNuevoPar(nueva);
+}
+// Pide la contraseña para desbloquear (sesión restaurada sin pasar por el login)
+function cifPedirClave(alTerminar){
+  var ov=document.getElementById('cif-clave-overlay'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='cif-clave-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:950;display:flex;align-items:center;justify-content:center;padding:1rem';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:1.2rem;width:100%;max-width:360px;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
+    +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:4px">🔒 Desbloquear Motivos</div>'
+    +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:10px">Los Motivos están cifrados. Ingresá tu contraseña para abrirlos. No se guarda en ningún lado.</div>'
+    +'<input type="password" id="cif-clave-inp" autocomplete="current-password" placeholder="Tu contraseña" style="width:100%;box-sizing:border-box;padding:8px 10px;font-size:14px;margin-bottom:8px" onkeydown="if(event.key===\'Enter\')cifConfirmarClave()">'
+    +'<div id="cif-clave-err" style="display:none;font-size:12.5px;color:#DC2626;margin-bottom:8px"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" onclick="document.getElementById(\'cif-clave-overlay\').remove()">Cancelar</button>'
+    +'<button class="btn btn-sm btn-primary" id="cif-clave-ok" onclick="cifConfirmarClave()">Desbloquear</button></div></div>';
+  ov._cb=alTerminar||null;
+  document.body.appendChild(ov);
+  var i=document.getElementById('cif-clave-inp'); if(i) i.focus();
+}
+async function cifConfirmarClave(){
+  var ov=document.getElementById('cif-clave-overlay'); if(!ov) return;
+  var inp=document.getElementById('cif-clave-inp'), err=document.getElementById('cif-clave-err'), btn=document.getElementById('cif-clave-ok');
+  var show=function(t){ err.textContent=t; err.style.display='block'; if(btn) btn.disabled=false; };
+  var u=pwUsuarioActual(); if(!u){ show('No se encontró tu usuario. Volvé a ingresar.'); return; }
+  if(btn) btn.disabled=true;
+  try{
+    if(!(await pwCoincide(u,inp.value||''))){ show('Contraseña incorrecta.'); return; }
+    await cifAsegurarLlaves(inp.value);
+  }catch(e){ show('No se pudo desbloquear: '+((e&&e.message)||e)); return; }
+  var cb=ov._cb; ov.remove();
+  if(cb) cb(); else if(typeof orRender==='function'&&orVista) orRender();
+}
+
+// ── Quién puede tener acceso: los que tienen oracion_todos por Función/rol (nunca solo por ser Super Admin) ──
+function cifPermisoDe(u,screen){
+  var order={ninguno:0,consulta:1,ejecuta:2}, best='ninguno';
+  function sube(p){ if((order[p]||0)>(order[best]||0)) best=p; }
+  if(u.role!=='super_admin'&&PERMISOS[u.role]) sube(PERMISOS[u.role][screen]||'ninguno');
+  var m=null;
+  if(u.memberId) m=(S.members||[]).find(function(x){return Number(x.id)===Number(u.memberId);});
+  if(!m&&u.name) m=(S.members||[]).find(function(x){return normName(fullName(x))===normName(u.name);});
+  if(m) (m.roles||[]).forEach(function(r){ if(r!=='super_admin'&&PERMISOS[r]) sube(PERMISOS[r][screen]||'ninguno'); });
+  return best;
+}
+function cifTitulares(usuarios){
+  return (usuarios||[]).filter(function(u){ return !u.cuentaSistema&&u.cifPub&&cifPermisoDe(u,'oracion_todos')==='ejecuta'; });
+}
+// Envuelve una llave AES (bytes crudos) para una persona. Devuelve su "sobre": {fp,k:{kv:...}}
+async function cifSobrePara(user,kvRaws){
+  var pub=await cifImportarPub(user.cifPub);
+  var k={};
+  for(var kv in kvRaws){ k[kv]=_pwB64(await crypto.subtle.encrypt({name:'RSA-OAEP'},pub,kvRaws[kv])); }
+  return {fp:await cifHuella(user.cifPub),k:k};
+}
+
 // ── Revisión manual (Super Admin): muestra el estado real y permite proteger / exigir el cambio ──
 function pwContar(){
   var us=S.users||[];
@@ -3358,14 +3564,27 @@ async function pwGuardarCambio(){
   var btn=document.getElementById('pw-guardar'); if(btn) btn.disabled=true;
   var err=await pwValidarCambio(u,actual,nueva,rep,true);
   if(err){ _pwError(err); if(btn) btn.disabled=false; return; }
-  var snap=Object.assign({},u);
-  await pwAsignar(u,nueva); delete u.debeCambiarPass;
-  await saveK(SK.users,S.users);
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    pwRestaurar(u,snap); await saveK(SK.users,S.users);
-    _pwError('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.'); if(btn) btn.disabled=false; return;
+  if(pwDisponible()&&typeof window.fbPatchUsuario==='function'){
+    // La nueva clave y las llaves de cifrado (re-envueltas con ella) se guardan JUNTAS y en una sola
+    // operación sobre este usuario: si algo falla no cambia nada, y no se pisan los datos de otros usuarios.
+    try{
+      var campos=Object.assign({passHash:await pwHash(nueva),pass:null,debeCambiarPass:null},await cifCamposTrasCambio(u,actual,nueva));
+      await window.fbPatchUsuario(u.id,campos);
+      cifRecargarUsuarios();
+    }catch(e){
+      _pwError('No se pudo guardar en la nube: '+((e&&e.message)||e)); if(btn) btn.disabled=false; return;
+    }
+    try{ var u2=pwUsuarioActual(); if(u2&&u2.cifPriv){ _cifPriv=await cifImportarPriv(await cifPrivBytes(u2,nueva)); _cifUid=u2.id; } }catch(e){ console.error('Llaves de cifrado:',e); }
+  } else {
+    var snap=Object.assign({},u);
+    await pwAsignar(u,nueva); delete u.debeCambiarPass;
+    await saveK(SK.users,S.users);
+    try{
+      if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    }catch(e){
+      pwRestaurar(u,snap); await saveK(SK.users,S.users);
+      _pwError('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.'); if(btn) btn.disabled=false; return;
+    }
   }
   var ov=document.getElementById('pw-cambio-overlay'); if(ov) ov.remove();
   showToast('🔑 Contraseña actualizada','#16A34A');
@@ -3396,11 +3615,12 @@ function pwForzarSiCorresponde(){
     if(isSuperAdmin()){ pwMigrarUsuarios().then(function(ok){ if(ok) showToast('🔒 Contraseñas protegidas','#16A34A'); }).catch(function(){}); }
   };
   if(pwDebeCambiar(found)) pwAbrirCambio({forzado:true,pedirActual:false,actualConocida:p,alTerminar:seguir});
-  else seguir();
+  else { seguir(); cifIntentar(p); }
 }
 
 function doLogout(){
   currentUser=null;
+  cifCerrarSesion();
   localStorage.removeItem('vng_cu');
   sessionStorage.removeItem('vng_cu');
   document.getElementById('screen-login').style.display='';
@@ -3564,6 +3784,7 @@ function buildMiembrosHTML(){
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="saShowActualizarQR()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">📱 QR Actualizar datos</button>
         <button class="btn btn-sm" onclick="exportMiembrosExcel()" style="background:#F0FDF4;border-color:#86EFAC;color:#166634;font-weight:600">📥 Exportar Excel</button>
+        ${isSuperAdmin()?`<button class="btn btn-sm" onclick="dupAbrirPanel('miembros')" style="background:#FFFBEB;border-color:#FCD34D;color:#92400E;font-weight:600">🔍 Posibles duplicados (${dupContar('miembros')})</button>`:''}
         ${canEditMiembros()?`<button class="btn btn-primary btn-sm" onclick="saOpenNewMember()">+ Nueva persona</button>`:''}
       </div>
     </div>
@@ -6011,6 +6232,65 @@ function canAccessFormularios(){
 // • Cerrar / Reabrir: permiso oracion_cerrar (por defecto Pastor).
 // ══════════════════════════════════════════════════════════════════
 var orVista={id:null,tab:'abiertos',filtroProp:'',creando:false,q:'',orden:'desc'};
+// ── Cifrado de Motivos: caché en memoria (nunca se guarda en disco) ──
+// orTxt: m<id> = Motivo · x<id> = texto de un mensaje · c<id> = descripción de cierre.
+//   undefined = pendiente de abrir · null = sin acceso
+var orKeys={}, orTxt={}, orDescifrando=false;
+function orTitulo(m){ if(!m.cifrado) return m.titulo||''; var t=orTxt['m'+m.id]; return t===undefined?'…':(t===null?'🔒 Cifrado (sin acceso)':t); }
+function orTexto(x){ if(!x.enc) return x.texto||''; var t=orTxt['x'+x.id]; return t===undefined?'…':(t===null?'🔒 (sin acceso)':t); }
+function orNota(m){ if(!m.encCierre) return m.notaCierre||''; var t=orTxt['c'+m.id]; return t===undefined?'…':(t===null?'🔒 (sin acceso)':t); }
+function orTieneAcceso(m){ return !m.cifrado||!!(m.claves&&currentUser&&m.claves[currentUser.id]); }
+function orLimpiarCache(motivoId){
+  delete orTxt['m'+motivoId]; delete orTxt['c'+motivoId];
+  orMensajesDe(motivoId).forEach(function(x){ delete orTxt['x'+x.id]; });
+  Object.keys(orKeys).forEach(function(k){ if(k.indexOf(motivoId+':')===0) delete orKeys[k]; });
+}
+// Llave AES del Motivo (versión kv): se abre con MI llave privada. null si no tengo sobre.
+async function orClaveAES(mot,kv){
+  var ck=mot.id+':'+kv; if(orKeys[ck]) return orKeys[ck];
+  var env=mot.claves&&currentUser?mot.claves[currentUser.id]:null;
+  var w=env&&env.k?env.k[String(kv)]:null;
+  if(!w) return null;
+  var raw=await crypto.subtle.decrypt({name:'RSA-OAEP'},_cifPriv,_pwUnB64(w));
+  var K=await crypto.subtle.importKey('raw',raw,{name:'AES-GCM'},true,['encrypt','decrypt']);
+  orKeys[ck]=K; return K;
+}
+async function orAbrirSello(mot,sello){
+  try{
+    var K=await orClaveAES(mot,cifKvDe(sello)); if(!K) return null;
+    return await cifAbrirSello(K,sello);
+  }catch(e){ return null; }
+}
+function orHayPendientes(){
+  var vis=(S.oracionMotivos||[]).filter(orVisible);
+  for(var i=0;i<vis.length;i++){ if(vis[i].cifrado&&orTxt['m'+vis[i].id]===undefined) return true; }
+  if(orVista.id!=null){
+    var m=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(orVista.id);});
+    if(m&&orVisible(m)&&m.cifrado){
+      if(m.encCierre&&orTxt['c'+m.id]===undefined) return true;
+      if(orMensajesDe(m.id).some(function(x){return x.enc&&orTxt['x'+x.id]===undefined;})) return true;
+    }
+  }
+  return false;
+}
+async function orDescifrarVisibles(){
+  if(!cifListo()) return;
+  var vis=(S.oracionMotivos||[]).filter(orVisible);
+  for(var i=0;i<vis.length;i++){
+    var m=vis[i];
+    if(m.cifrado&&orTxt['m'+m.id]===undefined){ var o=await orAbrirSello(m,m.enc); orTxt['m'+m.id]=o?o.t:null; }
+  }
+  if(orVista.id!=null){
+    var d=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(orVista.id);});
+    if(d&&orVisible(d)&&d.cifrado){
+      if(d.encCierre&&orTxt['c'+d.id]===undefined){ var oc=await orAbrirSello(d,d.encCierre); orTxt['c'+d.id]=oc?oc.x:null; }
+      var ms=orMensajesDe(d.id);
+      for(var j=0;j<ms.length;j++){
+        if(ms[j].enc&&orTxt['x'+ms[j].id]===undefined){ var ox=await orAbrirSello(d,ms[j].enc); orTxt['x'+ms[j].id]=ox?ox.x:null; }
+      }
+    }
+  }
+}
 function orEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function orPropositosLiderados(){
   var linked=getLinkedMember();
@@ -6086,6 +6366,11 @@ function openOracion(){
 function orRender(){
   var c=document.getElementById('app-content'); if(!c) return;
   var h='<div class="gdv-app" id="or-root">';
+  if((S.oracionMotivos||[]).some(function(m){return m.cifrado&&orVisible(m);})&&!cifListo()){
+    h+='<div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;color:#92400E;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">'
+      +'<span>🔒 Los Motivos están cifrados. Ingresá tu contraseña para verlos.</span>'
+      +'<button class="btn btn-sm btn-primary" onclick="cifPedirClave()">Desbloquear</button></div>';
+  }
   if(orVista.id!=null) h+=orHtmlDetalle(orVista.id);
   else if(orVista.creando) h+=orHtmlNuevo();
   else h+=orHtmlLista();
@@ -6094,6 +6379,10 @@ function orRender(){
   if(orVista.id!=null){
     orMarcarLeido(orVista.id);
     var th=document.getElementById('or-hilo'); if(th) th.scrollTop=(orVista.orden==='asc')?th.scrollHeight:0;
+  }
+  if(cifListo()&&!orDescifrando&&orHayPendientes()){
+    orDescifrando=true;
+    orDescifrarVisibles().then(function(){ orDescifrando=false; orRender(); }).catch(function(e){ orDescifrando=false; console.error('Descifrado:',e); });
   }
 }
 function orHtmlLista(){
@@ -6128,7 +6417,7 @@ function orHtmlItems(){
   });
   if(orVerTodos()&&orVista.filtroProp) lista=lista.filter(function(m){var ids=(m.propositoIds&&m.propositoIds.length)?m.propositoIds:(m.propositoId?[m.propositoId]:[]);return ids.map(String).indexOf(String(orVista.filtroProp))>=0;});
   var q=normName(orVista.q||'');
-  if(q) lista=lista.filter(function(m){return normName(m.titulo||'').indexOf(q)>=0||normName(m.creadoPorNombre||'').indexOf(q)>=0;});
+  if(q) lista=lista.filter(function(m){return normName(orTitulo(m)).indexOf(q)>=0||normName(m.creadoPorNombre||'').indexOf(q)>=0;});
   lista=lista.slice().sort(function(a,b){
     var ua=(orMensajesDe(a.id).slice(-1)[0]||{ts:a.creadoTs}).ts, ub=(orMensajesDe(b.id).slice(-1)[0]||{ts:b.creadoTs}).ts;
     return (ub||0)-(ua||0);
@@ -6141,7 +6430,7 @@ function orHtmlItems(){
     var ms=orMensajesDe(m.id), u=ms[ms.length-1];
     return '<div onclick="orVista.id='+m.id+';orVista.orden=\'desc\';orRender()" style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:9px 12px;margin-bottom:8px;cursor:pointer">'
       +'<div style="display:flex;align-items:baseline;gap:8px;min-width:0">'
-      +'<span style="font-size:14px;font-weight:700;color:#1F4E79;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+orEsc(m.titulo)+'</span>'
+      +'<span style="font-size:14px;font-weight:700;color:#1F4E79;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+orEsc(orTitulo(m))+'</span>'
       +'<span style="font-size:11px;color:#6B7280;white-space:nowrap;flex-shrink:0">'+agendaFmtFechaHora(m.creadoTs)+'</span>'
       +(orSinLeer(m)?'<span class="badge b-danger" style="font-size:10px;flex-shrink:0;margin-left:auto">● Nuevo</span>':'')+'</div>'
       +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:3px;min-width:0">'
@@ -6154,6 +6443,7 @@ function orHtmlNuevo(){
   return '<button class="btn btn-sm" onclick="orVista.creando=false;orRender()" style="margin-bottom:10px">← Volver</button>'
     +'<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:14px">'
     +'<div style="font-size:15px;font-weight:600;color:#1F4E79;margin-bottom:10px">🙏 Nuevo Motivo de Oración</div>'
+    +'<div style="font-size:12px;color:#065F46;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:6px 9px;margin-bottom:10px">🔐 El Motivo y el detalle se guardan cifrados. Solo los verán quienes tengan acceso: vos y los Pastores.</div>'
     +'<label style="font-size:12px;color:#6B7280">Motivo</label>'
     +'<input id="or-f-titulo" type="text" maxlength="120" placeholder="Ej: Por la salud de..." style="width:100%;box-sizing:border-box;margin:3px 0 10px;padding:7px 9px">'
     +'<label style="font-size:12px;color:#6B7280">Detalle del pedido</label>'
@@ -6175,19 +6465,23 @@ function orHtmlDetalle(id){
   var ms=orMensajesDe(m.id); if(desc) ms=ms.slice().reverse();
   var h='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px">'
     +'<button class="btn btn-sm" onclick="orVista.id=null;orRender()">← Volver</button>';
-  if(orPuedeCerrar()){
+  h+='<div style="display:flex;gap:6px">';
+  if(m.cifrado&&cifListo()&&orTieneAcceso(m)&&orVerTodos()) h+='<button class="btn btn-sm" onclick="orAbrirAcceso('+m.id+')">🔐 Acceso</button>';
+  if(orPuedeCerrar()&&orTieneAcceso(m)){
     h+=cerrado?'<button class="btn btn-sm" onclick="orReabrir('+m.id+')">🔓 Reabrir Motivo</button>'
               :'<button class="btn btn-sm btn-danger" onclick="orPedirCierre('+m.id+')">🔒 Cerrar Motivo</button>';
   }
-  h+='</div>'
+  h+='</div></div>'
     +'<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:12px 14px;margin-bottom:10px">'
-    +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="font-size:15px;font-weight:600;color:#1F4E79">'+orEsc(m.titulo)+'</div>'
+    +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="font-size:15px;font-weight:600;color:#1F4E79">'+orEsc(orTitulo(m))+'</div>'
     +'<span class="badge '+(cerrado?'b-muted':'b-ok')+'" style="font-size:10px;flex-shrink:0">'+(cerrado?'Cerrado':'Abierto')+'</span></div>'
     +'<div style="font-size:11.5px;color:#6B7280;margin-top:3px">'+(orNombresProposito(m)?orEsc(orNombresProposito(m))+' · ':'')+'Creado por '+orEsc(m.creadoPorNombre||'')+' · '+agendaFmtFechaHora(m.creadoTs)+'</div>'
-    +(cerrado?'<div style="font-size:12px;color:#6B7280;margin-top:6px;background:#F3F4F6;border-radius:8px;padding:6px 9px">🔒 Cerrado por '+orEsc(m.cerradoPor||'')+' · '+agendaFmtFechaHora(m.cerradoTs)+(m.notaCierre?'<br>Descripción de cierre: '+orEsc(m.notaCierre):'')+'</div>':'')
+    +(cerrado?'<div style="font-size:12px;color:#6B7280;margin-top:6px;background:#F3F4F6;border-radius:8px;padding:6px 9px">🔒 Cerrado por '+orEsc(m.cerradoPor||'')+' · '+agendaFmtFechaHora(m.cerradoTs)+(orNota(m)?'<br>Descripción de cierre: '+orEsc(orNota(m)):'')+'</div>':'')
     +'</div>';
   var caja='';
-  if(!cerrado){
+  if(m.cifrado&&cifListo()&&!orTieneAcceso(m)){
+    caja='<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:12.5px;color:#991B1B">🔒 No tenés acceso a este Motivo. Pedile a un Pastor que te lo habilite desde “🔐 Acceso”.</div>';
+  } else if(!cerrado&&!(m.cifrado&&!cifListo())){
     caja='<div style="display:flex;gap:6px;margin:10px 0;align-items:flex-end">'
       +'<textarea id="or-msg" rows="2" placeholder="Escribí un mensaje…" style="flex:1;padding:7px 9px;font-family:inherit;font-size:13px"></textarea>'
       +'<button class="btn btn-sm btn-primary" onclick="orEnviar('+m.id+')">Enviar</button></div>';
@@ -6199,11 +6493,11 @@ function orHtmlDetalle(id){
   h+='<div id="or-hilo" style="display:flex;flex-direction:column;gap:7px;max-height:60vh;overflow-y:auto;padding:2px">';
   ms.forEach(function(x){
     if(x.tipo==='cierre'||x.tipo==='reapertura'){
-      h+='<div style="text-align:center;font-size:11px;color:#6B7280;background:#F3F4F6;border-radius:8px;padding:5px 8px">'+(x.tipo==='cierre'?'🔒 Cerrado':'🔓 Reabierto')+' por '+orEsc(x.autor)+' · '+agendaFmtFechaHora(x.ts)+(x.texto?'<br>'+orEsc(x.texto):'')+'</div>';
+      h+='<div style="text-align:center;font-size:11px;color:#6B7280;background:#F3F4F6;border-radius:8px;padding:5px 8px">'+(x.tipo==='cierre'?'🔒 Cerrado':'🔓 Reabierto')+' por '+orEsc(x.autor)+' · '+agendaFmtFechaHora(x.ts)+(orTexto(x)?'<br>'+orEsc(orTexto(x)):'')+'</div>';
     } else {
       var mio=Number(x.autorUserId)===Number(currentUser&&currentUser.id);
       h+='<div style="align-self:'+(mio?'flex-end':'flex-start')+';max-width:88%;background:'+(mio?'#E0ECF8':'#F7F3E9')+';border-radius:10px;padding:7px 10px;font-size:13px;color:#2B2620;white-space:pre-wrap;word-break:break-word">'
-        +orEsc(x.texto)+'<div style="color:#9CA3AF;font-size:10.5px;margin-top:3px;white-space:normal">'+orEsc(x.autor)+' · '+agendaFmtFechaHora(x.ts)+'</div></div>';
+        +orEsc(orTexto(x))+'<div style="color:#9CA3AF;font-size:10.5px;margin-top:3px;white-space:normal">'+orEsc(x.autor)+' · '+agendaFmtFechaHora(x.ts)+'</div></div>';
     }
   });
   h+='</div>';
@@ -6248,14 +6542,36 @@ async function orCrearMotivo(){
   var detalle=(document.getElementById('or-f-detalle').value||'').trim();
   if(!titulo){ alert('Escribí el Motivo.'); return; }
   if(!detalle){ alert('Escribí el detalle del pedido.'); return; }
+  if(!cifDisponible()){ alert('Este navegador no permite el cifrado (hace falta entrar por la dirección https oficial de la app). El Motivo no se creó.'); return; }
+  if(!cifListo()){ cifPedirClave(function(){ orCrearMotivo(); }); return; }
+  var usuarios;
+  try{ usuarios=await window.fbLeerUsuarios(); }
+  catch(e){ alert('No se pudo verificar los accesos en la nube: '+((e&&e.message)||e)+'\n\nEl Motivo no se creó.'); return; }
+  var yo=usuarios.find(function(u){return Number(u.id)===Number(currentUser.id);});
+  if(!yo||!yo.cifPub){ alert('Tus llaves de cifrado todavía no están guardadas en la nube. Cerrá sesión y volvé a ingresar con tu contraseña.'); return; }
+  var titulares=cifTitulares(usuarios);
+  if(!titulares.length){
+    alert('Todavía no hay ningún Pastor con llaves de cifrado, así que el Motivo no se puede crear (nadie podría leerlo).\n\nLos Pastores tienen que ingresar al menos una vez con su contraseña nueva.');
+    return;
+  }
+  var dest=[yo].concat(titulares.filter(function(t){return Number(t.id)!==Number(yo.id);}));
   var propIds=orPropositosLiderados().map(function(p){return p.id;});
   var linked=getLinkedMember();
   var ahora=Date.now();
-  var motivo={id:orNuevoId(S.oracionMotivos),titulo:titulo,propositoIds:propIds,propositoId:propIds.length===1?propIds[0]:null,
-    creadoUserId:currentUser.id,creadoMemberId:linked?linked.id:null,creadoPorNombre:currentUser.name,
-    creadoTs:ahora,estado:'Abierto',_ts:ahora};
-  var msg={id:orNuevoId(S.oracionMensajes),motivoId:motivo.id,texto:detalle,tipo:'msg',
-    autor:currentUser.name,autorUserId:currentUser.id,ts:ahora,_ts:ahora};
+  var motivo, msg, K;
+  try{
+    K=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+    var raw=new Uint8Array(await crypto.subtle.exportKey('raw',K));
+    var claves={};
+    for(var i=0;i<dest.length;i++){ claves[dest[i].id]=await cifSobrePara(dest[i],{'1':raw}); }
+    motivo={id:orNuevoId(S.oracionMotivos),cifrado:true,kv:1,claves:claves,enc:await cifSellar(K,{t:titulo},1),
+      propositoIds:propIds,propositoId:propIds.length===1?propIds[0]:null,
+      creadoUserId:currentUser.id,creadoMemberId:linked?linked.id:null,creadoPorNombre:currentUser.name,
+      creadoTs:ahora,estado:'Abierto',_ts:ahora};
+    msg={id:orNuevoId(S.oracionMensajes),motivoId:motivo.id,tipo:'msg',enc:await cifSellar(K,{x:detalle},1),
+      autor:currentUser.name,autorUserId:currentUser.id,ts:ahora,_ts:ahora};
+  }catch(e){ alert('No se pudo cifrar el Motivo: '+((e&&e.message)||e)+'\n\nEl Motivo no se creó.'); return; }
+  orKeys[motivo.id+':1']=K; orTxt['m'+motivo.id]=titulo; orTxt['x'+msg.id]=detalle;
   S.oracionMotivos.push(motivo); S.oracionMensajes.push(msg);
   var ok=await orPersistir(function(){
     S.oracionMotivos=S.oracionMotivos.filter(function(x){return x!==motivo;});
@@ -6263,7 +6579,7 @@ async function orCrearMotivo(){
   });
   if(!ok) return;
   orVista.creando=false; orVista.id=motivo.id; orVista.tab='abiertos';
-  orRender(); showToast('🙏 Motivo creado','#16A34A');
+  orRender(); showToast('🙏 Motivo creado y cifrado','#16A34A');
 }
 async function orEnviar(motivoId){
   var m=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(motivoId);});
@@ -6273,8 +6589,17 @@ async function orEnviar(motivoId){
   var texto=(inp&&inp.value||'').trim();
   if(!texto){ showToast('Escribí un mensaje primero','#D97706'); return; }
   var ahora=Date.now();
-  var msg={id:orNuevoId(S.oracionMensajes),motivoId:m.id,texto:texto,tipo:'msg',
+  var msg={id:orNuevoId(S.oracionMensajes),motivoId:m.id,tipo:'msg',
     autor:currentUser.name,autorUserId:currentUser.id,ts:ahora,_ts:ahora};
+  if(m.cifrado){
+    if(!cifListo()){ cifPedirClave(function(){ orEnviar(motivoId); }); return; }
+    try{
+      var K=await orClaveAES(m,m.kv||1);
+      if(!K){ alert('No tenés acceso a este Motivo. Pedile a un Pastor que te lo habilite.'); return; }
+      msg.enc=await cifSellar(K,{x:texto},m.kv||1);
+    }catch(e){ alert('No se pudo cifrar el mensaje: '+((e&&e.message)||e)); return; }
+    orTxt['x'+msg.id]=texto;
+  } else { msg.texto=texto; }
   S.oracionMensajes.push(msg);
   var ok=await orPersistir(function(){ S.oracionMensajes=S.oracionMensajes.filter(function(x){return x!==msg;}); });
   if(!ok){ orRender(); return; }
@@ -6287,10 +6612,23 @@ async function orCerrar(motivoId,nota){
   nota=(nota||'').trim();
   if(nota.length<OR_MIN_CIERRE){ alert('La descripción de cierre es obligatoria (mínimo '+OR_MIN_CIERRE+' caracteres).'); return false; }
   var ahora=Date.now();
-  var prev={estado:m.estado,cerradoTs:m.cerradoTs,cerradoPor:m.cerradoPor,notaCierre:m.notaCierre,_ts:m._ts};
-  var msg={id:orNuevoId(S.oracionMensajes),motivoId:m.id,texto:nota,tipo:'cierre',
+  var prev={estado:m.estado,cerradoTs:m.cerradoTs,cerradoPor:m.cerradoPor,notaCierre:m.notaCierre,encCierre:m.encCierre,_ts:m._ts};
+  var msg={id:orNuevoId(S.oracionMensajes),motivoId:m.id,tipo:'cierre',
     autor:currentUser.name,autorUserId:currentUser.id,ts:ahora,_ts:ahora};
-  Object.assign(m,{estado:'Cerrado',cerradoTs:ahora,cerradoPor:currentUser.name,notaCierre:nota,_ts:ahora});
+  if(m.cifrado){
+    if(!cifListo()){ cifPedirClave(function(){ orConfirmarCierre(motivoId); }); return false; }
+    try{
+      var K=await orClaveAES(m,m.kv||1);
+      if(!K){ alert('No tenés acceso a este Motivo, no se puede cerrar.'); return false; }
+      var sello=await cifSellar(K,{x:nota},m.kv||1);
+      msg.enc=sello;
+      Object.assign(m,{estado:'Cerrado',cerradoTs:ahora,cerradoPor:currentUser.name,encCierre:sello,notaCierre:null,_ts:ahora});
+    }catch(e){ alert('No se pudo cifrar la descripción de cierre: '+((e&&e.message)||e)); return false; }
+    orTxt['c'+m.id]=nota; orTxt['x'+msg.id]=nota;
+  } else {
+    msg.texto=nota;
+    Object.assign(m,{estado:'Cerrado',cerradoTs:ahora,cerradoPor:currentUser.name,notaCierre:nota,_ts:ahora});
+  }
   S.oracionMensajes.push(msg);
   var ok=await orPersistir(function(){ Object.assign(m,prev); S.oracionMensajes=S.oracionMensajes.filter(function(x){return x!==msg;}); });
   orRender();
@@ -6303,14 +6641,120 @@ async function orReabrir(motivoId){
   if(!m||m.estado!=='Cerrado') return;
   if(!confirm('¿Reabrir este Motivo?')) return;
   var ahora=Date.now();
-  var prev={estado:m.estado,cerradoTs:m.cerradoTs,cerradoPor:m.cerradoPor,notaCierre:m.notaCierre,_ts:m._ts};
+  var prev={estado:m.estado,cerradoTs:m.cerradoTs,cerradoPor:m.cerradoPor,notaCierre:m.notaCierre,encCierre:m.encCierre,_ts:m._ts};
   var msg={id:orNuevoId(S.oracionMensajes),motivoId:m.id,texto:'',tipo:'reapertura',
     autor:currentUser.name,autorUserId:currentUser.id,ts:ahora,_ts:ahora};
-  Object.assign(m,{estado:'Abierto',cerradoTs:null,cerradoPor:null,notaCierre:null,_ts:ahora});
+  Object.assign(m,{estado:'Abierto',cerradoTs:null,cerradoPor:null,notaCierre:null,encCierre:null,_ts:ahora});
   S.oracionMensajes.push(msg);
   var ok=await orPersistir(function(){ Object.assign(m,prev); S.oracionMensajes=S.oracionMensajes.filter(function(x){return x!==msg;}); });
   orRender();
   if(ok) showToast('🔓 Motivo reabierto','#16A34A');
+}
+
+// ── 🔐 Acceso a un Motivo: quién puede leerlo. Solo lo manejan quienes ya tienen acceso (Pastores). ──
+function orCerrarAcceso(){ var ov=document.getElementById('or-acceso-overlay'); if(ov) ov.remove(); }
+async function orAbrirAcceso(motivoId){
+  var m=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(motivoId);});
+  if(!m||!m.cifrado||!orTieneAcceso(m)||!orVerTodos()) return;
+  var usuarios;
+  try{ usuarios=await window.fbLeerUsuarios(); }
+  catch(e){ alert('No se pudo leer la lista de usuarios en la nube: '+((e&&e.message)||e)); return; }
+  var conAcc=[], reHab=[];
+  Object.keys(m.claves||{}).forEach(function(uid){
+    var u=usuarios.find(function(x){return String(x.id)===String(uid);});
+    if(!u){ return; }
+    conAcc.push({u:u,env:m.claves[uid]});
+  });
+  var filas='';
+  for(var i=0;i<conAcc.length;i++){
+    var u=conAcc[i].u, env=conAcc[i].env;
+    var vigente=u.cifPub?((await cifHuella(u.cifPub))===env.fp):false;
+    var esCreador=Number(u.id)===Number(m.creadoUserId), soyYo=Number(u.id)===Number(currentUser.id);
+    filas+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #F3F4F6;font-size:13px">'
+      +'<span>'+orEsc(u.name)+(esCreador?' <span style="font-size:10.5px;color:#6B7280">(creó el Motivo)</span>':'')+(soyYo?' <span style="font-size:10.5px;color:#6B7280">(vos)</span>':'')
+      +(vigente?'':' <span style="font-size:10.5px;color:#B45309">⚠️ cambió/reseteó su clave: ya no puede leerlo</span>')+'</span>'
+      +'<span style="display:flex;gap:6px">'
+      +(vigente?'':(u.cifPub?'<button class="btn btn-sm" onclick="orDarAcceso('+m.id+','+u.id+')">Volver a dar acceso</button>':''))
+      +((!esCreador&&!soyYo)?'<button class="btn btn-sm btn-danger" onclick="orQuitarAcceso('+m.id+','+u.id+')">Quitar</button>':'')
+      +'</span></div>';
+  }
+  var cand=usuarios.filter(function(u){return !u.cuentaSistema&&u.cifPub&&!(m.claves&&m.claves[u.id]);})
+    .sort(function(a,b){return String(a.name).localeCompare(String(b.name));});
+  var opts=cand.map(function(u){return '<option value="'+u.id+'">'+orEsc(u.name)+'</option>';}).join('');
+  var ov=document.getElementById('or-acceso-overlay'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='or-acceso-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:flex;align-items:center;justify-content:center;padding:1rem';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:1.2rem;width:100%;max-width:440px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
+    +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:2px">🔐 Acceso a este Motivo</div>'
+    +'<div style="font-size:12px;color:#6B7280;margin-bottom:10px">Solo ven el contenido las personas de esta lista. Nadie más, tampoco un administrador.</div>'
+    +'<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:2px">Con acceso</div>'+filas
+    +'<div style="font-size:12px;font-weight:600;color:#374151;margin:14px 0 4px">Dar acceso a otra persona</div>'
+    +(cand.length?'<div style="display:flex;gap:6px"><select id="or-acceso-sel" style="flex:1;padding:6px 8px;font-size:13px">'+opts+'</select><button class="btn btn-sm btn-primary" onclick="orDarAcceso('+m.id+',document.getElementById(\'or-acceso-sel\').value)">Dar acceso</button></div>'
+      :'<div style="font-size:12px;color:#9CA3AF">No hay más personas con llaves de cifrado para habilitar (tienen que ingresar al menos una vez con su contraseña).</div>')
+    +'<div style="font-size:11px;color:#9CA3AF;margin-top:10px">Al quitar a alguien, no podrá leer los mensajes nuevos; lo que ya haya visto no se puede “des-ver”.</div>'
+    +'<div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn btn-sm" onclick="orCerrarAcceso()">Cerrar</button></div></div>';
+  document.body.appendChild(ov);
+}
+async function orDarAcceso(motivoId,userId){
+  var m=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(motivoId);});
+  if(!m||!m.cifrado||!orTieneAcceso(m)||!orVerTodos()||!cifListo()) return;
+  var usuarios;
+  try{ usuarios=await window.fbLeerUsuarios(); }
+  catch(e){ alert('No se pudo leer la lista de usuarios en la nube: '+((e&&e.message)||e)); return; }
+  var t=usuarios.find(function(x){return Number(x.id)===Number(userId);});
+  if(!t||!t.cifPub){ alert('Esa persona todavía no tiene llaves de cifrado (tiene que ingresar con su contraseña).'); return; }
+  if(!confirm('¿Dar acceso a este Motivo a '+t.name+'?')) return;
+  var sobre;
+  try{
+    var raws={}, mi=m.claves[currentUser.id];
+    var kvs=Object.keys(mi.k||{});
+    for(var i=0;i<kvs.length;i++){
+      var K=await orClaveAES(m,kvs[i]); if(!K) continue;
+      raws[kvs[i]]=new Uint8Array(await crypto.subtle.exportKey('raw',K));
+    }
+    if(!Object.keys(raws).length) throw new Error('no se pudo abrir la llave del Motivo');
+    sobre=await cifSobrePara(t,raws);
+  }catch(e){ alert('No se pudo preparar el acceso: '+((e&&e.message)||e)); return; }
+  var prevEnv=m.claves[t.id], prevTs=m._ts;
+  m.claves[t.id]=sobre; m._ts=Date.now();
+  var ok=await orPersistir(function(){ if(prevEnv===undefined) delete m.claves[t.id]; else m.claves[t.id]=prevEnv; m._ts=prevTs; });
+  if(!ok) return;
+  showToast('🔐 Acceso otorgado a '+t.name,'#16A34A');
+  orAbrirAcceso(motivoId);
+}
+async function orQuitarAcceso(motivoId,userId){
+  var m=(S.oracionMotivos||[]).find(function(x){return Number(x.id)===Number(motivoId);});
+  if(!m||!m.cifrado||!orTieneAcceso(m)||!orVerTodos()||!cifListo()) return;
+  if(Number(userId)===Number(m.creadoUserId)||Number(userId)===Number(currentUser.id)) return;
+  var usuarios;
+  try{ usuarios=await window.fbLeerUsuarios(); }
+  catch(e){ alert('No se pudo leer la lista de usuarios en la nube: '+((e&&e.message)||e)); return; }
+  var t=usuarios.find(function(x){return Number(x.id)===Number(userId);});
+  if(!confirm('¿Quitar el acceso a '+(t?t.name:'esta persona')+'?\n\nNo podrá leer los mensajes nuevos de este Motivo.')) return;
+  var kv2=(m.kv||1)+1, nuevas={}, K2;
+  try{
+    K2=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+    var raw2=await crypto.subtle.exportKey('raw',K2);
+    var uids=Object.keys(m.claves||{}).filter(function(x){return String(x)!==String(userId);});
+    for(var i=0;i<uids.length;i++){
+      var env=m.claves[uids[i]];
+      var u=usuarios.find(function(x){return String(x.id)===String(uids[i]);});
+      var env2={fp:env.fp,k:Object.assign({},env.k)};
+      // solo se le da la llave nueva a quien sigue siendo la misma persona (misma llave pública)
+      if(u&&u.cifPub&&(await cifHuella(u.cifPub))===env.fp){
+        var pub=await cifImportarPub(u.cifPub);
+        env2.k[kv2]=_pwB64(await crypto.subtle.encrypt({name:'RSA-OAEP'},pub,raw2));
+      }
+      nuevas[uids[i]]=env2;
+    }
+  }catch(e){ alert('No se pudo rotar la llave: '+((e&&e.message)||e)); return; }
+  var prev={claves:m.claves,kv:m.kv,_ts:m._ts};
+  m.claves=nuevas; m.kv=kv2; m._ts=Date.now();
+  orKeys[m.id+':'+kv2]=K2;
+  var ok=await orPersistir(function(){ Object.assign(m,prev); delete orKeys[m.id+':'+kv2]; });
+  if(!ok) return;
+  showToast('🔐 Acceso quitado','#6B7280');
+  orAbrirAcceso(motivoId);
 }
 
 function openEquipo(){
@@ -10611,7 +11055,7 @@ async function cfgSaveUser(){
     var resolvedMemberId=esSistema?null:(existing.memberId||memberIdVal||selectorMemberId);
     Object.assign(existing,{name,user,role,groupId,memberId:resolvedMemberId});
     if(esSistema) existing.cuentaSistema=true; else delete existing.cuentaSistema;
-    if(pass){ await pwAsignar(existing,pass); if(currentUser&&Number(existing.id)===Number(currentUser.id)) delete existing.debeCambiarPass; else existing.debeCambiarPass=true; }
+    if(pass){ await pwAsignar(existing,pass); cifInvalidarLocal(existing); if(currentUser&&Number(existing.id)===Number(currentUser.id)) delete existing.debeCambiarPass; else existing.debeCambiarPass=true; }
     // Sincronizar función con S.members para que se vea en Rebaños
     var memberId=resolvedMemberId;
     if(memberId){
@@ -12847,7 +13291,7 @@ async function gdvSaveUser(){
     var existing=S.users.find(x=>x.id===gdvEditingUserId);
     snapshot=Object.assign({},existing);
     Object.assign(existing,{name,user,role,groupId});
-    if(pass){ await pwAsignar(existing,pass); if(currentUser&&Number(existing.id)===Number(currentUser.id)) delete existing.debeCambiarPass; else existing.debeCambiarPass=true; }
+    if(pass){ await pwAsignar(existing,pass); cifInvalidarLocal(existing); if(currentUser&&Number(existing.id)===Number(currentUser.id)) delete existing.debeCambiarPass; else existing.debeCambiarPass=true; }
   } else {
     nuevoId=Date.now();
     var nuG={id:nuevoId,name,user,role,groupId};
@@ -14601,6 +15045,7 @@ function buildNuevosHTML(){
       <div><label class="field-label">Hasta</label><input type="date" id="nv-fil-hasta" onchange="renderNuevos()"></div>
       <button class="btn btn-sm" onclick="nvVerTodos()" title="Ignora las fechas y muestra todos los Nuevos Contactos">Todos</button>
       <button class="btn btn-sm" onclick="nvResetRango()" title="Volver a las últimas 3 semanas">🔄</button>
+      ${canEliminarNuevos()?`<button class="btn btn-sm" onclick="dupAbrirPanel('nuevos')" style="background:#FFFBEB;border-color:#FCD34D;color:#92400E;font-weight:600">🔍 Posibles duplicados (${dupContar('nuevos')})</button>`:''}
     </div>
     <div style="display:flex;gap:6px;margin-bottom:1rem;align-items:center;flex-wrap:nowrap">
       <input type="text" id="nv-search" placeholder="Buscar..." onkeyup="renderNuevos()" style="flex:1.4;min-width:0">
@@ -16532,28 +16977,162 @@ function nvTokensNombre(nombre, apellido){
   var u=[]; t.forEach(function(x){ if(u.indexOf(x)<0) u.push(x); });
   return u.sort().join(' ');
 }
-function nvCoincide2de3(nombre, apellido, tel, m){
-  var coincidencias=0;
-  var tk=nvTokensNombre(nombre,apellido);
-  if(tk&&tk===nvTokensNombre(m.nombre,m.apellido)){
-    coincidencias+=2; // mismo nombre completo (en cualquier orden) = coinciden Nombre y Apellido
-  } else {
-    // alguna palabra en común (en cualquier posición) = 1 coincidencia de nombre
-    var a1=tk?tk.split(' '):[], a2=nvTokensNombre(m.nombre,m.apellido).split(' ');
-    var comunes=a1.filter(function(w){return w&&a2.indexOf(w)>=0;}).length;
-    if(comunes>=2) coincidencias+=2; else if(comunes===1) coincidencias++;
-  }
-  var telNorm=(tel||'').replace(/\D/g,'').slice(-4);
-  var mTelNorm=(m.tel||'').replace(/\D/g,'').slice(-4);
-  if(telNorm.length===4&&telNorm===mTelNorm) coincidencias++;
-  return coincidencias>=2;
-}
-
 // Busca en TODA la base (sin importar condición ni estado) si ya existe alguien parecido.
 function nvBuscarPosibleDuplicado(nombre, apellido, tel){
   return (S.members||[]).find(function(m){
     return nvCoincide2de3(nombre,apellido,tel,m);
   });
+}
+
+// ════════════════════════════════════════════════════════════
+// DUPLICADOS — regla de "misma persona" + panel de revisión (Rebaños y Conexiones/Nuevos)
+// ════════════════════════════════════════════════════════════
+// Regla (vale para TODAS las altas y para el panel):
+//  • Mismo nombre completo (en cualquier orden, sin tildes/mayúsculas) → duplicado.
+//  • Comparten el nombre de pila (o lo tienen cruzado con el apellido) Y además el apellido o los
+//    últimos 4 dígitos del celular → duplicado.
+//  • Solo comparten el apellido (o solo el celular) → NO: es familia (los chicos se cargan con el
+//    celular de los papás).
+function nvTokensDe(s){
+  var t=nvNormalizarTexto(s).split(/[^a-z0-9ñ]+/).filter(Boolean), u=[];
+  t.forEach(function(x){ if(u.indexOf(x)<0) u.push(x); });
+  return u;
+}
+function nvInterseca(a,b){ return a.some(function(w){ return b.indexOf(w)>=0; }); }
+function nvCoincide2de3(nombre, apellido, tel, m){
+  var tkA=nvTokensNombre(nombre,apellido), tkB=nvTokensNombre(m.nombre,m.apellido);
+  if(!tkA||!tkB) return false;
+  if(tkA===tkB) return true;
+  var nomA=nvTokensDe(nombre), apeA=nvTokensDe(apellido), nomB=nvTokensDe(m.nombre), apeB=nvTokensDe(m.apellido);
+  var mismoNombre=nvInterseca(nomA,nomB);
+  var cruzado=nvInterseca(nomA,apeB)||nvInterseca(apeA,nomB);
+  if(!mismoNombre&&!cruzado) return false;
+  var t1=(tel||'').replace(/\D/g,'').slice(-4), t2=(m.tel||'').replace(/\D/g,'').slice(-4);
+  var telIgual=t1.length===4&&t1===t2;
+  var mismoApellido=nvInterseca(apeA,apeB);
+  return telIgual||mismoApellido;
+}
+
+var DUP_COND_ELIMINABLES=['Nuevo','Historico','Campaña'];
+function dupEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+// Grupos de personas que parecen la misma. origen 'miembros' = toda la base · 'nuevos' = los que involucran a un Nuevo/Histórico/Campaña
+function dupAgrupar(origen){
+  var M=S.members||[], n=M.length, parent=[], i, j;
+  for(i=0;i<n;i++) parent.push(i);
+  var find=function(x){ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+  var idx={};
+  M.forEach(function(m,k){ nvTokensDe((m.nombre||'')+' '+(m.apellido||'')).forEach(function(w){ (idx[w]=idx[w]||[]).push(k); }); });
+  var descartado=function(a,b){
+    return (a.dupOk||[]).map(String).indexOf(String(b.id))>=0||(b.dupOk||[]).map(String).indexOf(String(a.id))>=0;
+  };
+  var visto={};
+  Object.keys(idx).forEach(function(w){
+    var l=idx[w]; if(l.length<2||l.length>60) return;
+    for(i=0;i<l.length;i++) for(j=i+1;j<l.length;j++){
+      var a=l[i], b=l[j], key=a+'_'+b;
+      if(visto[key]) continue; visto[key]=1;
+      if(find(a)===find(b)) continue;
+      if(descartado(M[a],M[b])) continue;
+      if(nvCoincide2de3(M[a].nombre,M[a].apellido,M[a].tel,M[b])) parent[find(a)]=find(b);
+    }
+  });
+  var g={};
+  M.forEach(function(m,k){ var r=find(k); (g[r]=g[r]||[]).push(m); });
+  var res=Object.keys(g).map(function(r){return g[r];}).filter(function(x){return x.length>1;});
+  if(origen==='nuevos') res=res.filter(function(x){ return x.some(function(m){ return DUP_COND_ELIMINABLES.indexOf(m.condicion)>=0; }); });
+  return res;
+}
+function dupContar(origen){ try{ return dupAgrupar(origen).length; }catch(e){ return 0; } }
+function dupPuedeEliminar(m,origen){
+  var permiso=origen==='nuevos'?canEliminarNuevos():isSuperAdmin();
+  if(!permiso) return 'No tenés permiso para eliminar acá.';
+  var condOk=DUP_COND_ELIMINABLES.indexOf(m.condicion)>=0, estadoOk=m.estado==='Baja';
+  if(!condOk&&!estadoOk) return 'Solo se eliminan Nuevos, Históricos, Campaña o personas en Baja.';
+  if((S.users||[]).some(function(u){return u.memberId!=null&&Number(u.memberId)===Number(m.id);})) return 'Tiene un usuario del sistema asociado.';
+  return null;
+}
+function dupCompletitud(m){
+  return ['tel','fnac','dir','genero','grupoId','comoNosConocio','dni','email'].filter(function(k){ return m[k]!==undefined&&m[k]!==null&&String(m[k]).trim()!==''; }).length;
+}
+function dupGrupoNombre(m){
+  if(!m.grupoId) return 'Sin grupo';
+  var g=(S.groups||[]).find(function(x){return Number(x.id)===Number(m.grupoId);})||(S.ngComunidades||[]).find(function(x){return Number(x.id)===Number(m.grupoId);});
+  return g?g.name:'Grupo/Comunidad';
+}
+function dupCerrarPanel(){ var ov=document.getElementById('dup-overlay'); if(ov) ov.remove(); }
+function dupAbrirPanel(origen){
+  var grupos=dupAgrupar(origen);
+  var ov=document.getElementById('dup-overlay'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='dup-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:800;display:flex;align-items:center;justify-content:center;padding:1rem';
+  var h='<div style="background:#fff;border-radius:14px;padding:1.1rem;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px"><div style="font-size:16px;font-weight:700;color:#1F4E79">🔍 Posibles duplicados ('+grupos.length+')</div>'
+    +'<button class="btn btn-sm" onclick="dupCerrarPanel()">Cerrar</button></div>'
+    +'<div style="font-size:12px;color:#6B7280;margin-bottom:12px">Mismo nombre (en cualquier orden), o mismo nombre de pila con el mismo apellido o celular. Los familiares con el mismo apellido o celular no se marcan.'
+    +(origen==='nuevos'?' Acá se muestran los grupos donde hay al menos un Nuevo, Histórico o de Campaña.':'')+'</div>';
+  if(!grupos.length) h+='<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:14px;text-align:center;font-size:13px;color:#166534">✅ No hay posibles duplicados.</div>';
+  grupos.forEach(function(g){
+    var mejor=g.reduce(function(a,b){return dupCompletitud(b)>dupCompletitud(a)?b:a;},g[0]);
+    var ids=g.map(function(m){return m.id;}).join(',');
+    h+='<div style="border:1px solid #FCD34D;background:#FFFBEB;border-radius:12px;padding:10px 12px;margin-bottom:10px">';
+    g.forEach(function(m){
+      var motivoNo=dupPuedeEliminar(m,origen);
+      h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #FDE68A">'
+        +'<div style="font-size:12.5px;color:#374151;min-width:0"><strong style="font-size:13.5px;color:#1F2937">'+dupEsc(fullName(m))+'</strong>'+(m===mejor&&g.length>1?' <span style="font-size:10.5px;color:#92400E">⭐ más completa</span>':'')
+        +'<br>'+dupEsc(m.condicion||'—')+' · '+dupEsc(m.estado||'—')+' · '+dupEsc(dupGrupoNombre(m))
+        +'<br><span style="color:#6B7280">Ingreso/registro: '+dupEsc(m.fechaIngreso||m.fechaRegistro||'—')+' · Origen: '+dupEsc(m.origen||'—')+' · Cel: '+dupEsc(m.tel||'—')+' · Datos cargados: '+dupCompletitud(m)+'/8</span></div>'
+        +'<div style="flex-shrink:0">'+(motivoNo?'<span style="font-size:10.5px;color:#9CA3AF;max-width:130px;display:inline-block;text-align:right" title="'+dupEsc(motivoNo)+'">🔒 '+dupEsc(motivoNo)+'</span>'
+          :'<button class="btn btn-sm btn-danger" onclick="dupEliminar('+m.id+',\''+origen+'\')">🗑 Eliminar este</button>')+'</div></div>';
+    });
+    h+='<div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="dupNoEs(\''+ids+'\',\''+origen+'\')">✓ No son la misma persona</button></div></div>';
+  });
+  h+='</div>';
+  ov.innerHTML=h; document.body.appendChild(ov);
+}
+function dupRefrescar(origen){
+  try{ if(origen==='nuevos'&&typeof renderNuevos==='function') renderNuevos(); else if(typeof renderMiembrosStandalone==='function') renderMiembrosStandalone(); }catch(e){}
+  dupAbrirPanel(origen);
+}
+async function dupEliminar(id,origen){
+  var m=(S.members||[]).find(function(x){return Number(x.id)===Number(id);}); if(!m) return;
+  var no=dupPuedeEliminar(m,origen); if(no){ alert(no); return; }
+  if(!confirm('¿Eliminar definitivamente a '+fullName(m)+' ('+(m.condicion||'—')+' · '+(m.estado||'—')+')?\n\nEsta acción no se puede deshacer.')) return;
+  S.members=S.members.filter(function(x){return Number(x.id)!==Number(id);});
+  addTombstone(SK.members,id);
+  await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.members.push(m);
+    await saveK(SK.members,S.members);
+    alert('No se pudo eliminar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('🗑️ Eliminado','#DC2626');
+  dupRefrescar(origen);
+}
+async function dupNoEs(idsCsv,origen){
+  var ids=String(idsCsv).split(',');
+  var ms=(S.members||[]).filter(function(m){return ids.indexOf(String(m.id))>=0;});
+  if(ms.length<2) return;
+  var prev=ms.map(function(m){return {m:m,dupOk:m.dupOk,_ts:m._ts};});
+  var ahora=Date.now();
+  ms.forEach(function(m){
+    var s=(m.dupOk||[]).map(String);
+    ids.forEach(function(x){ if(x!==String(m.id)&&s.indexOf(x)<0) s.push(x); });
+    m.dupOk=s; m._ts=ahora;
+  });
+  await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    prev.forEach(function(p){ if(p.dupOk===undefined) delete p.m.dupOk; else p.m.dupOk=p.dupOk; p.m._ts=p._ts; });
+    await saveK(SK.members,S.members);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✓ Marcadas como personas distintas','#16A34A');
+  dupAbrirPanel(origen);
 }
 
 // Para las altas que no usan el diálogo de Nuevos (Grupos de Vida, Miembros, QR interno):
@@ -17204,7 +17783,7 @@ function renderHomeCumples(){
   }).map(function(m){
     var mes,dia,anio;
     if(m.fnac.indexOf('/')>=0){
-      var pp=m.fnac.split('/');dia=parseInt(pp[0]);mes=parseInt(pp[1]);anio=parseInt(pp[2]);if(anio<100)anio+=2000;
+      var pp=m.fnac.split('/');dia=parseInt(pp[0]);mes=parseInt(pp[1]);anio=parseInt(pp[2]);if(anio<100)anio+=(anio>(hoy.getFullYear()%100))?1900:2000; // año de 2 dígitos: 74→1974, 20→2020 (antes todo iba a 2000 y daba edades negativas)
     } else {
       var parts=m.fnac.split('-');mes=parseInt(parts[1]);dia=parseInt(parts[2]);anio=parseInt(parts[0]);
     }

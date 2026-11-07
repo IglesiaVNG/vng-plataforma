@@ -3833,7 +3833,7 @@ function buildMiembrosHTML(){
           <th style="width:19%">Grupos</th>
           <th style="width:18%">Función</th>
           <th style="width:13%">Condición</th>
-          <th style="width:9%">Estado</th>
+          <th style="width:9%">Categoría</th>
           <th style="width:12%">Ingreso</th>
         </tr></thead>
         <tbody id="sa-member-tbody"></tbody>
@@ -3860,14 +3860,14 @@ function buildMiembrosHTML(){
     <div id="sa-panel-servicio" style="display:none">
       <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:.75rem;font-size:13px;color:#92400E;text-align:center">🤝 <strong>Servicio</strong> — 🚧 Próximamente</div>
       <div class="card" style="padding:0;overflow:hidden;opacity:.4;pointer-events:none">
-        <table><thead><tr><th>Nombre</th><th>Grupos</th><th>Función</th><th>Condición</th><th>Estado</th></tr></thead>
+        <table><thead><tr><th>Nombre</th><th>Grupos</th><th>Función</th><th>Condición</th><th>Categoría</th></tr></thead>
         <tbody id="sa-member-tbody-servicio"></tbody></table>
       </div>
     </div>
     <div id="sa-panel-historial" style="display:none">
       <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:.75rem;font-size:13px;color:#92400E;text-align:center">📜 <strong>Historial</strong> — 🚧 Próximamente</div>
       <div class="card" style="padding:0;overflow:hidden;opacity:.4;pointer-events:none">
-        <table><thead><tr><th>Nombre</th><th>Grupos</th><th>Función</th><th>Condición</th><th>Estado</th></tr></thead>
+        <table><thead><tr><th>Nombre</th><th>Grupos</th><th>Función</th><th>Condición</th><th>Categoría</th></tr></thead>
         <tbody id="sa-member-tbody-historial"></tbody></table>
       </div>
     </div>
@@ -4034,6 +4034,12 @@ async function cfgSaveEtiquetas(){
   }
   etqAplicarSelects();
   showToast('✅ Etiquetas guardadas','#16A34A');
+}
+function saCategoriaBadge(m){
+  var c=categoriaDe(m);
+  if(c==='Comprometido') return '<span style="background:#EDE9FE;color:#5B21B6;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;white-space:nowrap">'+etqCat(c)+'</span>';
+  if(c==='Histórico') return '<span class="badge b-muted">'+etqCat(c)+'</span>';
+  return '<span class="badge b-ok">'+etqCat(c)+'</span>';
 }
 function saCondicionBadge(condicion){
   const map={
@@ -4394,7 +4400,7 @@ function renderMiembrosStandalone(){
       <td style="color:#6B7280;font-size:12px">${memberGroups.length?memberGroups.map(gr=>`<div>${gr.name}</div>`).join(''):'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
       <td style="max-width:180px"><div style="display:flex;flex-wrap:wrap;gap:3px;max-height:52px;overflow:hidden">${roleChips(m.roles||[],m.id)}</div></td>
       <td>${saCondicionBadgeM(m)}</td>
-      <td><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></td>
+      <td>${saCategoriaBadge(m)}</td>
       <td style="font-size:12px;color:#6B7280">${saFmtDate(m.fechaIngreso)||'—'}</td>
     </tr>`;
   }).join('');
@@ -4417,7 +4423,7 @@ function renderMiembrosStandalone(){
         +'<td style="font-size:12px;color:#6B7280">'+(mGroups.length?mGroups.map(gr=>'<div>'+gr.name+'</div>').join(''):'—')+'</td>'
         +'<td>'+roleChips(m.roles||[],m.id)+'</td>'
         +'<td>'+saCondicionBadgeM(m)+'</td>'
-        +'<td><span class="badge '+(m.estado==='Activo'?'b-ok':'b-danger')+'">'+m.estado+'</span></td>'
+        +'<td>'+saCategoriaBadge(m)+'</td>'
         +'</tr>';
     }).join('');
   });

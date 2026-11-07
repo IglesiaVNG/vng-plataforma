@@ -409,7 +409,7 @@ const KEY_GROUPS = {
   'ng':      ['_tomb_gdv_ng5','gdv_ng5','_tomb_gdv_ng_records','gdv_ng_records'],
   'modules': ['gdv_modules5'],
   'homeConfig': ['gdv_home_config'],
-  'agenda':  ['gdv_ministerios','_tomb_gdv_eventos','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas','_tomb_gdv_checklist_secciones','gdv_checklist_secciones'],
+  'agenda':  ['_tomb_gdv_ministerios','gdv_ministerios','_tomb_gdv_areas_servicio','gdv_areas_servicio','_tomb_gdv_eventos','gdv_eventos','_tomb_gdv_checklists','gdv_checklists','_tomb_gdv_checklist_tareas','gdv_checklist_tareas','_tomb_gdv_checklist_secciones','gdv_checklist_secciones'],
   'campanas':['_tomb_gdv_campanas','gdv_campanas'],
   'oracion': ['_tomb_gdv_oracion_motivos','gdv_oracion_motivos','_tomb_gdv_oracion_mensajes','gdv_oracion_mensajes'],
   'formularios': ['_tomb_gdv_formularios','gdv_formularios','_tomb_gdv_form_respuestas','gdv_form_respuestas','_tomb_gdv_form_analisis','gdv_form_analisis'],
@@ -442,8 +442,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes','gdv_ministerios','gdv_areas_servicio'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes','gdv_ministerios':'_tomb_gdv_ministerios','gdv_areas_servicio':'_tomb_gdv_areas_servicio'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -623,8 +623,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes','gdv_ministerios','gdv_areas_servicio'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes','gdv_ministerios':'_tomb_gdv_ministerios','gdv_areas_servicio':'_tomb_gdv_areas_servicio'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -718,7 +718,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zv';
+const APP_VERSION = '2026-08-24-zw';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -791,6 +791,7 @@ window.fbDownload().then(function(hasData) {
         S.ngRecords      = _ld('gdv_ng_records',    S.ngRecords      ||[]);
         S.modulesConfig  = _ld('gdv_modules5',      S.modulesConfig  ||[]);
         S.ministerios    = _ld('gdv_ministerios',   S.ministerios    ||[]);
+        S.areasServicio  = _ld('gdv_areas_servicio',S.areasServicio  ||[]);
         S.eventos        = _ld('gdv_eventos',       S.eventos        ||[]);
         (S.eventos||[]).forEach(function(e){
           if(!e.tipoActividad) e.tipoActividad=(e.recurrencia&&e.recurrencia.tipo&&e.recurrencia.tipo!=='ninguna')?'habitual':'especial';
@@ -880,6 +881,12 @@ const MODULES_PERM=[
     {key:'equipo_crear', label:'Ver todos los checklists y crear checklists nuevos desde un evento'},
     {key:'equipo_admin', label:'Administrar tareas y equipo de cualquier checklist'},
   ]},
+  {key:'categorias', label:'Categoría de las personas', icon:'🏷️', screens:[
+    {key:'categoria_editar', label:'Cambiar la Categoría (Asistente / Comprometido) de una persona'},
+  ]},
+  {key:'servicio', label:'Propósitos y Áreas de servicio', icon:'🤲', screens:[
+    {key:'servicio_admin', label:'Editar Propósitos, Áreas de servicio y Proyectos'},
+  ]},
   {key:'oracion', label:'Motivos de Oración', icon:'🙏', screens:[
     {key:'oracion_ver',    label:'Acceder al módulo y ver los Motivos propios'},
     {key:'oracion_crear',  label:'Crear Motivos (y escribir en los propios)'},
@@ -898,7 +905,7 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {oracion_crear:'ejecuta',gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',oracion_ver:'ejecuta',oracion_todos:'ejecuta',oracion_cerrar:'ejecuta',formularios_todos:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_editar:'ejecuta'},
+  pastor      : {servicio_admin:'ejecuta',categoria_editar:'ejecuta',oracion_crear:'ejecuta',gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',oracion_ver:'ejecuta',oracion_todos:'ejecuta',oracion_cerrar:'ejecuta',formularios_todos:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_editar:'ejecuta'},
   lider       : {oracion_ver:'consulta',oracion_crear:'ejecuta',gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   facilitador : {oracion_ver:'consulta',oracion_crear:'ejecuta',gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
@@ -1192,7 +1199,7 @@ const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles
   discPasos:'gdv_disc_pasos',discRecords:'gdv_disc_records',discCursadas:'gdv_disc_cursadas',discInscripciones:'gdv_disc_inscripciones',
   ngComunidades:'gdv_ng5',ngRecords:'gdv_ng_records',
   modulesConfig:'gdv_modules5',
-  ministerios:'gdv_ministerios',eventos:'gdv_eventos',
+  ministerios:'gdv_ministerios',areasServicio:'gdv_areas_servicio',eventos:'gdv_eventos',
   campanas:'gdv_campanas',
   checklists:'gdv_checklists',checklistTareas:'gdv_checklist_tareas',checklistSecciones:'gdv_checklist_secciones',
   formularios:'gdv_formularios',formRespuestas:'gdv_form_respuestas',formAnalisis:'gdv_form_analisis',
@@ -1464,6 +1471,7 @@ async function initStorage(){
     if(!cu.grupos) cu.grupos=[];
   });
   S.ministerios=load(SK.ministerios,[]);
+  S.areasServicio=load(SK.areasServicio,[]);
   S.eventos    =load(SK.eventos,    []);
   S.eventos.forEach(function(e){
     if(!e.tipoActividad) e.tipoActividad=(e.recurrencia&&e.recurrencia.tipo&&e.recurrencia.tipo!=='ninguna')?'habitual':'especial';
@@ -3803,9 +3811,10 @@ function buildMiembrosHTML(){
       </select>
       <select id="sa-mfil-rol" onchange="renderMiembrosStandalone()" style="flex:1;min-width:120px"><option value="">Todas las funciones</option></select>
       <select id="sa-mfil-estado" onchange="renderMiembrosStandalone()" style="flex:1;min-width:110px" title="Baja e Histórico son la misma situación">
-        <option value="Activo">Activos</option>
+        <option value="">Todas las Categorías</option>
+        <option value="Participante">Participante</option>
+        <option value="Comprometido">Comprometido</option>
         <option value="Baja">Histórico</option>
-        <option value="">Todos</option>
       </select>
     </div>
     <!-- Sub-tabs estilo GdV Dashboard -->
@@ -3963,10 +3972,26 @@ let saEditingMemberId=null;
 let saSelectedRoles=[];
 let saDetailMemberId=null;
 
+// Condición que tenía una persona antes de pasar a Histórico (Baja). Devuelve '' si no es Histórico.
+function condicionAnteriorDe(m){
+  if(!m) return '';
+  var esHist=m.condicion==='Historico'||m.estado==='Baja';
+  if(!esHist) return '';
+  if(m.condicionAnterior&&m.condicionAnterior!=='Historico') return m.condicionAnterior;
+  if(m.condicion!=='Historico'&&m.condicion) return m.condicion; // baja de formato viejo: la condición no se tocó
+  return 'sin registro';
+}
+function saCondicionBadgeM(m){
+  var esHist=m&&(m.condicion==='Historico'||m.estado==='Baja');
+  if(!esHist) return saCondicionBadge(m&&m.condicion);
+  return saCondicionBadge('Histórico')+'<div style="font-size:11px;color:#6B7280;margin-top:2px;white-space:nowrap">antes: '+condicionAnteriorDe(m)+'</div>';
+}
 function saCondicionBadge(condicion){
   const map={
     'Miembro': {bg:'#DBEAFE',color:'#1E40AF'},
     'Asistente': {bg:'#D1FAE5',color:'#065F46'},
+    'Asistente Bautizado': {bg:'#D1FAE5',color:'#065F46'},
+    'Asistente NO Bautizado': {bg:'#ECFCCB',color:'#3F6212'},
     'Nuevo': {bg:'#FEF3C7',color:'#92400E'},
   };
   const s=map[condicion]||{bg:'#F3F4F6',color:'#6B7280'};
@@ -4182,6 +4207,51 @@ function renderMiembrosPersonales(){
   }).join('');
 }
 
+// ── Categoría de una persona: Participante | Comprometido | Histórico ──
+// Prioridad: 1) lo marcado a mano por un Pastor / Super Admin, 2) la regla automática, 3) Participante.
+// Regla: es Comprometido quien tiene Función de Pastor, o lidera un Propósito, facilita un Grupo de Vida,
+// lidera o colabora en una Comunidad de Nuevas Generaciones, o es Coordinador/a o Colaborador/a de un
+// Área de servicio o Proyecto. (Integrante, solo, no alcanza.)
+function categoriaMotivoRegla(m){
+  if(!m) return null;
+  var id=Number(m.id), r=[];
+  if((m.roles||[]).indexOf('pastor')>=0) r.push('Pastor');
+  if((S.ministerios||[]).some(function(x){
+    return (x.liderIds||[]).map(Number).includes(id)||(x.coordinadorIds||[]).map(Number).includes(id)||(x.colaboradorIds||[]).map(Number).includes(id);
+  })) r.push('Propósito');
+  if((S.groups||[]).some(function(g){return Number(g.facId)===id||Number(g.facId2)===id;})) r.push('Facilitador');
+  if((S.ngComunidades||[]).some(function(c){return (c.liderIds||[]).map(Number).includes(id)||(c.colaboradorIds||[]).map(Number).includes(id);})) r.push('Nuevas Generaciones');
+  if((S.areasServicio||[]).some(function(a){return (a.equipo||[]).some(function(e){return Number(e.personaId)===id&&(e.rol==='Coordinador/a'||e.rol==='Colaborador/a');});})) r.push('Área de servicio');
+  return r.length?r.join(', '):null;
+}
+function categoriaPorRegla(m){ return categoriaMotivoRegla(m)?'Comprometido':null; }
+function categoriaDe(m){
+  if(!m||m.estado==='Baja'||m.condicion==='Historico') return 'Histórico';
+  if(m.categoria==='Comprometido') return 'Comprometido';
+  if(m.categoria==='Participante'||m.categoria==='Asistente') return 'Participante'; // 'Asistente' = nombre anterior
+  return categoriaPorRegla(m)||'Participante';
+}
+function puedeCambiarCategoria(){ return isSuperAdmin()||canEjecutar('categoria_editar'); }
+async function saSetCategoria(memberId,valor){
+  if(!puedeCambiarCategoria()){ alert('No tenés permiso para cambiar la Categoría.'); return; }
+  var m=S.members.find(function(x){return Number(x.id)===Number(memberId);}); if(!m) return;
+  if(valor!==''&&valor!=='Participante'&&valor!=='Comprometido') return;
+  var prev={categoria:m.categoria,categoriaOrigen:m.categoriaOrigen,categoriaPor:m.categoriaPor,categoriaFecha:m.categoriaFecha,_ts:m._ts};
+  if(valor===''){ delete m.categoria; delete m.categoriaOrigen; delete m.categoriaPor; delete m.categoriaFecha; }
+  else { m.categoria=valor; m.categoriaOrigen='manual'; m.categoriaPor=currentUser?currentUser.name:''; m.categoriaFecha=new Date().toISOString().slice(0,10); }
+  m._ts=Date.now();
+  try{
+    await saveK(SK.members,S.members);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.keys(prev).forEach(function(k){ if(prev[k]===undefined) delete m[k]; else m[k]=prev[k]; });
+    try{ await saveK(SK.members,S.members); }catch(e2){}
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    saShowDetail(memberId,null); return;
+  }
+  renderMiembrosStandalone();
+  showToast('✅ Categoría: '+(valor||'Automática'),'#16A34A');
+}
 function renderMiembrosStandalone(){
   // Populate role filter dynamically from S.roles
   const rolFilter=document.getElementById('sa-mfil-rol');
@@ -4237,7 +4307,7 @@ function renderMiembrosStandalone(){
   if(fRol)   members=members.filter(m=>(m.roles||[]).includes(fRol));
   if(fCond)  members=members.filter(m=>m.condicion===fCond);
   // Estado filter — Baja e Histórico son la misma situación, se agrupan juntos
-  if(fEstado==='Activo') members=members.filter(m=>m.estado!=='Baja'&&m.condicion!=='Historico');
+  if(fEstado==='Participante'||fEstado==='Comprometido') members=members.filter(m=>categoriaDe(m)===fEstado);
   else if(fEstado==='Baja') members=members.filter(m=>m.estado==='Baja'||m.condicion==='Historico');
   // '' = todos
 
@@ -4273,7 +4343,7 @@ function renderMiembrosStandalone(){
       <td><span style="background:${genBg};color:${genColor};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${m.genero}</span></td>
       <td style="color:#6B7280;font-size:12px">${memberGroups.length?memberGroups.map(gr=>`<div>${gr.name}</div>`).join(''):'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
       <td style="max-width:180px"><div style="display:flex;flex-wrap:wrap;gap:3px;max-height:52px;overflow:hidden">${roleChips(m.roles||[],m.id)}</div></td>
-      <td>${saCondicionBadge(m.condicion)}</td>
+      <td>${saCondicionBadgeM(m)}</td>
       <td><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></td>
       <td style="font-size:12px;color:#6B7280">${saFmtDate(m.fechaIngreso)||'—'}</td>
     </tr>`;
@@ -4296,7 +4366,7 @@ function renderMiembrosStandalone(){
         +'<td style="max-width:160px"><span style="color:#1F4E79;font-weight:600">'+fullName(m)+'</span></td>'
         +'<td style="font-size:12px;color:#6B7280">'+(mGroups.length?mGroups.map(gr=>'<div>'+gr.name+'</div>').join(''):'—')+'</td>'
         +'<td>'+roleChips(m.roles||[],m.id)+'</td>'
-        +'<td>'+saCondicionBadge(m.condicion)+'</td>'
+        +'<td>'+saCondicionBadgeM(m)+'</td>'
         +'<td><span class="badge '+(m.estado==='Activo'?'b-ok':'b-danger')+'">'+m.estado+'</span></td>'
         +'</tr>';
     }).join('');
@@ -4374,30 +4444,6 @@ function saDetailTab(tab,btn){
   });
 }
 
-// Ministerios donde participa un Miembro — se calcula solo desde Propósitos,
-// igual que los Grupos: se asigna una sola vez ahí y se ve automáticamente acá.
-function getMinisteriosDeMiembro(memberId){
-  var id=Number(memberId);
-  var resultado=[];
-  (S.ministerios||[]).forEach(function(min){
-    var nivel=null;
-    if((min.liderIds||[]).map(Number).includes(id)) nivel='Líder';
-    else if((min.coordinadorIds||[]).map(Number).includes(id)) nivel='Coordinador';
-    else if((min.colaboradorIds||[]).map(Number).includes(id)) nivel='Colaborador';
-    if(nivel) resultado.push({ministerio:min.nombre,area:min.area||'',nivel:nivel});
-  });
-  return resultado;
-}
-function ministerioNivelBadge(nivel){
-  var map={
-    'Líder':{bg:'#EDE9FE',color:'#5B21B6'},
-    'Coordinador':{bg:'#DBEAFE',color:'#1E40AF'},
-    'Colaborador':{bg:'#D1FAE5',color:'#065F46'},
-  };
-  var s=map[nivel]||{bg:'#F3F4F6',color:'#6B7280'};
-  return '<span style="background:'+s.bg+';color:'+s.color+';font-size:11px;padding:2px 9px;border-radius:99px;font-weight:600">'+nivel+'</span>';
-}
-
 function saShowDetail(id,event){
   if(saDetailMemberId===id){saCloseDetail();return;}
   saDetailMemberId=id;
@@ -4417,8 +4463,9 @@ function saShowDetail(id,event){
   // ── Tab 1: Datos Generales (institucional) ──
   document.getElementById('sa-detail-generales').innerHTML=
     saDetailLabel('Grupo', g?g.name:'<span style="color:#F59E0B">Sin grupo asignado</span>')
-    + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Condición</div>${saCondicionBadge(m.condicion)}</div>`
+    + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Condición</div>${saCondicionBadgeM(m)}</div>`
     + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Estado</div><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></div>`
+    + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Categoría</div>${categoriaDe(m)==='Histórico'?'<span class="badge b-muted">Histórico</span>':(puedeCambiarCategoria()?`<select onchange="saSetCategoria(${m.id},this.value)" style="font-size:13px"><option value=""${!m.categoria?' selected':''}>Automática (${categoriaPorRegla(m)||'Participante'})</option><option${(m.categoria==='Participante'||m.categoria==='Asistente')?' selected':''}>Participante</option><option${m.categoria==='Comprometido'?' selected':''}>Comprometido</option></select>`:'<span class="badge b-ok">'+categoriaDe(m)+'</span>')}${(!m.categoria&&categoriaMotivoRegla(m))?'<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+categoriaMotivoRegla(m)+'</div>':''}</div>`
     + saDetailLabel('Fecha de ingreso', saFmtDate(m.fechaIngreso)||'—')
     + ((m.roles||[]).length?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Función</div>${roleChips(m.roles,m.id)}</div>`:'')
     + (m.estado==='Baja'?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#DC2626;margin-bottom:4px">Fecha de baja</div><div style="font-size:13px;font-weight:500;color:#DC2626">${saFmtDate(m.fechaBaja||'')}</div></div>`:'')
@@ -4469,16 +4516,7 @@ function saShowDetail(id,event){
       </div>`:''}
     </div>`;
 
-  const misMinisterios=getMinisteriosDeMiembro(m.id);
-  document.getElementById('sa-detail-servicio').innerHTML=misMinisterios.length
-    ? misMinisterios.map(function(ms){
-        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F3F4F6">'+
-          '<div><div style="font-size:13px;font-weight:600;color:#374151">'+ms.ministerio+'</div>'+
-          (ms.area?'<div style="font-size:11px;color:#9CA3AF">'+ms.area+'</div>':'')+'</div>'+
-          ministerioNivelBadge(ms.nivel)+
-        '</div>';
-      }).join('')
-    : '<div class="empty" style="padding:1.5rem 0">Sin Propósitos asignados</div>';
+  document.getElementById('sa-detail-servicio').innerHTML=svcDondeSirveHTML(m.id);
   document.getElementById('sa-detail-historial').innerHTML='<div class="empty" style="padding:1.5rem 0">📜 Historial — 🚧 Próximamente</div>';
 
   // Reset to first tab
@@ -4792,6 +4830,7 @@ async function saQuickToggleEstado(id){
   const prevFechaBaja=m.fechaBaja;
   const prevCondicion=m.condicion;
   const prevCondicionAnterior=m.condicionAnterior;
+  const prevTs=m._ts;
   m.estado=nuevoEstado;
   // Baja y Histórico son el mismo concepto — se sincronizan juntos
   if(nuevoEstado==='Baja'){
@@ -4806,8 +4845,10 @@ async function saQuickToggleEstado(id){
     fecha:today(),
     de:estadoActual,
     a:nuevoEstado,
+    condicion:prevCondicion,
     motivo
   });
+  m._ts=Date.now();
   m.estadoMotivo=motivo;
   m.estadoMotivoFecha=today();
   if(nuevoEstado==='Baja') m.fechaBaja=today();
@@ -4821,6 +4862,7 @@ async function saQuickToggleEstado(id){
     m.fechaBaja=prevFechaBaja;
     m.condicion=prevCondicion;
     m.condicionAnterior=prevCondicionAnterior;
+    m._ts=prevTs;
     m.estadoHistorial.pop();
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
@@ -4901,7 +4943,7 @@ function configTab(sub, btn){
         <button class="btn btn-primary btn-sm" onclick="ministerioOpenForm()">+ Propósito</button>
       </div>
       <div style="font-size:12px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#F9FAFB;border-radius:8px">
-        Un mismo Ministerio puede tener varias Áreas — creá una fila por cada combinación (ej: "Alabanza" / "Coro", "Alabanza" / "Sonido"), o dejá el Área en blanco si no aplica.
+        El <strong>Propósito</strong> es el gran llamado y tiene líderes. Las <strong>Áreas de servicio</strong> (y los Proyectos) cuelgan de él, con su propio equipo y el rol de cada persona.
       </div>
       <div id="ministerios-list"></div>`;
     ministerioRenderList();
@@ -5514,159 +5556,202 @@ async function ngDeleteComunidad(id){
 // ══════════════════════════════════════════════════════════════════
 // SERVICIOS/MINISTERIOS (base de Agenda Ministerial)
 // ══════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════
+// PROPÓSITOS Y ÁREAS DE SERVICIO
+// • Propósito = nombre + estado + líderes (nada más). Su Líder sigue dando la Función automática "Líder Propósito".
+// • Área de servicio / Proyecto ministerial = registro propio (gdv_areas_servicio) con su equipo y el rol de cada
+//   persona (Coordinador/a, Colaborador/a, Integrante). Puede colgar de un Propósito o ser independiente.
+// • Todo cambio lleva _ts, se guarda local + nube de forma bloqueante y, si la nube falla, se revierte en memoria.
+// ═════════════════════════════════════════════════════════════════
+var SVC_ROLES=['Coordinador/a','Colaborador/a','Integrante'];
+function svcEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function svcPuedeEditar(){ return isSuperAdmin()||canEjecutar('servicio_admin'); }
+function svcPersona(id){ return (S.members||[]).find(function(x){return Number(x.id)===Number(id);}); }
+function svcNombre(id){ var m=svcPersona(id); return m?fullName(m):'(persona eliminada)'; }
+function svcAreas(){ if(!S.areasServicio) S.areasServicio=[]; return S.areasServicio; }
+function svcActivo(m){ return !!m&&m.estado!=='Baja'&&(m.condicion==='Miembro'||String(m.condicion||'').indexOf('Asistente')===0); }
+function svcBuscar(q,soloMiembros,excluir){
+  q=normName(q||''); if(q.length<2) return [];
+  var ex=(excluir||[]).map(Number);
+  return (S.members||[]).filter(function(m){
+    if(!svcActivo(m)) return false;
+    if(soloMiembros&&m.condicion!=='Miembro') return false;
+    if(ex.includes(Number(m.id))) return false;
+    return normName(fullName(m)).indexOf(q)>=0||normName(listName(m)).indexOf(q)>=0;
+  }).sort(function(a,b){return listName(a).localeCompare(listName(b));}).slice(0,12);
+}
+function svcQuitarTombstone(key,id){
+  try{ var k='_tomb_'+key; var l=JSON.parse(localStorage.getItem(k)||'[]').filter(function(t){return String(t.id)!==String(id);}); localStorage.setItem(k,JSON.stringify(l)); }catch(e){}
+}
+// Datos viejos: Propósitos que todavía traen área / coordinadores / colaboradores adentro
+function svcEsLegacy(m){ return !!(m&&(m.area||(m.coordinadorIds&&m.coordinadorIds.length)||(m.colaboradorIds&&m.colaboradorIds.length)||m.coordinadorIds||m.colaboradorIds)); }
+function svcHayLegacy(){ return (S.ministerios||[]).some(svcEsLegacy); }
+
+// ── Dónde sirve una persona (se calcula; no se duplica nada) ──
+function getMinisteriosDeMiembro(memberId){
+  var id=Number(memberId), r=[];
+  (S.ministerios||[]).forEach(function(min){
+    if((min.liderIds||[]).map(Number).includes(id)) r.push({ministerio:min.nombre,area:'',nivel:'Líder',tipo:'Propósito'});
+    else if(svcEsLegacy(min)){
+      if((min.coordinadorIds||[]).map(Number).includes(id)) r.push({ministerio:min.nombre,area:min.area||'',nivel:'Coordinador',tipo:'Propósito'});
+      else if((min.colaboradorIds||[]).map(Number).includes(id)) r.push({ministerio:min.nombre,area:min.area||'',nivel:'Colaborador',tipo:'Propósito'});
+    }
+  });
+  svcAreas().forEach(function(a){
+    (a.equipo||[]).forEach(function(e){
+      if(Number(e.personaId)!==id) return;
+      var p=a.propositoId?(S.ministerios||[]).find(function(x){return Number(x.id)===Number(a.propositoId);}):null;
+      r.push({ministerio:p?p.nombre:'',area:a.nombre,nivel:e.rol,tipo:a.tipo||'Área de servicio',estado:a.estado});
+    });
+  });
+  return r;
+}
+function ministerioNivelBadge(nivel){
+  var map={
+    'Líder':{bg:'#EDE9FE',color:'#5B21B6'},
+    'Coordinador':{bg:'#DBEAFE',color:'#1E40AF'},'Coordinador/a':{bg:'#DBEAFE',color:'#1E40AF'},
+    'Colaborador':{bg:'#D1FAE5',color:'#065F46'},'Colaborador/a':{bg:'#D1FAE5',color:'#065F46'},
+    'Integrante':{bg:'#FEF3C7',color:'#92400E'}
+  };
+  var s=map[nivel]||{bg:'#F3F4F6',color:'#6B7280'};
+  return '<span style="background:'+s.bg+';color:'+s.color+';font-size:11px;padding:2px 9px;border-radius:99px;font-weight:600">'+svcEsc(nivel)+'</span>';
+}
+function svcDondeSirveHTML(memberId){
+  var id=Number(memberId), out='';
+  function fila(titulo,sub,badge){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F3F4F6"><div><div style="font-size:13px;font-weight:600;color:#374151">'+svcEsc(titulo)+'</div>'+(sub?'<div style="font-size:11px;color:#9CA3AF">'+svcEsc(sub)+'</div>':'')+'</div>'+badge+'</div>';
+  }
+  function bloque(t,filas){ return filas.length?'<div style="font-size:12px;font-weight:700;color:#1F4E79;margin:10px 0 2px">'+t+'</div>'+filas.join(''):''; }
+  var serv=getMinisteriosDeMiembro(id).map(function(ms){
+    var titulo=ms.area?(ms.area):ms.ministerio;
+    var sub=ms.area?(ms.ministerio?ms.ministerio+' · ':'')+ms.tipo+(ms.estado==='Inactivo'?' · inactiva':''):'Propósito';
+    return fila(titulo,sub,ministerioNivelBadge(ms.nivel));
+  });
+  var gdv=(S.groups||[]).filter(function(g){return Number(g.facId)===id||Number(g.facId2)===id;}).map(function(g){return fila(g.name,'Grupo de Vida',ministerioNivelBadge('Facilitador'));});
+  var ng=[];
+  (S.ngComunidades||[]).forEach(function(c){
+    if((c.liderIds||[]).map(Number).includes(id)) ng.push(fila(c.name,'Nuevas Generaciones',ministerioNivelBadge('Líder')));
+    else if((c.colaboradorIds||[]).map(Number).includes(id)) ng.push(fila(c.name,'Nuevas Generaciones',ministerioNivelBadge('Colaborador/a')));
+  });
+  out=bloque('Áreas y Propósitos',serv)+bloque('Grupos de Vida',gdv)+bloque('Nuevas Generaciones',ng);
+  return out||'<div class="empty" style="padding:1.5rem 0">No figura sirviendo en ningún lugar</div>';
+}
+
+// ── Pantalla 1: lista ──
+function svcResumenProposito(p){
+  var areas=svcAreas().filter(function(a){return Number(a.propositoId)===Number(p.id);});
+  var gente=new Set(); (p.liderIds||[]).forEach(function(i){gente.add(Number(i));});
+  areas.forEach(function(a){(a.equipo||[]).forEach(function(e){gente.add(Number(e.personaId));});});
+  return {areas:areas,gente:gente.size};
+}
+function svcFilaArea(a){
+  var coords=(a.equipo||[]).filter(function(e){return e.rol==='Coordinador/a';}).map(function(e){return svcNombre(e.personaId);}).join(', ');
+  var n=(a.equipo||[]).length;
+  return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #F3F4F6">'+
+    '<div style="min-width:0"><div style="font-size:13px;font-weight:600;color:#374151">'+svcEsc(a.nombre)+(a.tipo==='Proyecto ministerial'?' <span style="font-size:10px;background:#FEF3C7;color:#92400E;border-radius:99px;padding:1px 7px">Proyecto</span>':'')+(a.estado==='Inactivo'?' <span style="font-size:10px;background:#F3F4F6;color:#6B7280;border-radius:99px;padding:1px 7px">Inactiva</span>':'')+'</div>'+
+    '<div style="font-size:12px;color:#6B7280">'+(coords?'Coordina: '+svcEsc(coords)+' · ':'<span style="color:#B45309">Sin coordinador/a</span> · ')+n+' persona'+(n===1?'':'s')+'</div></div>'+
+    (svcPuedeEditar()?'<div style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-sm" onclick="svcAbrirArea('+a.id+')">✏️</button><button onclick="svcEliminarArea('+a.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:13px">🗑️</button></div>':'')+
+  '</div>';
+}
 function ministerioRenderList(){
   const c=document.getElementById('ministerios-list');
   if(!c) return;
-  if(!S.ministerios.length){
-    c.innerHTML='<p style="color:#9CA3AF;font-size:13px;text-align:center;padding:24px">Sin Propósitos cargados</p>';
-    return;
+  var edit=svcPuedeEditar(), html='';
+  if(svcHayLegacy()&&isSuperAdmin()){
+    html+='<div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;font-size:13px;color:#92400E;margin-bottom:1rem">'+
+      '🔧 Hay Propósitos con el formato anterior (área, coordinadores y colaboradores adentro del Propósito). '+
+      '<button class="btn btn-sm btn-primary" style="margin-left:6px" onclick="svcMigrar()">Pasar a Áreas de servicio</button></div>';
   }
-  // Agrupar filas por Nombre para que las distintas Áreas queden juntas
-  const porNombre={};
-  S.ministerios.forEach(function(m){
-    if(!porNombre[m.nombre]) porNombre[m.nombre]=[];
-    porNombre[m.nombre].push(m);
-  });
-  c.innerHTML=Object.keys(porNombre).sort().map(function(nombre){
-    const filas=porNombre[nombre];
-    return '<div class="card" style="margin-bottom:.75rem">'+
-      '<div style="font-weight:700;color:#1F4E79;font-size:14px;margin-bottom:6px">'+nombre+'</div>'+
-      filas.map(function(m){
-        const lideres=(m.liderIds||[]).map(function(id){
-          var mm=S.members.find(function(x){return Number(x.id)===Number(id);});
-          return mm?fullName(mm):null;
-        }).filter(Boolean).join(', ')||'—';
-        const coords=(m.coordinadorIds||[]).map(function(id){
-          var mm=S.members.find(function(x){return Number(x.id)===Number(id);});
-          return mm?fullName(mm):null;
-        }).filter(Boolean).join(', ');
-        const colabs=(m.colaboradorIds||[]).map(function(id){
-          var mm=S.members.find(function(x){return Number(x.id)===Number(id);});
-          return mm?fullName(mm):null;
-        }).filter(Boolean).join(', ');
-        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #F3F4F6">'+
-          '<div>'+
-            (m.area?'<div style="font-size:13px;font-weight:600;color:#374151">'+m.area+'</div>':'<div style="font-size:12px;color:#9CA3AF;font-style:italic">Sin área específica</div>')+
-            '<div style="font-size:12px;color:#6B7280">Líder: '+lideres+(coords?' · Coordinador: '+coords:'')+(colabs?' · Colaborador: '+colabs:'')+'</div>'+
-          '</div>'+
-          '<div style="display:flex;gap:6px;flex-shrink:0">'+
-            '<button class="btn btn-sm" onclick="ministerioOpenForm('+m.id+')">✏️</button>'+
-            '<button onclick="ministerioDeleteMinisterio('+m.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:13px">🗑️</button>'+
-          '</div>'+
-        '</div>';
-      }).join('')+
+  var props=(S.ministerios||[]).slice().sort(function(a,b){return String(a.nombre).localeCompare(String(b.nombre));});
+  if(!props.length) html+='<p style="color:#9CA3AF;font-size:13px;text-align:center;padding:24px">Sin Propósitos cargados</p>';
+  props.forEach(function(p){
+    var r=svcResumenProposito(p);
+    var lideres=(p.liderIds||[]).map(svcNombre).join(', ')||'—';
+    html+='<div class="card" style="margin-bottom:.75rem">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+        '<div style="min-width:0"><div style="font-weight:700;color:#1F4E79;font-size:14px">'+svcEsc(p.nombre)+(p.estado==='Inactivo'?' <span style="font-size:10px;background:#F3F4F6;color:#6B7280;border-radius:99px;padding:1px 7px">Inactivo</span>':'')+'</div>'+
+        '<div style="font-size:12px;color:#6B7280">Líder: '+svcEsc(lideres)+' · '+r.areas.length+' área'+(r.areas.length===1?'':'s')+' · '+r.gente+' persona'+(r.gente===1?'':'s')+' sirviendo</div></div>'+
+        (edit?'<div style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-sm" onclick="ministerioOpenForm('+p.id+')">✏️</button><button onclick="ministerioDeleteMinisterio('+p.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:13px">🗑️</button></div>':'')+
+      '</div>'+
+      r.areas.map(svcFilaArea).join('')+
+      (edit?'<div style="padding-top:8px"><button class="btn btn-sm" onclick="svcAbrirArea(null,'+p.id+')">+ Área de este Propósito</button></div>':'')+
     '</div>';
-  }).join('');
+  });
+  var sueltas=svcAreas().filter(function(a){return !a.propositoId||!(S.ministerios||[]).some(function(p){return Number(p.id)===Number(a.propositoId);});});
+  html+='<div class="card" style="margin-bottom:.75rem;border-style:dashed">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700;color:#1F4E79;font-size:14px">Proyectos y áreas independientes</div>'+
+    (edit?'<button class="btn btn-sm" onclick="svcAbrirArea(null,null,\'Proyecto ministerial\')">+ Proyecto</button>':'')+'</div>'+
+    (sueltas.length?sueltas.map(svcFilaArea).join(''):'<div style="font-size:12px;color:#9CA3AF;padding-top:6px">Ninguno. Acá van los proyectos que no dependen de un Propósito.</div>')+
+  '</div>';
+  c.innerHTML=html;
 }
 
-let ministerioEditingId=null;
-
+// ── Pantalla 2: Propósito (nombre, estado, líderes) ──
+var svcP=null;
 function ministerioOpenForm(id){
-  ministerioEditingId=id||null;
-  const min=id?S.ministerios.find(function(x){return Number(x.id)===Number(id);}):null;
-  const membros=S.members.filter(function(m){return m.estado!=='Baja'&&m.condicion!=='Historico';})
-    .sort(function(a,b){return listName(a).localeCompare(listName(b));});
-
-  function buildChecklist(idPref, selectedIds){
-    return membros.map(function(m){
-      var checked=(selectedIds||[]).map(Number).includes(Number(m.id));
-      return '<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-bottom:1px solid #F9FAFB">'+
-        '<input type="checkbox" class="'+idPref+'-cb" value="'+m.id+'"'+(checked?' checked':'')+' style="width:15px;height:15px;flex-shrink:0;cursor:pointer">'+
-        '<span style="font-size:13px">'+listName(m)+'</span>'+
-      '</label>';
-    }).join('');
-  }
-
-  document.getElementById('cfg-ministerio-overlay').innerHTML=
-    '<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">'+
-      '<div style="font-size:15px;font-weight:700;color:#1F4E79">'+(id?'Editar':'Nuevo')+' Propósito</div>'+
-      '<button class="btn btn-sm" onclick="ministerioCloseForm()">✕</button>'+
-    '</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+
-      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre *</label>'+
-        '<input id="min-f-nombre" type="text" maxlength="60" value="'+(min?min.nombre:'')+'" placeholder="Ej: Evangelismo" style="width:100%"></div>'+
-      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Área <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>'+
-        '<input id="min-f-area" type="text" maxlength="60" value="'+(min&&min.area?min.area:'')+'" placeholder="Ej: Calles" style="width:100%"></div>'+
-    '</div>'+
-
-    '<div style="margin-bottom:14px">'+
-      '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Líder(es) <span style="font-weight:400;color:#9CA3AF">— pueden ser varios</span></label>'+
-      '<input type="text" placeholder="Buscar..." oninput="ministerioFilterLista(\'min-lider\',this.value)" style="margin-bottom:4px">'+
-      '<div id="min-lider-list" style="max-height:130px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+buildChecklist('min-lider',min?min.liderIds:[])+'</div>'+
-    '</div>'+
-
-    '<div style="margin-bottom:14px">'+
-      '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Coordinador(es) <span style="font-weight:400;color:#9CA3AF">— entre Líder y Colaborador, pueden ser varios</span></label>'+
-      '<input type="text" placeholder="Buscar..." oninput="ministerioFilterLista(\'min-coord\',this.value)" style="margin-bottom:4px">'+
-      '<div id="min-coord-list" style="max-height:130px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+buildChecklist('min-coord',min?min.coordinadorIds:[])+'</div>'+
-    '</div>'+
-
-    '<div style="margin-bottom:16px">'+
-      '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Colaborador(es) <span style="font-weight:400;color:#9CA3AF">— pueden ser varios</span></label>'+
-      '<input type="text" placeholder="Buscar..." oninput="ministerioFilterLista(\'min-colab\',this.value)" style="margin-bottom:4px">'+
-      '<div id="min-colab-list" style="max-height:130px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;padding:4px">'+buildChecklist('min-colab',min?min.colaboradorIds:[])+'</div>'+
-    '</div>'+
-
-    '<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px">'+
-      '<button class="btn" onclick="ministerioCloseForm()">Cancelar</button>'+
-      '<button class="btn btn-primary" onclick="ministerioSaveMinisterio()">Confirmar</button>'+
-    '</div>'+
-  '</div>';
-
+  if(!svcPuedeEditar()){ alert('No tenés permiso para editar Propósitos.'); return; }
+  var min=id?(S.ministerios||[]).find(function(x){return Number(x.id)===Number(id);}):null;
+  svcP={id:min?min.id:null,nombre:min?min.nombre:'',estado:min?(min.estado||'Activo'):'Activo',liderIds:min?(min.liderIds||[]).map(Number):[]};
+  svcRenderProposito();
   document.getElementById('cfg-ministerio-overlay').style.display='flex';
 }
-
-function ministerioFilterLista(prefix,q){
-  q=(q||'').toLowerCase();
-  document.querySelectorAll('#'+prefix+'-list label').forEach(function(lbl){
-    lbl.style.display=lbl.textContent.toLowerCase().includes(q)?'':'none';
-  });
+function svcRenderProposito(q){
+  var chips=svcP.liderIds.map(function(i){
+    return '<span style="display:inline-flex;align-items:center;gap:4px;background:#EDE9FE;color:#5B21B6;border-radius:99px;padding:3px 6px 3px 10px;font-size:12.5px;margin:2px">'+svcEsc(svcNombre(i))+'<button onclick="svcPQuitar('+i+')" style="border:none;background:none;cursor:pointer;color:#5B21B6;font-size:14px">✕</button></span>';
+  }).join('')||'<span style="font-size:12px;color:#9CA3AF">Sin líderes</span>';
+  document.getElementById('cfg-ministerio-overlay').innerHTML=
+    '<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><div style="font-size:15px;font-weight:700;color:#1F4E79">'+(svcP.id?'Editar':'Nuevo')+' Propósito</div><button class="btn btn-sm" onclick="ministerioCloseForm()">✕</button></div>'+
+    '<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:14px">'+
+      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre *</label><input id="svcp-nombre" type="text" maxlength="60" value="'+svcEsc(svcP.nombre)+'" oninput="svcP.nombre=this.value" style="width:100%"></div>'+
+      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Estado</label><select onchange="svcP.estado=this.value" style="width:100%"><option'+(svcP.estado==='Activo'?' selected':'')+'>Activo</option><option'+(svcP.estado==='Inactivo'?' selected':'')+'>Inactivo</option></select></div>'+
+    '</div>'+
+    '<div style="margin-bottom:14px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Líder(es) <span style="font-weight:400;color:#9CA3AF">— solo Miembros activos</span></label>'+
+      '<div style="margin-bottom:6px">'+chips+'</div>'+
+      '<input id="svcp-q" type="text" placeholder="Buscar por nombre (2 letras o más)…" oninput="svcPBuscar(this.value)" style="width:100%"><div id="svcp-res"></div></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" onclick="ministerioCloseForm()">Cancelar</button><button class="btn btn-primary" id="svcp-ok" onclick="ministerioSaveMinisterio()">Confirmar</button></div></div>';
+  if(q){ var i=document.getElementById('svcp-q'); if(i){ i.value=q; i.focus(); svcPBuscar(q);} }
 }
-
+function svcPBuscar(q){
+  var r=svcBuscar(q,true,svcP.liderIds), el=document.getElementById('svcp-res'); if(!el) return;
+  el.innerHTML=r.map(function(m){return '<div onclick="svcPAgregar('+m.id+')" style="padding:7px 10px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px">'+svcEsc(listName(m))+'</div>';}).join('')||(String(q||'').length>=2?'<div style="font-size:12px;color:#9CA3AF;padding:6px">Sin resultados</div>':'');
+}
+function svcPAgregar(id){ svcP.liderIds.push(Number(id)); svcRenderProposito(); }
+function svcPQuitar(id){ svcP.liderIds=svcP.liderIds.filter(function(x){return Number(x)!==Number(id);}); svcRenderProposito(); }
 function ministerioCloseForm(){
   document.getElementById('cfg-ministerio-overlay').style.display='none';
-  ministerioEditingId=null;
+  svcP=null; svcA=null;
 }
-
 async function ministerioSaveMinisterio(){
-  const nombre=(document.getElementById('min-f-nombre')?.value||'').trim();
+  if(!svcP) return;
+  if(!svcPuedeEditar()){ alert('No tenés permiso para editar Propósitos.'); return; }
+  var nombre=(svcP.nombre||'').trim();
   if(!nombre){ alert('Ingresá el Nombre del Propósito'); return; }
-  const area=(document.getElementById('min-f-area')?.value||'').trim();
-  var liderIds=[...document.querySelectorAll('.min-lider-cb:checked')].map(function(cb){return parseInt(cb.value);});
-  var coordinadorIds=[...document.querySelectorAll('.min-coord-cb:checked')].map(function(cb){return parseInt(cb.value);});
-  var colaboradorIds=[...document.querySelectorAll('.min-colab-cb:checked')].map(function(cb){return parseInt(cb.value);});
-  var snapshotMin=null, esNuevoMin=false, nuevoMinRef=null, min;
-  // Función "Líder Propósito" (automática): personas afectadas = líderes de antes y de ahora
-  var involucradosMin=liderIds.slice();
-  if(ministerioEditingId){
-    var minPrevFn=S.ministerios.find(function(x){return Number(x.id)===Number(ministerioEditingId);});
-    if(minPrevFn) involucradosMin=involucradosMin.concat(minPrevFn.liderIds||[]);
+  var dup=(S.ministerios||[]).some(function(x){return Number(x.id)!==Number(svcP.id)&&normName(x.nombre)===normName(nombre);});
+  if(dup){ alert('Ya existe un Propósito con ese nombre.'); return; }
+  var btn=document.getElementById('svcp-ok'); if(btn) btn.disabled=true;
+  var liderIds=svcP.liderIds.slice(), estado=svcP.estado;
+  var esNuevo=!svcP.id, min=null, snapshot=null, nuevoRef=null;
+  var involucrados=liderIds.slice();
+  if(!esNuevo){
+    min=S.ministerios.find(function(x){return Number(x.id)===Number(svcP.id);});
+    if(min) involucrados=involucrados.concat(min.liderIds||[]);
   }
-  var snapFuncMin=funcionesAutoSnapshot(involucradosMin);
-  funcionesAutoAdoptar(involucradosMin);
-  if(ministerioEditingId){
-    min=S.ministerios.find(function(x){return Number(x.id)===Number(ministerioEditingId);});
-    if(min){ snapshotMin=Object.assign({},min); Object.assign(min,{nombre,area,liderIds,coordinadorIds,colaboradorIds}); }
-  } else {
-    esNuevoMin=true;
-    nuevoMinRef={id:Date.now(),nombre,area,liderIds,coordinadorIds,colaboradorIds,estado:'Activo'};
-    S.ministerios.push(nuevoMinRef);
-  }
-  funcionesAutoReconciliar(involucradosMin);
-  await saveK(SK.ministerios,S.ministerios);
-  await saveK(SK.members,S.members);
+  var snapFunc=funcionesAutoSnapshot(involucrados);
+  funcionesAutoAdoptar(involucrados);
+  if(!esNuevo&&min){ snapshot=JSON.parse(JSON.stringify(min)); Object.assign(min,{nombre:nombre,estado:estado,liderIds:liderIds,_ts:Date.now()}); }
+  else { esNuevo=true; nuevoRef={id:Date.now(),nombre:nombre,liderIds:liderIds,estado:estado,_ts:Date.now()}; S.ministerios.push(nuevoRef); }
+  funcionesAutoReconciliar(involucrados);
   try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    if(esNuevoMin){
-      S.ministerios=S.ministerios.filter(function(x){return x!==nuevoMinRef;});
-    } else if(min&&snapshotMin){
-      Object.assign(min,snapshotMin);
-    }
-    funcionesAutoRevertir(snapFuncMin);
     await saveK(SK.ministerios,S.ministerios);
     await saveK(SK.members,S.members);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    if(esNuevo) S.ministerios=S.ministerios.filter(function(x){return x!==nuevoRef;});
+    else if(min&&snapshot){ Object.keys(min).forEach(function(k){delete min[k];}); Object.assign(min,snapshot); }
+    funcionesAutoRevertir(snapFunc);
+    try{ await saveK(SK.ministerios,S.ministerios); await saveK(SK.members,S.members); }catch(e2){}
+    if(btn) btn.disabled=false;
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -5674,20 +5759,21 @@ async function ministerioSaveMinisterio(){
   ministerioRenderList();
   showToast('✅ Propósito guardado','#16A34A');
 }
-
 async function ministerioDeleteMinisterio(id){
+  if(!svcPuedeEditar()){ alert('No tenés permiso para eliminar Propósitos.'); return; }
   var min=S.ministerios.find(function(x){return Number(x.id)===Number(id);});
   if(!min) return;
   var enUso=S.eventos.filter(function(e){return Number(e.ministerioId)===Number(id);});
-  if(enUso.length>0){
-    alert('Este Propósito tiene '+enUso.length+' evento'+(enUso.length>1?'s':'')+' asociado'+(enUso.length>1?'s':'')+'. Reasigná o eliminá esos eventos antes de borrarlo.');
-    return;
-  }
-  if(!confirm('¿Eliminar "'+min.nombre+(min.area?' / '+min.area:'')+'"? Esta acción no se puede deshacer.')) return;
-  var snapFuncDel=funcionesAutoSnapshot(min.liderIds||[]);
+  if(enUso.length>0){ alert('Este Propósito tiene '+enUso.length+' evento'+(enUso.length>1?'s':'')+' asociado'+(enUso.length>1?'s':'')+'. Reasigná o eliminá esos eventos antes de borrarlo.'); return; }
+  var areas=svcAreas().filter(function(a){return Number(a.propositoId)===Number(id);});
+  if(areas.length>0){ alert('Este Propósito tiene '+areas.length+' área'+(areas.length>1?'s':'')+' de servicio. Eliminá las áreas (o pasalas a otro Propósito) antes de borrarlo.'); return; }
+  if(!confirm('¿Eliminar el Propósito "'+min.nombre+'"? Esta acción no se puede deshacer.')) return;
+  var snapFunc=funcionesAutoSnapshot(min.liderIds||[]);
   funcionesAutoAdoptar(min.liderIds||[]);
+  var antes=S.ministerios.slice();
   S.ministerios=S.ministerios.filter(function(x){return Number(x.id)!==Number(id);});
   funcionesAutoReconciliar(min.liderIds||[]);
+  addTombstone(SK.ministerios,id);
   try{
     await saveK(SK.ministerios,S.ministerios);
     await saveK(SK.members,S.members);
@@ -5695,12 +5781,160 @@ async function ministerioDeleteMinisterio(id){
     ministerioRenderList();
     showToast('✅ Eliminado','#16A34A');
   }catch(e){
-    S.ministerios.push(min);
-    funcionesAutoRevertir(snapFuncDel);
-    await saveK(SK.ministerios,S.ministerios);
-    await saveK(SK.members,S.members);
+    S.ministerios=antes;
+    svcQuitarTombstone(SK.ministerios,id);
+    funcionesAutoRevertir(snapFunc);
+    try{ await saveK(SK.ministerios,S.ministerios); await saveK(SK.members,S.members); }catch(e2){}
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
+}
+
+// ── Pantalla 3: Área de servicio / Proyecto ministerial (3 pasos: equipo → datos → confirmar) ──
+var svcA=null;
+function svcAbrirArea(id,propositoId,tipo){
+  if(!svcPuedeEditar()){ alert('No tenés permiso para editar Áreas de servicio.'); return; }
+  var a=id?svcAreas().find(function(x){return Number(x.id)===Number(id);}):null;
+  svcA={id:a?a.id:null,tipo:a?(a.tipo||'Área de servicio'):(tipo||'Área de servicio'),
+        propositoId:a?(a.propositoId||null):(propositoId||null),nombre:a?a.nombre:'',estado:a?(a.estado||'Activo'):'Activo',
+        equipo:a?(a.equipo||[]).map(function(e){return {personaId:Number(e.personaId),rol:e.rol};}):[]};
+  svcRenderArea();
+  document.getElementById('cfg-ministerio-overlay').style.display='flex';
+  var n=document.getElementById('svca-nombre'); if(n&&!svcA.nombre) n.focus();
+}
+// Una sola pantalla: datos arriba, equipo abajo. El Propósito ya viene dado por desde dónde se entró.
+function svcRenderArea(){
+  var s=svcA;
+  var p=s.propositoId?(S.ministerios||[]).find(function(x){return Number(x.id)===Number(s.propositoId);}):null;
+  var tit=(s.id?'Editar ':'Nueva ')+(s.tipo==='Proyecto ministerial'?'Proyecto ministerial':'Área de servicio');
+  var selProp='';
+  if(s.id&&!s.propositoId){
+    var props=(S.ministerios||[]).slice().sort(function(a,b){return String(a.nombre).localeCompare(String(b.nombre));});
+    selProp='<div style="margin-bottom:12px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Propósito <span style="color:#9CA3AF">(opcional)</span></label>'+
+      '<select onchange="svcA.propositoId=this.value?Number(this.value):null;svcRenderArea()" style="width:100%"><option value="">— Independiente —</option>'+props.map(function(q){return '<option value="'+q.id+'">'+svcEsc(q.nombre)+'</option>';}).join('')+'</select></div>';
+  }
+  var filas=s.equipo.map(function(e,i){
+    return '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid #F3F4F6"><div style="flex:1;font-size:13px">'+svcEsc(svcNombre(e.personaId))+'</div>'+
+      '<select onchange="svcA.equipo['+i+'].rol=this.value" style="font-size:12.5px">'+SVC_ROLES.map(function(r){return '<option'+(e.rol===r?' selected':'')+'>'+r+'</option>';}).join('')+'</select>'+
+      '<button onclick="svcAQuitar('+i+')" title="Quitar" style="border:none;background:none;cursor:pointer;color:#DC2626;font-size:15px">✕</button></div>';
+  }).join('')||'<div style="font-size:12px;color:#9CA3AF;padding:6px 0">Todavía no hay personas en el equipo</div>';
+  var sinCoord=s.equipo.length>0&&!s.equipo.some(function(e){return e.rol==='Coordinador/a';});
+  document.getElementById('cfg-ministerio-overlay').innerHTML=
+    '<div style="background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+tit+'</div>'+
+      '<div style="font-size:12px;color:#6B7280">'+(p?'Propósito: <strong>'+svcEsc(p.nombre)+'</strong>':'Independiente (sin Propósito)')+'</div></div><button class="btn btn-sm" onclick="ministerioCloseForm()">✕</button></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
+      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label><select onchange="svcA.tipo=this.value;svcRenderArea()" style="width:100%"><option'+(s.tipo==='Área de servicio'?' selected':'')+'>Área de servicio</option><option'+(s.tipo==='Proyecto ministerial'?' selected':'')+'>Proyecto ministerial</option></select></div>'+
+      '<div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Estado</label><select onchange="svcA.estado=this.value" style="width:100%"><option'+(s.estado==='Activo'?' selected':'')+'>Activo</option><option'+(s.estado==='Inactivo'?' selected':'')+'>Inactivo</option></select></div>'+
+    '</div>'+
+    '<div style="margin-bottom:12px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre *</label><input id="svca-nombre" type="text" maxlength="60" value="'+svcEsc(s.nombre)+'" oninput="svcA.nombre=this.value" style="width:100%"></div>'+
+    selProp+
+    '<div style="font-size:13px;font-weight:600;color:#374151;margin:14px 0 4px">Equipo ('+s.equipo.length+')</div>'+filas+
+    '<input id="svca-q" type="text" placeholder="Agregar persona: buscar por nombre (2 letras o más)…" oninput="svcABuscar(this.value)" style="width:100%;margin-top:10px"><div id="svca-res"></div>'+
+    '<div style="font-size:11.5px;color:#9CA3AF;margin-top:4px">Se suma como Colaborador/a; cambiale el rol en la lista. Solo Miembros y Asistentes activos.</div>'+
+    (sinCoord?'<div style="font-size:12px;color:#B45309;margin-top:8px">⚠️ Todavía no tiene Coordinador/a. Podés guardarla igual.</div>':'')+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="btn" onclick="ministerioCloseForm()">Cancelar</button><button class="btn btn-primary" id="svca-ok" onclick="svcGuardarArea()">Guardar</button></div></div>';
+}
+function svcABuscar(q){
+  var r=svcBuscar(q,false,svcA.equipo.map(function(e){return e.personaId;})), el=document.getElementById('svca-res'); if(!el) return;
+  el.innerHTML=r.map(function(m){return '<div onclick="svcAAgregar('+m.id+')" style="padding:7px 10px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px">'+svcEsc(listName(m))+' <span style="color:#9CA3AF;font-size:11px">'+svcEsc(m.condicion)+'</span></div>';}).join('')||(String(q||'').length>=2?'<div style="font-size:12px;color:#9CA3AF;padding:6px">Sin resultados</div>':'');
+}
+function svcAAgregar(id){
+  if(svcA.equipo.some(function(e){return Number(e.personaId)===Number(id);})) return;
+  svcA.equipo.push({personaId:Number(id),rol:'Colaborador/a'}); svcRenderArea();
+  var i=document.getElementById('svca-q'); if(i) i.focus();
+}
+function svcAQuitar(i){ svcA.equipo.splice(i,1); svcRenderArea(); }
+async function svcGuardarArea(){
+  if(!svcA) return;
+  if(!svcPuedeEditar()){ alert('No tenés permiso para editar Áreas de servicio.'); return; }
+  var s=svcA, nombre=(s.nombre||'').trim();
+  if(!nombre){ alert('Ingresá el Nombre'); return; }
+  var dup=svcAreas().some(function(x){return Number(x.id)!==Number(s.id)&&normName(x.nombre)===normName(nombre)&&Number(x.propositoId||0)===Number(s.propositoId||0);});
+  if(dup){ alert('Ya existe un área con ese nombre en el mismo Propósito.'); return; }
+  var btn=document.getElementById('svca-ok'); if(btn) btn.disabled=true;
+  var equipo=[], vistos={};
+  s.equipo.forEach(function(e){ if(vistos[e.personaId]) return; vistos[e.personaId]=1; equipo.push({personaId:Number(e.personaId),rol:SVC_ROLES.includes(e.rol)?e.rol:'Colaborador/a',_ts:Date.now()}); });
+  var lista=svcAreas(), reg=s.id?lista.find(function(x){return Number(x.id)===Number(s.id);}):null, snap=null, nuevo=null;
+  if(reg){ snap=JSON.parse(JSON.stringify(reg)); Object.assign(reg,{tipo:s.tipo,propositoId:s.propositoId||null,nombre:nombre,estado:s.estado,equipo:equipo,_ts:Date.now()}); }
+  else { nuevo={id:Date.now(),tipo:s.tipo,propositoId:s.propositoId||null,nombre:nombre,estado:s.estado,equipo:equipo,_ts:Date.now()}; lista.push(nuevo); }
+  try{
+    await saveK(SK.areasServicio,S.areasServicio);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    if(nuevo) S.areasServicio=S.areasServicio.filter(function(x){return x!==nuevo;});
+    else if(reg&&snap){ Object.keys(reg).forEach(function(k){delete reg[k];}); Object.assign(reg,snap); }
+    try{ await saveK(SK.areasServicio,S.areasServicio); }catch(e2){}
+    if(btn) btn.disabled=false;
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  ministerioCloseForm(); ministerioRenderList(); showToast('✅ Guardado','#16A34A');
+}
+async function svcEliminarArea(id){
+  if(!svcPuedeEditar()){ alert('No tenés permiso para eliminar Áreas de servicio.'); return; }
+  var a=svcAreas().find(function(x){return Number(x.id)===Number(id);}); if(!a) return;
+  if(!confirm('¿Eliminar "'+a.nombre+'" y su equipo? Esta acción no se puede deshacer.')) return;
+  var antes=S.areasServicio.slice();
+  S.areasServicio=S.areasServicio.filter(function(x){return Number(x.id)!==Number(id);});
+  addTombstone(SK.areasServicio,id);
+  try{
+    await saveK(SK.areasServicio,S.areasServicio);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    ministerioRenderList(); showToast('✅ Eliminado','#16A34A');
+  }catch(e){
+    S.areasServicio=antes; svcQuitarTombstone(SK.areasServicio,id);
+    try{ await saveK(SK.areasServicio,S.areasServicio); }catch(e2){}
+    alert('No se pudo eliminar. Verificá tu conexión.');
+  }
+}
+
+// ── Migración única (manual, solo Super Admin): formato viejo → Propósito + Áreas ──
+function svcPlanMigracion(){
+  var plan=[];
+  (S.ministerios||[]).forEach(function(m){
+    if(!svcEsLegacy(m)) return;
+    var equipo=[], vistos={};
+    (m.coordinadorIds||[]).forEach(function(i){ i=Number(i); if(vistos[i]) return; vistos[i]=1; equipo.push({personaId:i,rol:'Coordinador/a'}); });
+    (m.colaboradorIds||[]).forEach(function(i){ i=Number(i); if(vistos[i]) return; vistos[i]=1; equipo.push({personaId:i,rol:'Colaborador/a'}); });
+    var nombreArea=(m.area||'').trim()||(equipo.length?'General':'');
+    plan.push({prop:m,nombreArea:nombreArea,equipo:equipo});
+  });
+  return plan;
+}
+async function svcMigrar(){
+  if(!isSuperAdmin()){ alert('Solo el Super Admin puede hacer esta migración.'); return; }
+  var plan=svcPlanMigracion(); if(!plan.length){ alert('No hay nada para migrar.'); return; }
+  var txt=plan.map(function(p){ return '• '+p.prop.nombre+(p.nombreArea?' → Área "'+p.nombreArea+'" ('+p.equipo.length+' persona'+(p.equipo.length===1?'':'s')+')':' (solo se limpia el formato)'); }).join('\n');
+  if(!confirm('Se van a pasar estos Propósitos al formato nuevo:\n\n'+txt+'\n\nLos líderes no cambian. ¿Continuar?')) return;
+  var antesAreas=JSON.parse(JSON.stringify(svcAreas())), antesMin=JSON.parse(JSON.stringify(S.ministerios));
+  // 1) crear las Áreas (idempotente: si ya existe la migrada de ese Propósito, no se duplica)
+  plan.forEach(function(p){
+    if(!p.nombreArea) return;
+    var id=Number(p.prop.id)*10+1;
+    if(svcAreas().some(function(a){return Number(a.migradoDe)===Number(p.prop.id)||Number(a.id)===id;})) return;
+    S.areasServicio.push({id:id,tipo:'Área de servicio',propositoId:p.prop.id,nombre:p.nombreArea,estado:'Activo',
+      equipo:p.equipo.map(function(e){return {personaId:e.personaId,rol:e.rol,_ts:Date.now()};}),migradoDe:p.prop.id,_ts:Date.now()});
+  });
+  try{
+    await saveK(SK.areasServicio,S.areasServicio);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.areasServicio=antesAreas; try{ await saveK(SK.areasServicio,S.areasServicio); }catch(e2){}
+    alert('No se pudo guardar las Áreas en la nube. No se cambió nada. Verificá tu conexión.');
+    return;
+  }
+  // 2) recién con las Áreas ya en la nube se limpian los campos viejos del Propósito
+  plan.forEach(function(p){ delete p.prop.area; delete p.prop.coordinadorIds; delete p.prop.colaboradorIds; p.prop._ts=Date.now(); });
+  try{
+    await saveK(SK.ministerios,S.ministerios);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.ministerios=antesMin; try{ await saveK(SK.ministerios,S.ministerios); }catch(e2){}
+    alert('Las Áreas se crearon, pero no se pudo limpiar el formato viejo. Verificá tu conexión y volvé a tocar "Pasar a Áreas de servicio" (no se duplica nada).');
+    ministerioRenderList(); return;
+  }
+  ministerioRenderList();
+  showToast('✅ Migración lista','#16A34A');
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -21502,7 +21736,7 @@ function exportMiembrosExcel(){
   }
   if(fRol)   members=members.filter(m=>(m.roles||[]).includes(fRol));
   if(fCond)  members=members.filter(m=>m.condicion===fCond);
-  if(fEstado==='Activo') members=members.filter(m=>m.estado!=='Baja'&&m.condicion!=='Historico');
+  if(fEstado==='Participante'||fEstado==='Comprometido') members=members.filter(m=>categoriaDe(m)===fEstado);
   else if(fEstado==='Baja') members=members.filter(m=>m.estado==='Baja'||m.condicion==='Historico');
 
   const rows=members.map(m=>{

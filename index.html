@@ -3984,7 +3984,56 @@ function condicionAnteriorDe(m){
 function saCondicionBadgeM(m){
   var esHist=m&&(m.condicion==='Historico'||m.estado==='Baja');
   if(!esHist) return saCondicionBadge(m&&m.condicion);
-  return saCondicionBadge('Histórico')+'<div style="font-size:11px;color:#6B7280;margin-top:2px;white-space:nowrap">antes: '+condicionAnteriorDe(m)+'</div>';
+  var ant=condicionAnteriorDe(m);
+  return saCondicionBadge('Historico')+'<div style="font-size:11px;color:#6B7280;margin-top:2px;white-space:nowrap">antes: '+(ant==='sin registro'?ant:etqCond(ant))+'</div>';
+}
+// ── Etiquetas editables (Config → Etiquetas): solo cambian el NOMBRE que se ve; los valores guardados no se tocan ──
+var ETQ_DEF={'cond:todas':'Todas las condiciones','cond:Miembro':'Miembro','cond:Asistente Bautizado':'Concurrente Bautizado','cond:Asistente NO Bautizado':'Concurrente No Bautizado','cond:Historico':'Histórico',
+  'cat:todas':'Todas las Categorías','cat:Participante':'Asistente','cat:Comprometido':'Comprometido','cat:Historico':'Histórico'};
+function etq(k){ var e=S.homeConfig&&S.homeConfig.etiquetas; var v=e&&e[k]; return (typeof v==='string'&&v.trim())?v.trim():(ETQ_DEF[k]||k); }
+function etqCond(c){ return ETQ_DEF['cond:'+c]!==undefined?etq('cond:'+c):(c||'—'); }
+function etqCat(c){ return etq('cat:'+(c==='Histórico'?'Historico':c)); }
+function etqAplicarSelects(){
+  function aplicar(id,fn){ var el=document.getElementById(id); if(!el) return; Array.prototype.forEach.call(el.options,function(o){ var t=fn(o.value); if(t) o.textContent=t; }); }
+  var cond=function(v){ return v===''?etq('cond:todas'):(ETQ_DEF['cond:'+v]!==undefined?etq('cond:'+v):null); };
+  aplicar('sa-mfil-condicion',cond);
+  aplicar('sa-mf-condicion',function(v){ return v===''?null:(ETQ_DEF['cond:'+v]!==undefined?etq('cond:'+v):null); });
+  aplicar('nv-promote-select',function(v){ if(v==='Miembro') return '⭐ Promover a '+etq('cond:Miembro'); if(v==='Asistente Bautizado'||v==='Asistente NO Bautizado') return '✅ Promover a '+etq('cond:'+v); return null; });
+  aplicar('sa-mfil-estado',function(v){ return v===''?etq('cat:todas'):v==='Participante'?etq('cat:Participante'):v==='Comprometido'?etq('cat:Comprometido'):v==='Baja'?etq('cat:Historico'):null; });
+}
+function cfgRenderEtiquetas(wrap){
+  var grupos=[['Condiciones (filtro y fichas de Rebaños)',['cond:todas','cond:Miembro','cond:Asistente Bautizado','cond:Asistente NO Bautizado','cond:Historico']],
+              ['Categorías (filtro y ficha de Rebaños)',['cat:todas','cat:Participante','cat:Comprometido','cat:Historico']]];
+  var h='<div style="font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:6px">🏷️ Etiquetas</div>'+
+    '<div style="font-size:12px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#F9FAFB;border-radius:8px">Acá cambiás cómo se <strong>llaman</strong> las Condiciones y Categorías en pantalla. Los datos de las personas no se modifican y las reglas siguen siendo las mismas. Dejá un campo vacío para volver al nombre original.</div>';
+  grupos.forEach(function(g){
+    h+='<div class="card" style="margin-bottom:.75rem"><div style="font-weight:700;color:#1F4E79;font-size:13px;margin-bottom:8px">'+g[0]+'</div>';
+    g[1].forEach(function(k){
+      var cur=(S.homeConfig&&S.homeConfig.etiquetas&&S.homeConfig.etiquetas[k])||'';
+      h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="flex:1;font-size:12.5px;color:#6B7280">'+svcEsc(ETQ_DEF[k])+'</div><input type="text" class="etq-inp" data-k="'+svcEsc(k)+'" maxlength="40" value="'+svcEsc(cur)+'" placeholder="'+svcEsc(ETQ_DEF[k])+'" style="flex:1"></div>';
+    });
+    h+='</div>';
+  });
+  h+='<button class="btn btn-primary" onclick="cfgSaveEtiquetas()">💾 Guardar</button>';
+  wrap.innerHTML=h;
+}
+async function cfgSaveEtiquetas(){
+  if(!isSuperAdmin()) return;
+  var et={};
+  document.querySelectorAll('.etq-inp').forEach(function(i){ var v=(i.value||'').trim(); if(v&&v!==ETQ_DEF[i.getAttribute('data-k')]) et[i.getAttribute('data-k')]=v; });
+  var snapshot=JSON.stringify(S.homeConfig||{});
+  S.homeConfig=Object.assign({},S.homeConfig||{},{etiquetas:et,_ts:Date.now()});
+  try{
+    await saveK(SK.homeConfig,S.homeConfig);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.homeConfig=JSON.parse(snapshot);
+    try{ await saveK(SK.homeConfig,S.homeConfig); }catch(e2){}
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  etqAplicarSelects();
+  showToast('✅ Etiquetas guardadas','#16A34A');
 }
 function saCondicionBadge(condicion){
   const map={
@@ -3995,7 +4044,7 @@ function saCondicionBadge(condicion){
     'Nuevo': {bg:'#FEF3C7',color:'#92400E'},
   };
   const s=map[condicion]||{bg:'#F3F4F6',color:'#6B7280'};
-  return `<span style="background:${s.bg};color:${s.color};font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;white-space:nowrap">${condicion||'—'}</span>`;
+  return `<span style="background:${s.bg};color:${s.color};font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;white-space:nowrap">${etqCond(condicion)}</span>`;
 }
 
 function saShowActualizarQR(){
@@ -4250,9 +4299,10 @@ async function saSetCategoria(memberId,valor){
     saShowDetail(memberId,null); return;
   }
   renderMiembrosStandalone();
-  showToast('✅ Categoría: '+(valor||'Automática'),'#16A34A');
+  showToast('✅ Categoría: '+(valor?etqCat(valor):'Automática'),'#16A34A');
 }
 function renderMiembrosStandalone(){
+  etqAplicarSelects();
   // Populate role filter dynamically from S.roles
   const rolFilter=document.getElementById('sa-mfil-rol');
   if(rolFilter&&rolFilter.options.length<=1){
@@ -4465,7 +4515,7 @@ function saShowDetail(id,event){
     saDetailLabel('Grupo', g?g.name:'<span style="color:#F59E0B">Sin grupo asignado</span>')
     + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Condición</div>${saCondicionBadgeM(m)}</div>`
     + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Estado</div><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></div>`
-    + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Categoría</div>${categoriaDe(m)==='Histórico'?'<span class="badge b-muted">Histórico</span>':(puedeCambiarCategoria()?`<select onchange="saSetCategoria(${m.id},this.value)" style="font-size:13px"><option value=""${!m.categoria?' selected':''}>Automática (${categoriaPorRegla(m)||'Participante'})</option><option${(m.categoria==='Participante'||m.categoria==='Asistente')?' selected':''}>Participante</option><option${m.categoria==='Comprometido'?' selected':''}>Comprometido</option></select>`:'<span class="badge b-ok">'+categoriaDe(m)+'</span>')}${(!m.categoria&&categoriaMotivoRegla(m))?'<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+categoriaMotivoRegla(m)+'</div>':''}</div>`
+    + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Categoría</div>${categoriaDe(m)==='Histórico'?'<span class="badge b-muted">'+etq('cat:Historico')+'</span>':(puedeCambiarCategoria()?`<select onchange="saSetCategoria(${m.id},this.value)" style="font-size:13px"><option value=""${!m.categoria?' selected':''}>Automática (${etqCat(categoriaPorRegla(m)||'Participante')})</option><option value="Participante"${(m.categoria==='Participante'||m.categoria==='Asistente')?' selected':''}>${etq('cat:Participante')}</option><option value="Comprometido"${m.categoria==='Comprometido'?' selected':''}>${etq('cat:Comprometido')}</option></select>`:'<span class="badge b-ok">'+etqCat(categoriaDe(m))+'</span>')}${(!m.categoria&&categoriaMotivoRegla(m))?'<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+categoriaMotivoRegla(m)+'</div>':''}</div>`
     + saDetailLabel('Fecha de ingreso', saFmtDate(m.fechaIngreso)||'—')
     + ((m.roles||[]).length?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Función</div>${roleChips(m.roles,m.id)}</div>`:'')
     + (m.estado==='Baja'?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#DC2626;margin-bottom:4px">Fecha de baja</div><div style="font-size:13px;font-weight:500;color:#DC2626">${saFmtDate(m.fechaBaja||'')}</div></div>`:'')
@@ -4638,6 +4688,7 @@ function saToggleGrupoExtra(gid,el){
 }
 
 function saOpenNewMember(){
+  etqAplicarSelects();
   saEditingMemberId=null;
   document.getElementById('sa-mf-title').textContent='Nueva persona';
   ['sa-mf-nombre','sa-mf-apellido','sa-mf-tel','sa-mf-dir'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -4663,6 +4714,7 @@ function saOpenNewMember(){
 let saOriginalEstado='Activo';
 
 function saEditMember(id){
+  etqAplicarSelects();
   const m=S.members.find(x=>Number(x.id)===Number(id));
   if(!m){alert('Miembro no encontrado (id='+id+')');return;}
   saEditingMemberId=id;
@@ -4899,6 +4951,7 @@ function buildConfigHTML(){
       <button class="btn btn-sm" id="cfg-tab-campanas" onclick="configTab('campanas',this)">🌳 Campañas</button>
       <button class="btn btn-sm" id="cfg-tab-modulos" onclick="configTab('modulos',this)">📱 Módulos</button>
       <button class="btn btn-sm" id="cfg-tab-home" onclick="configTab('home',this)">🏠 Home</button>
+      <button class="btn btn-sm" id="cfg-tab-etiquetas" onclick="configTab('etiquetas',this)">🏷️ Etiquetas</button>
       <button class="btn btn-sm" id="cfg-tab-usuarios" onclick="configTab('usuarios',this)">👤 Usuarios</button>
       <button class="btn btn-sm" id="cfg-tab-roles" onclick="configTab('roles',this)">🎭 Funciones</button>
       <button class="btn btn-sm" id="cfg-tab-permisos" onclick="configTab('permisos',this)">🔐 Permisos</button>
@@ -4962,6 +5015,8 @@ function configTab(sub, btn){
     cfgRenderModulos(wrap);
   } else if(sub==='home'){
     cfgRenderHomeConfig(wrap);
+  } else if(sub==='etiquetas'){
+    cfgRenderEtiquetas(wrap);
   } else if(sub==='usuarios'){
     wrap.innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
@@ -5161,7 +5216,7 @@ async function cfgSaveHomeConfig(){
   dc=Math.min(90,Math.max(1,dc)); de=Math.min(90,Math.max(1,de)); dh=Math.min(90,Math.max(1,dh));
   vc=Math.min(12,Math.max(1,vc));
   var snapshot=JSON.stringify(S.homeConfig||{});
-  S.homeConfig={diasCumples:dc,diasEspeciales:de,diasHabituales:dh,ventanaCargaSemanas:vc};
+  S.homeConfig=Object.assign({},S.homeConfig||{},{diasCumples:dc,diasEspeciales:de,diasHabituales:dh,ventanaCargaSemanas:vc});
   await saveK(SK.homeConfig,S.homeConfig);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -15881,6 +15936,7 @@ function nvOpenPromote(id){
     if(subSelect) subSelect.value=m.subEstado||'Ingresado';
     if(subInfo) subInfo.textContent=m.contactadoPor?`Contactado por ${m.contactadoPor}`:'';
   }
+  etqAplicarSelects();
   const selCond=document.getElementById('nv-promote-select');
   if(selCond) selCond.value=(m.condicion==='Nuevo')?'Nuevo':(m.condicion||'Nuevo');
   // Restrict condition buttons and seguimiento to Pastores/SuperAdmin

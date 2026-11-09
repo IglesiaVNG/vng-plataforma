@@ -718,7 +718,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zza';
+const APP_VERSION = '2026-08-24-zzc';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -4842,13 +4842,45 @@ function saComentariosHTML(m){
   if(!saComentariosPuedeVer()) return '';
   var coms=(m.comentarios||[]).slice().sort(function(a,b){return (b.ts||0)-(a.ts||0);});
   var lista=coms.length?coms.map(function(c){
-    return '<div style="padding:7px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #1F4E79"><div style="color:#1F2937;font-size:13px;margin-bottom:2px;white-space:pre-wrap;word-break:break-word">'+svcEsc(c.texto)+'</div>'+
+    var borrar=comentarioBotonBorrar(m,c);
+    return '<div style="padding:7px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #1F4E79">'+borrar+'<div style="color:#1F2937;font-size:13px;margin-bottom:2px;white-space:pre-wrap;word-break:break-word">'+svcEsc(c.texto)+'</div>'+
       '<div style="font-size:11px;color:#9CA3AF">'+svcEsc(c.autor||'—')+' · '+(c.ts?new Date(c.ts).toLocaleString('es-AR'):'—')+'</div></div>';
   }).join(''):'<div style="color:#9CA3AF;font-size:13px;padding:4px 0">Sin comentarios aún.</div>';
   var alta=saComentariosPuedeEscribir()?
     '<div style="margin-top:8px"><textarea id="sa-com-txt-'+m.id+'" placeholder="Agregar comentario…" style="width:100%;box-sizing:border-box;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;min-height:60px;resize:vertical"></textarea>'+
     '<div style="text-align:right;margin-top:6px"><button class="btn btn-primary btn-sm" id="sa-com-btn-'+m.id+'" onclick="saGuardarComentario('+m.id+')">Guardar comentario</button></div></div>':'';
   return '<div style="padding:.5rem 0"><div style="max-height:260px;overflow-y:auto">'+lista+'</div>'+alta+'</div>';
+}
+// 🗑 para eliminar un comentario (Rebaños, Nuevos Contactos y Campañas) — SOLO Super Admin
+function comentarioBotonBorrar(m,c){
+  if(!isSuperAdmin()||!c||!c.ts) return '';
+  return '<button class="btn btn-sm" title="Eliminar comentario (solo Super Admin)" style="float:right;padding:1px 6px;font-size:12px;color:#B91C1C;background:transparent;border:none;cursor:pointer" onclick="saEliminarComentario('+Number(m.id)+','+Number(c.ts)+')">🗑</button>';
+}
+// Eliminar un comentario de la ficha — SOLO Super Admin. Copy-on-write: si la nube falla, vuelve el array anterior.
+async function saEliminarComentario(memberId, ts){
+  if(!isSuperAdmin()){ alert('Solo el Super Admin puede eliminar comentarios.'); return; }
+  var m=S.members.find(function(x){return Number(x.id)===Number(memberId);}); if(!m) return;
+  var antes=m.comentarios||[], idx=antes.findIndex(function(c){return Number(c.ts)===Number(ts);});
+  if(idx<0){ alert('No se encontró el comentario (puede que ya se haya eliminado).'); return; }
+  var c=antes[idx], txt=String(c.texto||'');
+  if(!confirm('¿Eliminar este comentario?\n\n"'+(txt.length>120?txt.slice(0,120)+'…':txt)+'"\n— '+(c.autor||'—')+'\n\nEsta acción no se puede deshacer.')) return;
+  var prevTs=m._ts;
+  m.comentarios=antes.filter(function(_x,i){return i!==idx;}); m._ts=Date.now();
+  try{
+    await saveK(SK.members,S.members);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    m.comentarios=antes; if(prevTs===undefined) delete m._ts; else m._ts=prevTs;
+    try{ await saveK(SK.members,S.members); }catch(e2){}
+    alert('No se pudo eliminar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  // Refrescar la vista que esté abierta (cada render se saltea solo si su lista no está en pantalla)
+  var cont=document.getElementById('sa-detail-comentarios'); if(cont) cont.innerHTML=saComentariosHTML(m);
+  try{ nvRenderComentarios(m); }catch(_e){}
+  try{ nvRenderComentariosContactar(m); }catch(_e){}
+  try{ nvCampRenderComentarios(m); }catch(_e){}
+  showToast('🗑 Comentario eliminado','#16A34A');
 }
 async function saGuardarComentario(memberId){
   if(!saComentariosPuedeEscribir()){ alert('No tenés permiso para escribir comentarios.'); return; }
@@ -16479,7 +16511,7 @@ function nvRenderComentarios(m){
     lista.innerHTML='<div style="color:#9CA3AF;padding:4px 0">Sin comentarios aún.</div>';
   } else {
     lista.innerHTML=coms.map(c=>`
-      <div style="padding:6px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #1F4E79">
+      <div style="padding:6px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #1F4E79">${comentarioBotonBorrar(m,c)}
         <div style="color:#1F2937;margin-bottom:2px">${c.texto}</div>
         <div style="font-size:11px;color:#9CA3AF">${c.autor} · ${new Date(c.ts).toLocaleString('es-AR')}</div>
       </div>`).join('');
@@ -16586,7 +16618,7 @@ function nvRenderComentariosContactar(m){
     lista.innerHTML='<div style="color:#9CA3AF;padding:4px 0">Sin comentarios aún — el primero marca el contacto como realizado.</div>';
   } else {
     lista.innerHTML=coms.map(c=>`
-      <div style="padding:6px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #1D4ED8">
+      <div style="padding:6px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #1D4ED8">${comentarioBotonBorrar(m,c)}
         <div style="color:#1F2937;margin-bottom:2px">${c.texto}</div>
         <div style="font-size:11px;color:#9CA3AF">${c.autor} · ${new Date(c.ts).toLocaleString('es-AR')}</div>
       </div>`).join('');
@@ -17508,7 +17540,7 @@ function nvCampRenderComentarios(m){
   if(!lista) return;
   var coms=(m.comentarios||[]).slice().sort(function(a,b){return b.ts-a.ts;});
   lista.innerHTML=coms.length?coms.map(function(c){
-    return '<div style="padding:6px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #7C3AED">'
+    return '<div style="padding:6px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #7C3AED">'+comentarioBotonBorrar(m,c)
       +'<div style="color:#1F2937;margin-bottom:2px">'+c.texto+'</div>'
       +'<div style="font-size:11px;color:#9CA3AF">'+c.autor+' · '+new Date(c.ts).toLocaleString('es-AR')+'</div></div>';
   }).join(''):'<div style="color:#9CA3AF;padding:4px 0">Sin comentarios aún</div>';

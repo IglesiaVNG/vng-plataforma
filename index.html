@@ -718,7 +718,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzc';
+const APP_VERSION = '2026-08-24-zzd';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -4610,12 +4610,14 @@ function categoriaMotivoRegla(m){
   if(!m) return null;
   var id=Number(m.id), r=[];
   if((m.roles||[]).indexOf('pastor')>=0) r.push('Pastor');
+  // Solo cuentan asignaciones ACTIVAS (mismo criterio que las Funciones automáticas)
   if((S.ministerios||[]).some(function(x){
+    if(x.estado==='Inactivo') return false;
     return (x.liderIds||[]).map(Number).includes(id)||(x.coordinadorIds||[]).map(Number).includes(id)||(x.colaboradorIds||[]).map(Number).includes(id);
   })) r.push('Propósito');
-  if((S.groups||[]).some(function(g){return Number(g.facId)===id||Number(g.facId2)===id;})) r.push('Facilitador');
-  if((S.ngComunidades||[]).some(function(c){return (c.liderIds||[]).map(Number).includes(id)||(c.colaboradorIds||[]).map(Number).includes(id);})) r.push('Nuevas Generaciones');
-  if((S.areasServicio||[]).some(function(a){return (a.equipo||[]).some(function(e){return Number(e.personaId)===id&&(e.rol==='Coordinador/a'||e.rol==='Colaborador/a');});})) r.push('Área de servicio');
+  if((S.groups||[]).some(function(g){return g.estado!=='Inactivo'&&(Number(g.facId)===id||Number(g.facId2)===id);})) r.push('Facilitador');
+  if((S.ngComunidades||[]).some(function(c){return c.estado!=='Inactivo'&&((c.liderIds||[]).map(Number).includes(id)||(c.colaboradorIds||[]).map(Number).includes(id));})) r.push('Nuevas Generaciones');
+  if((S.areasServicio||[]).some(function(a){return svcAreaActiva(a)&&(a.equipo||[]).some(function(e){return Number(e.personaId)===id&&(e.rol==='Coordinador/a'||e.rol==='Colaborador/a');});})) r.push('Área de servicio');
   return r.length?r.join(', '):null;
 }
 function categoriaPorRegla(m){ return categoriaMotivoRegla(m)?'Comprometido':null; }
@@ -5812,12 +5814,18 @@ async function ngToggleComunidadActiva(id){
   var prevEstado=ng.estado;
   var prevTs=ng._ts;
   var nuevoEstado=ng.estado==='Inactivo'?'Activo':'Inactivo';
+  if(nuevoEstado==='Inactivo'){
+    if(!inactConfirmar('Se está dejando Inactiva la Comunidad "'+ng.name+'".',['También quedarán desafectadas las personas vinculadas:',
+      inactLineaPersonas('Líderes',ng.liderIds||[]),inactLineaPersonas('Colaboradores/as',ng.colaboradorIds||[])])) return;
+  }
+  var prevLid=(ng.liderIds||[]).slice(), prevCol=(ng.colaboradorIds||[]).slice(), teniaLid='liderIds' in ng, teniaCol='colaboradorIds' in ng;
   // Una Comunidad desactivada no cuenta como asignación: sus líderes/colaboradores pierden la Función
   // (salvo que estén en otra Comunidad activa) y la recuperan solos al reactivarla.
   var involucradosFn=(ng.liderIds||[]).concat(ng.colaboradorIds||[]);
   var snapFunciones=funcionesAutoSnapshot(involucradosFn);
   funcionesAutoAdoptar(involucradosFn);
   ng.estado=nuevoEstado;
+  if(nuevoEstado==='Inactivo'){ ng.liderIds=[]; ng.colaboradorIds=[]; }
   ng._ts=Date.now();
   funcionesAutoReconciliar(involucradosFn);
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
@@ -5833,6 +5841,8 @@ async function ngToggleComunidadActiva(id){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     ng.estado=prevEstado;
+    if(teniaLid) ng.liderIds=prevLid; else delete ng.liderIds;
+    if(teniaCol) ng.colaboradorIds=prevCol; else delete ng.colaboradorIds;
     ng._ts=prevTs;
     funcionesAutoRevertir(snapFunciones);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
@@ -5939,6 +5949,11 @@ async function ngSaveComunidad(){
   var liderIds=[...document.querySelectorAll('.ng-lider-cb:checked')].map(function(cb){return parseInt(cb.value);});
   var colaboradorIds=[...document.querySelectorAll('.ng-colab-cb:checked')].map(function(cb){return parseInt(cb.value);});
   var estado=document.getElementById('ng-f-activa')?.checked?'Activo':'Inactivo';
+  if(estado==='Inactivo'&&(liderIds.length||colaboradorIds.length)){
+    if(!inactConfirmar('Se está dejando Inactiva la Comunidad "'+nombre+'".',['También quedarán desafectadas las personas vinculadas:',
+      inactLineaPersonas('Líderes',liderIds),inactLineaPersonas('Colaboradores/as',colaboradorIds)])) return;
+    liderIds=[]; colaboradorIds=[];
+  }
 
   // Snapshot para poder revertir todo (Comunidad + roles de miembros) si falla la nube
   var snapshotNgComunidades=JSON.parse(JSON.stringify(S.ngComunidades));
@@ -6067,6 +6082,43 @@ function svcCerrarGestion(){
   var ov=document.getElementById('svc-gestion-overlay'); if(ov) ov.remove();
   try{ renderMiembrosServicio(); }catch(_e){}
 }
+// ── Inactivar = desafectar ──
+// Al pasar a Inactivo un Área/Proyecto, Propósito, Grupo de Vida o Comunidad NG, las personas vinculadas
+// dejan de figurar (equipo, líderes, facilitadores; en GdV también los integrantes pasan a Sin Asignar).
+// Al reactivar NO se restauran: se reasignan a mano. La historia queda en el registro de Servicio.
+function inactNombres(ids){
+  var vistos={}, out=[];
+  (ids||[]).forEach(function(id){ if(id==null||id===''||vistos[id]) return; vistos[id]=1; out.push(svcNombre(id)); });
+  return out;
+}
+function inactConfirmar(titulo, lineas){
+  return confirm(titulo+'\n\n'+lineas.filter(Boolean).join('\n')+(lineas.filter(Boolean).length?'\n\n':'')+
+    'Si se reactiva, deberá reasignar a las personas involucradas en cada Función.\n\n¿Continuar?');
+}
+function inactLineaPersonas(etiqueta, ids){
+  var n=inactNombres(ids); if(!n.length) return '';
+  return '• '+etiqueta+' ('+n.length+'): '+(n.length>8?n.slice(0,8).join(', ')+' y '+(n.length-8)+' más':n.join(', '));
+}
+// GdV: integrantes ACTIVOS de un Grupo pasan a Sin Asignar. Devuelve la foto para revertir.
+function gdvDesasignarIntegrantes(gid){
+  var fotos=[];
+  (S.members||[]).forEach(function(m){
+    if(m.estado==='Baja') return;
+    var enPrincipal=Number(m.grupoId)===Number(gid), enLista=(m.grupoIds||[]).map(Number).includes(Number(gid));
+    if(!enPrincipal&&!enLista) return;
+    fotos.push({m:m,tenia:{grupoId:Object.prototype.hasOwnProperty.call(m,'grupoId'),grupoIds:Object.prototype.hasOwnProperty.call(m,'grupoIds')},grupoId:m.grupoId,grupoIds:m.grupoIds,_ts:m._ts});
+    if(enLista) m.grupoIds=(m.grupoIds||[]).filter(function(x){return Number(x)!==Number(gid);});
+    if(enPrincipal) m.grupoId=(m.grupoIds&&m.grupoIds.length)?m.grupoIds[0]:null;
+    m._ts=Date.now();
+  });
+  return fotos;
+}
+function gdvRevertirIntegrantes(fotos){
+  (fotos||[]).forEach(function(f){
+    ['grupoId','grupoIds'].forEach(function(k){ if(f.tenia[k]) f.m[k]=f[k]; else delete f.m[k]; });
+    if(f._ts===undefined) delete f.m._ts; else f.m._ts=f._ts;
+  });
+}
 function svcPersona(id){ return (S.members||[]).find(function(x){return Number(x.id)===Number(id);}); }
 function svcNombre(id){ var m=svcPersona(id); return m?fullName(m):'(persona eliminada)'; }
 function svcAreas(){ if(!S.areasServicio) S.areasServicio=[]; return S.areasServicio; }
@@ -6151,7 +6203,7 @@ function svcFilaArea(a){
   return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #F3F4F6">'+
     '<div style="min-width:0"><div style="font-size:13px;font-weight:600;color:#374151">'+svcEsc(a.nombre)+(a.tipo==='Proyecto ministerial'?' <span style="font-size:10px;background:#FEF3C7;color:#92400E;border-radius:99px;padding:1px 7px">Proyecto</span>':'')+(a.estado==='Inactivo'?' <span style="font-size:10px;background:#F3F4F6;color:#6B7280;border-radius:99px;padding:1px 7px">Inactiva</span>':'')+'</div>'+
     '<div style="font-size:12px;color:#6B7280">'+(coords?'Coordina: '+svcEsc(coords)+' · ':'<span style="color:#B45309">Sin coordinador/a</span> · ')+n+' persona'+(n===1?'':'s')+'</div></div>'+
-    (svcPuedeEditar()?'<div style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-sm" onclick="svcAbrirArea('+a.id+')">✏️</button><button onclick="svcEliminarArea('+a.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:13px">🗑️</button></div>':'')+
+    (svcPuedeEditar()?'<div style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-sm" title="Editar / Transferir a otro Propósito" onclick="svcAbrirArea('+a.id+')">✏️</button><button onclick="svcEliminarArea('+a.id+')" style="background:none;border:1px solid #FECACA;border-radius:6px;cursor:pointer;padding:3px 8px;color:#DC2626;font-size:13px">🗑️</button></div>':'')+
   '</div>';
 }
 function ministerioRenderList(){
@@ -6231,8 +6283,19 @@ async function ministerioSaveMinisterio(){
   if(!nombre){ alert('Ingresá el Nombre del Propósito'); return; }
   var dup=(S.ministerios||[]).some(function(x){return Number(x.id)!==Number(svcP.id)&&normName(x.nombre)===normName(nombre);});
   if(dup){ alert('Ya existe un Propósito con ese nombre.'); return; }
+  var estado=svcP.estado, liderIds=svcP.liderIds.slice();
+  if(estado==='Inactivo'){
+    var actP=svcP.id?svcAreas().filter(function(a){return Number(a.propositoId)===Number(svcP.id)&&a.estado!=='Inactivo';}):[];
+    if(actP.length){
+      alert('No se puede dejar Inactivo el Propósito "'+nombre+'": tiene '+actP.length+' Área'+(actP.length>1?'s':'')+'/Proyecto'+(actP.length>1?'s':'')+' activo'+(actP.length>1?'s':'')+':\n\n'+actP.map(function(a){return '• '+a.nombre;}).join('\n')+
+        '\n\nTransferilos a otro Propósito (✏️ en cada uno → Propósito) o dejalos Inactivos primero.'); return;
+    }
+    if(liderIds.length){
+      if(!inactConfirmar('Se está dejando Inactivo el Propósito "'+nombre+'".',['También quedarán desafectadas las personas vinculadas:',inactLineaPersonas('Líderes',liderIds)])) return;
+      liderIds=[];
+    }
+  }
   var btn=document.getElementById('svcp-ok'); if(btn) btn.disabled=true;
-  var liderIds=svcP.liderIds.slice(), estado=svcP.estado;
   var esNuevo=!svcP.id, min=null, snapshot=null, nuevoRef=null;
   var involucrados=liderIds.slice();
   if(!esNuevo){
@@ -6310,10 +6373,11 @@ function svcRenderArea(){
   var p=s.propositoId?(S.ministerios||[]).find(function(x){return Number(x.id)===Number(s.propositoId);}):null;
   var tit=(s.id?'Editar ':'Nueva ')+(s.tipo==='Proyecto ministerial'?'Proyecto ministerial':'Área de servicio');
   var selProp='';
-  if(s.id&&!s.propositoId){
-    var props=(S.ministerios||[]).slice().sort(function(a,b){return String(a.nombre).localeCompare(String(b.nombre));});
-    selProp='<div style="margin-bottom:12px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Propósito <span style="color:#9CA3AF">(opcional)</span></label>'+
-      '<select onchange="svcA.propositoId=this.value?Number(this.value):null;svcRenderArea()" style="width:100%"><option value="">— Independiente —</option>'+props.map(function(q){return '<option value="'+q.id+'">'+svcEsc(q.nombre)+'</option>';}).join('')+'</select></div>';
+  if(s.id){
+    // Transferencia: el Área/Proyecto puede pasar a otro Propósito (solo Propósitos activos, o el actual)
+    var props=(S.ministerios||[]).filter(function(q){return q.estado!=='Inactivo'||Number(q.id)===Number(s.propositoId);}).sort(function(a,b){return String(a.nombre).localeCompare(String(b.nombre));});
+    selProp='<div style="margin-bottom:12px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Propósito <span style="color:#9CA3AF">(cambialo para transferir '+(s.tipo==='Proyecto ministerial'?'este Proyecto':'esta Área')+' a otro Propósito)</span></label>'+
+      '<select onchange="svcA.propositoId=this.value?Number(this.value):null;svcRenderArea()" style="width:100%"><option value="">— Independiente —</option>'+props.map(function(q){return '<option value="'+q.id+'"'+(Number(q.id)===Number(s.propositoId)?' selected':'')+'>'+svcEsc(q.nombre)+(q.estado==='Inactivo'?' (inactivo)':'')+'</option>';}).join('')+'</select></div>';
   }
   var filas=s.equipo.map(function(e,i){
     return '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid #F3F4F6"><div style="flex:1;font-size:13px">'+svcEsc(svcNombre(e.personaId))+'</div>'+
@@ -6354,9 +6418,21 @@ async function svcGuardarArea(){
   if(!nombre){ alert('Ingresá el Nombre'); return; }
   var dup=svcAreas().some(function(x){return Number(x.id)!==Number(s.id)&&normName(x.nombre)===normName(nombre)&&Number(x.propositoId||0)===Number(s.propositoId||0);});
   if(dup){ alert('Ya existe un área con ese nombre en el mismo Propósito.'); return; }
+  var propDest=s.propositoId?(S.ministerios||[]).find(function(x){return Number(x.id)===Number(s.propositoId);}):null;
+  if(s.estado!=='Inactivo'&&propDest&&propDest.estado==='Inactivo'){
+    alert('El Propósito "'+propDest.nombre+'" está Inactivo. Elegí otro Propósito (transferencia) o dejá el '+(s.tipo==='Proyecto ministerial'?'Proyecto':'Área')+' Inactivo/a.'); return;
+  }
+  var desafectar=false;
+  if(s.estado==='Inactivo'&&(s.equipo||[]).length){
+    var esProy=s.tipo==='Proyecto ministerial';
+    var porRol=SVC_ROLES.map(function(r){ return inactLineaPersonas(r, s.equipo.filter(function(e){return e.rol===r;}).map(function(e){return e.personaId;})); });
+    if(!inactConfirmar('Se está dejando '+(esProy?'Inactivo el Proyecto':'Inactiva el Área')+' "'+nombre+'".',
+      ['También quedarán desafectadas las personas vinculadas:'].concat(porRol))) return;
+    desafectar=true;
+  }
   var btn=document.getElementById('svca-ok'); if(btn) btn.disabled=true;
   var equipo=[], vistos={};
-  s.equipo.forEach(function(e){ if(vistos[e.personaId]) return; vistos[e.personaId]=1; equipo.push({personaId:Number(e.personaId),rol:SVC_ROLES.includes(e.rol)?e.rol:'Colaborador/a',_ts:Date.now()}); });
+  if(!desafectar) s.equipo.forEach(function(e){ if(vistos[e.personaId]) return; vistos[e.personaId]=1; equipo.push({personaId:Number(e.personaId),rol:SVC_ROLES.includes(e.rol)?e.rol:'Colaborador/a',_ts:Date.now()}); });
   var lista=svcAreas(), reg=s.id?lista.find(function(x){return Number(x.id)===Number(s.id);}):null, snap=null, nuevo=null;
   // Coordinadores/as antes y después: su Función automática se ajusta sola
   var coordIds=svcCoordIds([reg,{equipo:equipo}]);
@@ -11475,14 +11551,22 @@ async function cfgToggleGrupoActivo(id){
   var g=(S.groups||[]).find(function(x){return Number(x.id)===Number(id);});
   if(!g) return;
   var nuevoEstado=g.estado==='Inactivo'?'Activo':'Inactivo';
-  if(!confirm((nuevoEstado==='Inactivo'?'¿Deshabilitar':'¿Habilitar')+' el Grupo "'+g.name+'"?'+(nuevoEstado==='Inactivo'?'\nSu actividad en Agenda deja de repetirse hacia adelante (el historial no se toca).':'\nSu actividad en Agenda vuelve a repetirse en Agenda.'))) return;
-  var estadoAnterior=g.estado;
+  var integrantesG=groupMembers(g.id);
+  if(nuevoEstado==='Inactivo'){
+    if(!inactConfirmar('Se está dejando Inactivo el Grupo "'+g.name+'".',[
+      'También quedarán desafectadas las personas vinculadas:',
+      inactLineaPersonas('Facilitador/a',[g.facId,g.facId2]),
+      integrantesG.length?'• Los integrantes actuales ('+integrantesG.length+') pasan a estar Sin Asignar en Grupos.':'',
+      'Su actividad en Agenda deja de repetirse hacia adelante (el historial no se toca).'])) return;
+  } else if(!confirm('¿Habilitar el Grupo "'+g.name+'"?\nSu actividad en Agenda vuelve a repetirse. Recordá asignarle facilitador/a e integrantes.')) return;
+  var estadoAnterior=g.estado, facAnt={facId:g.facId,facId2:g.facId2}, fotosInt=[];
   // Un Grupo deshabilitado no cuenta como asignación: sus facilitadores pierden la Función
   // (salvo que facilitem otro Grupo activo) y la recuperan solos al volver a habilitarlo.
   var involucradosFn=[g.facId,g.facId2];
   var snapFunciones=funcionesAutoSnapshot(involucradosFn);
   funcionesAutoAdoptar(involucradosFn);
   g.estado=nuevoEstado;
+  if(nuevoEstado==='Inactivo'){ g.facId=null; g.facId2=null; fotosInt=gdvDesasignarIntegrantes(g.id); }
   funcionesAutoReconciliar(involucradosFn);
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
   var tocoEventos=agendaSincronizarActividadOrigen('gdv',g.id,{
@@ -11496,7 +11580,8 @@ async function cfgToggleGrupoActivo(id){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    g.estado=estadoAnterior;
+    g.estado=estadoAnterior; g.facId=facAnt.facId; g.facId2=facAnt.facId2;
+    gdvRevertirIntegrantes(fotosInt);
     funcionesAutoRevertir(snapFunciones);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.groups,S.groups);
@@ -16512,8 +16597,8 @@ function nvRenderComentarios(m){
   } else {
     lista.innerHTML=coms.map(c=>`
       <div style="padding:6px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #1F4E79">${comentarioBotonBorrar(m,c)}
-        <div style="color:#1F2937;margin-bottom:2px">${c.texto}</div>
-        <div style="font-size:11px;color:#9CA3AF">${c.autor} · ${new Date(c.ts).toLocaleString('es-AR')}</div>
+        <div style="color:#1F2937;margin-bottom:2px;white-space:pre-wrap;word-break:break-word">${svcEsc(c.texto)}</div>
+        <div style="font-size:11px;color:#9CA3AF">${svcEsc(c.autor||'—')} · ${c.ts?new Date(c.ts).toLocaleString('es-AR'):'—'}</div>
       </div>`).join('');
   }
   // Show/hide input based on permission
@@ -16619,8 +16704,8 @@ function nvRenderComentariosContactar(m){
   } else {
     lista.innerHTML=coms.map(c=>`
       <div style="padding:6px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #1D4ED8">${comentarioBotonBorrar(m,c)}
-        <div style="color:#1F2937;margin-bottom:2px">${c.texto}</div>
-        <div style="font-size:11px;color:#9CA3AF">${c.autor} · ${new Date(c.ts).toLocaleString('es-AR')}</div>
+        <div style="color:#1F2937;margin-bottom:2px;white-space:pre-wrap;word-break:break-word">${svcEsc(c.texto)}</div>
+        <div style="font-size:11px;color:#9CA3AF">${svcEsc(c.autor||'—')} · ${c.ts?new Date(c.ts).toLocaleString('es-AR'):'—'}</div>
       </div>`).join('');
   }
 }
@@ -17541,8 +17626,8 @@ function nvCampRenderComentarios(m){
   var coms=(m.comentarios||[]).slice().sort(function(a,b){return b.ts-a.ts;});
   lista.innerHTML=coms.length?coms.map(function(c){
     return '<div style="padding:6px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #7C3AED">'+comentarioBotonBorrar(m,c)
-      +'<div style="color:#1F2937;margin-bottom:2px">'+c.texto+'</div>'
-      +'<div style="font-size:11px;color:#9CA3AF">'+c.autor+' · '+new Date(c.ts).toLocaleString('es-AR')+'</div></div>';
+      +'<div style="color:#1F2937;margin-bottom:2px;white-space:pre-wrap;word-break:break-word">'+svcEsc(c.texto)+'</div>'
+      +'<div style="font-size:11px;color:#9CA3AF">'+svcEsc(c.autor||'—')+' · '+(c.ts?new Date(c.ts).toLocaleString('es-AR'):'—')+'</div></div>';
   }).join(''):'<div style="color:#9CA3AF;padding:4px 0">Sin comentarios aún</div>';
 }
 async function nvCampGuardarComentario(){

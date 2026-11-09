@@ -718,7 +718,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zw';
+const APP_VERSION = '2026-08-24-zz';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -780,6 +780,7 @@ window.fbDownload().then(function(hasData) {
         S.records     = _ld('gdv_r5',            S.records     ||[]);
         S.members     = _ld('gdv_m5',            S.members     ||[]);
         S.roles       = _ld('gdv_roles5',        S.roles       ||[]);
+        try{ if(typeof window.funcionesAutoAsegurarDefs==='function') window.funcionesAutoAsegurarDefs(); }catch(_e){}
         S.discPasos      = _ld('gdv_disc_pasos',    S.discPasos      ||[]);
         S.discRecords    = _ld('gdv_disc_records',  S.discRecords    ||[]);S.discCursadas=_ld('gdv_disc_cursadas',S.discCursadas||[]);S.discInscripciones=_ld('gdv_disc_inscripciones',S.discInscripciones||[]);
         (S.discPasos||[]).forEach(function(p){ if(!p.discipuladorIds) p.discipuladorIds=p.discipuladorId?[p.discipuladorId]:[]; });
@@ -1301,6 +1302,37 @@ const DEFAULT_ROLES=[
   {id:'admin_of',     name:'Admin Orient.Fam.',color:'#BE185D',desc:'Orientación Familiar'},
 ];
 
+// Funciones automáticas con id FIJO en el código (ver FUNC_AUTO_IDS). Si alguna desaparece de
+// S.roles (ej: la borraron desde Configuración), la persona sigue teniéndola porque el
+// reconciliador se la vuelve a poner — y queda "huérfana" (sin nombre, color ni permisos).
+// Por eso se re-crean solas con el MISMO id. "Líder Propósito" no está acá: su id es generado
+// y se la reconoce por el nombre (funcLiderPropositoId).
+function funcionesAutoDefs(){
+  return [
+    {id:'facilitador',              name:'Facilitador',    color:'#059669', desc:'Lidera un Grupo de Vida'},
+    {id:'lider',                    name:'Líder',          color:'#0369A1', desc:'Liderazgo de área'},
+    {id:'colaborador1783645248659', name:'Colaborador NG', color:'#0D9488', desc:'Colabora en una Comunidad de Nuevas Generaciones (automática)'}
+  ];
+}
+// Agrega a S.roles las definiciones que falten (copy-on-write). Devuelve la lista de ids agregados.
+function funcionesAutoAsegurarDefs(){
+  var actuales=S.roles||[], faltan=funcionesAutoDefs().filter(function(d){
+    return !actuales.some(function(r){return r.id===d.id;});
+  });
+  if(faltan.length){
+    S.roles=actuales.concat(faltan.map(function(d){return Object.assign({},d);}));
+    console.warn('[FUNCIONES] Re-creadas definiciones faltantes:', faltan.map(function(d){return d.id;}).join(', '));
+  }
+  return faltan.map(function(d){return d.id;});
+}
+function esFuncionAutomatica(id){
+  try{ return funcAutoIds().includes(id); }catch(_e){ return false; }
+}
+function avisoFuncionAutomatica(id){
+  var r=(S.roles||[]).find(function(x){return x.id===id;});
+  alert('"'+(r?r.name:id)+'" es una Función automática: la tiene quien está asignado a un Grupo, Comunidad o Propósito activo, y se pierde sola al dejarlo. No se puede eliminar.\n\nPodés cambiarle el nombre, el color o la descripción con ✏️.');
+}
+
 const DEFAULT_GROUPS=[
   {id:1, name:'Equipo Ministerial',type:'Mixto',  facId:1,   dia:'',horario:''},
   {id:2, name:'Grupo 2',          type:'Hombres',facId:null, dia:'',horario:''},
@@ -1500,10 +1532,11 @@ async function initStorage(){
   var missingRoles=[
     {id:'contactar',name:'Contactar',color:'#D97706',desc:'Agrega nuevos contactos y se autoasigna seguimiento'}
   ];
+  // Re-crear Funciones automáticas que falten (antes de migratePermisos, así reciben su fila)
+  var migrated=funcionesAutoAsegurarDefs().length>0;
   // Also ensure contactar permissions are initialized if missing
   // Run permissions migration for any new keys
   await migratePermisos();
-  var migrated=false;
   missingRoles.forEach(function(nr){
     if(!S.roles.find(function(r){return r.id===nr.id;})){
       S.roles.push(nr); migrated=true;
@@ -11778,7 +11811,7 @@ function cfgRenderRoles(){
         <span class="badge b-muted" style="cursor:pointer;text-decoration:underline dotted" title="Ver miembros">${count} miembro${count!==1?'s':''}</span>
       </button>
       <button class="btn btn-sm" onclick="openRoleModal('${r.id}',cfgRenderRoles)">✏️</button>
-      <button class="btn btn-sm btn-danger" onclick="deleteRoleGlobal('${r.id}',cfgRenderRoles)">🗑</button>
+      ${esFuncionAutomatica(r.id)?'<span class="badge b-muted" title="Se asigna y se retira sola según las asignaciones activas">Automática</span>':`<button class="btn btn-sm btn-danger" onclick="deleteRoleGlobal('${r.id}',cfgRenderRoles)">🗑</button>`}
     </div>`;
   }).join('');
 }
@@ -11821,6 +11854,7 @@ async function cfgSaveRole(){
   cfgCloseRoleForm();cfgRenderRoles();
 }
 async function cfgDeleteRole(id){
+  if(esFuncionAutomatica(id)){ avisoFuncionAutomatica(id); return; }
   if(!confirm('¿Eliminar este rol? Se quitará de todos los miembros.'))return;
   var role=S.roles.find(function(r){return r.id===id;});
   var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
@@ -13974,7 +14008,7 @@ function gdvRenderRoles(){
       <div style="flex:1"><div style="font-weight:600;font-size:13px">${r.name}</div>${r.desc?`<div style="font-size:12px;color:#6B7280">${r.desc}</div>`:''}</div>
       <span class="badge b-muted">${S.members.filter(m=>(m.roles||[]).includes(r.id)).length} miembros</span>
       <button class="btn btn-sm" onclick="gdvEditRole('${r.id}')">✏️</button>
-      <button class="btn btn-sm btn-danger" onclick="gdvDeleteRole('${r.id}')">🗑</button>
+      ${esFuncionAutomatica(r.id)?'<span class="badge b-muted" title="Se asigna y se retira sola según las asignaciones activas">Automática</span>':`<button class="btn btn-sm btn-danger" onclick="gdvDeleteRole('${r.id}')">🗑</button>`}
     </div>`).join('');
 }
 function gdvOpenNewRole(){
@@ -14019,6 +14053,7 @@ async function gdvSaveRole(){
   gdvCloseRoleForm();gdvRenderRoles();
 }
 async function gdvDeleteRole(id){
+  if(esFuncionAutomatica(id)){ avisoFuncionAutomatica(id); return; }
   if(!confirm('¿Eliminar este rol?'))return;
   var role=S.roles.find(function(r){return r.id===id;});
   var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
@@ -17341,7 +17376,7 @@ async function nvGraduarUno(destino){
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    Object.assign(m,snapshot);
+    nvRestaurarExacto(m,snapshot);
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -17366,7 +17401,7 @@ async function nvGraduarSeleccionados(destino){
   }catch(e){
     snapshots.forEach(function(s){
       var m=S.members.find(function(x){return x.id===s.id;});
-      if(m) Object.assign(m,s.data);
+      if(m) nvRestaurarExacto(m,s.data);
     });
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
@@ -17378,15 +17413,30 @@ async function nvGraduarSeleccionados(destino){
 }
 
 async function nvAplicarGraduacion(m, destino){
+  var condPrev=m.condicion||'Campaña';
+  var camp=(S.campanas||[]).find(function(c){return Number(c.id)===Number(m.campanaId);});
+  var motivo='Graduación de Campaña'+(camp&&camp.nombre?' "'+camp.nombre+'"':'');
   if(destino==='Nuevo'){
+    cambioReg(m,'condicion',condPrev,'Nuevo',motivo);
     m.condicion='Nuevo';
     m.subEstado='Ingresado';
     m.subEstadoHistorial=[{de:'Campaña',a:'Ingresado',autor:currentUser?.name||'Sistema',fecha:new Date().toISOString(),comentario:'Graduado desde Campaña'}];
   } else {
+    cambioReg(m,'estado',m.estado||'Activo','Baja',motivo);
+    cambioReg(m,'condicion',condPrev,'Historico',motivo);
+    m.condicionAnterior=condPrev; // "antes: Campaña" en la grilla; al Reactivar desde Rebaños vuelve a Campaña
     m.condicion='Historico';
     m.estado='Baja';
+    m.fechaBaja=todayAA();
+    m.motivoBaja=motivo;
   }
   m._ts=Date.now();
+}
+// Deja a la persona EXACTAMENTE como estaba en la foto: restaura los valores y borra los campos
+// que no existían (ej: m.cambios creado por la graduación). Object.assign solo no los borra.
+function nvRestaurarExacto(m, foto){
+  Object.keys(m).forEach(function(k){ if(!Object.prototype.hasOwnProperty.call(foto,k)) delete m[k]; });
+  Object.assign(m, foto);
 }
 
 // ── Comentarios de Campaña (sin cambio de estado) ──
@@ -18396,6 +18446,7 @@ async function rmCambiar(memberId,agregar){
 }
 
 async function deleteRoleGlobal(id, callback){
+  if(esFuncionAutomatica(id)){ avisoFuncionAutomatica(id); return; }
   const r=S.roles.find(x=>x.id===id);
   if(!confirm(`¿Eliminar el rol "${r?.name}"? Se quitará de todos los miembros.`)) return;
   var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
@@ -22169,7 +22220,9 @@ function exportMiembrosExcel(){
       apellido:m.apellido,
       genero:m.genero==='H'?'Hombre':m.genero==='M'?'Mujer':'-',
       grupo:memberGroups.length?memberGroups.map(gr=>gr.name).join(', '):'Sin grupo',
-      condicion:m.condicion||'',
+      // Nombres visibles (Config → Etiquetas), igual que en pantalla; los valores guardados no cambian
+      condicion:m.condicion?etqCond(m.condicion):'',
+      categoria:etqCat(categoriaDe(m)),
       estado:m.estado||'Activo',
       telefono:m.tel||'',
       direccion:m.dir||'',
@@ -22185,7 +22238,8 @@ function exportMiembrosExcel(){
     {key:'apellido',  label:'Apellido',     width:18},
     {key:'genero',    label:'Género',       width:10},
     {key:'grupo',     label:'Grupo',        width:20},
-    {key:'condicion', label:'Condición',    width:14},
+    {key:'condicion', label:'Condición',    width:22},
+    {key:'categoria', label:'Categoría',    width:14},
     {key:'estado',    label:'Estado',       width:10},
     {key:'telefono',  label:'Teléfono',     width:16},
     {key:'direccion', label:'Barrio / Ciudad', width:24},

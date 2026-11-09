@@ -4396,7 +4396,7 @@ function renderMiembrosServicio(){
   base.forEach(function(m){
     var l=servicioLugaresDe(m), nAntes=(m.servicio||[]).filter(function(e){return !!e.hasta;}).length;
     if(l.length){ personas++; lugares+=l.length; }
-    if(l.length||nAntes||todos) filas.push({m:m,l:l,nAntes:nAntes});
+    if(l.length||nAntes||todos||base.length<=5) filas.push({m:m,l:l,nAntes:nAntes});
   });
   tb.innerHTML=filas.map(function(f){
     var m=f.m, isBaja=m.estado==='Baja';
@@ -4469,17 +4469,19 @@ function renderMiembrosHistorial(){
   var verCom=saComentariosPuedeVer();
   var th=document.getElementById('sa-hist-th-com'); if(th) th.style.display=verCom?'':'none';
   var cols=verCom?5:4, filas=[], conCambios=0;
-  (window._saMembrosFiltered||[]).forEach(function(m){
+  var lista=window._saMembrosFiltered||[], consulta=lista.length<=5; // pocas personas = se está consultando a alguien puntual: se muestra aunque no tenga cambios
+  lista.forEach(function(m){
     var ev=histEventos(m); if(ev.length) conCambios++;
-    if(ev.length||todos) filas.push({m:m,ev:ev});
+    if(ev.length||todos||consulta) filas.push({m:m,ev:ev});
   });
   tb.innerHTML=filas.map(function(f){
     var m=f.m, isBaja=m.estado==='Baja';
     return '<tr style="vertical-align:top;'+(isBaja?'opacity:0.55;background:#FEF2F2':'')+'">'
       +'<td style="max-width:150px"><span style="cursor:pointer;color:#1F4E79;font-weight:600;word-break:break-word" onclick="saShowDetail('+m.id+',event)">'+svcEsc(listName(m))+'</span>'
       +(f.ev.length?'<div><a href="#" onclick="histVerTodo('+m.id+');return false" style="font-size:11.5px;color:#1F4E79;font-weight:600">📜 Ver historial completo ('+f.ev.length+')</a></div>':'')+'</td>'
-      +'<td>'+histCelda(m,f.ev,'condicion')+'</td><td>'+histCelda(m,f.ev,'categoria')+'</td><td>'+histCelda(m,f.ev,'servicio')+'</td>'
-      +(verCom?'<td>'+histCelda(m,f.ev,'comentario')+'</td>':'')+'</tr>';
+      +(f.ev.length?'<td>'+histCelda(m,f.ev,'condicion')+'</td><td>'+histCelda(m,f.ev,'categoria')+'</td><td>'+histCelda(m,f.ev,'servicio')+'</td>'
+        +(verCom?'<td>'+histCelda(m,f.ev,'comentario')+'</td>':'')
+        :'<td colspan="'+(cols-1)+'" style="text-align:center;color:#9CA3AF;padding:1.2rem">Todavía no hay cambios registrados con estos filtros</td>')+'</tr>';
   }).join('')||'<tr><td colspan="'+cols+'" style="text-align:center;color:#9CA3AF;padding:1.5rem">Todavía no hay cambios registrados con estos filtros</td></tr>';
   var r=document.getElementById('sa-hist-resumen'); if(r) r.textContent=conCambios+' persona'+(conCambios===1?'':'s')+' con cambios registrados';
 }

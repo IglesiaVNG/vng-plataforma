@@ -718,7 +718,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zz';
+const APP_VERSION = '2026-08-24-zza';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -889,7 +889,8 @@ const MODULES_PERM=[
     {key:'comentarios_rebanos', label:'Ver y escribir Comentarios pastorales en la ficha de Rebaños'},
   ]},
   {key:'servicio', label:'Propósitos y Áreas de servicio', icon:'🤲', screens:[
-    {key:'servicio_admin', label:'Editar Propósitos, Áreas de servicio y Proyectos'},
+    {key:'propositos_editar', label:'Editar Propósitos, Áreas de servicio y Proyectos (desde Rebaños → Servicio)'},
+    {key:'servicio_admin', label:'Registrar la historia de Servicio (automático, al usar la app)'},
   ]},
   {key:'oracion', label:'Motivos de Oración', icon:'🙏', screens:[
     {key:'oracion_ver',    label:'Acceder al módulo y ver los Motivos propios'},
@@ -1311,7 +1312,8 @@ function funcionesAutoDefs(){
   return [
     {id:'facilitador',              name:'Facilitador',    color:'#059669', desc:'Lidera un Grupo de Vida'},
     {id:'lider',                    name:'Líder',          color:'#0369A1', desc:'Liderazgo de área'},
-    {id:'colaborador1783645248659', name:'Colaborador NG', color:'#0D9488', desc:'Colabora en una Comunidad de Nuevas Generaciones (automática)'}
+    {id:'colaborador1783645248659', name:'Colaborador NG', color:'#0D9488', desc:'Colabora en una Comunidad de Nuevas Generaciones (automática)'},
+    {id:'coord_area',               name:'Coordinador/a de Área', color:'#B45309', desc:'Coordina un Área de servicio o Proyecto (automática)'}
   ];
 }
 // Agrega a S.roles las definiciones que falten (copy-on-write). Devuelve la lista de ids agregados.
@@ -1588,6 +1590,10 @@ function groupMembers(gid){
 // Los roles de acceso al sistema (Pastor, Admin GdV, etc.) no tienen un área específica.
 function getRoleContexto(memberId, roleId){
   var id=Number(memberId);
+  if(roleId==='coord_area'){
+    var areasC=(S.areasServicio||[]).filter(function(a){return svcAreaActiva(a)&&(a.equipo||[]).some(function(e){return e.rol==='Coordinador/a'&&Number(e.personaId)===id;});}).map(function(a){return a.nombre;});
+    if(areasC.length) return areasC.join(', ');
+  }
   if(roleId==='facilitador'){
     var grupos=S.groups.filter(function(g){return Number(g.facId)===id||Number(g.facId2)===id;}).map(function(g){return g.name;});
     if(grupos.length) return grupos.join(', ');
@@ -3049,12 +3055,33 @@ function getLinkedMember(){
 var FUNC_AUTO_FAC='facilitador';
 var FUNC_AUTO_LIDER_NG='lider';
 var FUNC_AUTO_COLAB_NG='colaborador1783645248659';
-var FUNC_AUTO_IDS=[FUNC_AUTO_FAC,FUNC_AUTO_LIDER_NG,FUNC_AUTO_COLAB_NG];
-// "Líder Propósito": Función creada desde Configuración (id generado), se identifica por su nombre.
-// La tienen automáticamente quienes figuran como Líder de un Propósito (Propósito) activo.
+var FUNC_AUTO_COORD_AREA='coord_area';
+var FUNC_AUTO_IDS=[FUNC_AUTO_FAC,FUNC_AUTO_LIDER_NG,FUNC_AUTO_COLAB_NG,FUNC_AUTO_COORD_AREA];
+// Un Área cuenta como activa si ella y su Propósito no están Inactivos.
+function svcAreaActiva(a){
+  if(!a||a.estado==='Inactivo') return false;
+  if(a.propositoId){ var p=(S.ministerios||[]).find(function(x){return Number(x.id)===Number(a.propositoId);}); if(p&&p.estado==='Inactivo') return false; }
+  return true;
+}
+// Coordinadores/as de una lista de Áreas (ids de persona, sin repetir).
+function svcCoordIds(areas){
+  var out=[];
+  (areas||[]).forEach(function(a){ ((a&&a.equipo)||[]).forEach(function(e){ if(e.rol==='Coordinador/a'&&out.indexOf(Number(e.personaId))<0) out.push(Number(e.personaId)); }); });
+  return out;
+}
+// "Líder Propósito": Función creada desde Configuración (id generado). La tienen automáticamente
+// quienes figuran como Líder de un Propósito activo. Se reconoce por la marca autoTipo; la primera
+// vez se la encuentra por el nombre y se la marca (en memoria). La marca viaja con S.roles en el
+// próximo guardado de Funciones — por eso, al renombrarla desde ✏️, se guarda ya marcada y sigue
+// siendo automática aunque el nombre nuevo no diga "Líder" ni "Propósito".
+var FUNC_AUTO_TIPO_LP='lider_proposito';
 function funcLiderPropositoId(){
-  var r=(S.roles||[]).find(function(x){var n=normName(x.name);return n.indexOf('lider')===0&&n.indexOf('proposito')>0;});
-  return r?r.id:null;
+  var roles=S.roles||[];
+  var t=roles.find(function(x){return x&&x.autoTipo===FUNC_AUTO_TIPO_LP;});
+  if(t) return t.id;
+  var r=roles.find(function(x){var n=normName(x&&x.name);return n.indexOf('lider')===0&&n.indexOf('proposito')>0;});
+  if(r){ r.autoTipo=FUNC_AUTO_TIPO_LP; return r.id; }
+  return null;
 }
 function funcAutoIds(){
   var ids=FUNC_AUTO_IDS.slice(), lp=funcLiderPropositoId();
@@ -3084,6 +3111,10 @@ function funcionesAutoDeseadas(memberId){
     if(ng.estado==='Inactivo') return;
     if((ng.liderIds||[]).some(function(x){return String(x)===k;})) out.add(FUNC_AUTO_LIDER_NG);
     if((ng.colaboradorIds||[]).some(function(x){return String(x)===k;})) out.add(FUNC_AUTO_COLAB_NG);
+  });
+  (S.areasServicio||[]).forEach(function(a){
+    if(!svcAreaActiva(a)) return;
+    if((a.equipo||[]).some(function(e){return e.rol==='Coordinador/a'&&String(e.personaId)===k;})) out.add(FUNC_AUTO_COORD_AREA);
   });
   var lp=funcLiderPropositoId();
   if(lp!==null) (S.ministerios||[]).forEach(function(mn){
@@ -3189,7 +3220,7 @@ function cfgAbrirRevisionFuncionesAuto(){
   window._faRevision=d;
   var total=d.agregar.length+d.pegadas.length+d.adoptar.length;
   var h='<div style="font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:4px">🔄 Funciones automáticas — revisión</div>'
-    +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:14px;line-height:1.5">Facilitador, Líder NG, Colaborador NG y Líder Propósito se tienen <strong>mientras haya una asignación activa</strong> (Grupo, Comunidad o Propósito) y se pierden solas al terminar. Acá se compara lo que hay hoy con las asignaciones reales. <strong>No se cambia nada hasta que toques "Aplicar".</strong></div>';
+    +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:14px;line-height:1.5">Facilitador, Líder NG, Colaborador NG, Coordinador/a de Área y Líder Propósito se tienen <strong>mientras haya una asignación activa</strong> (Grupo, Comunidad, Área o Propósito) y se pierden solas al terminar. Acá se compara lo que hay hoy con las asignaciones reales. <strong>No se cambia nada hasta que toques "Aplicar".</strong></div>';
   if(!total) h+='<div style="padding:1.25rem;text-align:center;color:#16A34A;font-weight:600">✅ Todo al día — no hay nada para revisar.</div>';
   if(d.pegadas.length){
     h+='<div style="font-size:13px;font-weight:700;color:#B91C1C;margin:10px 0 6px">⚠️ Tienen la Función pero NO una asignación activa ('+d.pegadas.length+')</div>'
@@ -3894,7 +3925,7 @@ function buildMiembrosHTML(){
     <div id="sa-panel-servicio" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:.75rem">
         <label style="font-size:13px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);cursor:pointer"><input type="checkbox" id="sa-serv-todos" onchange="renderMiembrosServicio()" style="margin-right:6px">Mostrar también a las personas que no sirven</label>
-        <span id="sa-serv-resumen" style="font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)"></span>
+        <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="sa-serv-resumen" style="font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)"></span><button id="sa-serv-gestion-btn" class="btn btn-sm" style="display:none;background:#fff" onclick="svcAbrirGestion()">🤝 Propósitos y Áreas</button></span>
       </div>
       <div class="card" style="padding:0;overflow:hidden">
         <table><thead><tr><th style="width:24%">Nombre</th><th style="width:16%">Condición</th><th style="width:12%">Categoría</th><th style="width:48%">Dónde sirve</th></tr></thead>
@@ -4077,6 +4108,9 @@ async function cfgSaveEtiquetas(){
   etqAplicarSelects();
   showToast('✅ Etiquetas guardadas','#16A34A');
 }
+// Largo mínimo de comentarios y motivos en Rebaños, Nuevos Contactos y Campañas
+var COMENT_MIN=12;
+function comentMsg(){ return 'El comentario debe tener al menos '+COMENT_MIN+' caracteres.'; }
 // ── Registro de cambios por persona (m.cambios): Condición, Categoría y Estado ──
 // Cada línea: tipo, de, a, ts, autor (y motivo si lo hubo). Solo crece; nunca se pisa. Se arma con concat
 // (array nuevo) para que las reversiones por falla de nube puedan volver al array anterior.
@@ -4424,6 +4458,7 @@ function servicioDesdeDe(m,k){ var e=(m.servicio||[]).filter(function(x){return 
 function svcToggleAntes(id){ var e=document.getElementById('serv-antes-'+id); if(e) e.style.display=(e.style.display==='none'?'block':'none'); }
 function renderMiembrosServicio(){
   var tb=document.getElementById('sa-member-tbody-servicio'); if(!tb) return;
+  var gb=document.getElementById('sa-serv-gestion-btn'); if(gb) gb.style.display=svcPuedeEditar()?'':'none';
   var todos=!!(document.getElementById('sa-serv-todos')&&document.getElementById('sa-serv-todos').checked);
   var base=window._saMembrosFiltered||[], filas=[], lugares=0, personas=0;
   base.forEach(function(m){
@@ -4819,7 +4854,8 @@ async function saGuardarComentario(memberId){
   if(!saComentariosPuedeEscribir()){ alert('No tenés permiso para escribir comentarios.'); return; }
   var m=S.members.find(function(x){return Number(x.id)===Number(memberId);}); if(!m) return;
   var el=document.getElementById('sa-com-txt-'+memberId); var txt=((el&&el.value)||'').trim();
-  if(txt.length<3){ showToast('Escribí el comentario primero','#D97706'); return; }
+  if(!txt){ showToast('Escribí el comentario primero','#D97706'); return; }
+  if(txt.length<COMENT_MIN){ alert(comentMsg()); return; }
   var btn=document.getElementById('sa-com-btn-'+memberId); if(btn) btn.disabled=true;
   var prevTs=m._ts, tenia=!!m.comentarios, nuevo={texto:txt,autor:(currentUser&&currentUser.name)||'Sistema',ts:Date.now(),origen:'rebanos'};
   if(!m.comentarios) m.comentarios=[];
@@ -5194,30 +5230,7 @@ async function saDeleteMember(id){
   showToast('🗑️ Eliminado','#DC2626');
 }
 
-async function saDarDeBaja(id){
-  const m=S.members.find(x=>x.id===id);
-  if(!m) return;
-  var motivo=prompt('Motivo de baja para '+fullName(m)+' (mínimo 10 caracteres):','');
-  if(motivo===null) return; // cancelled
-  if(!motivo||motivo.trim().length<10){
-    alert('El motivo de baja es obligatorio y debe tener al menos 10 caracteres.');
-    return;
-  }
-  const hoy=today();
-  Object.assign(m,{estado:'Baja',fechaBaja:hoy,motivoBaja:motivo.trim()});
-  await saveK(SK.members,S.members);
-  saCloseDetail();
-  renderMiembrosStandalone();
-}
 
-async function saReactivar(id){
-  const m=S.members.find(x=>x.id===id);
-  if(!m) return;
-  if(!confirm(`¿Reactivar a ${fullName(m)}?`)) return;
-  Object.assign(m,{estado:'Activo',fechaBaja:''});
-  await saveK(SK.members,S.members);
-  renderMiembrosStandalone();
-}
 
 async function saCloseMemberForm(){
   document.getElementById('sa-member-modal-overlay').style.display='none';
@@ -5227,7 +5240,7 @@ async function saCloseMemberForm(){
 // Pide un texto (motivo) con una ventana propia de la app: el prompt() del navegador puede estar bloqueado
 // (ventana embebida o "no permitir más diálogos") y entonces el botón parecía no hacer nada.
 function saPedirMotivo(titulo,ayuda,minimo){
-  minimo=minimo||10;
+  minimo=minimo||COMENT_MIN;
   return new Promise(function(resolve){
     var ov=document.getElementById('sa-motivo-overlay'); if(ov) ov.remove();
     ov=document.createElement('div'); ov.id='sa-motivo-overlay';
@@ -5254,7 +5267,7 @@ async function saQuickToggleEstado(id){
   const estadoActual=m.estado==='Baja'?'Baja':'Activo';
   const nuevoEstado=estadoActual==='Baja'?'Activo':'Baja';
   const accion=nuevoEstado==='Baja'?'dar de baja':'reactivar';
-  var motivo=await saPedirMotivo('Motivo para '+accion+' a '+fullName(m),'Mínimo 10 caracteres.');
+  var motivo=await saPedirMotivo('Motivo para '+accion+' a '+fullName(m),'Mínimo '+COMENT_MIN+' caracteres.');
   if(motivo===null) return; // cancelado
   motivo=motivo.trim();
   const prevEstado=m.estado;
@@ -5448,7 +5461,7 @@ function configTab(sub, btn){
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
         <span style="font-size:14px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6)">Funciones del sistema</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-sm" onclick="cfgAbrirRevisionFuncionesAuto()" title="Compara las Funciones de Facilitador y Líder/Colaborador NG con las asignaciones reales">🔄 Revisar Funciones automáticas</button>
+          <button class="btn btn-sm" onclick="cfgAbrirRevisionFuncionesAuto()" title="Compara las Funciones automáticas (Facilitador, Líder/Colaborador NG, Coordinador/a de Área y Líder Propósito) con las asignaciones reales">🔄 Revisar Funciones automáticas</button>
           <button class="btn btn-primary btn-sm" onclick="cfgOpenNewRole()">+ Nueva función</button>
         </div>
       </div>
@@ -6003,7 +6016,25 @@ async function ngDeleteComunidad(id){
 // ═════════════════════════════════════════════════════════════════
 var SVC_ROLES=['Coordinador/a','Colaborador/a','Integrante'];
 function svcEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function svcPuedeEditar(){ return isSuperAdmin()||canEjecutar('servicio_admin'); }
+function svcPuedeEditar(){ return isSuperAdmin()||canEjecutar('propositos_editar'); }
+// Propósitos y Áreas fuera de Configuración, para quien tenga el permiso "propositos_editar".
+function svcAbrirGestion(){
+  if(!svcPuedeEditar()){ alert('No tenés permiso para editar Propósitos y Áreas.'); return; }
+  var ov=document.getElementById('svc-gestion-overlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='svc-gestion-overlay'; document.body.appendChild(ov); }
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto';
+  ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:760px;width:100%;padding:1.25rem;margin:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:1rem;flex-wrap:wrap">'
+    +'<span style="font-size:15px;font-weight:700;color:#1F4E79">🤝 Propósitos y Áreas de servicio</span>'
+    +'<span style="display:flex;gap:6px"><button class="btn btn-primary btn-sm" onclick="ministerioOpenForm()">+ Propósito</button><button class="btn btn-sm" onclick="svcCerrarGestion()">Cerrar</button></span></div>'
+    +'<div style="font-size:12px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#F9FAFB;border-radius:8px">El <strong>Propósito</strong> es el gran llamado y tiene líderes. Las <strong>Áreas de servicio</strong> (y los Proyectos) cuelgan de él, con su propio equipo y el rol de cada persona.</div>'
+    +'<div id="svc-gestion-list"></div></div>';
+  ministerioRenderList();
+}
+function svcCerrarGestion(){
+  var ov=document.getElementById('svc-gestion-overlay'); if(ov) ov.remove();
+  try{ renderMiembrosServicio(); }catch(_e){}
+}
 function svcPersona(id){ return (S.members||[]).find(function(x){return Number(x.id)===Number(id);}); }
 function svcNombre(id){ var m=svcPersona(id); return m?fullName(m):'(persona eliminada)'; }
 function svcAreas(){ if(!S.areasServicio) S.areasServicio=[]; return S.areasServicio; }
@@ -6092,8 +6123,9 @@ function svcFilaArea(a){
   '</div>';
 }
 function ministerioRenderList(){
-  const c=document.getElementById('ministerios-list');
-  if(!c) return;
+  // Se dibuja en Configuración y/o en la ventana de Rebaños → Servicio (la que esté abierta)
+  var cs=['ministerios-list','svc-gestion-list'].map(function(x){return document.getElementById(x);}).filter(Boolean);
+  if(!cs.length) return;
   var edit=svcPuedeEditar(), html='';
   if(svcHayLegacy()&&isSuperAdmin()){
     html+='<div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;font-size:13px;color:#92400E;margin-bottom:1rem">'+
@@ -6121,7 +6153,7 @@ function ministerioRenderList(){
     (edit?'<button class="btn btn-sm" onclick="svcAbrirArea(null,null,\'Proyecto ministerial\')">+ Proyecto</button>':'')+'</div>'+
     (sueltas.length?sueltas.map(svcFilaArea).join(''):'<div style="font-size:12px;color:#9CA3AF;padding-top:6px">Ninguno. Acá van los proyectos que no dependen de un Propósito.</div>')+
   '</div>';
-  c.innerHTML=html;
+  cs.forEach(function(c){ c.innerHTML=html; });
 }
 
 // ── Pantalla 2: Propósito (nombre, estado, líderes) ──
@@ -6174,6 +6206,7 @@ async function ministerioSaveMinisterio(){
   if(!esNuevo){
     min=S.ministerios.find(function(x){return Number(x.id)===Number(svcP.id);});
     if(min) involucrados=involucrados.concat(min.liderIds||[]);
+    involucrados=involucrados.concat(svcCoordIds(svcAreas().filter(function(a){return Number(a.propositoId)===Number(svcP.id);})));
   }
   var snapFunc=funcionesAutoSnapshot(involucrados);
   funcionesAutoAdoptar(involucrados);
@@ -6293,15 +6326,22 @@ async function svcGuardarArea(){
   var equipo=[], vistos={};
   s.equipo.forEach(function(e){ if(vistos[e.personaId]) return; vistos[e.personaId]=1; equipo.push({personaId:Number(e.personaId),rol:SVC_ROLES.includes(e.rol)?e.rol:'Colaborador/a',_ts:Date.now()}); });
   var lista=svcAreas(), reg=s.id?lista.find(function(x){return Number(x.id)===Number(s.id);}):null, snap=null, nuevo=null;
+  // Coordinadores/as antes y después: su Función automática se ajusta sola
+  var coordIds=svcCoordIds([reg,{equipo:equipo}]);
+  var snapFunc=funcionesAutoSnapshot(coordIds);
+  funcionesAutoAdoptar(coordIds);
   if(reg){ snap=JSON.parse(JSON.stringify(reg)); Object.assign(reg,{tipo:s.tipo,propositoId:s.propositoId||null,nombre:nombre,estado:s.estado,equipo:equipo,_ts:Date.now()}); }
   else { nuevo={id:Date.now(),tipo:s.tipo,propositoId:s.propositoId||null,nombre:nombre,estado:s.estado,equipo:equipo,_ts:Date.now()}; lista.push(nuevo); }
+  funcionesAutoReconciliar(coordIds);
   try{
     await saveK(SK.areasServicio,S.areasServicio);
+    await saveK(SK.members,S.members);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     if(nuevo) S.areasServicio=S.areasServicio.filter(function(x){return x!==nuevo;});
     else if(reg&&snap){ Object.keys(reg).forEach(function(k){delete reg[k];}); Object.assign(reg,snap); }
-    try{ await saveK(SK.areasServicio,S.areasServicio); }catch(e2){}
+    funcionesAutoRevertir(snapFunc);
+    try{ await saveK(SK.areasServicio,S.areasServicio); await saveK(SK.members,S.members); }catch(e2){}
     if(btn) btn.disabled=false;
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -6313,15 +6353,20 @@ async function svcEliminarArea(id){
   var a=svcAreas().find(function(x){return Number(x.id)===Number(id);}); if(!a) return;
   if(!confirm('¿Eliminar "'+a.nombre+'" y su equipo? Esta acción no se puede deshacer.')) return;
   var antes=S.areasServicio.slice();
+  var coordIds=svcCoordIds([a]), snapFunc=funcionesAutoSnapshot(coordIds);
+  funcionesAutoAdoptar(coordIds);
   S.areasServicio=S.areasServicio.filter(function(x){return Number(x.id)!==Number(id);});
+  funcionesAutoReconciliar(coordIds);
   addTombstone(SK.areasServicio,id);
   try{
     await saveK(SK.areasServicio,S.areasServicio);
+    await saveK(SK.members,S.members);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
     ministerioRenderList(); showToast('✅ Eliminado','#16A34A');
   }catch(e){
     S.areasServicio=antes; svcQuitarTombstone(SK.areasServicio,id);
-    try{ await saveK(SK.areasServicio,S.areasServicio); }catch(e2){}
+    funcionesAutoRevertir(snapFunc);
+    try{ await saveK(SK.areasServicio,S.areasServicio); await saveK(SK.members,S.members); }catch(e2){}
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
 }
@@ -16453,6 +16498,7 @@ async function nvGuardarComentario(){
   const txt=(document.getElementById('nv-comentario-txt')?.value||'').trim();
   const huboSeguimiento=nvDraftSeguimientoSet;
   if(!txt&&!huboSeguimiento&&!nvHuboCambioGrupo){showToast('No hay cambios para confirmar','#6B7280');return;}
+  if(txt&&txt.length<COMENT_MIN){ alert(comentMsg()); return; }
   nvHuboCambioGrupo=false;
   var comentarioAgregado=null;
   var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),_ts:m._ts};
@@ -16486,6 +16532,7 @@ async function nvCambiarSubEstadoManual(nuevoSubEstado){
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
   const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
+  if(txtComentario&&txtComentario.length<COMENT_MIN){ alert(comentMsg()); return; }
   const anterior=m.subEstado||'Ingresado';
   var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   m.subEstado=nuevoSubEstado;
@@ -16553,8 +16600,8 @@ async function nvGuardarComentarioContactar(){
   const txt=(document.getElementById('nv-contactar-comentario-txt')?.value||'').trim();
   const esPrimerContacto=(m.subEstado||'Ingresado')==='Ingresado';
   if(!txt){showToast('Escribí un comentario primero','#D97706');return;}
-  if(esPrimerContacto&&txt.length<10){
-    alert('Para registrar el primer contacto escribí un comentario de al menos 10 caracteres (cómo fue, qué se conversó).');
+  if(txt.length<COMENT_MIN){
+    alert(esPrimerContacto?'Para registrar el primer contacto escribí un comentario de al menos '+COMENT_MIN+' caracteres (cómo fue, qué se conversó).':comentMsg());
     return;
   }
   var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
@@ -16593,8 +16640,8 @@ async function nvPromover(condicion){
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
   const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
-  if(!txtComentario||txtComentario.length<10){
-    alert('El comentario es obligatorio (mín. 10 caracteres) para registrar cualquier cambio de condición.');
+  if(!txtComentario||txtComentario.length<COMENT_MIN){
+    alert('El comentario es obligatorio (mín. '+COMENT_MIN+' caracteres) para registrar cualquier cambio de condición.');
     document.getElementById('nv-comentario-txt')?.focus();
     return;
   }
@@ -16642,8 +16689,8 @@ async function nvDarDeBaja(){
   if(!m) return;
   // Use the comment textarea as motivo
   const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
-  if(!txtComentario||txtComentario.length<10){
-    alert('Para pasar a Histórico escribí un comentario de al menos 10 caracteres explicando el motivo.');
+  if(!txtComentario||txtComentario.length<COMENT_MIN){
+    alert('Para pasar a Histórico escribí un comentario de al menos '+COMENT_MIN+' caracteres explicando el motivo.');
     document.getElementById('nv-comentario-txt')?.focus();
     return;
   }
@@ -16794,6 +16841,8 @@ async function nvGuardarEditar(){
 async function nvReactivar(){
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
+  var _txtR=(document.getElementById('nv-comentario-txt')?.value||'').trim();
+  if(_txtR&&_txtR.length<COMENT_MIN){ alert(comentMsg()); return; }
   var snapshot=Object.assign({},m);
   const cambiosPrev=m.cambios;
   cambioReg(m,'estado',m.estado||'Baja','Activo','Re-activación desde Histórico');
@@ -17469,6 +17518,7 @@ async function nvCampGuardarComentario(){
   if(!m) return;
   var txt=(document.getElementById('nv-camp-com-txt')?.value||'').trim();
   if(!txt){ showToast('Escribí un comentario primero','#D97706'); return; }
+  if(txt.length<COMENT_MIN){ alert(comentMsg()); return; }
   if(!m.comentarios) m.comentarios=[];
   var nuevoComentario={texto:txt,autor:currentUser?.name||'Sistema',ts:Date.now()};
   m.comentarios.push(nuevoComentario);
@@ -18684,186 +18734,6 @@ function renderHomeActividadesGrupos(){
 
 
 
-function buildFormularioPublicoHTML(){
-  return `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Iglesia Vida Nueva — Registrate</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#F5F7FA;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem}
-.card{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:440px;box-shadow:0 4px 24px rgba(0,0,0,.1)}
-.logo{text-align:center;margin-bottom:1.5rem}
-.logo-icon{font-size:48px;margin-bottom:.5rem}
-.logo-title{font-size:20px;font-weight:700;color:#1F4E79}
-.logo-sub{font-size:13px;color:#6B7280;margin-top:4px}
-.form-title{font-size:16px;font-weight:700;color:#1F4E79;margin-bottom:.25rem}
-.form-desc{font-size:13px;color:#6B7280;margin-bottom:1.25rem;line-height:1.5}
-label{font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px;margin-top:12px}
-label:first-of-type{margin-top:0}
-input,select,textarea{width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;font-family:Arial,sans-serif;color:#1F2937}
-input:focus,select:focus,textarea:focus{outline:none;border-color:#1F4E79}
-textarea{min-height:80px;resize:vertical}
-.opt{font-size:11px;color:#9CA3AF;margin-top:2px}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.btn{width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif;margin-top:1.25rem}
-.btn:hover{background:#163a5c}
-.error{background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px;display:none}
-.success{display:none;text-align:center;padding:1.5rem 0}
-.success-icon{font-size:4rem;margin-bottom:1rem}
-.success-title{font-size:20px;font-weight:700;color:#1F4E79;margin-bottom:.5rem}
-.success-msg{font-size:14px;color:#6B7280;line-height:1.7}
-.success-horarios{background:#EFF6FF;border-radius:10px;padding:12px;margin-top:1rem;font-size:13px;color:#1F4E79;font-weight:600}
-</style>
-
-</head>
-<body>
-<div class="card">
-  <div class="logo">
-    <div class="logo-icon">⛪</div>
-    <div class="logo-title">Iglesia Vida Nueva</div>
-    <div class="logo-sub">Un lugar para crecer en familia · Gerli</div>
-  </div>
-
-  <div id="form-wrap">
-    <div class="form-title">¡Nos alegra que estés acá!</div>
-    <div class="form-desc">Completá tus datos y nos ponemos en contacto con vos. Es rápido y sin compromisos.</div>
-    <div class="error" id="form-error"></div>
-
-    <div class="row">
-      <div><label>Nombre *</label><input type="text" id="f-nombre" placeholder="Tu nombre"></div>
-      <div><label>Apellido *</label><input type="text" id="f-apellido" placeholder="Tu apellido"></div>
-    </div>
-
-    <div class="row">
-      <div><label>Celular *</label><input type="tel" id="f-cel" placeholder="Ej: 11 1234-5678" inputmode="numeric"></div>
-      <div><label>Fecha de nacimiento *</label><input type="text" id="f-fnac" placeholder="DD/MM/AA" maxlength="8" inputmode="numeric" oninput="fmtFnac(this)"></div>
-    </div>
-    <div class="row">
-      <div><label>Género *</label><select id="f-genero"><option value="">— Seleccioná —</option><option value="H">Hombre</option><option value="M">Mujer</option></select></div>
-      <div><label>Barrio / Ciudad *</label><input type="text" id="f-barrio" placeholder="Desde donde nos escribís..."></div>
-    </div>
-
-    <label>¿Cómo nos conociste? *</label>
-    <select id="f-como">
-      <option value="">— Seleccioná una opción —</option>
-      <option>Por un amigo o familiar</option>
-      <option>Instagram (@iglesiavng)</option>
-      <option>YouTube</option>
-      <option>Pasé por la iglesia</option>
-      <option>Google / Internet</option>
-      <option>Volante o folleto</option>
-      <option>Otro</option>
-    </select>
-
-    <label>¿Algún motivo especial para que te contactemos? <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
-    <textarea id="f-motivo" placeholder="Podés contarnos lo que quieras... estamos acá para escucharte."></textarea>
-    <div class="opt">Esta información es confidencial y solo la verá el equipo pastoral.</div>
-
-    <button class="btn" onclick="enviarForm()">Enviar — ¡Te esperamos! 🙌</button>
-  </div>
-
-  <div class="success" id="form-success">
-    <div class="success-icon">🎉</div>
-    <div class="success-title">¡Gracias por escribirnos!</div>
-    <div class="success-msg">Recibimos tus datos y pronto alguien de nuestro equipo se va a comunicar con vos.</div>
-    <div class="success-horarios">
-      📍 Lacarra 1965, Gerli<br>
-      🕐 Domingos 10:00 y 11:30 hs<br>
-      ¡Te esperamos!
-    </div>
-  </div>
-</div>
-<script>
-
-// Marca un campo como inválido visualmente
-function markFieldError(el, msg){
-  if(!el) return;
-  el.style.border='2px solid #DC2626';
-  el.style.background='#FEF2F2';
-  el.title=msg||'Campo inválido';
-  el.focus();
-  setTimeout(function(){ el.style.border=''; el.style.background=''; el.title=''; }, 4000);
-}
-function fmtFnac(el){
-  var pos=el.selectionStart;
-  var raw=el.value.replace(/\D/g,'').slice(0,6); // solo 6 dígitos max
-  var out='';
-  for(var i=0;i<raw.length;i++){
-    if(i===2||i===4) out+='/';
-    out+=raw[i];
-  }
-  el.value=out;
-  // Ajustar cursor: si estamos justo después de una barra, avanzar uno
-  var newPos=pos;
-  if(out.length>pos && out[pos-1]==='/' && pos>0) newPos=pos+1;
-  try{ el.setSelectionRange(newPos,newPos); }catch(e){}
-}
-
-// Valida que el valor sea dd/mm/aa con números reales
-function validarFnac(val){
-  if(!val) return true; // opcional — vacío es OK
-  var p=val.split('/');
-  if(p.length!==3) return false;
-  var d=parseInt(p[0]),m=parseInt(p[1]),a=parseInt(p[2]);
-  if(isNaN(d)||isNaN(m)||isNaN(a)) return false;
-  if(d<1||d>31||m<1||m>12||a<0||a>99) return false;
-  if(p[0].length!==2||p[1].length!==2||p[2].length!==2) return false;
-  return true;
-}
-
-// Format dd/mm/aa for fechaIngreso field
-function fmtFechaIngreso(el){ fmtFnac(el); }
-
-function enviarForm(){
-  var n=document.getElementById('f-nombre').value.trim();
-  var a=document.getElementById('f-apellido').value.trim();
-  var cel=document.getElementById('f-cel').value.trim();
-  var fnac=document.getElementById('f-fnac').value.trim();
-  var genero=document.getElementById('f-genero').value;
-  var barrio=document.getElementById('f-barrio').value.trim();
-  var como=document.getElementById('f-como').value;
-  var motivo=document.getElementById('f-motivo').value.trim();
-  var err=document.getElementById('form-error');
-  if(!n||!a||!cel||!fnac||!genero||!barrio||!como){
-    err.textContent='Por favor completá todos los campos obligatorios (*)';
-    err.style.display='block';
-    return;
-  }
-  err.style.display='none';
-  if(!nvConfirmarAltaSiHayParecido(n,a,cel)) return;
-  // Save using S.members + saveK so _local_ts_ is updated and Firebase can't overwrite
-  try{
-    var nuevo={
-      id:Date.now(),nombre:n,apellido:a,tel:cel,genero:genero,
-      grupoId:null,condicion:'Nuevo',estado:'Activo',
-      subEstado:'Ingresado',subEstadoHistorial:[],
-      dir:barrio,fnac:fnac,roles:[],
-      comoNosConocio:como,motivoContacto:motivo,
-      fechaRegistro:todayAA(),
-      _ts:Date.now(),
-      origen:'QR Nuevos Contactos'
-    };
-    S.members.push(nuevo);
-    saveK(SK.members, S.members).then(function(){
-      if(window.fbUpload) window.fbUpload(true);
-    }).catch(function(){});
-  }catch(e){}
-  document.getElementById('form-wrap').style.display='none';
-  document.getElementById('form-success').style.display='block';
-}
-<\/script>
-
-
-
-</div>
-</div>
-
-</body>
-</html>`;
-}
 
 function gdvShowQRModal(){
   // Use permanent URL with query parameter

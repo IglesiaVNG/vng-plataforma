@@ -884,6 +884,9 @@ const MODULES_PERM=[
   {key:'categorias', label:'Categoría de las personas', icon:'🏷️', screens:[
     {key:'categoria_editar', label:'Cambiar la Categoría (Asistente / Comprometido) de una persona'},
   ]},
+  {key:'comentarios', label:'Comentarios pastorales (Rebaños)', icon:'💬', screens:[
+    {key:'comentarios_rebanos', label:'Ver y escribir Comentarios pastorales en la ficha de Rebaños'},
+  ]},
   {key:'servicio', label:'Propósitos y Áreas de servicio', icon:'🤲', screens:[
     {key:'servicio_admin', label:'Editar Propósitos, Áreas de servicio y Proyectos'},
   ]},
@@ -905,7 +908,7 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {servicio_admin:'ejecuta',categoria_editar:'ejecuta',oracion_crear:'ejecuta',gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',oracion_ver:'ejecuta',oracion_todos:'ejecuta',oracion_cerrar:'ejecuta',formularios_todos:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_editar:'ejecuta'},
+  pastor      : {comentarios_rebanos:'ejecuta',servicio_admin:'ejecuta',categoria_editar:'ejecuta',oracion_crear:'ejecuta',gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',oracion_ver:'ejecuta',oracion_todos:'ejecuta',oracion_cerrar:'ejecuta',formularios_todos:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_editar:'ejecuta'},
   lider       : {oracion_ver:'consulta',oracion_crear:'ejecuta',gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   facilitador : {oracion_ver:'consulta',oracion_crear:'ejecuta',gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
@@ -3828,10 +3831,11 @@ function buildMiembrosHTML(){
     <div id="sa-panel-generales" class="card" style="display:none;padding:0;overflow:hidden">
       <table>
         <thead><tr>
-          <th style="width:30%">Nombre</th>
-          <th style="width:22%">Condición</th>
-          <th style="width:30%">Grupos</th>
-          <th style="width:18%">Categoría</th>
+          <th style="width:26%">Nombre</th>
+          <th style="width:19%">Condición</th>
+          <th style="width:25%">Grupos</th>
+          <th style="width:15%">Categoría</th>
+          <th style="width:15%">Fecha Ingreso</th>
         </tr></thead>
         <tbody id="sa-member-tbody"></tbody>
       </table>
@@ -3856,8 +3860,8 @@ function buildMiembrosHTML(){
     </div>
     <div id="sa-panel-servicio" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:.75rem">
-        <label style="font-size:13px;color:#4B5563;cursor:pointer"><input type="checkbox" id="sa-serv-todos" onchange="renderMiembrosServicio()" style="margin-right:6px">Mostrar también a las personas que no sirven</label>
-        <span id="sa-serv-resumen" style="font-size:12px;color:#6B7280"></span>
+        <label style="font-size:13px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);cursor:pointer"><input type="checkbox" id="sa-serv-todos" onchange="renderMiembrosServicio()" style="margin-right:6px">Mostrar también a las personas que no sirven</label>
+        <span id="sa-serv-resumen" style="font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)"></span>
       </div>
       <div class="card" style="padding:0;overflow:hidden">
         <table><thead><tr><th style="width:24%">Nombre</th><th style="width:16%">Condición</th><th style="width:12%">Categoría</th><th style="width:48%">Dónde sirve</th></tr></thead>
@@ -3865,9 +3869,12 @@ function buildMiembrosHTML(){
       </div>
     </div>
     <div id="sa-panel-historial" style="display:none">
-      <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:.75rem;font-size:13px;color:#92400E;text-align:center">📜 <strong>Historial</strong> — 🚧 Próximamente</div>
-      <div class="card" style="padding:0;overflow:hidden;opacity:.4;pointer-events:none">
-        <table><thead><tr><th>Nombre</th><th>Grupos</th><th>Función</th><th>Condición</th><th>Categoría</th></tr></thead>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:.75rem">
+        <label style="font-size:13px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);cursor:pointer"><input type="checkbox" id="sa-hist-todos" onchange="renderMiembrosHistorial()" style="margin-right:6px">Mostrar también a las personas sin cambios</label>
+        <span id="sa-hist-resumen" style="font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)"></span>
+      </div>
+      <div class="card" style="padding:0;overflow-x:auto">
+        <table><thead><tr><th style="width:18%">Nombre</th><th style="width:20%">Condición</th><th style="width:20%">Categoría</th><th style="width:22%">Servicio</th><th id="sa-hist-th-com" style="width:20%">Comentarios</th></tr></thead>
         <tbody id="sa-member-tbody-historial"></tbody></table>
       </div>
     </div>
@@ -3891,12 +3898,14 @@ function buildMiembrosHTML(){
         <button class="nav-btn" onclick="saDetailTab('formacion',this)" style="font-size:12px;padding:6px 10px">🎓 Formación</button>
         <button class="nav-btn" onclick="saDetailTab('servicio',this)" style="font-size:12px;padding:6px 10px">🤝 Servicio</button>
         <button class="nav-btn" onclick="saDetailTab('historial',this)" style="font-size:12px;padding:6px 10px">📜 Historial</button>
+        <button class="nav-btn" id="sa-detail-btn-comentarios" onclick="saDetailTab('comentarios',this)" style="font-size:12px;padding:6px 10px;display:none">💬 Comentarios</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px" id="sa-detail-generales"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;display:none" id="sa-detail-personales"></div>
       <div style="display:none" id="sa-detail-formacion"></div>
       <div style="display:none" id="sa-detail-servicio"></div>
       <div style="display:none" id="sa-detail-historial"></div>
+      <div style="display:none" id="sa-detail-comentarios"></div>
     </div>
 
     <!-- MODAL nuevo/editar miembro -->
@@ -4035,6 +4044,19 @@ async function cfgSaveEtiquetas(){
   etqAplicarSelects();
   showToast('✅ Etiquetas guardadas','#16A34A');
 }
+// ── Registro de cambios por persona (m.cambios): Condición, Categoría y Estado ──
+// Cada línea: tipo, de, a, ts, autor (y motivo si lo hubo). Solo crece; nunca se pisa. Se arma con concat
+// (array nuevo) para que las reversiones por falla de nube puedan volver al array anterior.
+function cambioReg(m,tipo,de,a,motivo,auto){
+  var d=(de==null?'':String(de)), n=(a==null?'':String(a));
+  if(d===n) return;
+  var e={tipo:tipo,de:d,a:n,ts:Date.now(),autor:(currentUser&&currentUser.name)||'Sistema'};
+  if(motivo) e.motivo=String(motivo).slice(0,300);
+  if(auto) e.auto=true;
+  m.cambios=(m.cambios||[]).concat([e]);
+  return e;
+}
+function cambioRestaurarA(m,previo){ if(previo===undefined) delete m.cambios; else m.cambios=previo; }
 function saCategoriaBadge(m){
   var c=categoriaDe(m);
   if(c==='Comprometido') return '<span style="background:#EDE9FE;color:#5B21B6;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;white-space:nowrap">'+etqCat(c)+'</span>';
@@ -4236,7 +4258,8 @@ function saMembrosTab(tab, btn){
   });
   if(tab==='personales') renderMiembrosPersonales();
   if(tab==='formacion') renderFormacionGrid();
-  if(tab==='servicio') renderMiembrosServicio();
+  if(tab==='historial') renderMiembrosHistorial();
+  if(tab==='servicio'){ renderMiembrosServicio(); if(servicioPuedeReconciliar()) servicioReconciliarYGuardar().then(function(){ renderMiembrosServicio(); }); }
 }
 
 // ── Servicio: dónde sirve cada persona (todo calculado de Funciones, Propósitos, Áreas, Grupos y NG; no se duplica nada) ──
@@ -4245,13 +4268,13 @@ var SERV_COL={
   'Colaborador/a':{bg:'#D1FAE5',color:'#065F46'},'Facilitador/a':{bg:'#FEF3C7',color:'#92400E'},'Integrante':{bg:'#F3F4F6',color:'#4B5563'}};
 function servicioLugaresDe(m){
   var id=Number(m.id), r=[];
-  if((m.roles||[]).indexOf('pastor')>=0) r.push({rol:'Pastor',donde:'Pastor'});
+  if((m.roles||[]).indexOf('pastor')>=0) r.push({k:'Pastor|rol',rol:'Pastor',donde:'Pastor'});
   (S.ministerios||[]).forEach(function(p){
-    if((p.liderIds||[]).map(Number).includes(id)) r.push({rol:'Líder',donde:'Propósito '+p.nombre});
+    if((p.liderIds||[]).map(Number).includes(id)) r.push({k:'Líder|p'+p.id,rol:'Líder',donde:'Propósito '+p.nombre});
     if(svcEsLegacy(p)){
       var a=p.area?(' · '+p.area):'';
-      if((p.coordinadorIds||[]).map(Number).includes(id)) r.push({rol:'Coordinador/a',donde:'Área '+(p.area||'General')+' ('+p.nombre+')'});
-      else if((p.colaboradorIds||[]).map(Number).includes(id)) r.push({rol:'Colaborador/a',donde:'Área '+(p.area||'General')+' ('+p.nombre+')'});
+      if((p.coordinadorIds||[]).map(Number).includes(id)) r.push({k:'Coordinador/a|l'+p.id,rol:'Coordinador/a',donde:'Área '+(p.area||'General')+' ('+p.nombre+')'});
+      else if((p.colaboradorIds||[]).map(Number).includes(id)) r.push({k:'Colaborador/a|l'+p.id,rol:'Colaborador/a',donde:'Área '+(p.area||'General')+' ('+p.nombre+')'});
     }
   });
   svcAreas().forEach(function(a){
@@ -4259,37 +4282,232 @@ function servicioLugaresDe(m){
       if(Number(e.personaId)!==id) return;
       var p=a.propositoId?(S.ministerios||[]).find(function(x){return Number(x.id)===Number(a.propositoId);}):null;
       var tipo=a.tipo==='Proyecto ministerial'?'Proyecto':'Área';
-      r.push({rol:SERV_COL[e.rol]?e.rol:'Integrante',donde:tipo+' '+a.nombre+(p?' ('+p.nombre+')':'')+(a.estado==='Inactivo'?' · inactiva':'')});
+      r.push({k:(SERV_COL[e.rol]?e.rol:'Integrante')+'|a'+a.id,rol:SERV_COL[e.rol]?e.rol:'Integrante',donde:tipo+' '+a.nombre+(p?' ('+p.nombre+')':'')+(a.estado==='Inactivo'?' · inactiva':'')});
     });
   });
-  (S.groups||[]).forEach(function(g){ if(Number(g.facId)===id||Number(g.facId2)===id) r.push({rol:'Facilitador/a',donde:'Grupo de Vida '+g.name}); });
+  (S.groups||[]).forEach(function(g){ if(Number(g.facId)===id||Number(g.facId2)===id) r.push({k:'Facilitador/a|g'+g.id,rol:'Facilitador/a',donde:'Grupo de Vida '+g.name}); });
   (S.ngComunidades||[]).forEach(function(c){
-    if((c.liderIds||[]).map(Number).includes(id)) r.push({rol:'Líder',donde:'NG '+c.name});
-    else if((c.colaboradorIds||[]).map(Number).includes(id)) r.push({rol:'Colaborador/a',donde:'NG '+c.name});
+    if((c.liderIds||[]).map(Number).includes(id)) r.push({k:'Líder|n'+c.id,rol:'Líder',donde:'NG '+c.name});
+    else if((c.colaboradorIds||[]).map(Number).includes(id)) r.push({k:'Colaborador/a|n'+c.id,rol:'Colaborador/a',donde:'NG '+c.name});
   });
   return r;
 }
+// ── Historia de Servicio y de Categoría (automática) ──
+// Cada vez que se sube un cambio, se compara lo vigente contra lo registrado: si alguien empezó en un lugar se abre
+// una participación con la fecha de hoy, si dejó de estar se cierra con la fecha de salida (m.servicio). Si la Categoría
+// efectiva cambió por la regla, se anota en m.cambios con su fecha. La primera vez se toma una "foto" de lo vigente
+// SIN fecha (no se puede saber cuándo empezó) y recién desde ahí se registra con fecha real.
+var _recReg=false, _recInicial=false, _recInstalado=false, _recPend=false;
+function servicioPuedeReconciliar(){ return !!currentUser&&(isSuperAdmin()||canEjecutar('servicio_admin')); }
+function servicioReconciliar(){
+  var hoy=today(), autor=(currentUser&&currentUser.name)||'Sistema';
+  var base=!(S.homeConfig&&S.homeConfig.servicioHistDesde);
+  var undo=[];
+  (S.members||[]).forEach(function(m){
+    if(m.condicion==='Nuevo'||m.condicion==='Campaña') return;
+    var prev={servicio:m.servicio,catUlt:m.catUlt,_ts:m._ts}, tocado=false, mias=[];
+    var actuales=servicioLugaresDe(m), porK={}; actuales.forEach(function(x){ porK[x.k]=x; });
+    var hist=(m.servicio||[]).map(function(e){ return Object.assign({},e); }), abiertos={};
+    hist.forEach(function(e){ if(!e.hasta) abiertos[e.k]=e; });
+    Object.keys(abiertos).forEach(function(k){
+      if(!porK[k]){ abiertos[k].hasta=hoy; abiertos[k].autorHasta=autor; tocado=true; }
+      else if(abiertos[k].donde!==porK[k].donde){ abiertos[k].donde=porK[k].donde; tocado=true; }
+    });
+    actuales.forEach(function(x){
+      if(abiertos[x.k]) return;
+      var e={k:x.k,rol:x.rol,donde:x.donde,desde:base?null:hoy,autorDesde:autor}; if(base) e.base=hoy;
+      hist.push(e); tocado=true;
+    });
+    if(tocado) m.servicio=hist;
+    var cat=categoriaDe(m), antes=m.catUlt||'Participante';
+    if(cat!==antes){
+      if(!base){ var motivo=cat==='Comprometido'?categoriaMotivoRegla(m):(cat==='Histórico'?'pasó a Histórico':'ya no cumple la regla de Comprometido'); var e2=cambioReg(m,'categoria',antes,cat,motivo,true); if(e2) mias.push(e2); }
+      m.catUlt=cat; tocado=true;
+    }
+    if(tocado){ m._ts=Date.now(); undo.push({m:m,prev:prev,mias:mias}); }
+  });
+  return {n:undo.length,undo:undo,base:base};
+}
+function servicioDeshacer(r){
+  r.undo.forEach(function(u){
+    var m=u.m;
+    if(u.prev.servicio===undefined) delete m.servicio; else m.servicio=u.prev.servicio;
+    if(u.prev.catUlt===undefined) delete m.catUlt; else m.catUlt=u.prev.catUlt;
+    if(u.mias.length&&m.cambios){ m.cambios=m.cambios.filter(function(c){ return u.mias.indexOf(c)<0; }); if(!m.cambios.length) delete m.cambios; }
+    if(u.prev._ts===undefined) delete m._ts; else m._ts=u.prev._ts;
+  });
+}
+async function servicioReconciliarYGuardar(){
+  if(!servicioPuedeReconciliar()) return;
+  if(_recReg){ _recPend=true; return; }
+  _recReg=true;
+  try{
+    var r=servicioReconciliar();
+    if(!r.n&&!r.base) return;
+    var prevHC=S.homeConfig;
+    if(r.base) S.homeConfig=Object.assign({},S.homeConfig||{},{servicioHistDesde:today()});
+    try{
+      await saveK(SK.members,S.members);
+      if(r.base) await saveK(SK.homeConfig,S.homeConfig);
+      if(typeof window.fbUpload==='function') await window.fbUpload(true);
+    }catch(e){
+      servicioDeshacer(r); S.homeConfig=prevHC;
+      try{ await saveK(SK.members,S.members); await saveK(SK.homeConfig,S.homeConfig); }catch(e2){}
+      console.warn('Historia de servicio: no se pudo guardar, se reintenta en el próximo cambio',e);
+      return;
+    }
+    try{ var tb=document.getElementById('sa-member-tbody-servicio'); if(tb&&tb.offsetParent) renderMiembrosServicio(); }catch(e){}
+  } finally { _recReg=false; if(_recPend){ _recPend=false; setTimeout(servicioReconciliarYGuardar,500); } }
+}
+// Se engancha a cada subida exitosa a la nube (el módulo de Firebase se define después de este script)
+function servicioAutoInstalar(){
+  setInterval(function(){
+    try{
+      if(!_recInstalado&&typeof window.fbUpload==='function'&&!window.fbUpload._svcHook){
+        var orig=window.fbUpload;
+        window.fbUpload=async function(){ var r=await orig.apply(this,arguments); setTimeout(servicioReconciliarYGuardar,300); return r; };
+        window.fbUpload._svcHook=true; _recInstalado=true;
+      }
+      if(servicioPuedeReconciliar()){
+        if(!_recInicial){ _recInicial=true; setTimeout(servicioReconciliarYGuardar,4000); }
+        else servicioReconciliarYGuardar(); // cada 5s se pone al día, con o sin el enganche de subida
+      }
+    }catch(e){}
+  },5000);
+}
+setTimeout(servicioAutoInstalar,0);
+// Participaciones anteriores (ya cerradas) de una persona
+function servicioAntesHTML(m){
+  var cerr=(m.servicio||[]).filter(function(e){return !!e.hasta;}).sort(function(a,b){return String(b.hasta).localeCompare(String(a.hasta));});
+  if(!cerr.length) return '';
+  var h='<div style="font-size:12px;font-weight:700;color:#6B7280;margin:12px 0 2px">Antes</div>';
+  cerr.forEach(function(e){
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #F3F4F6"><div><div style="font-size:13px;color:#374151">'+svcEsc(e.donde)+'</div>'+
+       '<div style="font-size:11px;color:#9CA3AF">'+(e.desde?'Desde '+fmtAA(e.desde):'Desde antes de '+fmtAA(e.base||''))+' · hasta '+fmtAA(e.hasta)+'</div></div>'+ministerioNivelBadge(e.rol)+'</div>';
+  });
+  return h;
+}
+function servicioDesdeDe(m,k){ var e=(m.servicio||[]).filter(function(x){return x.k===k&&!x.hasta;})[0]; return e&&e.desde?e.desde:null; }
+function svcToggleAntes(id){ var e=document.getElementById('serv-antes-'+id); if(e) e.style.display=(e.style.display==='none'?'block':'none'); }
 function renderMiembrosServicio(){
   var tb=document.getElementById('sa-member-tbody-servicio'); if(!tb) return;
   var todos=!!(document.getElementById('sa-serv-todos')&&document.getElementById('sa-serv-todos').checked);
   var base=window._saMembrosFiltered||[], filas=[], lugares=0, personas=0;
   base.forEach(function(m){
-    var l=servicioLugaresDe(m);
+    var l=servicioLugaresDe(m), nAntes=(m.servicio||[]).filter(function(e){return !!e.hasta;}).length;
     if(l.length){ personas++; lugares+=l.length; }
-    if(l.length||todos) filas.push({m:m,l:l});
+    if(l.length||nAntes||todos||base.length<=5) filas.push({m:m,l:l,nAntes:nAntes});
   });
   tb.innerHTML=filas.map(function(f){
     var m=f.m, isBaja=m.estado==='Baja';
     var chips=f.l.length?f.l.map(function(x){
       var c=SERV_COL[x.rol]||SERV_COL['Integrante'];
-      return '<span style="display:inline-block;background:'+c.bg+';color:'+c.color+';font-size:11.5px;padding:2px 9px;border-radius:99px;margin:2px 4px 2px 0;white-space:nowrap"><strong>'+svcEsc(x.rol)+'</strong> · '+svcEsc(x.donde)+'</span>';
+      return '<span style="display:inline-block;background:'+c.bg+';color:'+c.color+';font-size:11.5px;padding:2px 9px;border-radius:99px;margin:2px 4px 2px 0;white-space:nowrap"><strong>'+svcEsc(x.rol)+'</strong> · '+svcEsc(x.donde)+(servicioDesdeDe(m,x.k)?' <span style="opacity:.7">· desde '+fmtAA(servicioDesdeDe(m,x.k))+'</span>':'')+'</span>';
     }).join(''):'<span style="color:#9CA3AF;font-size:12px">No figura sirviendo</span>';
+    if(f.nAntes) chips+='<div style="margin-top:3px"><a href="#" onclick="svcToggleAntes('+m.id+');return false" style="font-size:11.5px;color:#1F4E79">▸ Antes ('+f.nAntes+')</a><div id="serv-antes-'+m.id+'" style="display:none;margin-top:2px">'+servicioAntesHTML(m).replace(/<div style="font-size:12px;font-weight:700[^>]*>Antes<\/div>/,'')+'</div></div>';
     return '<tr style="'+(isBaja?'opacity:0.55;background:#FEF2F2':'')+'">'
       +'<td style="max-width:160px"><span style="cursor:pointer;color:#1F4E79;font-weight:600;word-break:break-word" onclick="saShowDetail('+m.id+',event)">'+svcEsc(listName(m))+'</span></td>'
       +'<td>'+saCondicionBadgeM(m)+'</td><td>'+saCategoriaBadge(m)+'</td><td>'+chips+'</td></tr>';
   }).join('')||'<tr><td colspan="4" style="text-align:center;color:#9CA3AF;padding:1.5rem">Nadie para mostrar con estos filtros</td></tr>';
   var r=document.getElementById('sa-serv-resumen');
-  if(r) r.textContent=personas+' persona'+(personas===1?'':'s')+' sirviendo · '+lugares+' lugar'+(lugares===1?'':'es');
+  if(r){
+    var hd=S.homeConfig&&S.homeConfig.servicioHistDesde;
+    r.textContent=personas+' persona'+(personas===1?'':'s')+' sirviendo · '+lugares+' lugar'+(lugares===1?'':'es')+(servicioPuedeReconciliar()?(hd?' · historia registrada desde '+fmtAA(hd):' · historia aún sin activar'):'');
+  }
+}
+// ── Historial: lo último siempre visible, y con un clic se ve todo lo anterior ──
+var HIST_GRUPO={condicion:'condicion',estado:'condicion',categoria:'categoria',servicio:'servicio',comentario:'comentario'};
+var HIST_ICONO={condicion:'🏷️',estado:'🔄',categoria:'⭐',servicio:'🤝',comentario:'💬'};
+var HIST_NOMBRE={todo:'Todo',condicion:'Condición',categoria:'Categoría',servicio:'Servicio',comentario:'Comentarios'};
+function histTsDe(f){ var d=new Date(String(f).slice(0,10)+'T12:00:00'); return isNaN(d.getTime())?0:d.getTime(); }
+function histEventos(m){
+  var ev=[], cb=m.cambios||[], estDias={};
+  cb.forEach(function(c){
+    var f=dateToStr(new Date(c.ts||0));
+    if(c.tipo==='estado') estDias[f+'|'+c.a]=1;
+    var t;
+    if(c.tipo==='condicion') t='Condición: '+etqCond(c.de)+' → '+etqCond(c.a);
+    else if(c.tipo==='categoria') t='Categoría: '+etqCat(c.de||'Participante')+' → '+etqCat(c.a)+(c.auto?' (automático)':'');
+    else if(c.tipo==='estado') t='Estado: '+(c.de||'—')+' → '+(c.a||'—');
+    else return;
+    ev.push({tipo:c.tipo,ts:c.ts||0,f:f,texto:t,autor:c.autor||'',motivo:c.motivo||''});
+  });
+  (m.estadoHistorial||[]).forEach(function(h){
+    var f=String(h.fecha||'').slice(0,10); if(!f||estDias[f+'|'+h.a]) return;
+    ev.push({tipo:'estado',ts:histTsDe(f),f:f,texto:'Estado: '+(h.de||'—')+' → '+(h.a||'—'),autor:'',motivo:h.motivo||''});
+  });
+  (m.servicio||[]).forEach(function(e){
+    if(e.desde) ev.push({tipo:'servicio',ts:histTsDe(e.desde),f:e.desde,texto:'Se incorporó · '+e.rol+' · '+e.donde,autor:e.autorDesde||'',motivo:''});
+    if(e.hasta) ev.push({tipo:'servicio',ts:histTsDe(e.hasta)+1,f:e.hasta,texto:'Dejó de servir · '+e.rol+' · '+e.donde,autor:e.autorHasta||'',motivo:''});
+  });
+  if(saComentariosPuedeVer()) (m.comentarios||[]).forEach(function(c){
+    ev.push({tipo:'comentario',ts:c.ts||0,f:dateToStr(new Date(c.ts||0)),texto:c.texto||'',autor:c.autor||'',motivo:''});
+  });
+  return ev.sort(function(a,b){ return b.ts-a.ts; });
+}
+function histLinea(e,corto){
+  var t=svcEsc(e.texto); if(corto&&t.length>110) t=t.slice(0,110)+'…';
+  return '<div style="font-size:12.5px;color:#1F2937;word-break:break-word">'+t+'</div>'+
+    '<div style="font-size:11px;color:#9CA3AF">'+fmtAA(e.f)+(e.autor?' · '+svcEsc(e.autor):'')+(e.motivo?' · “'+svcEsc(e.motivo.length>80?e.motivo.slice(0,80)+'…':e.motivo)+'”':'')+'</div>';
+}
+function histCelda(m,evs,grupo){
+  var l=evs.filter(function(e){return HIST_GRUPO[e.tipo]===grupo;});
+  if(!l.length) return '<span style="color:#D1D5DB">—</span>';
+  var h=histLinea(l[0],true);
+  if(l.length>1){
+    var id='hist-'+grupo+'-'+m.id;
+    h+='<a href="#" onclick="histToggle(\''+id+'\');return false" style="font-size:11.5px;color:#1F4E79;font-weight:600">▸ Ver anteriores ('+(l.length-1)+')</a>'+
+      '<div id="'+id+'" style="display:none;margin-top:4px;padding-left:8px;border-left:2px solid #E5E7EB">'+
+      l.slice(1).map(function(e){ return '<div style="margin-bottom:5px">'+histLinea(e,false)+'</div>'; }).join('')+'</div>';
+  }
+  return h;
+}
+function histToggle(id){ var e=document.getElementById(id); if(e) e.style.display=(e.style.display==='none'?'block':'none'); }
+function renderMiembrosHistorial(){
+  var tb=document.getElementById('sa-member-tbody-historial'); if(!tb) return;
+  var todos=!!(document.getElementById('sa-hist-todos')&&document.getElementById('sa-hist-todos').checked);
+  var verCom=saComentariosPuedeVer();
+  var th=document.getElementById('sa-hist-th-com'); if(th) th.style.display=verCom?'':'none';
+  var cols=verCom?5:4, filas=[], conCambios=0;
+  var lista=window._saMembrosFiltered||[], consulta=lista.length<=5; // pocas personas = se está consultando a alguien puntual: se muestra aunque no tenga cambios
+  lista.forEach(function(m){
+    var ev=histEventos(m); if(ev.length) conCambios++;
+    if(ev.length||todos||consulta) filas.push({m:m,ev:ev});
+  });
+  tb.innerHTML=filas.map(function(f){
+    var m=f.m, isBaja=m.estado==='Baja';
+    return '<tr style="vertical-align:top;'+(isBaja?'opacity:0.55;background:#FEF2F2':'')+'">'
+      +'<td style="max-width:150px"><span style="cursor:pointer;color:#1F4E79;font-weight:600;word-break:break-word" onclick="saShowDetail('+m.id+',event)">'+svcEsc(listName(m))+'</span>'
+      +(f.ev.length?'<div><a href="#" onclick="histVerTodo('+m.id+');return false" style="font-size:11.5px;color:#1F4E79;font-weight:600">📜 Ver historial completo ('+f.ev.length+')</a></div>':'')+'</td>'
+      +(f.ev.length?'<td>'+histCelda(m,f.ev,'condicion')+'</td><td>'+histCelda(m,f.ev,'categoria')+'</td><td>'+histCelda(m,f.ev,'servicio')+'</td>'
+        +(verCom?'<td>'+histCelda(m,f.ev,'comentario')+'</td>':'')
+        :'<td colspan="'+(cols-1)+'" style="text-align:center;color:#9CA3AF;padding:1.2rem">Todavía no hay cambios registrados con estos filtros</td>')+'</tr>';
+  }).join('')||'<tr><td colspan="'+cols+'" style="text-align:center;color:#9CA3AF;padding:1.5rem">Todavía no hay cambios registrados con estos filtros</td></tr>';
+  var r=document.getElementById('sa-hist-resumen'); if(r) r.textContent=conCambios+' persona'+(conCambios===1?'':'s')+' con cambios registrados';
+}
+// Línea de tiempo de una persona (ficha), con filtro por tipo
+function histTimelineHTML(m,filtro){
+  filtro=filtro||'todo';
+  var ev=histEventos(m), tipos=['todo','condicion','categoria','servicio']; if(saComentariosPuedeVer()) tipos.push('comentario');
+  var chips='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+tipos.map(function(t){
+    var on=t===filtro;
+    return '<button type="button" onclick="histFiltro('+m.id+',\''+t+'\')" style="font-size:12px;padding:4px 10px;border-radius:99px;cursor:pointer;border:1px solid '+(on?'#1F4E79':'#E5E7EB')+';background:'+(on?'#1F4E79':'#fff')+';color:'+(on?'#fff':'#374151')+'">'+HIST_NOMBRE[t]+'</button>';
+  }).join('')+'</div>';
+  var l=ev.filter(function(e){ return filtro==='todo'||HIST_GRUPO[e.tipo]===filtro; });
+  var cuerpo=l.length?l.map(function(e){
+    return '<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #F3F4F6"><div style="font-size:15px">'+HIST_ICONO[e.tipo]+'</div><div>'+histLinea(e,false)+'</div></div>';
+  }).join(''):'<div style="color:#9CA3AF;font-size:13px;padding:6px 0">Sin cambios registrados todavía.</div>';
+  return chips+cuerpo+'<div style="font-size:11px;color:#9CA3AF;margin-top:8px">Se registra desde que se publicó esta función; la fecha de ingreso es el alta.</div>';
+}
+function histFiltro(id,tipo){
+  var m=S.members.find(function(x){return Number(x.id)===Number(id);}); var el=document.getElementById('sa-detail-historial');
+  if(m&&el) el.innerHTML=histTimelineHTML(m,tipo);
+}
+function histVerTodo(id){
+  if(typeof saDetailMemberId!=='undefined'&&saDetailMemberId!==id) saShowDetail(id,{});
+  var btns=document.querySelectorAll('#sa-detail-panel .nav-btn'), b=null;
+  btns.forEach(function(x){ if((x.getAttribute('onclick')||'').indexOf("'historial'")>=0) b=x; });
+  saDetailTab('historial',b);
 }
 function renderMiembrosPersonales(){
   const tbody=document.getElementById('sa-member-tbody-personales');
@@ -4344,14 +4562,19 @@ async function saSetCategoria(memberId,valor){
   if(!puedeCambiarCategoria()){ alert('No tenés permiso para cambiar la Categoría.'); return; }
   var m=S.members.find(function(x){return Number(x.id)===Number(memberId);}); if(!m) return;
   if(valor!==''&&valor!=='Participante'&&valor!=='Comprometido') return;
+  var prevCambios=m.cambios, catAntes=categoriaDe(m), prevCatUlt=m.catUlt;
   var prev={categoria:m.categoria,categoriaOrigen:m.categoriaOrigen,categoriaPor:m.categoriaPor,categoriaFecha:m.categoriaFecha,_ts:m._ts};
   if(valor===''){ delete m.categoria; delete m.categoriaOrigen; delete m.categoriaPor; delete m.categoriaFecha; }
   else { m.categoria=valor; m.categoriaOrigen='manual'; m.categoriaPor=currentUser?currentUser.name:''; m.categoriaFecha=new Date().toISOString().slice(0,10); }
+  cambioReg(m,'categoria',catAntes,categoriaDe(m));
+  m.catUlt=categoriaDe(m);
   m._ts=Date.now();
   try{
     await saveK(SK.members,S.members);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
+    cambioRestaurarA(m,prevCambios);
+    if(prevCatUlt===undefined) delete m.catUlt; else m.catUlt=prevCatUlt;
     Object.keys(prev).forEach(function(k){ if(prev[k]===undefined) delete m[k]; else m[k]=prev[k]; });
     try{ await saveK(SK.members,S.members); }catch(e2){}
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
@@ -4452,6 +4675,7 @@ function renderMiembrosStandalone(){
       <td>${saCondicionBadgeM(m)}</td>
       <td style="color:#6B7280;font-size:12px">${memberGroups.length?memberGroups.map(gr=>`<div>${gr.name}</div>`).join(''):'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
       <td>${saCategoriaBadge(m)}</td>
+      <td style="font-size:12px;color:#6B7280;white-space:nowrap">${saFmtDate(m.fechaIngreso)||'—'}</td>
     </tr>`;
   }).join('');
 
@@ -4479,6 +4703,7 @@ function renderMiembrosStandalone(){
   });
 
   if(document.getElementById('sa-panel-servicio')&&document.getElementById('sa-panel-servicio').style.display!=='none') renderMiembrosServicio();
+  if(document.getElementById('sa-panel-historial')&&document.getElementById('sa-panel-historial').style.display!=='none') renderMiembrosHistorial();
   // Re-render personales tab if it's active
   if(document.getElementById('sa-panel-personales')&&document.getElementById('sa-panel-personales').style.display!=='none'){
     renderMiembrosPersonales();
@@ -4540,10 +4765,50 @@ function saToggleEstadoHistorial(){
   const el=document.getElementById('sa-estado-historial');
   if(el) el.style.display=(el.style.display==='none')?'block':'none';
 }
+// ── Comentarios pastorales en Rebaños ──
+// Es la MISMA lista que usa Nuevos Contactos (m.comentarios: texto, autor, ts): se ve en los dos lados.
+// Permiso "comentarios_rebanos": consulta = solo leer, ejecuta = leer y escribir. Por defecto Pastor + Super Admin.
+function saComentariosPuedeVer(){ return isSuperAdmin()||canScreen('comentarios_rebanos'); }
+function saComentariosPuedeEscribir(){ return isSuperAdmin()||canEjecutar('comentarios_rebanos'); }
+function saComentariosHTML(m){
+  if(!saComentariosPuedeVer()) return '';
+  var coms=(m.comentarios||[]).slice().sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+  var lista=coms.length?coms.map(function(c){
+    return '<div style="padding:7px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #1F4E79"><div style="color:#1F2937;font-size:13px;margin-bottom:2px;white-space:pre-wrap;word-break:break-word">'+svcEsc(c.texto)+'</div>'+
+      '<div style="font-size:11px;color:#9CA3AF">'+svcEsc(c.autor||'—')+' · '+(c.ts?new Date(c.ts).toLocaleString('es-AR'):'—')+'</div></div>';
+  }).join(''):'<div style="color:#9CA3AF;font-size:13px;padding:4px 0">Sin comentarios aún.</div>';
+  var alta=saComentariosPuedeEscribir()?
+    '<div style="margin-top:8px"><textarea id="sa-com-txt-'+m.id+'" placeholder="Agregar comentario…" style="width:100%;box-sizing:border-box;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;min-height:60px;resize:vertical"></textarea>'+
+    '<div style="text-align:right;margin-top:6px"><button class="btn btn-primary btn-sm" id="sa-com-btn-'+m.id+'" onclick="saGuardarComentario('+m.id+')">Guardar comentario</button></div></div>':'';
+  return '<div style="padding:.5rem 0"><div style="max-height:260px;overflow-y:auto">'+lista+'</div>'+alta+'</div>';
+}
+async function saGuardarComentario(memberId){
+  if(!saComentariosPuedeEscribir()){ alert('No tenés permiso para escribir comentarios.'); return; }
+  var m=S.members.find(function(x){return Number(x.id)===Number(memberId);}); if(!m) return;
+  var el=document.getElementById('sa-com-txt-'+memberId); var txt=((el&&el.value)||'').trim();
+  if(txt.length<3){ showToast('Escribí el comentario primero','#D97706'); return; }
+  var btn=document.getElementById('sa-com-btn-'+memberId); if(btn) btn.disabled=true;
+  var prevTs=m._ts, tenia=!!m.comentarios, nuevo={texto:txt,autor:(currentUser&&currentUser.name)||'Sistema',ts:Date.now(),origen:'rebanos'};
+  if(!m.comentarios) m.comentarios=[];
+  m.comentarios.push(nuevo); m._ts=Date.now();
+  try{
+    await saveK(SK.members,S.members);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    m.comentarios=m.comentarios.filter(function(c){return c!==nuevo;}); if(!tenia&&!m.comentarios.length) delete m.comentarios;
+    if(prevTs===undefined) delete m._ts; else m._ts=prevTs;
+    try{ await saveK(SK.members,S.members); }catch(e2){}
+    if(btn) btn.disabled=false;
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  var cont=document.getElementById('sa-detail-comentarios'); if(cont) cont.innerHTML=saComentariosHTML(m);
+  showToast('💬 Comentario guardado','#16A34A');
+}
 function saDetailTab(tab,btn){
   document.querySelectorAll('#sa-detail-panel .nav-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  ['generales','personales','formacion','servicio','historial'].forEach(t=>{
+  ['generales','personales','formacion','servicio','historial','comentarios'].forEach(t=>{
     const el=document.getElementById('sa-detail-'+t);
     if(!el) return;
     if(t===tab) el.style.display=(t==='generales'||t==='personales')?'grid':'block';
@@ -4623,8 +4888,11 @@ function saShowDetail(id,event){
       </div>`:''}
     </div>`;
 
-  document.getElementById('sa-detail-servicio').innerHTML=svcDondeSirveHTML(m.id);
-  document.getElementById('sa-detail-historial').innerHTML='<div class="empty" style="padding:1.5rem 0">📜 Historial — 🚧 Próximamente</div>';
+  document.getElementById('sa-detail-servicio').innerHTML=svcDondeSirveHTML(m.id)+servicioAntesHTML(m);
+  document.getElementById('sa-detail-historial').innerHTML=histTimelineHTML(m,'todo');
+  var _bc=document.getElementById('sa-detail-btn-comentarios');
+  if(_bc) _bc.style.display=saComentariosPuedeVer()?'':'none';
+  document.getElementById('sa-detail-comentarios').innerHTML=saComentariosHTML(m);
 
   // Reset to first tab
   saDetailTab('generales', document.querySelector('#sa-detail-panel .nav-btn'));
@@ -4843,7 +5111,7 @@ async function saSaveMember(){
   let esNuevo=false;
   if(saEditingMemberId){
     target=S.members.find(x=>Number(x.id)===Number(saEditingMemberId));
-    if(target){ snapshotPrevio=Object.assign({},target); Object.assign(target,data); } // Estado no se toca acá — se cambia solo con Dar de baja/Reactivar
+    if(target){ snapshotPrevio=Object.assign({},target); Object.assign(target,data); cambioReg(target,'condicion',snapshotPrevio.condicion,data.condicion); } // Estado no se toca acá — se cambia solo con Dar de baja/Reactivar
   } else {
     esNuevo=true;
     if(!nvConfirmarAltaSiHayParecido(nombre,apellido,data.tel)) return;
@@ -4860,6 +5128,7 @@ async function saSaveMember(){
       S.members=S.members.filter(function(m){return m.id!==target.id;});
     } else if(target&&snapshotPrevio){
       Object.assign(target,snapshotPrevio);
+      cambioRestaurarA(target,snapshotPrevio.cambios);
     }
     await saveK(SK.members,S.members);
     const errMsg='No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.';
@@ -4922,24 +5191,45 @@ async function saCloseMemberForm(){
   saEditingMemberId=null;
 }
 
+// Pide un texto (motivo) con una ventana propia de la app: el prompt() del navegador puede estar bloqueado
+// (ventana embebida o "no permitir más diálogos") y entonces el botón parecía no hacer nada.
+function saPedirMotivo(titulo,ayuda,minimo){
+  minimo=minimo||10;
+  return new Promise(function(resolve){
+    var ov=document.getElementById('sa-motivo-overlay'); if(ov) ov.remove();
+    ov=document.createElement('div'); ov.id='sa-motivo-overlay';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:960;display:flex;align-items:center;justify-content:center;padding:1rem';
+    ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:1.25rem;width:100%;max-width:400px;box-shadow:0 12px 40px rgba(0,0,0,.3)">'+
+      '<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:4px">'+svcEsc(titulo)+'</div>'+
+      '<div style="font-size:12.5px;color:#6B7280;margin-bottom:8px">'+svcEsc(ayuda||'')+'</div>'+
+      '<textarea id="sa-motivo-txt" style="width:100%;box-sizing:border-box;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;min-height:80px;resize:vertical"></textarea>'+
+      '<div id="sa-motivo-err" style="display:none;font-size:12.5px;color:#DC2626;margin-top:4px"></div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn btn-sm" id="sa-motivo-no">Cancelar</button><button class="btn btn-sm btn-primary" id="sa-motivo-ok">Confirmar</button></div></div>';
+    document.body.appendChild(ov);
+    var t=document.getElementById('sa-motivo-txt'); t.focus();
+    document.getElementById('sa-motivo-no').onclick=function(){ ov.remove(); resolve(null); };
+    document.getElementById('sa-motivo-ok').onclick=function(){
+      var v=(t.value||'').trim();
+      if(v.length<minimo){ var e=document.getElementById('sa-motivo-err'); e.textContent='El motivo es obligatorio y debe tener al menos '+minimo+' caracteres.'; e.style.display='block'; return; }
+      ov.remove(); resolve(v);
+    };
+  });
+}
 async function saQuickToggleEstado(id){
   const m=S.members.find(x=>Number(x.id)===Number(id));
   if(!m) return;
   const estadoActual=m.estado==='Baja'?'Baja':'Activo';
   const nuevoEstado=estadoActual==='Baja'?'Activo':'Baja';
   const accion=nuevoEstado==='Baja'?'dar de baja':'reactivar';
-  var motivo=prompt('Motivo para '+accion+' a '+fullName(m)+' (mínimo 10 caracteres):','');
+  var motivo=await saPedirMotivo('Motivo para '+accion+' a '+fullName(m),'Mínimo 10 caracteres.');
   if(motivo===null) return; // cancelado
-  if(!motivo||motivo.trim().length<10){
-    alert('El motivo es obligatorio y debe tener al menos 10 caracteres.');
-    return;
-  }
   motivo=motivo.trim();
   const prevEstado=m.estado;
   const prevFechaBaja=m.fechaBaja;
   const prevCondicion=m.condicion;
   const prevCondicionAnterior=m.condicionAnterior;
   const prevTs=m._ts;
+  const prevCambios=m.cambios;
   m.estado=nuevoEstado;
   // Baja y Histórico son el mismo concepto — se sincronizan juntos
   if(nuevoEstado==='Baja'){
@@ -4957,6 +5247,8 @@ async function saQuickToggleEstado(id){
     condicion:prevCondicion,
     motivo
   });
+  cambioReg(m,'estado',estadoActual,nuevoEstado,motivo);
+  cambioReg(m,'condicion',prevCondicion,m.condicion,motivo);
   m._ts=Date.now();
   m.estadoMotivo=motivo;
   m.estadoMotivoFecha=today();
@@ -4972,6 +5264,7 @@ async function saQuickToggleEstado(id){
     m.condicion=prevCondicion;
     m.condicionAnterior=prevCondicionAnterior;
     m._ts=prevTs;
+    cambioRestaurarA(m,prevCambios);
     m.estadoHistorial.pop();
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
@@ -16272,7 +16565,9 @@ async function nvPromover(condicion){
   }
   var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,condicion:m.condicion,subEstado:m.subEstado,comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   const condAnterior=m.condicion||'Nuevo';
+  const cambiosPrev=m.cambios;
   m.condicion=condicion;
+  cambioReg(m,'condicion',condAnterior,condicion,txtComentario);
   if(condicion!=='Nuevo'){
     // Sale del pipeline de Nuevos — el historial de sub-estado queda guardado para auditoría
     m.subEstado=null;
@@ -16294,6 +16589,7 @@ async function nvPromover(condicion){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     Object.assign(m,snapshot);
+    cambioRestaurarA(m,cambiosPrev);
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -16318,6 +16614,9 @@ async function nvDarDeBaja(){
   }
   if(!confirm('¿Pasar a Histórico a '+fullName(m)+'?')) return;
   var snapshot=Object.assign({},m);
+  const cambiosPrev=m.cambios;
+  cambioReg(m,'estado',m.estado||'Activo','Baja',txtComentario);
+  cambioReg(m,'condicion',m.condicion,'Historico',txtComentario);
   m.condicion='Historico';
   m.subEstado=null;
   m.estado='Baja';
@@ -16336,6 +16635,7 @@ async function nvDarDeBaja(){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     Object.assign(m,snapshot);
+    cambioRestaurarA(m,cambiosPrev);
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -16460,6 +16760,9 @@ async function nvReactivar(){
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
   var snapshot=Object.assign({},m);
+  const cambiosPrev=m.cambios;
+  cambioReg(m,'estado',m.estado||'Baja','Activo','Re-activación desde Histórico');
+  cambioReg(m,'condicion',m.condicion,'Nuevo','Re-activación desde Histórico');
   const subEstadoAnterior=m.subEstado||'Ingresado';
   m.condicion='Nuevo';
   m.subEstado='Ingresado';
@@ -16484,6 +16787,7 @@ async function nvReactivar(){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     Object.assign(m,snapshot);
+    cambioRestaurarA(m,cambiosPrev);
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;

@@ -3819,27 +3819,24 @@ function buildMiembrosHTML(){
     </div>
     <!-- Sub-tabs estilo GdV Dashboard -->
     <div class="nav" style="margin-bottom:.75rem;flex-wrap:wrap">
-      <button class="nav-btn active" onclick="saMembrosTab('generales',this)">📋 Datos Generales</button>
-      <button class="nav-btn" onclick="saMembrosTab('personales',this)">👤 Datos Personales</button>
+      <button class="nav-btn active" onclick="saMembrosTab('personales',this)">👤 Datos Personales</button>
+      <button class="nav-btn" onclick="saMembrosTab('generales',this)">📋 Datos Generales</button>
       <button class="nav-btn" onclick="saMembrosTab('formacion',this)">🎓 Formación</button>
       <button class="nav-btn" onclick="saMembrosTab('servicio',this)">🤝 Servicio</button>
       <button class="nav-btn" onclick="saMembrosTab('historial',this)">📜 Historial</button>
     </div>
-    <div id="sa-panel-generales" class="card" style="padding:0;overflow:hidden">
+    <div id="sa-panel-generales" class="card" style="display:none;padding:0;overflow:hidden">
       <table>
         <thead><tr>
-          <th style="width:24%">Nombre</th>
-          <th style="width:5%">Sexo</th>
-          <th style="width:19%">Grupos</th>
-          <th style="width:18%">Función</th>
-          <th style="width:13%">Condición</th>
-          <th style="width:9%">Categoría</th>
-          <th style="width:12%">Ingreso</th>
+          <th style="width:30%">Nombre</th>
+          <th style="width:22%">Condición</th>
+          <th style="width:30%">Grupos</th>
+          <th style="width:18%">Categoría</th>
         </tr></thead>
         <tbody id="sa-member-tbody"></tbody>
       </table>
     </div>
-    <div id="sa-panel-personales" class="card" style="display:none;padding:0;overflow:hidden">
+    <div id="sa-panel-personales" class="card" style="padding:0;overflow:hidden">
       <table>
         <thead><tr>
           <th style="width:27%">Nombre</th>
@@ -3858,9 +3855,12 @@ function buildMiembrosHTML(){
       </div>
     </div>
     <div id="sa-panel-servicio" style="display:none">
-      <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:.75rem;font-size:13px;color:#92400E;text-align:center">🤝 <strong>Servicio</strong> — 🚧 Próximamente</div>
-      <div class="card" style="padding:0;overflow:hidden;opacity:.4;pointer-events:none">
-        <table><thead><tr><th>Nombre</th><th>Grupos</th><th>Función</th><th>Condición</th><th>Categoría</th></tr></thead>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:.75rem">
+        <label style="font-size:13px;color:#4B5563;cursor:pointer"><input type="checkbox" id="sa-serv-todos" onchange="renderMiembrosServicio()" style="margin-right:6px">Mostrar también a las personas que no sirven</label>
+        <span id="sa-serv-resumen" style="font-size:12px;color:#6B7280"></span>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table><thead><tr><th style="width:24%">Nombre</th><th style="width:16%">Condición</th><th style="width:12%">Categoría</th><th style="width:48%">Dónde sirve</th></tr></thead>
         <tbody id="sa-member-tbody-servicio"></tbody></table>
       </div>
     </div>
@@ -4236,8 +4236,61 @@ function saMembrosTab(tab, btn){
   });
   if(tab==='personales') renderMiembrosPersonales();
   if(tab==='formacion') renderFormacionGrid();
+  if(tab==='servicio') renderMiembrosServicio();
 }
 
+// ── Servicio: dónde sirve cada persona (todo calculado de Funciones, Propósitos, Áreas, Grupos y NG; no se duplica nada) ──
+var SERV_COL={
+  'Pastor':{bg:'#FEE2E2',color:'#991B1B'},'Líder':{bg:'#EDE9FE',color:'#5B21B6'},'Coordinador/a':{bg:'#DBEAFE',color:'#1E40AF'},
+  'Colaborador/a':{bg:'#D1FAE5',color:'#065F46'},'Facilitador/a':{bg:'#FEF3C7',color:'#92400E'},'Integrante':{bg:'#F3F4F6',color:'#4B5563'}};
+function servicioLugaresDe(m){
+  var id=Number(m.id), r=[];
+  if((m.roles||[]).indexOf('pastor')>=0) r.push({rol:'Pastor',donde:'Pastor'});
+  (S.ministerios||[]).forEach(function(p){
+    if((p.liderIds||[]).map(Number).includes(id)) r.push({rol:'Líder',donde:'Propósito '+p.nombre});
+    if(svcEsLegacy(p)){
+      var a=p.area?(' · '+p.area):'';
+      if((p.coordinadorIds||[]).map(Number).includes(id)) r.push({rol:'Coordinador/a',donde:'Área '+(p.area||'General')+' ('+p.nombre+')'});
+      else if((p.colaboradorIds||[]).map(Number).includes(id)) r.push({rol:'Colaborador/a',donde:'Área '+(p.area||'General')+' ('+p.nombre+')'});
+    }
+  });
+  svcAreas().forEach(function(a){
+    (a.equipo||[]).forEach(function(e){
+      if(Number(e.personaId)!==id) return;
+      var p=a.propositoId?(S.ministerios||[]).find(function(x){return Number(x.id)===Number(a.propositoId);}):null;
+      var tipo=a.tipo==='Proyecto ministerial'?'Proyecto':'Área';
+      r.push({rol:SERV_COL[e.rol]?e.rol:'Integrante',donde:tipo+' '+a.nombre+(p?' ('+p.nombre+')':'')+(a.estado==='Inactivo'?' · inactiva':'')});
+    });
+  });
+  (S.groups||[]).forEach(function(g){ if(Number(g.facId)===id||Number(g.facId2)===id) r.push({rol:'Facilitador/a',donde:'Grupo de Vida '+g.name}); });
+  (S.ngComunidades||[]).forEach(function(c){
+    if((c.liderIds||[]).map(Number).includes(id)) r.push({rol:'Líder',donde:'NG '+c.name});
+    else if((c.colaboradorIds||[]).map(Number).includes(id)) r.push({rol:'Colaborador/a',donde:'NG '+c.name});
+  });
+  return r;
+}
+function renderMiembrosServicio(){
+  var tb=document.getElementById('sa-member-tbody-servicio'); if(!tb) return;
+  var todos=!!(document.getElementById('sa-serv-todos')&&document.getElementById('sa-serv-todos').checked);
+  var base=window._saMembrosFiltered||[], filas=[], lugares=0, personas=0;
+  base.forEach(function(m){
+    var l=servicioLugaresDe(m);
+    if(l.length){ personas++; lugares+=l.length; }
+    if(l.length||todos) filas.push({m:m,l:l});
+  });
+  tb.innerHTML=filas.map(function(f){
+    var m=f.m, isBaja=m.estado==='Baja';
+    var chips=f.l.length?f.l.map(function(x){
+      var c=SERV_COL[x.rol]||SERV_COL['Integrante'];
+      return '<span style="display:inline-block;background:'+c.bg+';color:'+c.color+';font-size:11.5px;padding:2px 9px;border-radius:99px;margin:2px 4px 2px 0;white-space:nowrap"><strong>'+svcEsc(x.rol)+'</strong> · '+svcEsc(x.donde)+'</span>';
+    }).join(''):'<span style="color:#9CA3AF;font-size:12px">No figura sirviendo</span>';
+    return '<tr style="'+(isBaja?'opacity:0.55;background:#FEF2F2':'')+'">'
+      +'<td style="max-width:160px"><span style="cursor:pointer;color:#1F4E79;font-weight:600;word-break:break-word" onclick="saShowDetail('+m.id+',event)">'+svcEsc(listName(m))+'</span></td>'
+      +'<td>'+saCondicionBadgeM(m)+'</td><td>'+saCategoriaBadge(m)+'</td><td>'+chips+'</td></tr>';
+  }).join('')||'<tr><td colspan="4" style="text-align:center;color:#9CA3AF;padding:1.5rem">Nadie para mostrar con estos filtros</td></tr>';
+  var r=document.getElementById('sa-serv-resumen');
+  if(r) r.textContent=personas+' persona'+(personas===1?'':'s')+' sirviendo · '+lugares+' lugar'+(lugares===1?'':'es');
+}
 function renderMiembrosPersonales(){
   const tbody=document.getElementById('sa-member-tbody-personales');
   if(!tbody) return;
@@ -4396,17 +4449,14 @@ function renderMiembrosStandalone(){
         <span style="cursor:pointer;color:#1F4E79;font-weight:600;text-decoration:underline dotted;word-break:break-word" onclick="saShowDetail(${m.id},event)">${listName(m)}</span>
         ${isBaja?`<div style="font-size:11px;color:#DC2626;margin-top:2px">Baja: ${saFmtDate(m.fechaBaja||'')}</div>`:''}
       </td>
-      <td><span style="background:${genBg};color:${genColor};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${m.genero}</span></td>
-      <td style="color:#6B7280;font-size:12px">${memberGroups.length?memberGroups.map(gr=>`<div>${gr.name}</div>`).join(''):'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
-      <td style="max-width:180px"><div style="display:flex;flex-wrap:wrap;gap:3px;max-height:52px;overflow:hidden">${roleChips(m.roles||[],m.id)}</div></td>
       <td>${saCondicionBadgeM(m)}</td>
+      <td style="color:#6B7280;font-size:12px">${memberGroups.length?memberGroups.map(gr=>`<div>${gr.name}</div>`).join(''):'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
       <td>${saCategoriaBadge(m)}</td>
-      <td style="font-size:12px;color:#6B7280">${saFmtDate(m.fechaIngreso)||'—'}</td>
     </tr>`;
   }).join('');
 
   // Populate preview tables for Formación / Servicio / Historial (dimmed, read-only)
-  ['formacion','servicio','historial'].forEach(function(tab){
+  ['formacion','historial'].forEach(function(tab){
     const tb=document.getElementById('sa-member-tbody-'+tab);
     if(!tb) return;
     tb.innerHTML=members.map(function(m){
@@ -4428,6 +4478,7 @@ function renderMiembrosStandalone(){
     }).join('');
   });
 
+  if(document.getElementById('sa-panel-servicio')&&document.getElementById('sa-panel-servicio').style.display!=='none') renderMiembrosServicio();
   // Re-render personales tab if it's active
   if(document.getElementById('sa-panel-personales')&&document.getElementById('sa-panel-personales').style.display!=='none'){
     renderMiembrosPersonales();

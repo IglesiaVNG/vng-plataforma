@@ -466,6 +466,8 @@ const KEY_GROUPS = {
   // El orden importa: tombstones → celebraciones → marcas (la purga de marcas usa las celebraciones ya fusionadas).
   'celebraciones': ['_tomb_gdv_celebraciones','gdv_celebraciones','gdv_celeb_marcas'],
   'oracion': ['_tomb_gdv_oracion_motivos','gdv_oracion_motivos','_tomb_gdv_oracion_mensajes','gdv_oracion_mensajes'],
+  // Finanzas (zzx): documento propio, TODO cifrado (montos, saldos, cierres). Merge por id+_ts en las 4 claves.
+  'finanzas': ['_tomb_gdv_fin_movs','gdv_fin_movs','gdv_fin_meses','gdv_fin_llave','gdv_fin_config'],
   'formularios': ['_tomb_gdv_formularios','gdv_formularios','_tomb_gdv_form_respuestas','gdv_form_respuestas','_tomb_gdv_form_analisis','gdv_form_analisis'],
   'of':      ['of5_alumnos','of5_pagos','of5_encuentros','of5_asist',
                'of5_part','of5_obspart','of5_obspago','of5_materias',
@@ -496,8 +498,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes','gdv_ministerios','gdv_areas_servicio','gdv_celebraciones','gdv_celeb_marcas','gdv_roles5'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes','gdv_ministerios':'_tomb_gdv_ministerios','gdv_areas_servicio':'_tomb_gdv_areas_servicio','gdv_celebraciones':'_tomb_gdv_celebraciones','gdv_roles5':'_tomb_gdv_roles5'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes','gdv_ministerios','gdv_areas_servicio','gdv_celebraciones','gdv_celeb_marcas','gdv_roles5','gdv_fin_movs','gdv_fin_meses','gdv_fin_llave','gdv_fin_config'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes','gdv_ministerios':'_tomb_gdv_ministerios','gdv_areas_servicio':'_tomb_gdv_areas_servicio','gdv_celebraciones':'_tomb_gdv_celebraciones','gdv_roles5':'_tomb_gdv_roles5','gdv_fin_movs':'_tomb_gdv_fin_movs'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -735,8 +737,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes','gdv_ministerios','gdv_areas_servicio','gdv_celebraciones','gdv_celeb_marcas','gdv_roles5'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes','gdv_ministerios':'_tomb_gdv_ministerios','gdv_areas_servicio':'_tomb_gdv_areas_servicio','gdv_celebraciones':'_tomb_gdv_celebraciones','gdv_roles5':'_tomb_gdv_roles5'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes','gdv_ministerios','gdv_areas_servicio','gdv_celebraciones','gdv_celeb_marcas','gdv_roles5','gdv_fin_movs','gdv_fin_meses','gdv_fin_llave','gdv_fin_config'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes','gdv_ministerios':'_tomb_gdv_ministerios','gdv_areas_servicio':'_tomb_gdv_areas_servicio','gdv_celebraciones':'_tomb_gdv_celebraciones','gdv_roles5':'_tomb_gdv_roles5','gdv_fin_movs':'_tomb_gdv_fin_movs'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -831,7 +833,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzw';
+const APP_VERSION = '2026-08-24-zzx';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -983,6 +985,15 @@ const MODULES_PERM=[
     {key:'celeb_ausencias',  label:'Ver la alerta de ausencias ("No lo vemos hace N domingos")'},
     {key:'celeb_dashboard',  label:'Ver el Dashboard'},
   ]},
+  {key:'fin', label:'Finanzas', icon:'💰', screens:[
+    {key:'fin_ver',      label:'Ver movimientos, saldos, cierres y reportes (necesita la llave de Tesorería). El equipo del Área de servicio Tesorería recibe las Funciones automáticas Coordinador/a Tesorería y Colaborador/a Tesorería'},
+    {key:'fin_cargar',   label:'Cargar movimientos (sin "Ver": carga sin ver, queda pendiente de revisión)'},
+    {key:'fin_revisar',  label:'Revisar lo cargado sin ver (incorporar o rechazar)'},
+    {key:'fin_editar',   label:'Editar y eliminar movimientos, cerrar y reabrir meses, cargar meses resumen'},
+    {key:'fin_config',   label:'Configurar categorías, cuentas, mes de inicio y saldos iniciales'},
+    {key:'fin_llave',    label:'🔐 Dar y quitar acceso (entregar la llave de Tesorería y rotarla)'},
+    {key:'fin_exportar', label:'Exportar a Excel (sale sin cifrar)'},
+  ]},
   {key:'of', label:'Orientación Familiar', icon:'👨‍👩‍👧', screens:[
     {key:'of', label:'Módulo completo'},
   ]},
@@ -1038,7 +1049,7 @@ const SCREENS=MODULES_PERM.flatMap(function(m){return m.screens;});
 
 // Default permission matrix
 const DEFAULT_PERMISOS={
-  pastor      : {comentarios_rebanos:'ejecuta',servicio_admin:'ejecuta',categoria_editar:'ejecuta',oracion_crear:'ejecuta',gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',oracion_ver:'ejecuta',oracion_todos:'ejecuta',oracion_cerrar:'ejecuta',formularios_todos:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_editar:'ejecuta',celeb_historico:'ejecuta',celeb_ausencias:'ejecuta',celeb_dashboard:'ejecuta'},
+  pastor      : {comentarios_rebanos:'ejecuta',servicio_admin:'ejecuta',categoria_editar:'ejecuta',oracion_crear:'ejecuta',gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ejecuta',config:'ninguno',disc_dashboard:'ejecuta',disc_cargar:'ejecuta',disc_registros:'ejecuta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_mensaje_wa:'ejecuta',agenda_mensaje_externo:'ejecuta',equipo_admin:'ejecuta',oracion_ver:'ejecuta',oracion_todos:'ejecuta',oracion_cerrar:'ejecuta',formularios_todos:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_editar:'ejecuta',celeb_historico:'ejecuta',celeb_ausencias:'ejecuta',celeb_dashboard:'ejecuta',fin_ver:'ejecuta',fin_editar:'ejecuta'},
   lider       : {oracion_ver:'consulta',oracion_crear:'ejecuta',gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'consulta',miembros_editar:'ninguno',nuevos:'consulta',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'consulta',ng_cargar:'ejecuta',ng_registros:'consulta',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   facilitador : {oracion_ver:'consulta',oracion_crear:'ejecuta',gdv_dashboard:'consulta',gdv_cargar:'ejecuta',gdv_registros:'consulta',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ejecuta',ng_dashboard:'ninguno',ng_cargar:'ejecuta',ng_registros:'ninguno',ng_scope_grupo:'ejecuta',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   admin_gdv   : {gdv_dashboard:'ejecuta',gdv_cargar:'ejecuta',gdv_registros:'ejecuta',miembros_ver:'ejecuta',miembros_editar:'ejecuta',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ejecuta',ng_cargar:'ejecuta',ng_registros:'ejecuta',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
@@ -1050,6 +1061,9 @@ const DEFAULT_PERMISOS={
   // Funciones automáticas del equipo del Área Conexión (se pueden ajustar en Configuración → Permisos)
   conexion_coord: {nuevos:'ejecuta',nuevos_editar:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_mensaje_wa:'ejecuta',nuevos_exportar:'ejecuta',nuevos_ver_privados:'ejecuta',celeb_cargar:'ejecuta',celeb_cerrar:'ejecuta',celeb_historico:'ejecuta',celeb_editar:'ejecuta',celeb_ausencias:'ejecuta',celeb_dashboard:'ejecuta'},
   conexion_colab: {nuevos:'ejecuta',nuevos_editar:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ninguno',nuevos_eliminar:'ninguno',nuevos_mensaje_wa:'ninguno',nuevos_exportar:'ninguno',nuevos_ver_privados:'ejecuta',celeb_cargar:'ejecuta',celeb_historico:'ejecuta',celeb_dashboard:'ejecuta'},
+  // Funciones automáticas del equipo del Área Tesorería (Finanzas, zzx). Exportar arranca solo para Super Admin.
+  tesoreria_coord: {fin_ver:'ejecuta',fin_cargar:'ejecuta',fin_revisar:'ejecuta',fin_editar:'ejecuta',fin_config:'ejecuta',fin_llave:'ejecuta',fin_exportar:'ninguno'},
+  tesoreria_colab: {fin_cargar:'ejecuta'},
   contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_contactar:'ejecuta',nuevos_gestionar:'ninguno',nuevos_eliminar:'ninguno'}
 };
 
@@ -1349,6 +1363,7 @@ const SK={users:'gdv_u5',groups:'gdv_g5',records:'gdv_r5',members:'gdv_m5',roles
   checklists:'gdv_checklists',checklistTareas:'gdv_checklist_tareas',checklistSecciones:'gdv_checklist_secciones',
   formularios:'gdv_formularios',formRespuestas:'gdv_form_respuestas',formAnalisis:'gdv_form_analisis',
   oracionMotivos:'gdv_oracion_motivos',oracionMensajes:'gdv_oracion_mensajes',
+  finMovs:'gdv_fin_movs',finMeses:'gdv_fin_meses',finLlave:'gdv_fin_llave',finConfig:'gdv_fin_config',
   homeConfig:'gdv_home_config'};
 
 const DEFAULT_DISC_PASOS=[
@@ -1455,7 +1470,9 @@ function funcionesAutoDefs(){
     {id:'colaborador1783645248659', name:'Colaborador NG', color:'#0D9488', desc:'Colabora en una Comunidad de Nuevas Generaciones (automática)'},
     {id:'coord_area',               name:'Coordinador/a de Área', color:'#B45309', desc:'Coordina un Área de servicio o Proyecto (automática)'},
     {id:'conexion_coord',           name:'Coordinador/a Conexión', color:'#15803D', desc:'Coordinador/a del Área de servicio Conexión (automática)'},
-    {id:'conexion_colab',           name:'Colaborador/a Conexión', color:'#4D7C0F', desc:'Colaborador/a del Área de servicio Conexión (automática)'}
+    {id:'conexion_colab',           name:'Colaborador/a Conexión', color:'#4D7C0F', desc:'Colaborador/a del Área de servicio Conexión (automática)'},
+    {id:'tesoreria_coord',          name:'Coordinador/a Tesorería', color:'#A16207', desc:'Coordinador/a del Área de servicio Tesorería — Responsable de Finanzas (automática)'},
+    {id:'tesoreria_colab',          name:'Colaborador/a Tesorería', color:'#CA8A04', desc:'Colaborador/a del Área de servicio Tesorería — carga sin ver (automática)'}
   ];
 }
 // Agrega a S.roles las definiciones que falten (copy-on-write). Devuelve la lista de ids agregados.
@@ -1672,6 +1689,7 @@ async function initStorage(){
   S.formAnalisis   =load(SK.formAnalisis,   []);
   S.oracionMotivos =load(SK.oracionMotivos, []);
   S.oracionMensajes=load(SK.oracionMensajes,[]);
+  S.finMovs=load(SK.finMovs,[]); S.finMeses=load(SK.finMeses,[]); S.finLlave=load(SK.finLlave,[]); S.finConfig=load(SK.finConfig,[]); // Finanzas: todo cifrado
   S.homeConfig     =load(SK.homeConfig,     {});
   await cleanMembers();
   loadPermisos();
@@ -1751,6 +1769,10 @@ function groupMembers(gid){
 // Los roles de acceso al sistema (Pastor, Admin GdV, etc.) no tienen un área específica.
 function getRoleContexto(memberId, roleId){
   var id=Number(memberId);
+  if(roleId==='tesoreria_coord'||roleId==='tesoreria_colab'){
+    var at=tesoreriaAreas().map(function(a){return a.nombre;});
+    if(at.length) return at.join(', ');
+  }
   if(roleId==='conexion_coord'||roleId==='conexion_colab'){
     var ac=conexionAreas().map(function(a){return a.nombre;});
     if(ac.length) return ac.join(', ');
@@ -3162,6 +3184,22 @@ function conexionRolDe(memberId){
   });
   return rol;
 }
+// ── Equipo del Área de servicio Tesorería (Finanzas, zzx) — mismo mecanismo que Conexión ──
+function tesoreriaAreas(){
+  return (S.areasServicio||[]).filter(function(a){ return a&&normName(a.nombre).indexOf('tesoreria')===0&&svcAreaActiva(a); });
+}
+function tesoreriaRolDe(memberId){
+  if(memberId==null) return null;
+  var rol=null;
+  tesoreriaAreas().forEach(function(a){
+    (a.equipo||[]).forEach(function(e){
+      if(Number(e.personaId)!==Number(memberId)) return;
+      if(e.rol==='Coordinador/a') rol='coord';
+      else if(e.rol==='Colaborador/a'&&rol!=='coord') rol='colab';
+    });
+  });
+  return rol;
+}
 function isContactar(){
   return currentUser && currentUser.role==='contactar';
 }
@@ -3252,7 +3290,9 @@ var FUNC_AUTO_COLAB_NG='colaborador1783645248659';
 var FUNC_AUTO_COORD_AREA='coord_area';
 var FUNC_AUTO_CONEX_COORD='conexion_coord';
 var FUNC_AUTO_CONEX_COLAB='conexion_colab';
-var FUNC_AUTO_IDS=[FUNC_AUTO_FAC,FUNC_AUTO_LIDER_NG,FUNC_AUTO_COLAB_NG,FUNC_AUTO_COORD_AREA,FUNC_AUTO_CONEX_COORD,FUNC_AUTO_CONEX_COLAB];
+var FUNC_AUTO_TES_COORD='tesoreria_coord';
+var FUNC_AUTO_TES_COLAB='tesoreria_colab';
+var FUNC_AUTO_IDS=[FUNC_AUTO_FAC,FUNC_AUTO_LIDER_NG,FUNC_AUTO_COLAB_NG,FUNC_AUTO_COORD_AREA,FUNC_AUTO_CONEX_COORD,FUNC_AUTO_CONEX_COLAB,FUNC_AUTO_TES_COORD,FUNC_AUTO_TES_COLAB];
 // Un Área cuenta como activa si ella y su Propósito no están Inactivos.
 function svcAreaActiva(a){
   if(!a||a.estado==='Inactivo') return false;
@@ -3316,6 +3356,9 @@ function funcionesAutoDeseadas(memberId){
   // Equipo del Área Conexión (activa): Coordinador/a Conexión / Colaborador/a Conexión
   var rc=conexionRolDe(memberId);
   if(rc==='coord') out.add(FUNC_AUTO_CONEX_COORD); else if(rc==='colab') out.add(FUNC_AUTO_CONEX_COLAB);
+  // Equipo del Área Tesorería (activa): Coordinador/a Tesorería / Colaborador/a Tesorería (Finanzas)
+  var rt=tesoreriaRolDe(memberId);
+  if(rt==='coord') out.add(FUNC_AUTO_TES_COORD); else if(rt==='colab') out.add(FUNC_AUTO_TES_COLAB);
   var lp=funcLiderPropositoId();
   if(lp!==null) (S.ministerios||[]).forEach(function(mn){
     if(mn.estado==='Inactivo') return;
@@ -3610,7 +3653,7 @@ var CIF_ITER=250000;
 var _cifPriv=null, _cifUid=null;
 function cifDisponible(){ try{ return pwDisponible()&&!!window.crypto.subtle.generateKey; }catch(e){ return false; } }
 function cifListo(){ return !!_cifPriv&&!!currentUser&&Number(_cifUid)===Number(currentUser.id); }
-function cifCerrarSesion(){ _cifPriv=null; _cifUid=null; try{ orKeys={}; orTxt={}; }catch(e){} }
+function cifCerrarSesion(){ _cifPriv=null; _cifUid=null; try{ orKeys={}; orTxt={}; }catch(e){} try{ finLimpiarSesion(); }catch(e){} }
 function _cifBytes(s){ return new TextEncoder().encode(s); }
 async function _cifClaveDesde(pass,salt,iter){
   var base=await crypto.subtle.importKey('raw',_cifBytes(pass),'PBKDF2',false,['deriveKey']);
@@ -3703,13 +3746,14 @@ async function cifCamposTrasCambio(u,actual,nueva){
   return cifNuevoPar(nueva);
 }
 // Pide la contraseña para desbloquear (sesión restaurada sin pasar por el login)
-function cifPedirClave(alTerminar){
+function cifPedirClave(alTerminar,opts){
+  opts=opts||{};
   var ov=document.getElementById('cif-clave-overlay'); if(ov) ov.remove();
   ov=document.createElement('div'); ov.id='cif-clave-overlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:950;display:flex;align-items:center;justify-content:center;padding:1rem';
   ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:1.2rem;width:100%;max-width:360px;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
-    +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:4px">🔒 Desbloquear Motivos</div>'
-    +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:10px">Los Motivos están cifrados. Ingresá tu contraseña para abrirlos. No se guarda en ningún lado.</div>'
+    +'<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:4px">'+svcEsc(opts.titulo||'🔒 Desbloquear Motivos')+'</div>'
+    +'<div style="font-size:12.5px;color:#6B7280;margin-bottom:10px">'+svcEsc(opts.texto||'Los Motivos están cifrados. Ingresá tu contraseña para abrirlos. No se guarda en ningún lado.')+'</div>'
     +'<input type="password" id="cif-clave-inp" autocomplete="current-password" placeholder="Tu contraseña" style="width:100%;box-sizing:border-box;padding:8px 10px;font-size:14px;margin-bottom:8px" onkeydown="if(event.key===\'Enter\')cifConfirmarClave()">'
     +'<div id="cif-clave-err" style="display:none;font-size:12.5px;color:#DC2626;margin-bottom:8px"></div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" onclick="document.getElementById(\'cif-clave-overlay\').remove()">Cancelar</button>'
@@ -3950,6 +3994,7 @@ const DEFAULT_MODULES = [
   {key:'of',         icon:'👨‍👩‍👧',  name:'Orientación Familiar', desc:'Gestión de alumnos, asistencia, pagos y participación del curso.',                 tag:'Módulo activo', tagClass:'tag-purple', action:'openOF', activo:true},
   {key:'agenda',     icon:'📅',  name:'Agenda Ministerial',   desc:'Calendario de eventos y actividades por Propósito, con recurrencia semanal o mensual.', tag:'Módulo activo', tagClass:'tag-blue', action:'openAgenda', activo:false},
   {key:'equipo',     icon:'🤝',  name:'Trabajo en Equipo',    desc:'Checklists colaborativos para organizar actividades: coordinadores, colaboradores y tareas asignadas.', tag:'Módulo activo', tagClass:'tag-purple', action:'openEquipo', activo:false},
+  {key:'fin',        icon:'💰',  name:'Finanzas',             desc:'Tesorería: ingresos, egresos y cierre mensual por cuenta. Todo cifrado: solo lo ve quien tiene la llave.', tag:'Módulo activo', tagClass:'tag-green', action:'openFin', activo:false},
   {key:'oracion',    icon:'🙏',  name:'Motivos de Oración',   desc:'Motivos de oración de los Líderes de Propósito con los Pastores: conversación por motivo hasta cerrarlo.', tag:'Módulo activo', tagClass:'tag-purple', action:'openOracion', activo:false},
   {key:'formularios',icon:'📝',  name:'Formularios de Trabajo',desc:'Formularios semanales para Grupos de Vida, Nuevas Generaciones y Discipulado, con seguimiento por unidad y análisis.', tag:'Módulo activo', tagClass:'tag-purple', action:'openFormularios', activo:false},
   {key:'config',     icon:'⚙️',  name:'Configuración',         desc:'Gestión de grupos, usuarios del sistema y roles. Solo accesible para Super Admin.',   tag:'Solo Super Admin', tagClass:'tag-green', action:'openConfig', activo:true},
@@ -3990,7 +4035,7 @@ function renderModulesGrid(){
     miembros:canAccessMiembros(), nuevos:canAccessNuevos(), celeb:canAccessCeleb(),
     gdv:canAccessGdV(), ng:canAccessNG(),
     disc:canAccessDisc(), of:canAccessOF(), config:canAccessConfig(),
-    agenda:canAccessAgenda(), equipo:canAccessEquipo(), oracion:canAccessOracion(), formularios:canAccessFormularios()
+    agenda:canAccessAgenda(), equipo:canAccessEquipo(), oracion:canAccessOracion(), formularios:canAccessFormularios(), fin:canAccessFin()
   };
   allMods.forEach(function(mod){
     var tienePermiso=accessMap[mod.key];
@@ -24358,6 +24403,968 @@ function celebEquipoCuentasHTML(){
       var b=f.estado==='ok'?'<span style="color:#166534">✅ usuario vinculado</span>':f.estado==='nombre'?'<span style="color:#B45309">⚠️ usuario sin vincular (coincide por nombre)</span>':'<span style="color:#6B7280">— sin cuenta (solo si va a anotar)</span>';
       return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:4px 0;border-top:1px solid #F3F4F6;flex-wrap:wrap"><span>'+svcEsc(f.nombre)+' <span style="color:#6B7280">· '+svcEsc(f.rol)+'</span></span>'+b+'</div>';
     }).join('')+'</div>';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FINANZAS (Tesorería) — zzx · ver claude/Diseno_Finanzas.md
+// Confidencialidad: TODO monto, categoría usada, cuenta, observación, saldo y cierre se guarda
+// CIFRADO. En la nube y en localStorage solo hay texto ilegible; lo descifrado vive en memoria
+// (finDec) y se borra al cerrar sesión (cifCerrarSesion → finLimpiarSesion).
+//  • Llave de Tesorería: AES-GCM (versión kv) entregada en "sobres" por usuario (RSA de cada uno).
+//  • La Tesorería tiene además un par RSA propio: la pública queda a la vista (carga sin ver: quien
+//    tiene Cargar sin la llave cifra con ella); la privada viaja sellada con la llave AES.
+//  • Dar acceso = un titular con sesión abierta entrega el sobre. Quitar acceso = rotar la llave.
+//  • Metadatos en claro (a propósito, sin montos): id, mes (AAAA-MM), estado, quién cargó y cuándo,
+//    nombres de categorías y cuentas configuradas, mes de inicio.
+// Datos (documento Firebase 'finanzas', todos con merge por id + _ts):
+//  gdv_fin_movs   movimientos {id, mes, estado ok|pendiente|rechazado, kv, enc | encPub{w,s}, creado*, _ts}
+//  gdv_fin_meses  meses {id:'AAAA-MM', modalidad detallado|resumen, estado abierto|cerrado, kv, enc, log, _ts}
+//  gdv_fin_llave  [{id:'llave', kv, pub, privEnc, sobres:{uid:{fp,k:{kv:w}}}, _ts}]
+//  gdv_fin_config [{id:'config', categorias, cuentas, mesInicio, kv, encApertura, _ts}]
+// ════════════════════════════════════════════════════════════════════════════
+var FIN_CUENTAS_DEF=[{id:'efectivo',nombre:'Efectivo'},{id:'banco',nombre:'Banco'},{id:'mp',nombre:'Mercado Pago'}];
+var FIN_MEDIOS=[
+  {id:'efectivo', nombre:'Efectivo',                cuentas:['efectivo']},
+  {id:'transf',   nombre:'Transferencia bancaria',  cuentas:['banco','mp']},
+  {id:'mp',       nombre:'Mercado Pago',            cuentas:['mp']},
+  {id:'deposito', nombre:'Depósito bancario',       cuentas:['banco']},
+  {id:'debito',   nombre:'Tarjeta de débito',       cuentas:['banco']},
+  {id:'credito',  nombre:'Tarjeta de crédito (se registra el mes en que se paga el resumen)', cuentas:['banco','mp']},
+  {id:'debaut',   nombre:'Débito automático',       cuentas:['banco','mp']},
+  {id:'cheque',   nombre:'Cheque',                  cuentas:['banco']}
+];
+var FIN_CAT_DEF={
+  ingreso:[['diezmos','Diezmos'],['ofrendas','Ofrendas'],['misiones','Ofrendas especiales / Misiones'],['eventos_i','Eventos'],['donaciones','Donaciones']],
+  egreso:[['alquiler','Alquiler'],['servicios','Servicios'],['mantenimiento','Mantenimiento'],['ayuda','Ayuda social'],['eventos_e','Eventos'],['materiales','Materiales']]
+};
+// Permisos que necesitan la llave (todo lo que deja VER algo). Cargar sin estos = carga sin ver.
+var FIN_PERMS_LLAVE=['fin_ver','fin_editar','fin_revisar','fin_config','fin_llave','fin_exportar'];
+var FIN_PERMS=['fin_ver','fin_cargar','fin_revisar','fin_editar','fin_config','fin_llave','fin_exportar'];
+
+// ── Sesión (solo memoria) ──
+var _finKs={}, _finKv=null, _finPriv=null, _finPrivOld=[], _finUid=null, finDec={};
+function finLimpiarSesion(){ _finKs={}; _finKv=null; _finPriv=null; _finPrivOld=[]; _finUid=null; finDec={}; }
+var finVista={tab:null,mes:null,filtro:{tipo:'',cuenta:'',area:''},form:null,rechazando:null,resumen:false,ocupado:false};
+
+// ── Permisos (todo por la matriz) ──
+function finPuede(k){ if(isSuperAdmin()) return true; return k==='fin_ver'?canScreen(k):canEjecutar(k); }
+function canAccessFin(){ return isSuperAdmin()||FIN_PERMS.some(function(k){ return canScreen(k); }); }
+function finNecesitoLlave(){ return isSuperAdmin()||FIN_PERMS_LLAVE.some(function(k){ return canScreen(k); }); }
+// ¿Este usuario (de la lista de la nube) debe tener la llave? Super Admin siempre.
+function finNecesitaLlave(u){
+  if(!u||u.cuentaSistema) return false;
+  if(u.role==='super_admin') return true;
+  return FIN_PERMS_LLAVE.some(function(k){ return cifPermisoDe(u,k)!=='ninguno'; });
+}
+
+// ── Lecturas ──
+function finLlave(){ return (S.finLlave||[]).find(function(x){ return x&&x.id==='llave'; })||null; }
+function finConfig(){ return (S.finConfig||[]).find(function(x){ return x&&x.id==='config'; })||null; }
+function finCuentas(){ var c=finConfig(); return (c&&c.cuentas&&c.cuentas.length)?c.cuentas:FIN_CUENTAS_DEF; }
+function finCategorias(tipo){
+  var c=finConfig(), l=c&&c.categorias&&c.categorias[tipo];
+  return (l&&l.length)?l:FIN_CAT_DEF[tipo].map(function(x){ return {id:x[0],nombre:x[1],activa:true}; });
+}
+function finCatNombre(tipo,id){ var c=finCategorias(tipo).find(function(x){ return x.id===id; }); return c?c.nombre:(id||'—'); }
+function finCuentaNombre(id){ var c=finCuentas().find(function(x){ return x.id===id; }); return c?c.nombre:(id||'—'); }
+function finMedio(id){ return FIN_MEDIOS.find(function(x){ return x.id===id; })||null; }
+function finMedioNombre(id){ var m=finMedio(id); return m?m.nombre.replace(/ \(.*\)$/,''):(id||'—'); }
+function finTengoSobre(){
+  var l=finLlave();
+  return !!(l&&currentUser&&l.sobres&&l.sobres[currentUser.id]&&l.sobres[currentUser.id].k&&l.sobres[currentUser.id].k[String(l.kv)]);
+}
+function finAbierta(){
+  var l=finLlave();
+  return !!(l&&_finKs[String(l.kv)]&&_finKv===l.kv&&currentUser&&Number(_finUid)===Number(currentUser.id));
+}
+function finK(){ return finAbierta()?_finKs[String(_finKv)]:null; }
+function finRecargarLS(){
+  try{ S.finMovs=JSON.parse(localStorage.getItem(SK.finMovs)||'[]'); }catch(e){}
+  try{ S.finMeses=JSON.parse(localStorage.getItem(SK.finMeses)||'[]'); }catch(e){}
+  try{ S.finLlave=JSON.parse(localStorage.getItem(SK.finLlave)||'[]'); }catch(e){}
+  try{ S.finConfig=JSON.parse(localStorage.getItem(SK.finConfig)||'[]'); }catch(e){}
+}
+
+// ── Plata y meses ──
+function finNum(v){
+  if(typeof v==='number') return isFinite(v)?v:0;
+  var s=String(v==null?'':v).trim().replace(/\$/g,'').replace(/\s/g,'');
+  if(!s) return 0;
+  if(s.indexOf(',')>=0) s=s.replace(/\./g,'').replace(',','.'); // 1.234,50
+  else if(/^\-?\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,''); // 1.234.567
+  var n=parseFloat(s); return isFinite(n)?Math.round(n*100)/100:NaN;
+}
+function finFmt(n){ n=Number(n)||0; return (n<0?'− ':'')+'$ '+Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:2}); }
+function finFmtSimple(n){ n=Number(n)||0; return (n<0?'−':'')+Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:2}); }
+function finMesHoy(){ return today().slice(0,7); }
+function finMesPrev(m){ var y=+m.slice(0,4), mo=+m.slice(5,7)-1; if(mo<1){ mo=12; y--; } return y+'-'+String(mo).padStart(2,'0'); }
+function finMesSig(m){ var y=+m.slice(0,4), mo=+m.slice(5,7)+1; if(mo>12){ mo=1; y++; } return y+'-'+String(mo).padStart(2,'0'); }
+function finMesNombre(m){ return m?(MESES[+m.slice(5,7)-1]+' '+m.slice(0,4)):''; }
+function finMesValido(m){ return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(m||'')); }
+function finMeses(){ // desde el mes de inicio hasta hoy (o el último con datos), del más nuevo al más viejo
+  var c=finConfig(); if(!c||!finMesValido(c.mesInicio)) return [];
+  var fin=finMesHoy();
+  (S.finMovs||[]).concat(S.finMeses||[]).forEach(function(x){ var m=x&&(x.mes||x.id); if(finMesValido(m)&&m>fin) fin=m; });
+  var out=[], m=c.mesInicio, guard=0;
+  while(m<=fin&&guard<600){ out.push(m); m=finMesSig(m); guard++; }
+  return out.reverse();
+}
+function finMesRec(mes){ return (S.finMeses||[]).find(function(x){ return x&&x.id===mes; })||null; }
+function finMesModalidad(mes){ var r=finMesRec(mes); return r&&r.modalidad==='resumen'?'resumen':'detallado'; }
+function finMesCerrado(mes){ var r=finMesRec(mes); return !!(r&&r.estado==='cerrado'); }
+
+// ── Cifrado ──
+async function finNuevaAES(){ return crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']); }
+async function finRawB64(K){ return _pwB64(await crypto.subtle.exportKey('raw',K)); }
+function finImportAES(rawBytes){ return crypto.subtle.importKey('raw',rawBytes,{name:'AES-GCM'},true,['encrypt','decrypt']); }
+function finImportPrivTes(b64){ return crypto.subtle.importKey('pkcs8',_pwUnB64(b64),{name:'RSA-OAEP',hash:'SHA-256'},false,['decrypt']); }
+async function finNuevoParTes(){
+  var par=await crypto.subtle.generateKey({name:'RSA-OAEP',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['encrypt','decrypt']);
+  return { pub:_pwB64(await crypto.subtle.exportKey('spki',par.publicKey)), priv:_pwB64(await crypto.subtle.exportKey('pkcs8',par.privateKey)), privKey:par.privateKey };
+}
+// Sella con la llave de Tesorería vigente
+async function finSellar(obj){ var K=finK(); if(!K) throw new Error('La llave de Tesorería no está abierta'); return cifSellar(K,obj,_finKv); }
+// Abre un sello con la versión de llave que corresponda (vigente o anterior). null si no se puede.
+async function finAbrir(sello){
+  try{ var kv=cifKvDe(sello); var K=_finKs[String(kv)]; if(!K) return null; return await cifAbrirSello(K,sello); }catch(e){ return null; }
+}
+// Carga sin ver: llave AES de un solo uso, envuelta con la llave PÚBLICA de Tesorería.
+async function finSellarParaTesoreria(obj,pubB64){
+  var Ke=await finNuevaAES();
+  var raw=await crypto.subtle.exportKey('raw',Ke);
+  var pub=await cifImportarPub(pubB64);
+  var w=_pwB64(await crypto.subtle.encrypt({name:'RSA-OAEP'},pub,raw));
+  return {w:w, s:await cifSellar(Ke,obj,1)};
+}
+async function finAbrirDeTesoreria(encPub){
+  var privs=[_finPriv].concat(_finPrivOld||[]).filter(Boolean);
+  for(var i=0;i<privs.length;i++){
+    try{
+      var raw=await crypto.subtle.decrypt({name:'RSA-OAEP'},privs[i],_pwUnB64(encPub.w));
+      return await cifAbrirSello(await finImportAES(raw),encPub.s);
+    }catch(e){}
+  }
+  return null;
+}
+// Abre MI sobre con mi llave privada personal (requiere cifListo): llave AES vigente + privada de Tesorería
+// + las llaves anteriores que la Tesorería conserva (para leer algo sellado justo antes de una rotación).
+async function finAbrirLlave(){
+  var l=finLlave(); if(!l||!cifListo()||!finTengoSobre()) return false;
+  if(finAbierta()) return true;
+  var w=l.sobres[currentUser.id].k[String(l.kv)];
+  var raw=await crypto.subtle.decrypt({name:'RSA-OAEP'},_cifPriv,_pwUnB64(w));
+  var K=await finImportAES(raw);
+  var po=await cifAbrirSello(K,l.privEnc);
+  var ks={}; ks[String(l.kv)]=K;
+  var viejas=po.kOld||{};
+  for(var kv in viejas){ try{ ks[kv]=await finImportAES(_pwUnB64(viejas[kv])); }catch(e){} }
+  var olds=[];
+  for(var i=0;i<(po.pOld||[]).length;i++){ try{ olds.push(await finImportPrivTes(po.pOld[i])); }catch(e){} }
+  _finKs=ks; _finKv=l.kv; _finPriv=await finImportPrivTes(po.p); _finPrivOld=olds; _finUid=currentUser.id; finDec={};
+  return true;
+}
+// Descifra en memoria lo que falte o haya cambiado (por _ts). Nada descifrado se guarda en disco.
+function finDecV(pref,item){ var e=item&&finDec[pref+item.id]; return (e&&e.ts===item._ts)?e.v:null; }
+async function finDescifrarTodo(){
+  if(!finAbierta()) return;
+  var movs=S.finMovs||[];
+  for(var i=0;i<movs.length;i++){
+    var m=movs[i]; if(!m) continue;
+    var key=(m.estado==='pendiente'?'p':'m')+m.id, e=finDec[key];
+    if(e&&e.ts===m._ts) continue;
+    var v=m.estado==='pendiente'?(m.encPub?await finAbrirDeTesoreria(m.encPub):null):(m.enc?await finAbrir(m.enc):null);
+    var extra=null; if(m.estado==='rechazado'&&m.encMotivo) extra=await finAbrir(m.encMotivo);
+    if(v&&extra) v=Object.assign({},v,{_motivoRechazo:extra.x||''});
+    finDec[key]={ts:m._ts,v:v};
+  }
+  var meses=S.finMeses||[];
+  for(var j=0;j<meses.length;j++){
+    var r=meses[j]; if(!r||!r.enc) continue;
+    var ex=finDec['x'+r.id]; if(ex&&ex.ts===r._ts) continue;
+    finDec['x'+r.id]={ts:r._ts,v:await finAbrir(r.enc)};
+  }
+  var c=finConfig();
+  if(c&&c.encApertura){ var ea=finDec['a'+c.id]; if(!ea||ea.ts!==c._ts) finDec['a'+c.id]={ts:c._ts,v:await finAbrir(c.encApertura)}; }
+}
+
+// ── Cálculos (sobre lo descifrado) ──
+function finMovsDe(mes){
+  return (S.finMovs||[]).filter(function(m){ return m&&m.estado==='ok'&&m.mes===mes; })
+    .map(function(m){ return {m:m,d:finDecV('m',m)}; }).filter(function(x){ return !!x.d; })
+    .sort(function(a,b){ return (a.d.fecha||'')<(b.d.fecha||'')?-1:(a.d.fecha||'')>(b.d.fecha||'')?1:(a.m.id-b.m.id); });
+}
+function finPendientesDe(mes){ return (S.finMovs||[]).filter(function(m){ return m&&m.estado==='pendiente'&&(!mes||m.mes===mes); }); }
+function finApertura(){ var c=finConfig(); var v=c?finDecV('a',c):null; return (v&&v.saldos)||null; }
+function finCero(){ var o={}; finCuentas().forEach(function(c){ o[c.id]=0; }); return o; }
+// Totales del mes: por tipo, por cuenta y por categoría
+function finTotalesMes(mes){
+  var t={ingreso:0,egreso:0,porCuenta:{},porCat:{ingreso:{},egreso:{}},resumen:false};
+  finCuentas().forEach(function(c){ t.porCuenta[c.id]={ing:0,egr:0}; });
+  var r=finMesRec(mes);
+  if(r&&r.modalidad==='resumen'){
+    t.resumen=true; var d=finDecV('x',r);
+    if(d&&d.resumen){
+      ['ingreso','egreso'].forEach(function(tp){ var o=d.resumen[tp]||{}; for(var k in o){ var n=finNum(o[k])||0; t.porCat[tp][k]=(t.porCat[tp][k]||0)+n; t[tp]+=n; } });
+    }
+    t.porCuenta=null;
+    return t;
+  }
+  finMovsDe(mes).forEach(function(x){
+    var n=finNum(x.d.monto)||0, tp=x.d.tipo==='egreso'?'egreso':'ingreso';
+    t[tp]+=n; t.porCat[tp][x.d.categoria]=(t.porCat[tp][x.d.categoria]||0)+n;
+    if(!t.porCuenta[x.d.cuenta]) t.porCuenta[x.d.cuenta]={ing:0,egr:0};
+    if(tp==='ingreso') t.porCuenta[x.d.cuenta].ing+=n; else t.porCuenta[x.d.cuenta].egr+=n;
+  });
+  return t;
+}
+// Saldo inicial de un mes = saldo final del anterior (o la apertura en el mes de inicio)
+function finSaldoIni(mes,memo){
+  var c=finConfig(); if(!c||!finMesValido(c.mesInicio)||mes<c.mesInicio) return null;
+  if(mes===c.mesInicio){ var a=finApertura(); var o=finCero(); if(a) for(var k in a) o[k]=finNum(a[k])||0; return o; }
+  return finSaldoFin(finMesPrev(mes),memo);
+}
+// Calculado = inicial + ingresos − egresos (meses detallados)
+function finSaldoCalc(mes,memo){
+  var ini=finSaldoIni(mes,memo)||finCero(), out={};
+  Object.keys(Object.assign(finCero(),ini)).forEach(function(k){ out[k]=finNum(ini[k])||0; });
+  var t=finTotalesMes(mes);
+  if(t.porCuenta) for(var k in t.porCuenta){ out[k]=Math.round(((out[k]||0)+t.porCuenta[k].ing-t.porCuenta[k].egr)*100)/100; }
+  return out;
+}
+// Final: cerrado detallado → saldo real contado; resumen → saldo final cargado; abierto → calculado
+function finSaldoFin(mes,memo){
+  memo=memo||{}; if(memo[mes]) return memo[mes];
+  var r=finMesRec(mes), d=r?finDecV('x',r):null, out;
+  if(r&&r.modalidad==='resumen'){ out=Object.assign(finCero(),(d&&d.saldoFinal)?finNumObj(d.saldoFinal):(finSaldoIni(mes,memo)||{})); }
+  else if(r&&r.estado==='cerrado'&&d&&d.saldoReal){ out=Object.assign(finCero(),finNumObj(d.saldoReal)); }
+  else out=finSaldoCalc(mes,memo);
+  memo[mes]=out; return out;
+}
+function finNumObj(o){ var r={}; for(var k in (o||{})) r[k]=finNum(o[k])||0; return r; }
+function finSuma(o){ var s=0; for(var k in (o||{})) s+=Number(o[k])||0; return Math.round(s*100)/100; }
+
+// ── Guardado (bloquea hasta confirmar; revierte si falla) ──
+async function finPersistir(rollback){
+  await saveK(SK.finMovs,S.finMovs); await saveK(SK.finMeses,S.finMeses);
+  await saveK(SK.finLlave,S.finLlave); await saveK(SK.finConfig,S.finConfig);
+  try{
+    if(typeof window.fbUpload!=='function') throw new Error('Sin conexión con la nube');
+    await window.fbUpload(true);
+  }catch(e){
+    rollback();
+    await saveK(SK.finMovs,S.finMovs); await saveK(SK.finMeses,S.finMeses);
+    await saveK(SK.finLlave,S.finLlave); await saveK(SK.finConfig,S.finConfig);
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return false;
+  }
+  finRecargarLS(); // lo que quedó después de fusionar con la nube
+  return true;
+}
+function finQuitarTombLocal(key,id){
+  var tk='_tomb_'+key, l=[]; try{ l=JSON.parse(localStorage.getItem(tk)||'[]'); }catch(e){}
+  localStorage.setItem(tk,JSON.stringify(l.filter(function(t){ return String(t.id)!==String(id); })));
+}
+function finNuevoId(){ var id=Date.now(); while((S.finMovs||[]).some(function(x){ return Number(x.id)===id; })) id++; return id; }
+function finYo(){ var lm=getLinkedMember(); return {uid:currentUser.id, nombre:lm?fullName(lm):currentUser.name, memberId:lm?lm.id:null}; }
+function finSoltarDesbloqueo(cb){
+  cifPedirClave(function(){ finRender(); if(cb) cb(); },{titulo:'🔒 Desbloquear Finanzas',texto:'Finanzas está cifrado. Ingresá tu contraseña para abrir la llave de Tesorería. No se guarda en ningún lado.'});
+}
+
+// ── Llave de Tesorería: crear, entregar, rotar ──
+async function finCrearLlave(){
+  if(!(isSuperAdmin()||canEjecutar('fin_llave'))){ alert('No tenés permiso para administrar la llave de Tesorería.'); return; }
+  if(finLlave()){ alert('La llave de Tesorería ya existe.'); return; }
+  if(!cifDisponible()){ alert('Este navegador no permite el cifrado (hace falta entrar por la dirección https oficial de la app).'); return; }
+  if(!cifListo()){ finSoltarDesbloqueo(finCrearLlave); return; }
+  var usuarios;
+  try{ usuarios=await window.fbLeerUsuarios(); }catch(e){ alert('No se pudo leer la lista de usuarios en la nube: '+((e&&e.message)||e)); return; }
+  var yo=usuarios.find(function(u){ return Number(u.id)===Number(currentUser.id); });
+  if(!yo||!yo.cifPub){ alert('Tus llaves de cifrado todavía no están en la nube. Cerrá sesión y volvé a ingresar con tu contraseña.'); return; }
+  var dest=[yo].concat(usuarios.filter(function(u){ return Number(u.id)!==Number(yo.id)&&u.cifPub&&finNecesitaLlave(u); }));
+  if(!confirm('¿Crear la llave de Tesorería?\n\nLa reciben ahora '+dest.length+' persona(s) que ya tienen llaves de cifrado: '+dest.map(function(u){return u.name;}).join(', ')+'.\nA los demás con permiso se les entrega después desde Finanzas → Configuración.')) return;
+  var llave, conf, K, par, ahora=Date.now();
+  try{
+    K=await finNuevaAES(); par=await finNuevoParTes();
+    var raw=new Uint8Array(await crypto.subtle.exportKey('raw',K)), sobres={};
+    for(var i=0;i<dest.length;i++) sobres[dest[i].id]=await cifSobrePara(dest[i],{'1':raw});
+    llave={id:'llave',kv:1,pub:par.pub,privEnc:await cifSellar(K,{p:par.priv,kOld:{},pOld:[]},1),sobres:sobres,creadaTs:ahora,creadaPor:currentUser.name,_ts:ahora};
+    var c0=finConfig();
+    conf=Object.assign({id:'config',categorias:{ingreso:finCategorias('ingreso'),egreso:finCategorias('egreso')},cuentas:finCuentas(),mesInicio:finMesHoy()},c0||{},
+      {kv:1,encApertura:await cifSellar(K,{saldos:finCero()},1),_ts:ahora});
+  }catch(e){ alert('No se pudo crear la llave: '+((e&&e.message)||e)); return; }
+  var antL=S.finLlave, antC=S.finConfig;
+  S.finLlave=[llave]; S.finConfig=(antC||[]).filter(function(x){ return x&&x.id!=='config'; }).concat([conf]);
+  var ok=await finPersistir(function(){ S.finLlave=antL; S.finConfig=antC; });
+  if(!ok) return;
+  var ks={}; ks['1']=K; _finKs=ks; _finKv=1; _finPriv=par.privKey; _finPrivOld=[]; _finUid=currentUser.id; finDec={};
+  showToast('🔐 Llave de Tesorería creada','#16A34A');
+  finVista.tab='config'; finRender();
+}
+async function finEntregarLlave(userId){
+  if(!(isSuperAdmin()||canEjecutar('fin_llave'))) return;
+  if(!finAbierta()){ finSoltarDesbloqueo(); return; }
+  var usuarios;
+  try{ usuarios=await window.fbLeerUsuarios(); }catch(e){ alert('No se pudo leer la lista de usuarios en la nube: '+((e&&e.message)||e)); return; }
+  var t=usuarios.find(function(u){ return Number(u.id)===Number(userId); });
+  if(!t||!t.cifPub){ alert('Esa persona todavía no tiene llaves de cifrado: tiene que ingresar una vez con su contraseña (ya cambiada).'); return; }
+  if(!finNecesitaLlave(t)){ alert(t.name+' no tiene ningún permiso de Finanzas que necesite la llave. Primero dale el permiso en Configuración → Permisos.'); return; }
+  if(!confirm('¿Entregar la llave de Tesorería a '+t.name+'?\n\nVa a poder ver todos los movimientos, saldos y cierres.')) return;
+  var l=finLlave(), sobre;
+  try{ var raws={}; raws[String(l.kv)]=new Uint8Array(await crypto.subtle.exportKey('raw',finK())); sobre=await cifSobrePara(t,raws); }
+  catch(e){ alert('No se pudo preparar la llave: '+((e&&e.message)||e)); return; }
+  var ant=S.finLlave, sob=Object.assign({},l.sobres); sob[t.id]=sobre;
+  S.finLlave=[Object.assign({},l,{sobres:sob,_ts:Date.now()})];
+  var ok=await finPersistir(function(){ S.finLlave=ant; });
+  if(!ok) return;
+  showToast('🔐 Llave entregada a '+t.name,'#16A34A'); finRender();
+}
+// Rotar: llave AES y par RSA nuevos, se vuelve a cifrar TODO y se entrega solo a quienes siguen con
+// permiso y conservan la misma llave personal. Las llaves anteriores quedan guardadas DENTRO de la nueva
+// (solo las abren los titulares) para poder leer algo que un celular atrasado haya sellado con la vieja.
+async function finRotarLlave(){
+  if(!(isSuperAdmin()||canEjecutar('fin_llave'))) return;
+  if(!finAbierta()){ finSoltarDesbloqueo(); return; }
+  var usuarios;
+  try{ usuarios=await window.fbLeerUsuarios(); }catch(e){ alert('No se pudo leer la lista de usuarios en la nube: '+((e&&e.message)||e)); return; }
+  var l=finLlave(), kv2=(l.kv||1)+1;
+  var quedan=[], salen=[];
+  for(var uid in (l.sobres||{})){
+    var u=usuarios.find(function(x){ return String(x.id)===String(uid); });
+    var sigue=!!(u&&u.cifPub&&finNecesitaLlave(u)&&(await cifHuella(u.cifPub))===l.sobres[uid].fp);
+    (sigue?quedan:salen).push(u||{id:uid,name:'(usuario '+uid+')'});
+  }
+  if(!quedan.some(function(u){ return Number(u.id)===Number(currentUser.id); })){ alert('Tu propio acceso no quedaría vigente después de rotar. Revisá tus permisos de Finanzas.'); return; }
+  if(!confirm('¿Rotar la llave de Tesorería?\n\nSe vuelve a cifrar todo con una llave nueva.\nLa conservan: '+quedan.map(function(u){return u.name;}).join(', ')+'\nLa pierden: '+(salen.map(function(u){return u.name;}).join(', ')||'nadie'))) return;
+  finVista.ocupado=true; finRender();
+  var antM=S.finMovs, antX=S.finMeses, antL=S.finLlave, antC=S.finConfig, ahora=Date.now();
+  var K2, par2, nuevos;
+  try{
+    await finDescifrarTodo();
+    K2=await finNuevaAES(); par2=await finNuevoParTes();
+    var raw2=new Uint8Array(await crypto.subtle.exportKey('raw',K2));
+    var sellar=function(obj){ return cifSellar(K2,obj,kv2); };
+    var movs=[];
+    for(var i=0;i<(S.finMovs||[]).length;i++){
+      var m=S.finMovs[i]; if(!m) continue;
+      var n=Object.assign({},m,{_ts:ahora});
+      if(m.estado==='pendiente'){
+        var p=await finAbrirDeTesoreria(m.encPub); if(!p) throw new Error('no se pudo abrir una carga pendiente ('+m.id+')');
+        n.encPub=await finSellarParaTesoreria(p,par2.pub);
+      } else {
+        var d=await finAbrir(m.enc); if(!d) throw new Error('no se pudo abrir un movimiento ('+m.id+')');
+        n.enc=await sellar(d); n.kv=kv2;
+        if(m.encMotivo){ var mo=await finAbrir(m.encMotivo); n.encMotivo=await sellar(mo||{x:''}); }
+      }
+      movs.push(n);
+    }
+    var meses=[];
+    for(var j=0;j<(S.finMeses||[]).length;j++){
+      var r=S.finMeses[j]; if(!r) continue;
+      var nr=Object.assign({},r,{_ts:ahora,kv:kv2});
+      if(r.enc){ var dr=await finAbrir(r.enc); if(!dr) throw new Error('no se pudo abrir el mes '+r.id); nr.enc=await sellar(dr); }
+      meses.push(nr);
+    }
+    var c=finConfig(), conf=(S.finConfig||[]).slice();
+    if(c){
+      var nc=Object.assign({},c,{_ts:ahora,kv:kv2});
+      if(c.encApertura){ var da=await finAbrir(c.encApertura); if(!da) throw new Error('no se pudo abrir la apertura'); nc.encApertura=await sellar(da); }
+      conf=conf.map(function(x){ return x&&x.id==='config'?nc:x; });
+    }
+    var po=await cifAbrirSello(finK(),l.privEnc), kOld=Object.assign({},po.kOld||{}), pOld=(po.pOld||[]).slice();
+    kOld[String(l.kv)]=await finRawB64(finK()); pOld.push(po.p);
+    var sobres={};
+    for(var q=0;q<quedan.length;q++){ var raws={}; raws[String(kv2)]=raw2; sobres[quedan[q].id]=await cifSobrePara(quedan[q],raws); }
+    var llave=Object.assign({},l,{kv:kv2,pub:par2.pub,privEnc:await sellar({p:par2.priv,kOld:kOld,pOld:pOld}),sobres:sobres,rotadaTs:ahora,rotadaPor:currentUser.name,_ts:ahora});
+    nuevos={movs:movs,meses:meses,conf:conf,llave:llave};
+  }catch(e){ finVista.ocupado=false; alert('No se pudo rotar la llave: '+((e&&e.message)||e)+'\n\nNo se cambió nada.'); finRender(); return; }
+  var antSes={ks:_finKs,kv:_finKv,priv:_finPriv,old:_finPrivOld};
+  S.finMovs=nuevos.movs; S.finMeses=nuevos.meses; S.finConfig=nuevos.conf; S.finLlave=[nuevos.llave];
+  var ok=await finPersistir(function(){ S.finMovs=antM; S.finMeses=antX; S.finLlave=antL; S.finConfig=antC; });
+  finVista.ocupado=false;
+  if(!ok){ _finKs=antSes.ks; _finKv=antSes.kv; _finPriv=antSes.priv; _finPrivOld=antSes.old; finRender(); return; }
+  var ks=Object.assign({},_finKs); ks[String(kv2)]=K2;
+  _finKs=ks; _finKv=kv2; _finPrivOld=[_finPriv].concat(_finPrivOld||[]); _finPriv=par2.privKey; finDec={};
+  showToast('🔐 Llave rotada'+(salen.length?' — sin acceso: '+salen.map(function(u){return u.name;}).join(', '):''),'#1F4E79');
+  finRender();
+}
+
+// ── Movimientos ──
+function finLeerForm(){
+  var g=function(id){ var e=document.getElementById(id); return e?e.value:''; };
+  var f=finVista.form||{};
+  return { tipo:f.tipo==='egreso'?'egreso':'ingreso', fecha:g('fin-f-fecha'), monto:finNum(g('fin-f-monto')), medio:g('fin-f-medio'), cuenta:g('fin-f-cuenta'),
+    categoria:g('fin-f-cat'), area:g('fin-f-area'), comprobante:g('fin-f-comp').trim(), obs:g('fin-f-obs').trim(), celebId:g('fin-f-celeb'), contadoPor:g('fin-f-contado').trim() };
+}
+function finValidarMov(d){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) return 'Elegí la fecha.';
+  if(!(d.monto>0)) return 'El monto tiene que ser mayor a cero.';
+  if(!finMedio(d.medio)) return 'Elegí el medio.';
+  if(finMedio(d.medio).cuentas.indexOf(d.cuenta)<0) return 'Elegí la cuenta.';
+  if(!finCategorias(d.tipo).some(function(c){ return c.id===d.categoria; })) return 'Elegí la categoría.';
+  var c=finConfig(), mes=d.fecha.slice(0,7);
+  if(!c||!finMesValido(c.mesInicio)) return 'Finanzas todavía no está configurado (falta el mes de inicio).';
+  if(mes<c.mesInicio) return 'La fecha es anterior al mes de inicio ('+finMesNombre(c.mesInicio)+').';
+  if(finMesModalidad(mes)==='resumen') return finMesNombre(mes)+' está cargado como mes resumen: no lleva movimientos.';
+  if(finMesCerrado(mes)) return finMesNombre(mes)+' está cerrado. Para cargar o corregir, reabrilo desde Cierre mensual.';
+  return null;
+}
+function finAreaNombre(ref){
+  if(!ref||ref==='gen') return 'General / Iglesia';
+  var id=Number(String(ref).slice(1));
+  if(ref[0]==='p'){ var p=(S.ministerios||[]).find(function(x){ return Number(x.id)===id; }); return p?p.nombre:'(Propósito eliminado)'; }
+  if(ref[0]==='a'){ var a=(S.areasServicio||[]).find(function(x){ return Number(x.id)===id; }); return a?a.nombre:'(Área eliminada)'; }
+  return ref;
+}
+async function finGuardarMov(){
+  if(finVista.ocupado) return;
+  var f=finVista.form||{}, edit=!!f.id;
+  if(edit&&!finPuede('fin_editar')){ alert('No tenés permiso para editar movimientos.'); return; }
+  if(!edit&&!finPuede('fin_cargar')){ alert('No tenés permiso para cargar movimientos.'); return; }
+  var d=finLeerForm(), err=finValidarMov(d); if(err){ alert(err); return; }
+  var yo=finYo(), ahora=Date.now(), l=finLlave();
+  if(!l){ alert('Finanzas todavía no está configurado (falta crear la llave de Tesorería).'); return; }
+  d.areaNombre=finAreaNombre(d.area); d.responsable=yo.nombre; d.responsableId=yo.memberId;
+  var ant=S.finMovs, nuevo;
+  finVista.ocupado=true;
+  try{
+    if(edit){
+      if(!finAbierta()) throw new Error('la llave de Tesorería no está abierta');
+      var prev=(S.finMovs||[]).find(function(x){ return Number(x.id)===Number(f.id); });
+      var pd=prev?finDecV('m',prev):null; if(!prev||!pd) throw new Error('no se encontró el movimiento');
+      if(finMesCerrado(prev.mes)) throw new Error(finMesNombre(prev.mes)+' está cerrado: reabrilo primero');
+      var antes=Object.assign({},pd); delete antes.hist;
+      d.responsable=pd.responsable; d.responsableId=pd.responsableId; // quién lo registró no cambia
+      d.hist=(pd.hist||[]).concat([{ts:ahora,por:yo.nombre,antes:antes}]);
+      nuevo=Object.assign({},prev,{mes:d.fecha.slice(0,7),kv:_finKv,enc:await finSellar(d),editadoTs:ahora,editadoPor:yo.nombre,_ts:ahora});
+      S.finMovs=S.finMovs.map(function(x){ return Number(x.id)===Number(f.id)?nuevo:x; });
+    } else if(finAbierta()){
+      nuevo={id:finNuevoId(),mes:d.fecha.slice(0,7),estado:'ok',kv:_finKv,enc:await finSellar(d),creadoUid:yo.uid,creadoNombre:yo.nombre,creadoTs:ahora,_ts:ahora};
+      S.finMovs=(S.finMovs||[]).concat([nuevo]);
+    } else {
+      // Carga sin ver: cifrado con la llave PÚBLICA de Tesorería; queda pendiente de revisión
+      nuevo={id:finNuevoId(),mes:d.fecha.slice(0,7),estado:'pendiente',encPub:await finSellarParaTesoreria(d,l.pub),creadoUid:yo.uid,creadoNombre:yo.nombre,creadoTs:ahora,_ts:ahora};
+      S.finMovs=(S.finMovs||[]).concat([nuevo]);
+    }
+  }catch(e){ finVista.ocupado=false; S.finMovs=ant; alert('No se pudo guardar: '+((e&&e.message)||e)); return; }
+  var ok=await finPersistir(function(){ S.finMovs=ant; });
+  finVista.ocupado=false;
+  if(!ok) return;
+  if(nuevo.estado==='pendiente'){ finVista.form={tipo:d.tipo}; showToast('📨 Enviado a Tesorería (pendiente de revisión)','#16A34A'); }
+  else { finVista.form=null; showToast(edit?'✅ Movimiento actualizado':'✅ Movimiento guardado','#16A34A'); }
+  finRender();
+}
+async function finEliminarMov(id){
+  if(!finPuede('fin_editar')){ alert('No tenés permiso para eliminar movimientos.'); return; }
+  var m=(S.finMovs||[]).find(function(x){ return Number(x.id)===Number(id); }); if(!m) return;
+  if(finMesCerrado(m.mes)){ alert(finMesNombre(m.mes)+' está cerrado. Reabrilo desde Cierre mensual para corregir.'); return; }
+  if(!confirm('¿Eliminar este movimiento? No se puede deshacer.')) return;
+  var ant=S.finMovs;
+  S.finMovs=ant.filter(function(x){ return Number(x.id)!==Number(id); });
+  addTombstone(SK.finMovs,id);
+  var ok=await finPersistir(function(){ S.finMovs=ant; finQuitarTombLocal(SK.finMovs,id); });
+  if(!ok) return;
+  finVista.form=null; showToast('🗑 Movimiento eliminado','#6B7280'); finRender();
+}
+// ── Revisión de lo cargado sin ver ──
+async function finIncorporar(id){
+  if(!finPuede('fin_revisar')){ alert('No tenés permiso para revisar cargas.'); return; }
+  if(!finAbierta()){ finSoltarDesbloqueo(); return; }
+  var m=(S.finMovs||[]).find(function(x){ return Number(x.id)===Number(id)&&x.estado==='pendiente'; }); if(!m) return;
+  var d=finDecV('p',m)||await finAbrirDeTesoreria(m.encPub);
+  if(!d){ alert('No se pudo abrir esta carga.'); return; }
+  var err=finValidarMov(d); if(err){ alert('No se puede incorporar: '+err); return; }
+  var ahora=Date.now(), yo=finYo(), ant=S.finMovs, nuevo;
+  try{
+    nuevo=Object.assign({},m,{estado:'ok',kv:_finKv,enc:await finSellar(d),revisadoPor:yo.nombre,revisadoTs:ahora,_ts:ahora});
+    delete nuevo.encPub;
+  }catch(e){ alert('No se pudo cifrar: '+((e&&e.message)||e)); return; }
+  S.finMovs=ant.map(function(x){ return x===m?nuevo:x; });
+  var ok=await finPersistir(function(){ S.finMovs=ant; });
+  if(!ok) return;
+  showToast('✅ Incorporado','#16A34A'); finRender();
+}
+function finRechazarAbrir(id){ finVista.rechazando=id; finRender(); }
+async function finRechazar(id){
+  if(!finPuede('fin_revisar')){ alert('No tenés permiso para revisar cargas.'); return; }
+  if(!finAbierta()){ finSoltarDesbloqueo(); return; }
+  var motivo=((document.getElementById('fin-rech-'+id)||{}).value||'').trim();
+  if(motivo.length<5){ alert('Escribí el motivo del rechazo.'); return; }
+  var m=(S.finMovs||[]).find(function(x){ return Number(x.id)===Number(id)&&x.estado==='pendiente'; }); if(!m) return;
+  var d=finDecV('p',m)||await finAbrirDeTesoreria(m.encPub);
+  var ahora=Date.now(), yo=finYo(), ant=S.finMovs, nuevo;
+  try{
+    nuevo=Object.assign({},m,{estado:'rechazado',kv:_finKv,enc:await finSellar(d||{}),encMotivo:await finSellar({x:motivo}),revisadoPor:yo.nombre,revisadoTs:ahora,_ts:ahora});
+    delete nuevo.encPub;
+  }catch(e){ alert('No se pudo cifrar: '+((e&&e.message)||e)); return; }
+  S.finMovs=ant.map(function(x){ return x===m?nuevo:x; });
+  var ok=await finPersistir(function(){ S.finMovs=ant; });
+  if(!ok) return;
+  finVista.rechazando=null; showToast('Carga rechazada','#6B7280'); finRender();
+}
+// ── Cierre mensual ──
+function finMesNuevoRec(mes,base){ return Object.assign({id:mes,modalidad:'detallado',estado:'abierto',log:[]},base||{}); }
+async function finCerrarMes(mes){
+  if(!finPuede('fin_editar')){ alert('No tenés permiso para cerrar meses.'); return; }
+  if(!finAbierta()){ finSoltarDesbloqueo(); return; }
+  if(finMesModalidad(mes)!=='detallado'||finMesCerrado(mes)) return;
+  var pend=finPendientesDe(mes).length;
+  if(pend){ alert('Hay '+pend+' carga(s) pendiente(s) de revisión en '+finMesNombre(mes)+'. Revisalas antes de cerrar.'); return; }
+  var calc=finSaldoCalc(mes), real={}, difs=[], falta=false;
+  finCuentas().forEach(function(c){
+    var v=((document.getElementById('fin-real-'+c.id)||{}).value||'').trim();
+    if(v===''){ falta=true; return; }
+    var n=finNum(v); if(isNaN(n)){ falta=true; return; }
+    real[c.id]=n; var df=Math.round((n-(calc[c.id]||0))*100)/100; if(df!==0) difs.push(c.nombre+': '+finFmt(df));
+  });
+  if(falta){ alert('Cargá el saldo real de cada cuenta (caja contada, extracto del banco, resumen de MP).'); return; }
+  var obs=((document.getElementById('fin-cierre-obs')||{}).value||'').trim();
+  if(difs.length&&obs.length<5){ alert('Hay diferencia ('+difs.join(' · ')+'). Escribí una observación para cerrar igual.'); return; }
+  if(!confirm('¿Cerrar '+finMesNombre(mes)+'?'+(difs.length?'\n\nCon diferencia: '+difs.join(' · '):'\n\nTodas las cuentas coinciden.')+'\n\nLos saldos reales pasan a ser el saldo inicial de '+finMesNombre(finMesSig(mes))+'.')) return;
+  var yo=finYo(), ahora=Date.now(), r=finMesRec(mes), ant=S.finMeses, nuevo;
+  try{
+    nuevo=finMesNuevoRec(mes,r);
+    nuevo=Object.assign({},nuevo,{modalidad:'detallado',estado:'cerrado',kv:_finKv,enc:await finSellar({saldoReal:real,calc:calc,obs:obs}),
+      cerradoPor:yo.nombre,cerradoTs:ahora,log:(nuevo.log||[]).concat([{ts:ahora,por:yo.nombre,accion:'Cerró el mes'+(difs.length?' con diferencia':'')}]),_ts:ahora});
+  }catch(e){ alert('No se pudo cifrar: '+((e&&e.message)||e)); return; }
+  S.finMeses=(ant||[]).filter(function(x){ return x&&x.id!==mes; }).concat([nuevo]);
+  var ok=await finPersistir(function(){ S.finMeses=ant; });
+  if(!ok) return;
+  showToast('🔒 '+finMesNombre(mes)+' cerrado','#16A34A'); finRender();
+}
+async function finReabrirMes(mes){
+  if(!finPuede('fin_editar')){ alert('No tenés permiso para reabrir meses.'); return; }
+  var r=finMesRec(mes); if(!r||r.estado!=='cerrado') return;
+  if(!confirm('¿Reabrir '+finMesNombre(mes)+'?\n\nQueda registrado quién lo reabrió y cuándo. Mientras esté abierto, su saldo final vuelve a ser el calculado.')) return;
+  var yo=finYo(), ahora=Date.now(), ant=S.finMeses;
+  var nuevo=Object.assign({},r,{estado:'abierto',log:(r.log||[]).concat([{ts:ahora,por:yo.nombre,accion:'Reabrió el mes'}]),_ts:ahora});
+  S.finMeses=ant.map(function(x){ return x===r?nuevo:x; });
+  var ok=await finPersistir(function(){ S.finMeses=ant; });
+  if(!ok) return;
+  showToast('🔓 '+finMesNombre(mes)+' reabierto','#1F4E79'); finRender();
+}
+// Mes resumen (historia del Excel): totales por categoría y saldo final de cada cuenta. Queda cerrado.
+async function finGuardarResumen(){
+  if(!finPuede('fin_editar')){ alert('No tenés permiso para cargar meses resumen.'); return; }
+  if(!finAbierta()){ finSoltarDesbloqueo(); return; }
+  var mes=((document.getElementById('fin-res-mes')||{}).value||'').trim();
+  var c=finConfig();
+  if(!finMesValido(mes)){ alert('Elegí el mes.'); return; }
+  if(!c||mes<c.mesInicio){ alert('El mes es anterior al mes de inicio ('+finMesNombre(c&&c.mesInicio)+'). Si querés cargar historia anterior, primero cambiá el mes de inicio en Configuración.'); return; }
+  if((S.finMovs||[]).some(function(m){ return m&&m.mes===mes&&m.estado!=='rechazado'; })){ alert(finMesNombre(mes)+' ya tiene movimientos cargados: no puede ser un mes resumen.'); return; }
+  var r=finMesRec(mes);
+  if(r&&r.estado==='cerrado'&&r.modalidad!=='resumen'){ alert(finMesNombre(mes)+' ya está cerrado como mes detallado.'); return; }
+  var resumen={ingreso:{},egreso:{}}, bad=false;
+  ['ingreso','egreso'].forEach(function(tp){ finCategorias(tp).forEach(function(cat){
+    var v=((document.getElementById('fin-res-'+tp+'-'+cat.id)||{}).value||'').trim(); if(v==='') return;
+    var n=finNum(v); if(isNaN(n)||n<0) bad=true; else if(n) resumen[tp][cat.id]=n;
+  }); });
+  var saldo={};
+  finCuentas().forEach(function(ct){
+    var v=((document.getElementById('fin-res-saldo-'+ct.id)||{}).value||'').trim(); var n=finNum(v);
+    if(v===''||isNaN(n)) bad=true; else saldo[ct.id]=n;
+  });
+  if(bad){ alert('Revisá los importes: los totales tienen que ser números positivos y el saldo final de cada cuenta es obligatorio.'); return; }
+  var obs=((document.getElementById('fin-res-obs')||{}).value||'').trim();
+  var yo=finYo(), ahora=Date.now(), ant=S.finMeses, nuevo;
+  try{
+    nuevo=Object.assign(finMesNuevoRec(mes,r),{modalidad:'resumen',estado:'cerrado',kv:_finKv,enc:await finSellar({resumen:resumen,saldoFinal:saldo,obs:obs}),
+      cerradoPor:yo.nombre,cerradoTs:ahora,_ts:ahora});
+    nuevo.log=((r&&r.log)||[]).concat([{ts:ahora,por:yo.nombre,accion:r?'Corrigió el mes resumen':'Cargó el mes resumen'}]);
+  }catch(e){ alert('No se pudo cifrar: '+((e&&e.message)||e)); return; }
+  S.finMeses=(ant||[]).filter(function(x){ return x&&x.id!==mes; }).concat([nuevo]);
+  var ok=await finPersistir(function(){ S.finMeses=ant; });
+  if(!ok) return;
+  finVista.resumen=false; finVista.mes=mes; showToast('✅ Mes resumen guardado','#16A34A'); finRender();
+}
+// ── Configuración: inicio, categorías, cuentas ──
+async function finGuardarInicio(){
+  if(!finPuede('fin_config')){ alert('No tenés permiso para configurar Finanzas.'); return; }
+  if(!finAbierta()){ finSoltarDesbloqueo(); return; }
+  var mes=((document.getElementById('fin-ini-mes')||{}).value||'').trim();
+  if(!finMesValido(mes)){ alert('Elegí el mes de inicio.'); return; }
+  var saldos={}, bad=false;
+  finCuentas().forEach(function(ct){ var v=((document.getElementById('fin-ini-'+ct.id)||{}).value||'').trim(); var n=v===''?0:finNum(v); if(isNaN(n)) bad=true; else saldos[ct.id]=n; });
+  if(bad){ alert('Revisá los saldos iniciales.'); return; }
+  var antes=(S.finMovs||[]).concat(S.finMeses||[]).filter(function(x){ var m=x&&(x.mes||x.id); return finMesValido(m)&&m<mes&&x.estado!=='rechazado'; });
+  if(antes.length){ alert('Hay datos cargados antes de '+finMesNombre(mes)+'. El mes de inicio no puede ser posterior a esos datos.'); return; }
+  var c=finConfig(); if(!c) return;
+  var ant=S.finConfig, nc;
+  try{ nc=Object.assign({},c,{mesInicio:mes,kv:_finKv,encApertura:await finSellar({saldos:saldos}),_ts:Date.now()}); }
+  catch(e){ alert('No se pudo cifrar: '+((e&&e.message)||e)); return; }
+  S.finConfig=ant.map(function(x){ return x===c?nc:x; });
+  var ok=await finPersistir(function(){ S.finConfig=ant; });
+  if(!ok) return;
+  showToast('✅ Inicio guardado','#16A34A'); finRender();
+}
+async function finGuardarListas(){
+  if(!finPuede('fin_config')){ alert('No tenés permiso para configurar Finanzas.'); return; }
+  var c=finConfig(); if(!c){ alert('Primero hay que crear la llave de Tesorería.'); return; }
+  var cats={ingreso:[],egreso:[]}, bad=false;
+  ['ingreso','egreso'].forEach(function(tp){
+    finCategorias(tp).forEach(function(cat){
+      var n=((document.getElementById('fin-cat-'+tp+'-'+cat.id)||{}).value||'').trim();
+      var act=!!((document.getElementById('fin-catact-'+tp+'-'+cat.id)||{}).checked);
+      if(!n) bad=true;
+      cats[tp].push({id:cat.id,nombre:n||cat.nombre,activa:act});
+    });
+    var nueva=((document.getElementById('fin-catnew-'+tp)||{}).value||'').trim();
+    if(nueva) cats[tp].push({id:tp.slice(0,1)+Date.now()+Math.floor(Math.random()*1000),nombre:nueva,activa:true});
+  });
+  var cuentas=finCuentas().map(function(ct){ var n=((document.getElementById('fin-cta-'+ct.id)||{}).value||'').trim(); if(!n) bad=true; return {id:ct.id,nombre:n||ct.nombre}; });
+  if(bad){ alert('Los nombres no pueden quedar vacíos.'); return; }
+  var ant=S.finConfig, nc=Object.assign({},c,{categorias:cats,cuentas:cuentas,_ts:Date.now()});
+  S.finConfig=ant.map(function(x){ return x===c?nc:x; });
+  var ok=await finPersistir(function(){ S.finConfig=ant; });
+  if(!ok) return;
+  showToast('✅ Categorías y cuentas guardadas','#16A34A'); finRender();
+}
+// ── Exportar (CSV para Excel) ──
+function finExportar(){
+  if(!finPuede('fin_exportar')){ alert('No tenés permiso para exportar.'); return; }
+  if(!finAbierta()){ finSoltarDesbloqueo(); return; }
+  var mes=finVista.mes;
+  if(!confirm('Vas a descargar los movimientos de '+finMesNombre(mes)+' SIN cifrar.\n\nEl archivo queda fuera de la app: guardalo en un lugar seguro y no lo compartas.')) return;
+  var q=function(s){ s=String(s==null?'':s); return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  var filas=[['Fecha','Tipo','Monto','Medio','Cuenta','Categoría','Área / Proyecto','Responsable','Comprobante','Observación','Contado por'].join(';')];
+  finMovsDe(mes).forEach(function(x){ var d=x.d; filas.push([fmtAA(d.fecha),d.tipo==='egreso'?'Egreso':'Ingreso',String(d.monto).replace('.',','),finMedioNombre(d.medio),finCuentaNombre(d.cuenta),finCatNombre(d.tipo,d.categoria),d.areaNombre,d.responsable,d.comprobante,d.obs,d.contadoPor].map(q).join(';')); });
+  var blob=new Blob(['﻿'+filas.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Finanzas_'+mes+'.csv'; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1000);
+}
+
+// ════════════════════════════ PANTALLAS ════════════════════════════
+function finCss(){
+  if(document.getElementById('fin-css')) return;
+  var st=document.createElement('style'); st.id='fin-css';
+  st.textContent='.fin-app{max-width:none!important;width:100%!important;box-sizing:border-box}'
+   +'.fin-card{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:14px;box-sizing:border-box;min-width:0}'
+   +'.fin-lbl{font-size:12px;color:#4B5563;font-weight:600;text-transform:uppercase;letter-spacing:.03em}'
+   +'.fin-tw{overflow-x:auto}.fin-t{width:100%;border-collapse:collapse;font-size:13px}'
+   +'.fin-t th{text-align:left;font-size:12px;color:#4B5563;font-weight:600;padding:8px;border-bottom:1px solid #E5E7EB;white-space:nowrap}'
+   +'.fin-t td{padding:8px;border-bottom:1px solid #F3F4F6;vertical-align:top}.fin-n{text-align:right!important;font-variant-numeric:tabular-nums;white-space:nowrap}'
+   +'.fin-in{padding:8px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;width:100%}'
+   +'.fin-fl{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:#374151}'
+   +'.fin-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px;align-items:start}'
+   +'@media (max-width:900px){.fin-grid{grid-template-columns:1fr}}';
+  document.head.appendChild(st);
+}
+function openFin(){
+  if(!canAccessFin()){ alert('No tenés acceso a Finanzas.'); return; }
+  finCss(); finRecargarLS();
+  document.getElementById('screen-home').classList.add('hidden');
+  document.getElementById('screen-app').classList.add('show');
+  document.getElementById('app-topbar-title').textContent='💰 Finanzas';
+  document.getElementById('app-topbar-user').textContent=currentUser.name;
+  finVista={tab:null,mes:null,filtro:{tipo:'',cuenta:'',area:''},form:null,rechazando:null,resumen:false,ocupado:false};
+  document.getElementById('app-content').innerHTML='<div class="gdv-app fin-app" id="fin-root"><div class="fin-card" style="color:#6B7280">Abriendo Finanzas…</div></div>';
+  finRender();
+}
+var _finRenderando=false, _finRenderPend=false;
+async function finRender(){
+  var root=document.getElementById('fin-root'); if(!root) return;
+  if(_finRenderando){ _finRenderPend=true; return; } _finRenderando=true;
+  try{
+    if(finTengoSobre()&&cifListo()&&!finAbierta()){ try{ await finAbrirLlave(); }catch(e){ console.error('Finanzas: no se pudo abrir la llave',e); } }
+    if(finAbierta()){ try{ await finDescifrarTodo(); }catch(e){ console.error('Finanzas: descifrado',e); } }
+    root.innerHTML=finHtml();
+    if(finVista.form) finFormSync();
+  } finally { _finRenderando=false; if(_finRenderPend){ _finRenderPend=false; finRender(); } }
+}
+function finTabs(){
+  var t=[];
+  if(finAbierta()&&finPuede('fin_ver')) t.push(['dashboard','📊 Dashboard'],['movimientos','📒 Movimientos'],['cierre','🔒 Cierre mensual']);
+  if(finAbierta()&&!finPuede('fin_ver')&&(finPuede('fin_cargar')||finPuede('fin_revisar'))) t.push(['movimientos','📒 Movimientos']);
+  if(!finAbierta()&&finPuede('fin_cargar')&&finLlave()) t.push(['carga','✍️ Cargar']);
+  if(finPuede('fin_config')||finPuede('fin_llave')) t.push(['config','⚙️ Configuración']);
+  return t;
+}
+function finAviso(txt,boton){
+  return '<div class="fin-card" style="border-color:#FCD34D;background:#FFFBEB;color:#92400E;font-size:13.5px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px"><span>'+txt+'</span>'+(boton||'')+'</div>';
+}
+function finHtml(){
+  var l=finLlave(), h='', avisos='';
+  if(finVista.ocupado) return '<div class="fin-card">⏳ Trabajando… no cierres esta pantalla.</div>';
+  if(!cifDisponible()) return finAviso('Este navegador no permite el cifrado: entrá por la dirección https oficial de la app.');
+  if(!l){
+    if(isSuperAdmin()||canEjecutar('fin_llave')) avisos+=finAviso('🔐 Finanzas todavía no tiene la llave de Tesorería. Al crearla la reciben quienes tienen permisos de Finanzas y ya tienen sus llaves de cifrado.','<button class="btn btn-sm btn-primary" onclick="finCrearLlave()">Crear la llave de Tesorería</button>');
+    else return finAviso('Finanzas todavía no está configurado. Lo configura Super Admin o quien tenga el permiso "Dar y quitar acceso".');
+    return avisos;
+  }
+  if(finNecesitoLlave()&&!finAbierta()){
+    if(finTengoSobre()) avisos+=finAviso('🔒 Finanzas está cifrado. Ingresá tu contraseña para abrirlo.','<button class="btn btn-sm btn-primary" onclick="finSoltarDesbloqueo()">Desbloquear</button>');
+    else avisos+=finAviso('🔑 Tenés permiso en Finanzas pero todavía no tenés la llave de Tesorería. Pedile a quien la administra que te la entregue (Finanzas → Configuración).'+(pwUsuarioActual()&&pwUsuarioActual().cifPub?'':' Antes tenés que ingresar una vez con tu contraseña (ya cambiada) para que se generen tus llaves de cifrado.'));
+  }
+  var tabs=finTabs();
+  if(!tabs.length) return avisos||finAviso('No tenés nada para ver en Finanzas todavía.');
+  if(!finVista.tab||!tabs.some(function(t){ return t[0]===finVista.tab; })) finVista.tab=tabs[0][0];
+  if(!finVista.mes){ var ms=finMeses(); finVista.mes=ms[0]||finMesHoy(); }
+  h+=avisos+'<div class="nav" style="margin-bottom:.75rem;flex-wrap:wrap">'+tabs.map(function(t){
+    return '<button class="nav-btn'+(finVista.tab===t[0]?' active':'')+'" onclick="finIr(\''+t[0]+'\')">'+t[1]+'</button>';
+  }).join('')+'</div>';
+  if(finVista.tab==='dashboard') h+=finHtmlDashboard();
+  else if(finVista.tab==='movimientos') h+=finHtmlMovimientos();
+  else if(finVista.tab==='cierre') h+=finHtmlCierre();
+  else if(finVista.tab==='carga') h+=finHtmlCargaSinVer();
+  else if(finVista.tab==='config') h+=finHtmlConfig();
+  return h;
+}
+function finIr(t){ finVista.tab=t; finVista.form=null; finVista.rechazando=null; finVista.resumen=false; finRender(); }
+function finSelMes(onchange){
+  var ms=finMeses(); if(!ms.length) return '';
+  return '<label class="fin-fl" style="flex-direction:row;align-items:center;gap:8px">Mes <select class="fin-in" style="width:auto" onchange="'+onchange+'">'+ms.map(function(m){
+    var r=finMesRec(m), st=(r&&r.modalidad==='resumen'?'resumen':'detallado')+' · '+(r&&r.estado==='cerrado'?'cerrado':'abierto');
+    return '<option value="'+m+'"'+(m===finVista.mes?' selected':'')+'>'+finMesNombre(m)+' · '+st+'</option>';
+  }).join('')+'</select></label>';
+}
+function finSetMes(v){ finVista.mes=v; finVista.form=null; finRender(); }
+function finKpi(lbl,val,color){ return '<div class="fin-card"><div class="fin-lbl">'+lbl+'</div><div style="font-size:24px;font-weight:700;margin-top:6px;color:'+(color||'#111827')+'">'+val+'</div></div>'; }
+function finHtmlDashboard(){
+  var mes=finVista.mes, t=finTotalesMes(mes), memo={}, fin=finSaldoFin(mes,memo), ini=finSaldoIni(mes,memo)||finCero();
+  var pend=finPendientesDe(mes).length, h='';
+  h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">'+finSelMes('finSetMes(this.value)')
+    +(pend?'<span style="font-size:12px;background:#FEF3C7;color:#92400E;padding:4px 10px;border-radius:999px;font-weight:600">'+pend+' pendiente(s) de revisión</span>':'')+'</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px">'
+    +finKpi('Ingresos del mes',finFmt(t.ingreso),'#166534')+finKpi('Egresos del mes',finFmt(t.egreso),'#B91C1C')
+    +finKpi('Resultado',(t.ingreso-t.egreso>=0?'+ ':'')+finFmt(t.ingreso-t.egreso),'#1F4E79')+finKpi('Saldo total',finFmt(finSuma(fin)))+'</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin-bottom:12px">';
+  h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">Saldo por cuenta</div><div class="fin-tw"><table class="fin-t"><thead><tr><th>Cuenta</th><th class="fin-n">Inicial</th>'
+    +(t.porCuenta?'<th class="fin-n">Ingresos</th><th class="fin-n">Egresos</th>':'')+'<th class="fin-n">'+(finMesCerrado(mes)?'Final':'Actual')+'</th></tr></thead><tbody>'
+    +finCuentas().map(function(c){ var pc=t.porCuenta&&t.porCuenta[c.id];
+      return '<tr><td>'+svcEsc(c.nombre)+'</td><td class="fin-n">'+finFmtSimple(ini[c.id])+'</td>'+(t.porCuenta?'<td class="fin-n">'+finFmtSimple(pc?pc.ing:0)+'</td><td class="fin-n">'+finFmtSimple(pc?pc.egr:0)+'</td>':'')+'<td class="fin-n" style="font-weight:700">'+finFmtSimple(fin[c.id])+'</td></tr>'; }).join('')
+    +'</tbody></table></div>'+(t.resumen?'<div style="font-size:12px;color:#4B5563;margin-top:6px">Mes resumen: los totales son por categoría, sin detalle por cuenta.</div>':'')+'</div>';
+  var cats=[]; ['ingreso','egreso'].forEach(function(tp){ for(var k in t.porCat[tp]) cats.push({tp:tp,id:k,n:t.porCat[tp][k]}); });
+  cats.sort(function(a,b){ return b.n-a.n; });
+  h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">Por categoría</div><div class="fin-tw"><table class="fin-t"><thead><tr><th>Categoría</th><th class="fin-n">Ingreso</th><th class="fin-n">Egreso</th></tr></thead><tbody>'
+    +(cats.length?cats.map(function(c){ return '<tr><td>'+svcEsc(finCatNombre(c.tp,c.id))+'</td><td class="fin-n">'+(c.tp==='ingreso'?finFmtSimple(c.n):'—')+'</td><td class="fin-n">'+(c.tp==='egreso'?finFmtSimple(c.n):'—')+'</td></tr>'; }).join(''):'<tr><td colspan="3" style="color:#6B7280">Sin movimientos en este mes.</td></tr>')
+    +'</tbody></table></div></div></div>';
+  // Últimos 6 meses
+  var ms=finMeses().slice(0,6).reverse(), max=1, datos=ms.map(function(m){ var tt=finTotalesMes(m); max=Math.max(max,tt.ingreso,tt.egreso); return {m:m,t:tt}; });
+  if(ms.length>1){
+    h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:10px">Últimos meses (resumen y detallados juntos)</div>'
+      +'<div style="display:flex;align-items:flex-end;gap:18px;height:150px;padding:0 8px" role="img" aria-label="Ingresos y egresos por mes">'
+      +datos.map(function(x){ var hi=Math.round(x.t.ingreso/max*110), he=Math.round(x.t.egreso/max*110);
+        return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px" title="'+finMesNombre(x.m)+': ingresos '+finFmt(x.t.ingreso)+' · egresos '+finFmt(x.t.egreso)+'"><div style="display:flex;gap:4px;align-items:flex-end;height:115px"><div style="width:18px;height:'+hi+'px;background:#16A34A;border-radius:4px 4px 0 0"></div><div style="width:18px;height:'+he+'px;background:#DC2626;border-radius:4px 4px 0 0"></div></div><span style="font-size:11px;color:#4B5563">'+MESES[+x.m.slice(5,7)-1].slice(0,3)+' · '+(x.t.resumen?'R':'D')+'</span></div>'; }).join('')
+      +'</div><div style="font-size:12px;color:#4B5563;margin-top:8px">Verde ingresos · rojo egresos · R = mes resumen · D = mes detallado</div></div>';
+  }
+  return h;
+}
+function finHtmlPendientes(){
+  if(!finPuede('fin_revisar')||!finAbierta()) return '';
+  var p=finPendientesDe(null); if(!p.length) return '';
+  var h='<div class="fin-card" style="border-color:#FCD34D;background:#FFFBEB;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px"><div style="font-weight:700;color:#92400E">Pendientes de revisión ('+p.length+') · cargados sin ver</div><span style="font-size:12px;color:#78350F">No se puede cerrar un mes con pendientes.</span></div>'
+    +'<div class="fin-tw"><table class="fin-t"><thead><tr><th>Fecha</th><th>Cargó</th><th>Tipo</th><th>Categoría</th><th>Medio → Cuenta</th><th class="fin-n">Monto</th><th>Detalle</th><th></th></tr></thead><tbody>';
+  p.forEach(function(m){
+    var d=finDecV('p',m);
+    if(!d){ h+='<tr><td colspan="8" style="color:#B91C1C">No se pudo abrir esta carga ('+svcEsc(m.creadoNombre)+', '+new Date(m.creadoTs).toLocaleString('es-AR')+').</td></tr>'; return; }
+    var det=[d.celebId?'Celebración '+finCelebNombre(d.celebId):'',d.contadoPor?'contado con '+d.contadoPor:'',d.comprobante?'Comp.: '+d.comprobante:'',d.obs].filter(Boolean).join(' · ');
+    h+='<tr><td>'+fmtAA(d.fecha)+'</td><td>'+svcEsc(m.creadoNombre)+'</td><td>'+(d.tipo==='egreso'?'Egreso':'Ingreso')+'</td><td>'+svcEsc(finCatNombre(d.tipo,d.categoria))+'</td><td>'+svcEsc(finMedioNombre(d.medio))+' → '+svcEsc(finCuentaNombre(d.cuenta))+'</td><td class="fin-n">'+finFmtSimple(d.monto)+'</td><td>'+svcEsc(det)+'</td><td style="white-space:nowrap">'
+      +(finVista.rechazando===m.id
+        ?'<div style="display:flex;flex-direction:column;gap:6px;min-width:220px"><label class="fin-fl">Motivo del rechazo<textarea id="fin-rech-'+m.id+'" class="fin-in" rows="2"></textarea></label><div style="display:flex;gap:6px"><button class="btn btn-sm btn-danger" onclick="finRechazar('+m.id+')">Rechazar</button><button class="btn btn-sm" onclick="finRechazarAbrir(null)">Cancelar</button></div></div>'
+        :'<div style="display:flex;gap:6px"><button class="btn btn-sm btn-primary" onclick="finIncorporar('+m.id+')">Incorporar</button><button class="btn btn-sm" onclick="finRechazarAbrir('+m.id+')">Rechazar</button></div>')
+      +'</td></tr>';
+  });
+  return h+'</tbody></table></div></div>';
+}
+function finCelebNombre(id){ var c=(S.celebraciones||[]).find(function(x){ return x&&String(x.id)===String(id); }); return c?(fmtAA(c.fecha)+' '+(c.horario||'')):'(eliminada)'; }
+function finHtmlMovimientos(){
+  var mes=finVista.mes, fi=finVista.filtro, h=finHtmlPendientes();
+  var puedeVer=finPuede('fin_ver');
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+finSelMes('finSetMes(this.value)');
+  if(puedeVer){
+    h+='<label class="fin-fl">Tipo<select class="fin-in" style="width:auto" onchange="finVista.filtro.tipo=this.value;finRender()"><option value="">Todos</option><option value="ingreso"'+(fi.tipo==='ingreso'?' selected':'')+'>Ingresos</option><option value="egreso"'+(fi.tipo==='egreso'?' selected':'')+'>Egresos</option></select></label>'
+      +'<label class="fin-fl">Cuenta<select class="fin-in" style="width:auto" onchange="finVista.filtro.cuenta=this.value;finRender()"><option value="">Todas</option>'+finCuentas().map(function(c){ return '<option value="'+c.id+'"'+(fi.cuenta===c.id?' selected':'')+'>'+svcEsc(c.nombre)+'</option>'; }).join('')+'</select></label>';
+  }
+  h+='<div style="flex:1"></div>';
+  var cerrado=finMesCerrado(mes), resumen=finMesModalidad(mes)==='resumen';
+  if(finPuede('fin_cargar')&&!cerrado&&!resumen) h+='<button class="btn btn-sm" style="background:#16A34A;color:#fff;border-color:#16A34A" onclick="finNuevo(\'ingreso\')">+ Ingreso</button><button class="btn btn-sm btn-danger" onclick="finNuevo(\'egreso\')">+ Egreso</button>';
+  if(puedeVer&&finPuede('fin_exportar')) h+='<button class="btn btn-sm" onclick="finExportar()">Exportar</button>';
+  h+='</div>';
+  if(cerrado) h+='<div style="font-size:12.5px;color:#4B5563;margin-bottom:8px">🔒 '+finMesNombre(mes)+' está cerrado. Para corregir, reabrilo desde Cierre mensual.</div>';
+  if(resumen) h+='<div style="font-size:12.5px;color:#4B5563;margin-bottom:8px">'+finMesNombre(mes)+' es un mes resumen: no tiene movimientos. Los totales están en Dashboard y Cierre mensual.</div>';
+  var lista='';
+  if(puedeVer){
+    var movs=finMovsDe(mes).filter(function(x){ return (!fi.tipo||x.d.tipo===fi.tipo)&&(!fi.cuenta||x.d.cuenta===fi.cuenta); });
+    var rech=(S.finMovs||[]).filter(function(m){ return m&&m.estado==='rechazado'&&m.mes===mes; });
+    lista='<div class="fin-card"><div class="fin-tw"><table class="fin-t"><thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Cuenta</th><th>Área / Proyecto</th><th>Responsable</th><th class="fin-n">Monto</th><th></th></tr></thead><tbody>'
+      +(movs.length?movs.map(function(x){ var d=x.d;
+        return '<tr><td>'+fmtAA(d.fecha)+'</td><td style="font-weight:600;color:'+(d.tipo==='egreso'?'#B91C1C':'#166534')+'">'+(d.tipo==='egreso'?'Egreso':'Ingreso')+'</td><td>'+svcEsc(finCatNombre(d.tipo,d.categoria))+(d.obs?'<div style="font-size:11.5px;color:#6B7280">'+svcEsc(d.obs)+'</div>':'')+'</td><td>'+svcEsc(finCuentaNombre(d.cuenta))+'<div style="font-size:11.5px;color:#6B7280">'+svcEsc(finMedioNombre(d.medio))+'</div></td><td>'+svcEsc(d.areaNombre||'')+'</td><td>'+svcEsc(d.responsable||'')+(d.hist&&d.hist.length?'<div style="font-size:11px;color:#6B7280" title="'+svcEsc(d.hist.map(function(hh){ return new Date(hh.ts).toLocaleString('es-AR')+' · '+hh.por; }).join('\n'))+'">✏️ editado '+d.hist.length+' vez/veces</div>':'')+'</td><td class="fin-n">'+finFmtSimple(d.monto)+'</td><td>'+(finPuede('fin_editar')&&!cerrado?'<button class="btn btn-sm" aria-label="Editar" onclick="finEditar('+x.m.id+')">✏️</button>':'')+'</td></tr>'; }).join('')
+        :'<tr><td colspan="8" style="color:#6B7280">Sin movimientos'+(fi.tipo||fi.cuenta?' con este filtro':'')+'.</td></tr>')
+      +'</tbody></table></div>'
+      +(rech.length?'<details style="margin-top:8px;font-size:12.5px"><summary>'+rech.length+' carga(s) rechazada(s)</summary>'+rech.map(function(m){ var d=finDecV('m',m)||{}; return '<div style="padding:4px 0;color:#4B5563">'+svcEsc(m.creadoNombre)+' · '+(d.fecha?fmtAA(d.fecha)+' · '+finFmt(d.monto):'')+' · rechazada por '+svcEsc(m.revisadoPor||'')+': '+svcEsc(d._motivoRechazo||'')+'</div>'; }).join('')+'</details>':'')
+      +'</div>';
+  } else {
+    lista=finHtmlMisCargas();
+  }
+  if(finVista.form) h+='<div class="fin-grid">'+lista+finHtmlForm()+'</div>';
+  else h+=lista;
+  return h;
+}
+function finNuevo(tipo){ finVista.form={tipo:tipo}; finRender(); }
+function finEditar(id){ finVista.form={tipo:'ingreso',id:id}; var m=(S.finMovs||[]).find(function(x){ return Number(x.id)===Number(id); }); var d=m?finDecV('m',m):null; if(d) finVista.form.tipo=d.tipo; finRender(); }
+function finCancelarForm(){ finVista.form=null; finRender(); }
+function finHtmlForm(){
+  var f=finVista.form, tipo=f.tipo==='egreso'?'egreso':'ingreso', d={};
+  if(f.id){ var m=(S.finMovs||[]).find(function(x){ return Number(x.id)===Number(f.id); }); d=(m&&finDecV('m',m))||{}; }
+  var fecha=d.fecha||(finVista.mes===finMesHoy()||!finVista.mes?today():finVista.mes+'-01');
+  var areas='<option value="gen">General / Iglesia</option>'
+    +(S.ministerios||[]).filter(function(p){ return p&&p.estado!=='Inactivo'; }).map(function(p){ return '<option value="p'+p.id+'"'+(d.area==='p'+p.id?' selected':'')+'>Propósito · '+svcEsc(p.nombre)+'</option>'; }).join('')
+    +(S.areasServicio||[]).filter(function(a){ return svcAreaActiva(a); }).map(function(a){ return '<option value="a'+a.id+'"'+(d.area==='a'+a.id?' selected':'')+'>'+svcEsc(a.tipo||'Área')+' · '+svcEsc(a.nombre)+'</option>'; }).join('');
+  var nombres=(S.members||[]).filter(function(x){ return x&&x.estado!=='Baja'; }).map(function(x){ return '<option value="'+svcEsc(listName(x))+'">'; }).join('');
+  var color=tipo==='egreso'?'#B91C1C':'#166534';
+  return '<form class="fin-card" style="display:flex;flex-direction:column;gap:10px" onsubmit="event.preventDefault();finGuardarMov()" aria-label="'+(f.id?'Editar':'Nuevo')+' '+tipo+'">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700;color:'+color+'">'+(f.id?'Editar ':'Nuevo ')+tipo+'</div>'
+    +(f.id?'':'<div style="display:flex;gap:4px"><button type="button" class="btn btn-sm'+(tipo==='ingreso'?' btn-primary':'')+'" onclick="finVista.form.tipo=\'ingreso\';finRender()">Ingreso</button><button type="button" class="btn btn-sm'+(tipo==='egreso'?' btn-primary':'')+'" onclick="finVista.form.tipo=\'egreso\';finRender()">Egreso</button></div>')+'</div>'
+    +'<label class="fin-fl">Fecha<input type="date" id="fin-f-fecha" class="fin-in" value="'+fecha+'" onchange="finFormSync()"></label>'
+    +'<label class="fin-fl">Monto ($)<input type="text" inputmode="decimal" id="fin-f-monto" class="fin-in" style="font-size:18px" value="'+(d.monto!=null?String(d.monto).replace('.',','):'')+'" placeholder="0"></label>'
+    +'<label class="fin-fl">Medio<select id="fin-f-medio" class="fin-in" onchange="finFormSync()">'+FIN_MEDIOS.map(function(m){ return '<option value="'+m.id+'"'+(d.medio===m.id?' selected':'')+'>'+svcEsc(m.nombre)+'</option>'; }).join('')+'</select></label>'
+    +'<label class="fin-fl" id="fin-f-cuenta-wrap">Cuenta<select id="fin-f-cuenta" class="fin-in" data-val="'+svcEsc(d.cuenta||'')+'"></select></label>'
+    +'<label class="fin-fl">Categoría<select id="fin-f-cat" class="fin-in">'+finCategorias(tipo).filter(function(c){ return c.activa!==false||c.id===d.categoria; }).map(function(c){ return '<option value="'+c.id+'"'+(d.categoria===c.id?' selected':'')+'>'+svcEsc(c.nombre)+'</option>'; }).join('')+'</select></label>'
+    +'<label class="fin-fl">Área / Proyecto / Ministerio<select id="fin-f-area" class="fin-in">'+areas+'</select></label>'
+    +(tipo==='ingreso'?'<label class="fin-fl">Celebración (opcional)<select id="fin-f-celeb" class="fin-in" data-val="'+svcEsc(d.celebId||'')+'"></select></label>'
+      +'<label class="fin-fl">Contado por (segunda persona)<input type="text" id="fin-f-contado" class="fin-in" list="fin-personas" value="'+svcEsc(d.contadoPor||'')+'" placeholder="Buscar persona…"><datalist id="fin-personas">'+nombres+'</datalist></label>'
+      :'<input type="hidden" id="fin-f-celeb" value=""><input type="hidden" id="fin-f-contado" value="">')
+    +'<label class="fin-fl">Comprobante (número o link)<input type="text" id="fin-f-comp" class="fin-in" value="'+svcEsc(d.comprobante||'')+'"></label>'
+    +'<label class="fin-fl">Observación<textarea id="fin-f-obs" class="fin-in" rows="2">'+svcEsc(d.obs||'')+'</textarea></label>'
+    +'<div style="font-size:12px;color:#4B5563">Responsable: '+svcEsc(f.id?(d.responsable||''):finYo().nombre)+(f.id?'':' (quien carga)')+(finAbierta()?'':' · Se envía cifrado a Tesorería: después de enviarlo no lo vas a poder ver.')+'</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="submit" class="btn btn-primary">'+(finAbierta()?'Guardar':'Enviar a Tesorería')+'</button><button type="button" class="btn" onclick="finCancelarForm()">Cancelar</button>'
+    +(f.id&&finPuede('fin_editar')?'<button type="button" class="btn btn-danger" style="margin-left:auto" onclick="finEliminarMov('+f.id+')">Eliminar</button>':'')+'</div></form>';
+}
+// Cuenta según el Medio (se pregunta solo si hay más de una) y Celebraciones del día elegido
+function finFormSync(){
+  var med=finMedio((document.getElementById('fin-f-medio')||{}).value), sel=document.getElementById('fin-f-cuenta'), wrap=document.getElementById('fin-f-cuenta-wrap');
+  if(med&&sel){
+    var prev=sel.value||sel.getAttribute('data-val')||'';
+    sel.innerHTML=med.cuentas.map(function(c){ return '<option value="'+c+'"'+(c===prev?' selected':'')+'>'+svcEsc(finCuentaNombre(c))+'</option>'; }).join('');
+    if(wrap) wrap.style.display=med.cuentas.length>1?'':'none';
+  }
+  var cs=document.getElementById('fin-f-celeb');
+  if(cs&&cs.tagName==='SELECT'){
+    var fecha=(document.getElementById('fin-f-fecha')||{}).value||'', pv=cs.value||cs.getAttribute('data-val')||'';
+    var cels=(S.celebraciones||[]).filter(function(c){ return c&&c.fecha===fecha; });
+    cs.innerHTML='<option value="">Ninguna</option>'+cels.map(function(c){ return '<option value="'+svcEsc(c.id)+'"'+(String(c.id)===String(pv)?' selected':'')+'>'+fmtAA(c.fecha)+' '+svcEsc(c.horario||'')+'</option>'; }).join('');
+  }
+}
+function finHtmlMisCargas(){
+  var mias=(S.finMovs||[]).filter(function(m){ return m&&currentUser&&Number(m.creadoUid)===Number(currentUser.id); }).sort(function(a,b){ return b.creadoTs-a.creadoTs; }).slice(0,30);
+  return '<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">Mis cargas</div>'
+    +(mias.length?mias.map(function(m){ var st=m.estado==='pendiente'?['Pendiente de revisión','#92400E']:m.estado==='ok'?['Incorporado','#166534']:['Rechazado','#B91C1C'];
+      return '<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid #F3F4F6;font-size:13px"><span>'+new Date(m.creadoTs).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span><span style="color:'+st[1]+';font-weight:600">'+st[0]+'</span></div>'; }).join('')
+      :'<div style="font-size:13px;color:#6B7280">Todavía no cargaste nada.</div>')
+    +'<div style="font-size:12px;color:#4B5563;margin-top:8px">Sin montos: una vez enviada, solo Tesorería la puede leer.</div></div>';
+}
+function finHtmlCargaSinVer(){
+  if(!finVista.form) finVista.form={tipo:'ingreso'};
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;align-items:start">'
+    +'<div>'+finAviso('Lo que cargás se guarda cifrado. Solo Tesorería lo puede ver.')+finHtmlForm()+'</div>'+finHtmlMisCargas()+'</div>';
+}
+function finHtmlCierre(){
+  var mes=finVista.mes, r=finMesRec(mes), d=r?finDecV('x',r):null, memo={}, h='';
+  h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">'+finSelMes('finSetMes(this.value)')
+    +(finPuede('fin_editar')?'<button class="btn btn-sm" onclick="finVista.resumen=!finVista.resumen;finRender()">'+(finVista.resumen?'Cerrar formulario':'+ Cargar mes resumen')+'</button>':'')+'</div>';
+  if(finVista.resumen) h+=finHtmlResumenForm();
+  var modal=finMesModalidad(mes), cerrado=finMesCerrado(mes);
+  h+='<div class="fin-card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><div style="font-weight:700;color:#1F4E79;font-size:15px">'+finMesNombre(mes)+' · '+modal+'</div>'
+    +'<span style="font-size:12px;padding:4px 10px;border-radius:999px;font-weight:600;'+(cerrado?'background:#DCFCE7;color:#166534':'background:#E0F2FE;color:#075985')+'">'+(cerrado?'Cerrado':'Abierto')+'</span></div>';
+  if(modal==='resumen'){
+    var t=finTotalesMes(mes);
+    h+='<div class="fin-tw"><table class="fin-t"><thead><tr><th>Cuenta</th><th class="fin-n">Saldo inicial</th><th class="fin-n">Saldo final cargado</th></tr></thead><tbody>'
+      +finCuentas().map(function(c){ var ini=finSaldoIni(mes,memo)||{}; return '<tr><td>'+svcEsc(c.nombre)+'</td><td class="fin-n">'+finFmtSimple(ini[c.id])+'</td><td class="fin-n" style="font-weight:700">'+finFmtSimple(d&&d.saldoFinal?d.saldoFinal[c.id]:0)+'</td></tr>'; }).join('')
+      +'</tbody></table></div><div style="font-size:13px;margin-top:8px">Ingresos '+finFmt(t.ingreso)+' · Egresos '+finFmt(t.egreso)+(d&&d.obs?' · '+svcEsc(d.obs):'')+'</div>';
+  } else {
+    var calc=finSaldoCalc(mes,memo), ini2=finSaldoIni(mes,memo)||finCero(), tt=finTotalesMes(mes), real=(cerrado&&d&&d.saldoReal)?d.saldoReal:null, pend=finPendientesDe(mes).length;
+    h+='<div style="font-size:13px;color:#374151;margin-bottom:10px">Saldo inicial + Ingresos − Egresos = Saldo calculado.'+(cerrado?'':' Cargá el saldo real (caja contada, extracto del banco, resumen de MP).')+'</div>'
+      +'<div class="fin-tw"><table class="fin-t"><thead><tr><th>Cuenta</th><th class="fin-n">Saldo inicial</th><th class="fin-n">Ingresos</th><th class="fin-n">Egresos</th><th class="fin-n">Calculado</th><th class="fin-n">Saldo real</th><th class="fin-n">Diferencia</th></tr></thead><tbody>'
+      +finCuentas().map(function(c){ var pc=tt.porCuenta[c.id]||{ing:0,egr:0}, cv=calc[c.id]||0;
+        var realTd=real?finFmtSimple(real[c.id]):(finPuede('fin_editar')?'<label><span style="position:absolute;left:-9999px">Saldo real '+svcEsc(c.nombre)+'</span><input id="fin-real-'+c.id+'" class="fin-in" style="width:130px;text-align:right" inputmode="decimal" oninput="finCierreDif()" data-calc="'+cv+'"></label>':'—');
+        var dif=real?Math.round(((finNum(real[c.id])||0)-cv)*100)/100:null;
+        return '<tr><td>'+svcEsc(c.nombre)+'</td><td class="fin-n">'+finFmtSimple(ini2[c.id])+'</td><td class="fin-n">'+finFmtSimple(pc.ing)+'</td><td class="fin-n">'+finFmtSimple(pc.egr)+'</td><td class="fin-n" style="font-weight:700">'+finFmtSimple(cv)+'</td><td class="fin-n">'+realTd+'</td><td class="fin-n" id="fin-dif-'+c.id+'">'+(dif===null?'':dif===0?'<span style="color:#166534;font-weight:700">✓ coincide</span>':'<span style="color:#B91C1C;font-weight:700">'+finFmtSimple(dif)+'</span>')+'</td></tr>'; }).join('')
+      +'</tbody></table></div>';
+    if(cerrado){
+      h+=(d&&d.obs?'<div style="font-size:13px;margin-top:8px">Observación: '+svcEsc(d.obs)+'</div>':'')+'<div style="font-size:12px;color:#4B5563;margin-top:6px">Cerrado por '+svcEsc(r.cerradoPor||'')+' el '+(r.cerradoTs?new Date(r.cerradoTs).toLocaleString('es-AR'):'')+'</div>';
+    } else if(finPuede('fin_editar')){
+      h+=(pend?'<div style="font-size:13px;color:#92400E;margin-top:8px">Hay '+pend+' carga(s) pendiente(s) de revisión: revisalas en Movimientos antes de cerrar.</div>':'')
+        +'<label class="fin-fl" style="margin-top:12px">Observación (obligatoria si hay diferencia)<textarea id="fin-cierre-obs" class="fin-in" rows="2"></textarea></label>'
+        +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center"><button class="btn btn-primary" onclick="finCerrarMes(\''+mes+'\')">Cerrar el mes</button><span style="font-size:12px;color:#4B5563">Los saldos reales pasan a ser el saldo inicial de '+finMesNombre(finMesSig(mes))+'.</span></div>';
+    }
+  }
+  if(cerrado&&finPuede('fin_editar')) h+='<div style="margin-top:10px"><button class="btn btn-sm" onclick="finReabrirMes(\''+mes+'\')">Reabrir</button></div>';
+  if(r&&(r.log||[]).length) h+='<details style="margin-top:10px;font-size:12.5px"><summary>Registro del mes</summary>'+r.log.map(function(x){ return '<div style="color:#4B5563;padding:2px 0">'+new Date(x.ts).toLocaleString('es-AR')+' · '+svcEsc(x.por)+' · '+svcEsc(x.accion)+'</div>'; }).join('')+'</details>';
+  h+='</div>';
+  // Lista de meses
+  h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">Meses</div><div class="fin-tw"><table class="fin-t"><thead><tr><th>Mes</th><th>Modalidad</th><th>Estado</th><th class="fin-n">Ingresos</th><th class="fin-n">Egresos</th><th class="fin-n">Saldo final</th></tr></thead><tbody>'
+    +finMeses().map(function(m){ var rr=finMesRec(m), t2=finTotalesMes(m), p2=finPendientesDe(m).length;
+      return '<tr style="cursor:pointer" onclick="finSetMes(\''+m+'\')"><td><a href="#" onclick="event.preventDefault()">'+finMesNombre(m)+'</a></td><td>'+(rr&&rr.modalidad==='resumen'?'Resumen':'Detallado')+'</td><td'+(rr&&rr.estado==='cerrado'?' style="color:#166534;font-weight:600">Cerrado':'>Abierto'+(p2?' · '+p2+' pendiente(s)':''))+'</td><td class="fin-n">'+finFmtSimple(t2.ingreso)+'</td><td class="fin-n">'+finFmtSimple(t2.egreso)+'</td><td class="fin-n">'+finFmtSimple(finSuma(finSaldoFin(m,memo)))+'</td></tr>'; }).join('')
+    +'</tbody></table></div></div>';
+  return h;
+}
+function finCierreDif(){
+  finCuentas().forEach(function(c){
+    var i=document.getElementById('fin-real-'+c.id), o=document.getElementById('fin-dif-'+c.id); if(!i||!o) return;
+    if(i.value.trim()===''){ o.innerHTML=''; return; }
+    var n=finNum(i.value); if(isNaN(n)){ o.innerHTML='<span style="color:#B91C1C">?</span>'; return; }
+    var df=Math.round((n-Number(i.getAttribute('data-calc')||0))*100)/100;
+    o.innerHTML=df===0?'<span style="color:#166534;font-weight:700">✓ coincide</span>':'<span style="color:#B91C1C;font-weight:700">'+finFmtSimple(df)+'</span>';
+  });
+}
+function finHtmlResumenForm(){
+  var mes=finVista.mes, r=finMesRec(mes), d=(r&&r.modalidad==='resumen')?(finDecV('x',r)||{}):{};
+  var v=function(o,k){ return o&&o[k]!=null?String(o[k]).replace('.',','):''; };
+  var bloque=function(tp){ return '<div><div class="fin-lbl" style="margin-bottom:6px">'+(tp==='ingreso'?'Ingresos':'Egresos')+' por categoría</div>'+finCategorias(tp).map(function(c){
+    return '<label class="fin-fl" style="flex-direction:row;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">'+svcEsc(c.nombre)+'<input id="fin-res-'+tp+'-'+c.id+'" class="fin-in" style="width:140px;text-align:right" inputmode="decimal" value="'+v(d.resumen&&d.resumen[tp],c.id)+'"></label>'; }).join('')+'</div>'; };
+  return '<div class="fin-card" style="margin-bottom:12px;border-color:#1F4E79"><div style="font-weight:700;color:#1F4E79;margin-bottom:4px">Mes resumen</div>'
+    +'<div style="font-size:12.5px;color:#4B5563;margin-bottom:10px">Para cargar la historia (por ejemplo, desde el Excel): total por categoría y saldo final de cada cuenta. Queda cerrado. Un mes con movimientos no puede ser resumen.</div>'
+    +'<label class="fin-fl" style="max-width:220px;margin-bottom:10px">Mes<input type="month" id="fin-res-mes" class="fin-in" value="'+mes+'"></label>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">'+bloque('ingreso')+bloque('egreso')
+    +'<div><div class="fin-lbl" style="margin-bottom:6px">Saldo final de cada cuenta</div>'+finCuentas().map(function(c){ return '<label class="fin-fl" style="flex-direction:row;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">'+svcEsc(c.nombre)+'<input id="fin-res-saldo-'+c.id+'" class="fin-in" style="width:140px;text-align:right" inputmode="decimal" value="'+v(d.saldoFinal,c.id)+'"></label>'; }).join('')
+    +'<label class="fin-fl">Observación<textarea id="fin-res-obs" class="fin-in" rows="2">'+svcEsc(d.obs||'')+'</textarea></label></div></div>'
+    +'<div style="margin-top:10px"><button class="btn btn-primary" onclick="finGuardarResumen()">Guardar mes resumen</button></div></div>';
+}
+function finHtmlConfig(){
+  var h='', l=finLlave(), c=finConfig();
+  if(isSuperAdmin()||canEjecutar('fin_llave')) h+=finHtmlLlaveCfg();
+  if(finPuede('fin_config')&&c){
+    var ap=finApertura()||{};
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin-bottom:12px">';
+    h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:4px">Inicio de la contabilidad</div><div style="font-size:12.5px;color:#4B5563;margin-bottom:10px">Mes desde el que se lleva Finanzas en la app y saldo de cada cuenta al empezar ese mes. Para cargar historia anterior como meses resumen, poné un mes de inicio más viejo.</div>'
+      +(finAbierta()?'<label class="fin-fl" style="max-width:220px;margin-bottom:8px">Mes de inicio<input type="month" id="fin-ini-mes" class="fin-in" value="'+svcEsc(c.mesInicio||finMesHoy())+'"></label>'
+        +finCuentas().map(function(ct){ return '<label class="fin-fl" style="flex-direction:row;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">Saldo inicial · '+svcEsc(ct.nombre)+'<input id="fin-ini-'+ct.id+'" class="fin-in" style="width:150px;text-align:right" inputmode="decimal" value="'+(ap[ct.id]!=null?String(ap[ct.id]).replace('.',','):'0')+'"></label>'; }).join('')
+        +'<button class="btn btn-primary btn-sm" onclick="finGuardarInicio()">Guardar inicio</button>'
+        :'<div style="font-size:13px;color:#6B7280">Mes de inicio: '+finMesNombre(c.mesInicio)+'. Para ver o cambiar los saldos iniciales hace falta la llave de Tesorería.</div>')+'</div>';
+    h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">Categorías y cuentas</div>';
+    ['ingreso','egreso'].forEach(function(tp){
+      h+='<div class="fin-lbl" style="margin:8px 0 6px">'+(tp==='ingreso'?'Ingresos':'Egresos')+'</div>'+finCategorias(tp).map(function(cat){
+        return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><label style="flex:1"><span style="position:absolute;left:-9999px">Nombre</span><input id="fin-cat-'+tp+'-'+cat.id+'" class="fin-in" value="'+svcEsc(cat.nombre)+'"></label><label style="font-size:12px;white-space:nowrap;display:flex;gap:4px;align-items:center"><input type="checkbox" id="fin-catact-'+tp+'-'+cat.id+'"'+(cat.activa!==false?' checked':'')+'> En uso</label></div>'; }).join('')
+        +'<label class="fin-fl"><span>+ Nueva categoría de '+(tp==='ingreso'?'ingreso':'egreso')+'</span><input id="fin-catnew-'+tp+'" class="fin-in" placeholder="Nombre (opcional)"></label>';
+    });
+    h+='<div class="fin-lbl" style="margin:12px 0 6px">Cuentas</div>'+finCuentas().map(function(ct){ return '<label class="fin-fl" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:6px"><span style="width:110px;color:#6B7280">'+svcEsc(ct.id)+'</span><input id="fin-cta-'+ct.id+'" class="fin-in" value="'+svcEsc(ct.nombre)+'"></label>'; }).join('')
+      +'<div style="font-size:12px;color:#4B5563;margin:6px 0 10px">Se renombran como las Etiquetas: el código interno no cambia. Una categoría fuera de uso no aparece al cargar, pero se conserva en lo ya cargado.</div>'
+      +'<button class="btn btn-primary btn-sm" onclick="finGuardarListas()">Guardar categorías y cuentas</button></div></div>';
+  }
+  h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:6px">Equipo</div><div style="font-size:13px;color:#374151">El equipo sale del Área de servicio <strong>Tesorería</strong>: el Coordinador/a recibe la Función automática "Coordinador/a Tesorería" y los Colaboradores/as "Colaborador/a Tesorería". Qué puede hacer cada Función se define en Configuración → Permisos (sección Finanzas). Para cambiar el equipo: Configuración → Áreas de servicio.</div></div>';
+  return h;
+}
+function finHtmlLlaveCfg(){
+  var l=finLlave();
+  if(!l) return finAviso('🔐 Todavía no existe la llave de Tesorería.','<button class="btn btn-sm btn-primary" onclick="finCrearLlave()">Crear la llave de Tesorería</button>');
+  var filas=[], vistos={};
+  (S.users||[]).forEach(function(u){
+    if(!u||u.cuentaSistema) return;
+    var tiene=!!(l.sobres&&l.sobres[u.id]&&l.sobres[u.id].k&&l.sobres[u.id].k[String(l.kv)]), nec=finNecesitaLlave(u);
+    if(!tiene&&!nec&&!(cifPermisoDe(u,'fin_cargar')!=='ninguno')) return;
+    vistos[u.id]=1;
+    var perms=u.role==='super_admin'?'Todos':FIN_PERMS.filter(function(k){ return cifPermisoDe(u,k)!=='ninguno'; }).map(function(k){ return {fin_ver:'Ver',fin_cargar:'Cargar',fin_revisar:'Revisar',fin_editar:'Editar',fin_config:'Config.',fin_llave:'Llave',fin_exportar:'Exportar'}[k]; }).join(' · ');
+    var est, acc='';
+    if(tiene&&nec) est='<span style="color:#166534;font-weight:600">✓ Tiene</span>';
+    else if(tiene&&!nec){ est='<span style="color:#B91C1C;font-weight:600">Todavía tiene la llave sin permiso</span>'; acc='<button class="btn btn-sm btn-danger" onclick="finRotarLlave()">Rotar la llave</button>'; }
+    else if(nec&&!u.cifPub) est='<span style="color:#6B7280">No puede recibirla todavía: tiene que ingresar con su contraseña (ya cambiada)</span>';
+    else if(nec){ est='<span style="color:#B45309;font-weight:600">Le falta la llave</span>'; acc=finAbierta()?'<button class="btn btn-sm btn-primary" onclick="finEntregarLlave('+u.id+')">Entregar llave</button>':''; }
+    else est='<span style="color:#4B5563">No necesita (carga sin ver)</span>';
+    filas.push('<tr><td>'+svcEsc(u.name||u.user||('#'+u.id))+'</td><td>'+svcEsc(perms||'—')+'</td><td>'+est+'</td><td>'+acc+'</td></tr>');
+  });
+  return '<div class="fin-card" style="margin-bottom:12px"><div style="font-weight:700;color:#1F4E79;margin-bottom:4px">Quién tiene la llave de Tesorería</div>'
+    +'<div style="font-size:13px;color:#374151;margin-bottom:10px">Los permisos se dan en Configuración → Permisos. Quien tiene Ver, Editar, Revisar, Configurar, Llave o Exportar además necesita la llave, y se la entrega alguien que ya la tiene. Quien solo tiene Cargar no la necesita: carga sin ver.</div>'
+    +'<div class="fin-tw"><table class="fin-t"><thead><tr><th>Usuario</th><th>Permisos de Finanzas</th><th>Llave</th><th></th></tr></thead><tbody>'+filas.join('')+'</tbody></table></div>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">'+(finAbierta()?'<button class="btn btn-sm" onclick="finRotarLlave()">Rotar la llave</button>':'')+'<span style="font-size:12px;color:#4B5563">Versión '+l.kv+(l.rotadaTs?' · rotada el '+new Date(l.rotadaTs).toLocaleDateString('es-AR')+' por '+svcEsc(l.rotadaPor||''):'')+'. Rotar = llave nueva, se vuelve a cifrar todo y la conservan solo quienes siguen con permiso. Si todos los titulares olvidan su contraseña, los datos no se recuperan: exportá periódicamente.</span></div></div>';
 }
 
 boot();

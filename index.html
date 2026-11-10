@@ -23530,8 +23530,11 @@ function celebEntrarCarga(id){
         '<button onclick="celebSalirCarga()" style="background:none;border:1px solid #1F2933;color:#6B7280;border-radius:8px;padding:6px 10px;font-size:13px">← Salir</button>'+
         '<div style="text-align:center;flex:1;min-width:0"><div style="font-size:12px;color:#4B5563">'+svcEsc(celebFechaTxt(c.fecha))+' · '+svcEsc(c.horario)+'</div>'+
           '<div style="font-size:17px;color:#9CA3AF;font-weight:600">Marcados: <span id="celeb-cnt">0</span></div></div>'+
-        (canCelebCerrar()?'<button onclick="celebAbrirCierre(\''+c.id+'\')" style="background:#0F2A1B;border:1px solid #14532D;color:#86EFAC;border-radius:8px;padding:6px 10px;font-size:13px">Cerrar asistencia</button>'
-          :'<button onclick="celebAbrirConfirmar(\''+c.id+'\')" style="background:#0F2A1B;border:1px solid #14532D;color:#86EFAC;border-radius:8px;padding:6px 10px;font-size:13px">✅ Terminé</button>')+
+        // Todos confirman su parte con "✅ Terminé"; quien puede cerrar (Coordinador/a) ve además "🔒 Cerrar"
+        '<div style="display:flex;flex-direction:column;gap:4px;align-items:stretch">'+
+          '<button onclick="celebAbrirConfirmar(\''+c.id+'\')" style="background:#0F2A1B;border:1px solid #14532D;color:#86EFAC;border-radius:8px;padding:6px 10px;font-size:13px;white-space:nowrap">✅ Terminé</button>'+
+          (canCelebCerrar()?'<button onclick="celebAbrirCierre(\''+c.id+'\')" style="background:transparent;border:1px solid #1F2933;color:#9CA3AF;border-radius:8px;padding:4px 10px;font-size:12px;white-space:nowrap">🔒 Cerrar</button>':'')+
+        '</div>'+
       '</div>'+
       '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">'+
         '<input id="celeb-buscar" type="search" placeholder="Buscar por nombre…" oninput="celebCarga.buscar=this.value;celebRenderLista()" autocomplete="off" style="flex:1;background:#0D1117;border:1px solid #1F2933;color:#9CA3AF;border-radius:8px;padding:9px 10px;font-size:15px">'+

@@ -718,7 +718,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzg';
+const APP_VERSION = '2026-08-24-zzh';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -1083,7 +1083,7 @@ function getPerm(roleId, screen){
   if(hasRole('super_admin')) return 'ejecuta';
   const order={ninguno:0,consulta:1,ejecuta:2};
   let best='ninguno';
-  const sr=currentUser.role;
+  const sr=rolCuenta(); // Función de la cuenta, ya validada contra las asignaciones activas
   // System role (login access role)
   if(PERMISOS[sr]){
     const p=PERMISOS[sr][screen]||'ninguno';
@@ -2951,7 +2951,7 @@ function userRoles(){
   const linked=getLinkedMember();
   return linked?linked.roles:(currentUser.role?[currentUser.role]:[]);
 }
-function hasRole(...rols){ const r=userRoles(); return rols.some(x=>r.includes(x)||(currentUser&&currentUser.role&&currentUser.role===x)); }
+function hasRole(...rols){ const r=userRoles(); const rc=rolCuenta(); return rols.some(x=>r.includes(x)||(rc&&rc===x)); }
 
 // ── Permission functions ────────────────────────────────────
 // SUPER ADMIN: todo
@@ -3295,7 +3295,7 @@ async function cfgAplicarRevisionFuncionesAuto(){
 function getFacilitadorGroupIds(){
   // Returns ALL group ids this user is responsible for (can be more than one)
   const ids=new Set();
-  if(currentUser.groupId) ids.add(Number(currentUser.groupId));
+  if(grupoCuenta()) ids.add(Number(grupoCuenta()));
 
   const linked=getLinkedMember();
 
@@ -3319,7 +3319,7 @@ function getFacilitadorGroupId(){
 // bloquearla. Se usa antes de aplicar cualquier scope hardcodeado por nombre de rol.
 function tieneAccesoSinScope(scopeKey, cargarKey){
   var roles=userRoles();
-  var sr=currentUser&&currentUser.role;
+  var sr=rolCuenta();
   var todos=sr?[sr].concat(roles):roles;
   return todos.some(function(r){
     if(!PERMISOS[r]) return false;
@@ -3339,7 +3339,7 @@ function isGdVScoped(){
   // funcione correctamente en personas con más de un rol asignado (ej: Facilitador + Líder NG)
   if(hasRole('facilitador')) return !!getFacilitadorGroupId();
   // Other roles: configurable via permission
-  return canEjecutar('gdv_scope_grupo') && !!currentUser.groupId;
+  return canEjecutar('gdv_scope_grupo') && !!grupoCuenta();
 }
 function isGdVAdmin(){
   if(isSuperAdmin()) return true;
@@ -6040,6 +6040,7 @@ async function ngToggleComunidadActiva(id){
   if(nuevoEstado==='Inactivo'){ ng.liderIds=[]; ng.colaboradorIds=[]; }
   ng._ts=Date.now();
   funcionesAutoReconciliar(involucradosFn);
+  var fotosCuentas=nuevoEstado==='Inactivo'?cuentasSincronizar(involucradosFn,ng.id):[];
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
   var tocoEventos=agendaSincronizarActividadOrigen('ng',ng.id,{
     nombre:ng.name,dia:ng.dia,horario:ng.horario,
@@ -6049,6 +6050,7 @@ async function ngToggleComunidadActiva(id){
   await saveK(SK.ngComunidades,S.ngComunidades);
   await saveK(SK.members,S.members);
   if(tocoEventos) await saveK(SK.eventos,S.eventos);
+  if(fotosCuentas.length) await saveK(SK.users,S.users);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
@@ -6057,10 +6059,12 @@ async function ngToggleComunidadActiva(id){
     if(teniaCol) ng.colaboradorIds=prevCol; else delete ng.colaboradorIds;
     ng._ts=prevTs;
     funcionesAutoRevertir(snapFunciones);
+    cuentasRevertir(fotosCuentas);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades,S.ngComunidades);
     await saveK(SK.members,S.members);
     if(tocoEventos) await saveK(SK.eventos,S.eventos);
+    if(fotosCuentas.length) await saveK(SK.users,S.users);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -6192,6 +6196,7 @@ async function ngSaveComunidad(){
   // pierden solas al dejar de figurar. Ya NO se borran y rearman las de todos (eso pisaba las dadas
   // a mano): solo se recalculan las de las personas afectadas por este cambio.
   funcionesAutoReconciliar(involucradosNg);
+  var fotosCuentas=ngEditingId?cuentasSincronizar(involucradosNg,ngRef.id):[];
   // Sincronizar con Agenda: esta Comunidad pasa a tener (o actualizar) su propia Actividad Habitual
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
   var tocoEventos=agendaSincronizarActividadOrigen('ng',ngRef.id,{
@@ -6203,6 +6208,7 @@ async function ngSaveComunidad(){
   await saveK(SK.ngComunidades, S.ngComunidades);
   await saveK(SK.members, S.members);
   if(tocoEventos) await saveK(SK.eventos, S.eventos);
+  if(fotosCuentas.length) await saveK(SK.users, S.users);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
@@ -6212,10 +6218,12 @@ async function ngSaveComunidad(){
       if(s.rolesAuto===null) delete s.m.rolesAuto; else s.m.rolesAuto=s.rolesAuto;
       if(s.rolesManuales===null) delete s.m.rolesManuales; else s.m.rolesManuales=s.rolesManuales;
     });
+    cuentasRevertir(fotosCuentas);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades, S.ngComunidades);
     await saveK(SK.members, S.members);
     if(tocoEventos) await saveK(SK.eventos, S.eventos);
+    if(fotosCuentas.length) await saveK(SK.users, S.users);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -6242,6 +6250,7 @@ async function ngDeleteComunidad(id){
   funcionesAutoAdoptar(involucradosFn);
   S.ngComunidades=S.ngComunidades.filter(function(x){return Number(x.id)!==Number(id);});
   funcionesAutoReconciliar(involucradosFn);
+  var fotosCuentas=cuentasSincronizar(involucradosFn,id);
   addTombstone(SK.ngComunidades,id);
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
   var tocoEventos=agendaSincronizarActividadOrigen('ng',id,{activo:false});
@@ -6249,16 +6258,19 @@ async function ngDeleteComunidad(id){
     await saveK(SK.ngComunidades,S.ngComunidades);
     await saveK(SK.members,S.members);
     if(tocoEventos) await saveK(SK.eventos,S.eventos);
+    if(fotosCuentas.length) await saveK(SK.users,S.users);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
     ngRenderList();
     showToast('✅ Comunidad eliminada','#16A34A');
   }catch(e){
     S.ngComunidades.push(ng);
     funcionesAutoRevertir(snapFunciones);
+    cuentasRevertir(fotosCuentas);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.ngComunidades,S.ngComunidades);
     await saveK(SK.members,S.members);
     if(tocoEventos) await saveK(SK.eventos,S.eventos);
+    if(fotosCuentas.length) await saveK(SK.users,S.users);
     alert('No se pudo eliminar. Verificá tu conexión.');
   }
 }
@@ -6330,6 +6342,82 @@ function gdvRevertirIntegrantes(fotos){
     ['grupoId','grupoIds'].forEach(function(k){ if(f.tenia[k]) f.m[k]=f[k]; else delete f.m[k]; });
     if(f._ts===undefined) delete f.m._ts; else f.m._ts=f._ts;
   });
+}
+// ── Cuentas de usuario siguen a las asignaciones ──
+// La Función y el Grupo de la cuenta (S.users[].role / .groupId) se eligen al darla de alta, pero
+// después mandan las asignaciones activas: una cuenta con una Función automática (Facilitador, Líder
+// NG, …) que la persona ya no tiene vuelve a la Función Base; y el Grupo asignado deja de valer si el
+// Grupo está Inactivo / eliminado o, para una cuenta de Función automática, si la persona ya no lo
+// facilita. Se aplica en dos lugares: al leer la sesión (rolCuenta / grupoCuenta, sin escribir nada,
+// cubre cualquier cambio y sesiones ya abiertas) y como dato al inactivar/eliminar/editar un Grupo
+// (cuentasSincronizar), para que la pantalla de Usuarios muestre lo real.
+function cuentaMiembro(u){
+  if(!u||u.cuentaSistema) return null;
+  if(u.memberId){ var byId=(S.members||[]).find(function(x){return Number(x.id)===Number(u.memberId);}); if(byId) return byId; }
+  if(!u.name) return null;
+  return (S.members||[]).find(function(m){return normName(fullName(m))===normName(u.name);})||null;
+}
+function cuentaRolValido(role, m){
+  if(!role||!m) return true;
+  if(funcAutoIds().indexOf(role)<0) return true;
+  return (m.roles||[]).indexOf(role)>=0;
+}
+function cuentaGrupoValido(groupId, role, m){
+  if(groupId===null||groupId===undefined||groupId==='') return true;
+  var gid=Number(groupId);
+  var g=(S.groups||[]).find(function(x){return Number(x.id)===gid;});
+  if(!g){
+    var ng=(S.ngComunidades||[]).find(function(x){return Number(x.id)===gid;});
+    if(!ng||ng.estado==='Inactivo') return false;
+    if(!m||funcAutoIds().indexOf(role)<0) return true;
+    return (ng.liderIds||[]).concat(ng.colaboradorIds||[]).some(function(x){return Number(x)===Number(m.id);});
+  }
+  if(g.estado==='Inactivo') return false;
+  if(!m||funcAutoIds().indexOf(role)<0) return true;
+  return Number(g.facId)===Number(m.id)||Number(g.facId2)===Number(m.id);
+}
+// Sesión: Función y Grupo efectivos de la cuenta logueada (no escribe nada).
+function rolCuenta(){
+  var r=currentUser&&currentUser.role;
+  if(!r) return r;
+  var m=getLinkedMember();
+  if(cuentaRolValido(r,m)) return r;
+  return funcionBaseId();
+}
+function grupoCuenta(){
+  var g=currentUser&&currentUser.groupId;
+  if(!g) return null;
+  return cuentaGrupoValido(g,currentUser.role,getLinkedMember())?g:null;
+}
+// Dato: corrige las cuentas de estas personas y las que apuntan a este Grupo. Llamar DESPUÉS de
+// cambiar la asignación y de funcionesAutoReconciliar. Devuelve la foto para revertir.
+function cuentasSincronizar(memberIds, gid){
+  var ids=(memberIds||[]).filter(function(x){return x!==null&&x!==undefined&&x!=='';}).map(Number);
+  var base=funcionBaseId(), fotos=[];
+  (S.users||[]).forEach(function(u){
+    if(u.cuentaSistema) return;
+    var m=cuentaMiembro(u);
+    var apunta=gid!==null&&gid!==undefined&&u.groupId!==null&&u.groupId!==undefined&&Number(u.groupId)===Number(gid);
+    if(!apunta&&!(m&&ids.indexOf(Number(m.id))>=0)) return;
+    var nuevoRol=cuentaRolValido(u.role,m)?u.role:(base||u.role);
+    var nuevoGrupo=cuentaGrupoValido(u.groupId,u.role,m)?u.groupId:null; // con la Función ORIGINAL: una cuenta de Facilitador que deja de facilitar pierde el Grupo
+    if(nuevoRol===u.role&&nuevoGrupo===u.groupId) return;
+    fotos.push({u:u,role:u.role,groupId:u.groupId,teniaGroupId:Object.prototype.hasOwnProperty.call(u,'groupId')});
+    u.role=nuevoRol; u.groupId=nuevoGrupo;
+  });
+  return fotos;
+}
+function cuentasRevertir(fotos){
+  (fotos||[]).forEach(function(f){ f.u.role=f.role; if(f.teniaGroupId) f.u.groupId=f.groupId; else delete f.u.groupId; });
+}
+// Cuentas que hoy tienen asignado este Grupo (para la confirmación).
+function cuentasConGrupo(gid){
+  return (S.users||[]).filter(function(u){return !u.cuentaSistema&&u.groupId!==null&&u.groupId!==undefined&&Number(u.groupId)===Number(gid);});
+}
+function inactLineaCuentas(gid){
+  var c=cuentasConGrupo(gid); if(!c.length) return '';
+  var n=c.map(function(u){return u.name||('@'+u.user);});
+  return '• Cuentas de usuario con este Grupo asignado ('+n.length+'): '+(n.length>8?n.slice(0,8).join(', ')+' y '+(n.length-8)+' más':n.join(', '))+' — dejan de tenerlo.';
 }
 function svcPersona(id){ return (S.members||[]).find(function(x){return Number(x.id)===Number(id);}); }
 function svcNombre(id){ var m=svcPersona(id); return m?fullName(m):'(persona eliminada)'; }
@@ -10008,14 +10096,14 @@ function agendaMostrarConflictoDialog(conflictos, nuevaHora){
     }
     ov.innerHTML=modalHtml;
     ov.style.display='flex';
-    function cerrar(valor){
+    function cerrarConflicto(valor){
       ov.style.display='none';
       ov.innerHTML='';
       resolve(valor);
     }
-    document.getElementById('agenda-conflicto-reemplazar').onclick=function(){cerrar('reemplazar');};
-    document.getElementById('agenda-conflicto-agregar').onclick=function(){cerrar('agregar');};
-    document.getElementById('agenda-conflicto-cancelar').onclick=function(){cerrar('cancelar');};
+    document.getElementById('agenda-conflicto-reemplazar').onclick=function(){cerrarConflicto('reemplazar');};
+    document.getElementById('agenda-conflicto-agregar').onclick=function(){cerrarConflicto('agregar');};
+    document.getElementById('agenda-conflicto-cancelar').onclick=function(){cerrarConflicto('cancelar');};
   });
 }
 
@@ -10192,10 +10280,10 @@ function agendaMostrarEliminarDialog(ev, fechaOcurrencia){
     }
     ov.innerHTML=modalHtml;
     ov.style.display='flex';
-    function cerrar(valor){ ov.style.display='none'; ov.innerHTML=''; resolve(valor); }
-    document.getElementById('agenda-elim-solo-fecha').onclick=function(){cerrar('soloFecha');};
-    document.getElementById('agenda-elim-serie').onclick=function(){cerrar('serie');};
-    document.getElementById('agenda-elim-cancelar').onclick=function(){cerrar('cancelar');};
+    function cerrarEliminar(valor){ ov.style.display='none'; ov.innerHTML=''; resolve(valor); }
+    document.getElementById('agenda-elim-solo-fecha').onclick=function(){cerrarEliminar('soloFecha');};
+    document.getElementById('agenda-elim-serie').onclick=function(){cerrarEliminar('serie');};
+    document.getElementById('agenda-elim-cancelar').onclick=function(){cerrarEliminar('cancelar');};
   });
 }
 
@@ -11673,39 +11761,52 @@ let cfgEditingGroupId=null;
 async function cfgDeleteGroup(id){
   var g=(S.groups||[]).find(function(x){ return Number(x.id)===Number(id); });
   if(!g) return;
-  // Check for members in this group
+  // Eliminar = desafectar (igual que Inactivar): facilitadores, integrantes activos (pasan a Sin
+  // Asignar) y cuentas de usuario con este Grupo. El historial de asistencia no se toca.
   var miembros=S.members.filter(function(m){
     return m.estado!=='Baja' && (Number(m.grupoId)===Number(id)||(m.grupoIds||[]).map(Number).includes(Number(id)));
   });
-  if(miembros.length>0){
-    alert('El Grupo "'+g.name+'" tiene '+miembros.length+' miembro'+(miembros.length>1?'s':'')+' activo'+(miembros.length>1?'s':'')+'. Quitá todos los miembros del grupo antes de eliminarlo.');
-    return;
-  }
-  // Check for facilitators
-  if(g.facId||g.facId2){
-    alert('El Grupo "'+g.name+'" tiene facilitadores asignados. Quitá los facilitadores en "Editar" antes de eliminarlo.');
-    return;
-  }
-  // Confirm deletion
-  if(!confirm('¿Eliminár el Grupo "'+g.name+'"? Esta acción no se puede deshacer.')) return;
-  // Delete
+  var lineas=[
+    inactLineaPersonas('Facilitador/a',[g.facId,g.facId2]),
+    miembros.length?'• Los integrantes actuales ('+miembros.length+') pasan a estar Sin Asignar en Grupos.':'',
+    inactLineaCuentas(g.id)
+  ].filter(Boolean);
+  if(!confirm('Se va a eliminar el Grupo "'+g.name+'".\n\n'
+    +(lineas.length?'También quedarán desafectadas las personas vinculadas:\n'+lineas.join('\n')+'\n\n':'')
+    +'Su actividad en Agenda deja de repetirse. El historial de asistencia no se toca.\n'
+    +'Esta acción no se puede deshacer.\n\n¿Continuar?')) return;
+  var involucradosFn=[g.facId,g.facId2];
+  var snapFunciones=funcionesAutoSnapshot(involucradosFn);
+  funcionesAutoAdoptar(involucradosFn);
+  var gruposAntes=S.groups;
+  var fotosInt=gdvDesasignarIntegrantes(g.id);
   S.groups=S.groups.filter(function(x){ return Number(x.id)!==Number(id); });
+  funcionesAutoReconciliar(involucradosFn);
+  var fotosCuentas=cuentasSincronizar(involucradosFn,g.id);
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
   var tocoEventos=agendaSincronizarActividadOrigen('gdv',id,{activo:false});
   try{
     await saveK(SK.groups, S.groups);
+    await saveK(SK.members, S.members);
     if(tocoEventos) await saveK(SK.eventos, S.eventos);
+    if(fotosCuentas.length) await saveK(SK.users, S.users);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
-    cfgRenderGrupos();
-    showToast('✅ Grupo "'+g.name+'" eliminado','#16A34A');
   }catch(e){
-    // Revert on failure
-    S.groups.push(g);
+    // Revertir todo lo que se tocó en memoria y volver a guardar localmente
+    S.groups=gruposAntes;
+    gdvRevertirIntegrantes(fotosInt);
+    funcionesAutoRevertir(snapFunciones);
+    cuentasRevertir(fotosCuentas);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.groups, S.groups);
+    await saveK(SK.members, S.members);
     if(tocoEventos) await saveK(SK.eventos, S.eventos);
+    if(fotosCuentas.length) await saveK(SK.users, S.users);
     alert('No se pudo eliminar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
   }
+  cfgRenderGrupos();
+  showToast('✅ Grupo "'+g.name+'" eliminado','#16A34A');
 }
 function cfgPopulateFacSelects(fac1Id, fac2Id){
   // Show ALL active Miembros (not just those with facilitador role)
@@ -11769,6 +11870,7 @@ async function cfgToggleGrupoActivo(id){
       'También quedarán desafectadas las personas vinculadas:',
       inactLineaPersonas('Facilitador/a',[g.facId,g.facId2]),
       integrantesG.length?'• Los integrantes actuales ('+integrantesG.length+') pasan a estar Sin Asignar en Grupos.':'',
+      inactLineaCuentas(g.id),
       'Su actividad en Agenda deja de repetirse hacia adelante (el historial no se toca).'])) return;
   } else if(!confirm('¿Habilitar el Grupo "'+g.name+'"?\nSu actividad en Agenda vuelve a repetirse. Recordá asignarle facilitador/a e integrantes.')) return;
   var estadoAnterior=g.estado, facAnt={facId:g.facId,facId2:g.facId2}, fotosInt=[];
@@ -11780,6 +11882,8 @@ async function cfgToggleGrupoActivo(id){
   g.estado=nuevoEstado;
   if(nuevoEstado==='Inactivo'){ g.facId=null; g.facId2=null; fotosInt=gdvDesasignarIntegrantes(g.id); }
   funcionesAutoReconciliar(involucradosFn);
+  // Cuentas de usuario: dejan el Grupo y, si ya no facilitan, vuelven a la Función Base
+  var fotosCuentas=nuevoEstado==='Inactivo'?cuentasSincronizar(involucradosFn,g.id):[];
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
   var tocoEventos=agendaSincronizarActividadOrigen('gdv',g.id,{
     nombre:g.name,dia:g.dia,horario:g.horario,
@@ -11789,16 +11893,19 @@ async function cfgToggleGrupoActivo(id){
   await saveK(SK.groups,S.groups);
   await saveK(SK.members,S.members);
   if(tocoEventos) await saveK(SK.eventos,S.eventos);
+  if(fotosCuentas.length) await saveK(SK.users,S.users);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     g.estado=estadoAnterior; g.facId=facAnt.facId; g.facId2=facAnt.facId2;
     gdvRevertirIntegrantes(fotosInt);
     funcionesAutoRevertir(snapFunciones);
+    cuentasRevertir(fotosCuentas);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.groups,S.groups);
     await saveK(SK.members,S.members);
     if(tocoEventos) await saveK(SK.eventos,S.eventos);
+    if(fotosCuentas.length) await saveK(SK.users,S.users);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
@@ -11876,6 +11983,8 @@ async function cfgSaveGroup(){
   // Función 'facilitador': la tienen quienes figuran como facilitador 1 o 2 de un Grupo ACTIVO, y la
   // pierde sola quien deja de figurar — salvo que siga en otro Grupo.
   funcionesAutoReconciliar(involucradosFn);
+  // Cuentas de usuario de quien deja de facilitar este Grupo: pierden el Grupo y vuelven a Base
+  var fotosCuentas=esNuevoGrupo?[]:cuentasSincronizar(involucradosFn,g.id);
 
   // Sincronizar con Agenda: este Grupo pasa a tener (o actualizar) su propia Actividad Habitual
   var snapshotEventosStr=JSON.stringify(S.eventos||[]);
@@ -11888,6 +11997,7 @@ async function cfgSaveGroup(){
   await saveK(SK.groups,S.groups);
   await saveK(SK.members,S.members);
   if(tocoEventos) await saveK(SK.eventos,S.eventos);
+  if(fotosCuentas.length) await saveK(SK.users,S.users);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
@@ -11899,9 +12009,11 @@ async function cfgSaveGroup(){
       if(gr) Object.assign(gr,snapshotGrupo);
     }
     funcionesAutoRevertir(snapFunciones);
+    cuentasRevertir(fotosCuentas);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
     await saveK(SK.groups, S.groups);
     await saveK(SK.members, S.members);
+    if(fotosCuentas.length) await saveK(SK.users, S.users);
     if(tocoEventos) await saveK(SK.eventos, S.eventos);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -12704,7 +12816,7 @@ function gdvCheckDuplicateWeek(gid){
 function gdvCheckDuplicateWeekOnDateChange(){
   var sel=document.getElementById('gdv-grupo-sel');
   var gid=parseInt(sel?.value)||null;
-  if(!gid) gid=currentUser.groupId;
+  if(!gid) gid=grupoCuenta();
   if(gid) gdvCheckDuplicateWeek(gid);
   gdvSyncFormularioUI();
   var fpa=document.getElementById('gdv-form-pendiente-alert');
@@ -12897,7 +13009,7 @@ function gdvAutoComplete(type, query){
   let pool=S.members.filter(function(m){ return m.estado!=='Baja'; });
   if(type==='other'){
     // Visitas de otro grupo: excluir miembros del grupo actual (por grupoId principal O grupoIds adicionales)
-    const curGrupo=parseInt(document.getElementById('gdv-grupo-sel')?.value)||currentUser.groupId||null;
+    const curGrupo=parseInt(document.getElementById('gdv-grupo-sel')?.value)||grupoCuenta()||null;
     if(curGrupo){
       pool=pool.filter(function(m){
         const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
@@ -12979,7 +13091,7 @@ function gdvAbrirFormNuevoContacto(){
   // de una y aparezca como Integrante en la próxima carga — antes había que acordarse de elegirlo
   // a mano en el desplegable genérico, y si se salteaba, la persona no quedaba en ningún grupo.
   var facGids=isGdVFacilitador()?getFacilitadorGroupIds():[];
-  var gid=facGids.length===1?facGids[0]:currentUser.groupId;
+  var gid=facGids.length===1?facGids[0]:grupoCuenta();
   if(isGdVAdmin()||facGids.length>1){var sel=document.getElementById('gdv-grupo-sel');if(sel)gid=parseInt(sel.value)||null;}
   nvOpenInlineForm(gid?{grupoId:gid,tipoGrupo:'gdv',origenModulo:'gdv'}:{origenModulo:'gdv'});
 }
@@ -12997,7 +13109,7 @@ function gdvRenderVisitTags(){
 
 async function gdvSaveRecord(){
   const facGids=isGdVFacilitador()?getFacilitadorGroupIds():[];
-  let gid=facGids.length===1?facGids[0]:currentUser.groupId;
+  let gid=facGids.length===1?facGids[0]:grupoCuenta();
   if(isGdVAdmin()||facGids.length>1){const sel=document.getElementById('gdv-grupo-sel');if(sel)gid=parseInt(sel.value)||null;}
   const g=S.groups.find(x=>x.id===gid);
   const fecha=document.getElementById('gdv-fecha').value;
@@ -13362,7 +13474,7 @@ function gdvUpdateFilterSummary(){
 }
 
 function gdvGetFilteredRecords(){
-  const ownGroupId=currentUser.groupId||null;
+  const ownGroupId=grupoCuenta()||null;
   return S.records.filter(r=>{
     if(r.sinEncuentro) return false;
     // Facilitador: only see their own group
@@ -19276,7 +19388,7 @@ let discAsignandoCursadaId=null;
 function discTieneAccesoSinScope(accionKey, nivelMin){
   var orden={ninguno:0,consulta:1,ejecuta:2};
   var roles=userRoles();
-  var sr=currentUser&&currentUser.role;
+  var sr=rolCuenta();
   var todos=sr?[sr].concat(roles):roles;
   return todos.some(function(r){
     if(!PERMISOS[r]) return false;

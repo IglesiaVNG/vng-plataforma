@@ -769,7 +769,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzq';
+const APP_VERSION = '2026-08-24-zzs';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -3042,9 +3042,8 @@ function canGestionarNuevos(){
   return isSuperAdmin() || canEjecutar('nuevos_gestionar');
 }
 function canContactarNuevos(){
-  // isContactar() (rol de login 'contactar') se conserva solo acá, para no cortarle Contactar
-  // a quien ya lo usa; ya NO le muestra Gestionar (eso es nuevos_gestionar).
-  return isSuperAdmin() || canEjecutar('nuevos_contactar') || isContactar();
+  // Solo por la matriz de Permisos (10/11/26: se quitó el acceso fijo de las cuentas con Función 'contactar')
+  return isSuperAdmin() || canEjecutar('nuevos_contactar');
 }
 function canEliminarNuevos(){
   return isSuperAdmin() || canEjecutar('nuevos_eliminar');
@@ -16552,8 +16551,8 @@ function buildNuevosHTML(){
             <select id="nv-camp-selector" onchange="nvRenderCampana()" style="width:100%">
               <option value="">— Elegí una Campaña —</option>
             </select></div>
-          <button class="btn btn-sm" onclick="nvCampanaAbrirQR()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">📱 Generar QR Campaña</button>
-          <button class="btn btn-sm" onclick="nvCampanaCopiarTelefonos()" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">📋 Copiar teléfonos</button>
+          ${canEditarNuevos()?`<button class="btn btn-sm" onclick="nvCampanaAbrirQR()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">📱 Generar QR Campaña</button>`:''}
+          ${canExportarNuevos()?`<button class="btn btn-sm" onclick="nvCampanaCopiarTelefonos()" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">📋 Copiar teléfonos</button>`:''}
           ${canExportarNuevos()?`<button class="btn btn-sm" onclick="nvExportarCampanaExcel()" style="background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600">📊 Exportar a Excel</button>`:''}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;padding-top:10px;border-top:1px solid #F3F4F6">
@@ -17542,8 +17541,9 @@ function nvCampAbrirAcciones(id){
   if(nameEl) nameEl.textContent=fullName(m);
   let btns='';
   if(canEditarNuevos()) btns+=`<button class="btn btn-sm" style="width:100%;text-align:left" onclick="nvCloseActions();nvAbrirEditar(${m.id})">✏️ Editar</button>`;
-  btns+=`<button class="btn btn-sm" style="width:100%;text-align:left" onclick="nvCloseActions();nvCampAbrirComentario(${m.id})">💬 Comentarios</button>`;
-  btns+=`<button class="btn btn-sm" style="width:100%;text-align:left;background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvCloseActions();nvAbrirGraduar(${m.id})">🎓 Graduar</button>`;
+  if(canVerPrivadosNuevos()) btns+=`<button class="btn btn-sm" style="width:100%;text-align:left" onclick="nvCloseActions();nvCampAbrirComentario(${m.id})">💬 Comentarios</button>`;
+  if(canGestionarNuevos()) btns+=`<button class="btn btn-sm" style="width:100%;text-align:left;background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvCloseActions();nvAbrirGraduar(${m.id})">🎓 Graduar</button>`;
+  if(!btns) btns='<div style="font-size:12px;color:#9CA3AF">Solo consulta</div>';
   if(canEliminarNuevos()){
     btns+=`<button class="btn btn-sm" style="width:100%;text-align:left;color:#DC2626;border-color:#FECACA" onclick="nvCloseActions();nvEliminarContacto(${m.id})">🗑️ Eliminar</button>`;
   }
@@ -17868,6 +17868,7 @@ async function nvGuardarComentarioContactar(){
 }
 
 async function nvPromover(condicion){
+  if(!canGestionarNuevos()){ alert('No tenés permiso para esta acción.'); return; }
   if(!nvSelectedId) return;
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
@@ -17916,6 +17917,7 @@ async function nvPromover(condicion){
 }
 
 async function nvDarDeBaja(){
+  if(!canGestionarNuevos()){ alert('No tenés permiso para esta acción.'); return; }
   if(!nvSelectedId) return;
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
@@ -18077,6 +18079,7 @@ async function nvGuardarEditar(){
 }
 
 async function nvReactivar(){
+  if(!canGestionarNuevos()){ alert('No tenés permiso para esta acción.'); return; }
   const m=S.members.find(x=>x.id===nvSelectedId);
   if(!m) return;
   var _txtR=(document.getElementById('nv-comentario-txt')?.value||'').trim();
@@ -18583,7 +18586,8 @@ function nvRenderCampana(){
     listEl.innerHTML='<div class="empty" style="background:#F9FAFB;border-radius:12px;padding:2rem">Sin contactos que coincidan con el filtro</div>';
     return;
   }
-  var puedeSeleccionar=hasRole('super_admin','pastor');
+  var puedeSeleccionar=canGestionarNuevos(); // graduar = gestionar (antes fijo para Super Admin y Pastor)
+  var privC=canVerPrivadosNuevos(), contC=canContactarNuevos();
   listEl.innerHTML=contactos.map(function(m){
     var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
     var genColor=m.genero==='H'?'#1E40AF':'#9D174D';
@@ -18598,15 +18602,15 @@ function nvRenderCampana(){
       +(m.condicion!=='Campaña'?'<span class="badge b-muted" style="font-size:10px;font-weight:600">'+(m.condicion||'—')+'</span>':'')
       +'</div>'
       +'<div style="font-size:12px;color:#6B7280;margin-top:2px">'
-      +(m.tel?'📱 '+m.tel:'<span style="color:#F59E0B">Sin celular</span>')
-      +(edad!==null?' · '+edad+' años':'')
-      +(m.dir?' · '+m.dir:'')
+      +(privC?(m.tel?'📱 '+m.tel:'<span style="color:#F59E0B">Sin celular</span>'):'')
+      +(edad!==null?(privC?' · ':'')+edad+' años':'')
+      +(privC&&m.dir?' · '+m.dir:'')
       +'</div>'
       +'<div style="font-size:11px;color:#9CA3AF;margin-top:2px">Ingresó: '+(m.fechaRegistro||'—')
       +(m.ultimoContactoWA&&esHoyMs(m.ultimoContactoWA)?' · <span style="color:#16A34A;font-weight:600">✅ Contactado hoy '+new Date(m.ultimoContactoWA).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+'</span>':'')
       +'</div>'
       +'</div>'
-      +(m.tel?'<button class="btn btn-sm" onclick="event.stopPropagation();nvAbrirWhatsapp('+m.id+')" style="background:#DCFCE7;border-color:#86EFAC;color:#166534;font-weight:600;flex-shrink:0">💬 WhatsApp</button>':'')
+      +(m.tel&&privC&&contC?'<button class="btn btn-sm nv-wa" onclick="event.stopPropagation();nvAbrirWhatsapp('+m.id+')" style="flex-shrink:0">WhatsApp</button>':'')
       +'</div></div>';
   }).join('');
 }
@@ -18630,6 +18634,7 @@ function nvCampActualizarToolbar(){
 }
 
 function nvCampanaCopiarTelefonos(){
+  if(!canExportarNuevos()){ alert('No tenés permiso para esta acción.'); return; }
   var camp=nvCampanaActual();
   if(!camp){ showToast('Elegí una Campaña primero','#D97706'); return; }
   var contactos=S.members.filter(function(m){return Number(m.campanaId)===Number(camp.id)&&m.condicion==='Campaña'&&m.tel;});
@@ -18649,6 +18654,7 @@ function nvCampanaCopiarTelefonos(){
 // ── Graduar (individual y en bloque) ──
 let nvGraduarId=null;
 function nvAbrirGraduar(id){
+  if(!canGestionarNuevos()){ alert('No tenés permiso para esta acción.'); return; }
   nvGraduarId=id;
   var m=S.members.find(function(x){return x.id===id;});
   if(!m) return;
@@ -18660,6 +18666,7 @@ function nvCampCloseGraduar(){
   nvGraduarId=null;
 }
 async function nvGraduarUno(destino){
+  if(!canGestionarNuevos()){ alert('No tenés permiso para esta acción.'); return; }
   var m=S.members.find(function(x){return x.id===nvGraduarId;});
   if(!m) return;
   var snapshot=Object.assign({},m);
@@ -18679,6 +18686,7 @@ async function nvGraduarUno(destino){
 }
 
 async function nvGraduarSeleccionados(destino){
+  if(!canGestionarNuevos()){ alert('No tenés permiso para esta acción.'); return; }
   if(!nvCampSeleccionados.length) return;
   var nombres=nvCampSeleccionados.map(function(id){var m=S.members.find(function(x){return x.id===id;});return m?fullName(m):null;}).filter(Boolean);
   if(!confirm('¿Graduar '+nvCampSeleccionados.length+' persona'+(nvCampSeleccionados.length!==1?'s':'')+' a '+(destino==='Nuevo'?'Nuevos Contactos':'Histórico')+'?')) return;
@@ -18748,6 +18756,7 @@ function nvRestaurarExacto(m, foto){
 // ── Comentarios de Campaña (sin cambio de estado) ──
 let nvCampComentarioId=null;
 function nvCampAbrirComentario(id){
+  if(!canVerPrivadosNuevos()){ alert('No tenés permiso para esta acción.'); return; }
   nvCampComentarioId=id;
   var m=S.members.find(function(x){return x.id===id;});
   if(!m) return;
@@ -18771,6 +18780,7 @@ function nvCampRenderComentarios(m){
   }).join(''):'<div style="color:#9CA3AF;padding:4px 0">Sin comentarios aún</div>';
 }
 async function nvCampGuardarComentario(){
+  if(!canVerPrivadosNuevos()){ alert('No tenés permiso para esta acción.'); return; }
   var m=S.members.find(function(x){return x.id===nvCampComentarioId;});
   if(!m) return;
   var txt=(document.getElementById('nv-camp-com-txt')?.value||'').trim();
@@ -18801,6 +18811,7 @@ function nvAgregarNuevo(){
 }
 
 function nvCampanaAbrirQR(){
+  if(!canEditarNuevos()){ alert('No tenés permiso para esta acción.'); return; }
   var camp=nvCampanaActual();
   if(!camp){ showToast('Elegí una Campaña primero','#D97706'); return; }
   var baseUrl=window.location.origin+window.location.pathname;
@@ -18940,13 +18951,8 @@ function nvOpenSeguimientoSelector(){
   const search=(document.getElementById('nv-seg-search')?.value||'').toLowerCase();
   // Rol 'contactar': solo puede autoasignarse
   let activos;
-  if(isContactar()){
-    const self=getLinkedMember();
-    activos=self?[self]:[];
-  } else {
-    // Solo Miembros plenos de Rebaños pueden quedar como responsables de seguimiento
-    activos=S.members.filter(m=>m.estado!=='Baja'&&m.condicion==='Miembro');
-  }
+  // Solo Miembros plenos de Rebaños pueden quedar como responsables de seguimiento
+  activos=S.members.filter(m=>m.estado!=='Baja'&&m.condicion==='Miembro');
   const filtered=search?activos.filter(m=>fullName(m).toLowerCase().includes(search)):activos;
   // Asignación directa desde Conexión: opción para dejar sin responsable
   const quitarHtml=(nvAsignarDestino&&S.members.some(function(x){return nvAsignarDestino.indexOf(Number(x.id))>=0&&x.seguimientoId;}))

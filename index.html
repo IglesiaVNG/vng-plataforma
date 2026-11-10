@@ -23359,8 +23359,15 @@ function celebStatsDomingo(fecha){
   var maestrosSala=(ng.maestrosIds||[]).filter(function(id){ return !M[id]; }).length;
   var rebanos=rebNom+rebNum+maestrosSala, nuevos=nuevosNom+nuevosNum;
   var declarados=declNom+declNum, cargados=nd.length;
+  // Rebaños por género: solo de quienes se identificó (marcados que no son Nuevos del día + maestros en salas)
+  var rebH=0, rebM=0;
+  ids.filter(function(id){return nd.indexOf(id)<0;}).concat((ng.maestrosIds||[]).filter(function(id){ return !M[id]; })).forEach(function(id){
+    var m=(S.members||[]).find(function(x){return Number(x.id)===id;}); if(!m) return;
+    if(m.genero==='H') rebH++; else if(m.genero==='M') rebM++;
+  });
+  var rebSin=Math.max(0,rebanos-rebH-rebM); // no identificados, carga numérica y personas sin género
   return {fecha:fecha,cels:cels,identificados:ids.length,noIdent:noIdent,numerico:numTot,
-    rebanos:rebanos,nuevos:nuevos,ninos:ninos,ninosFuente:ng.hay?'ng':(hayManual?'manual':''),maestrosSala:maestrosSala,
+    rebanos:rebanos,nuevos:nuevos,ninos:ninos,ninosFuente:ng.hay?'ng':(hayManual?'manual':''),maestrosSala:maestrosSala,rebH:rebH,rebM:rebM,rebSin:rebSin,
     auditorio:rebNom+rebNum+nuevos,total:rebanos+nuevos+(ninos||0),
     cobertura:hayNominal&&(rebNom+nuevosNom)>0?Math.round(ids.length/(rebNom+nuevosNom)*100):null,hayNominal:hayNominal,
     nuevosDeclarados:declarados,nuevosCargados:cargados,nuevosPendientes:Math.max(0,declarados-cargados),
@@ -23373,10 +23380,18 @@ function celebCuadreHTML(st,clic){
   if(st.nuevosPendientes>0) return '<span'+on+'display:inline-block;padding:2px 8px;border-radius:999px;background:#FEF3C7;color:#92400E;font-size:11.5px;font-weight:600" title="'+(clic&&canCelebEditar()?'Tocar para vincular a los Nuevos cargados en Conexión':'')+'">🌱 Nuevos pendientes de cuadrar: '+st.nuevosPendientes+' de '+st.nuevosDeclarados+(clic&&canCelebEditar()?' ›':'')+'</span>';
   return '<span'+on+'display:inline-block;padding:2px 8px;border-radius:999px;background:#DCFCE7;color:#166534;font-size:11.5px;font-weight:600">🌱 Nuevos cuadrados: '+st.nuevosCargados+' de '+st.nuevosDeclarados+'</span>';
 }
+// Colores del desglose: Hombres azul · Mujeres rosa · Sin distinguir gris · Nuevos verde · Niños (NG) amarillo
+var CELEB_COL={H:'#2563EB',M:'#DB2777',sin:'#9CA3AF',nuevos:'#16A34A',ninos:'#F59E0B'};
+function celebPunto(col){ return '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+col+';margin-right:3px;vertical-align:baseline"></span>'; }
+function celebRebDetalle(st){
+  var p=[]; if(st.rebH) p.push(celebPunto(CELEB_COL.H)+st.rebH+' H'); if(st.rebM) p.push(celebPunto(CELEB_COL.M)+st.rebM+' M'); if(st.rebSin) p.push(celebPunto(CELEB_COL.sin)+st.rebSin+' sin distinguir');
+  return p.join(' · ');
+}
 function celebLineaTotales(st){
   var ninos=st.ninos===null?'<span style="color:#B45309" title="Sale del registro de las salas en Nuevas Generaciones (aparece solo cuando se carga) o del número manual del cierre">⏳ sin cargar</span>':'<strong>'+st.ninos+'</strong>'+(st.ninosFuente==='ng'?' <span style="color:#6B7280">(salas NG)</span>':'');
-  return 'Total <strong>'+st.total+'</strong> · Rebaños <strong>'+st.rebanos+'</strong>'+(st.maestrosSala?' <span style="color:#6B7280">(incl. '+st.maestrosSala+' maestro'+(st.maestrosSala!==1?'s':'')+' en salas)</span>':'')+
-    ' · Nuevos del día <strong>'+st.nuevos+'</strong> · Niños '+ninos+(st.cobertura!==null?' · Identificados '+st.identificados+' ('+st.cobertura+'%)':'');
+  var det=celebRebDetalle(st);
+  return 'Total <strong>'+st.total+'</strong> · Rebaños <strong>'+st.rebanos+'</strong>'+(det?' <span style="color:#6B7280">('+det+(st.maestrosSala?'; incl. '+st.maestrosSala+' maestro'+(st.maestrosSala!==1?'s':'')+' en salas':'')+')</span>':'')+
+    ' · '+celebPunto(CELEB_COL.nuevos)+'Nuevos del día <strong>'+st.nuevos+'</strong> · '+celebPunto(CELEB_COL.ninos)+'Niños '+ninos+(st.cobertura!==null?' · Identificados '+st.identificados+' ('+st.cobertura+'%)':'');
 }
 
 // ── Índice de presencias por persona (domingos con asistencia nominal) ──
@@ -24238,10 +24253,10 @@ function celebRenderDashboard(el){
     if(!doms.length) h+='<div class="card" style="margin-bottom:.75rem"><div class="empty" style="padding:1rem;color:#9CA3AF">Todavía no hay celebraciones cargadas.</div></div>';
     else{
       var sts=doms.map(celebStatsDomingo), ult=sts[0], max=Math.max.apply(null,sts.map(function(s){return s.total;}).concat([1]));
-      var tarj=[['⛪','Total',ult.total],['🐑','Rebaños',ult.rebanos],['🌱','Nuevos del día',ult.nuevos],['🧒','Niños',ult.ninos===null?'⏳':ult.ninos],['🔎','Identificados',ult.cobertura===null?'—':ult.cobertura+'%']];
+      var tarj=[['⛪','Total',ult.total],['🐑','Rebaños',ult.rebanos,celebRebDetalle(ult)],['🌱','Nuevos del día',ult.nuevos],['🧒','Niños (NG)',ult.ninos===null?'⏳':ult.ninos],['🔎','Identificados',ult.cobertura===null?'—':ult.cobertura+'%']];
       h+='<div style="font-size:13px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);margin-bottom:6px">Último domingo cargado: <strong>'+svcEsc(celebFechaTxt(ult.fecha))+'</strong>'+(ult.especial?' ⭐':'')+(ult.abiertas?' (con carga abierta)':'')+'</div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:.75rem">'+tarj.map(function(t){
-          return '<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:12px 8px;text-align:center"><div style="font-size:1.2rem">'+t[0]+'</div><div style="font-size:20px;font-weight:700;color:#1F4E79">'+t[2]+'</div><div style="font-size:11.5px;color:#6B7280">'+t[1]+'</div></div>';
+          return '<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:12px 8px;text-align:center"><div style="font-size:1.2rem">'+t[0]+'</div><div style="font-size:20px;font-weight:700;color:#1F4E79">'+t[2]+'</div><div style="font-size:11.5px;color:#6B7280">'+t[1]+'</div>'+(t[3]?'<div style="font-size:10.5px;color:#6B7280;margin-top:3px">'+t[3]+'</div>':'')+'</div>';
         }).join('')+'</div>'+
         (ult.nuevosDeclarados?'<div style="margin-bottom:.75rem">'+celebCuadreHTML(ult,true)+'</div>':'')+
         '<div class="card" style="margin-bottom:.75rem"><div style="font-weight:700;color:#1F4E79;font-size:13px;margin-bottom:8px">Últimos domingos</div>'+
@@ -24249,10 +24264,14 @@ function celebRenderDashboard(el){
           return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12.5px">'+
             '<div style="width:92px;color:#374151;white-space:nowrap">'+fmtAA(s.fecha)+(s.especial?' ⭐':'')+'</div>'+
             '<div style="flex:1;background:#F3F4F6;border-radius:6px;height:16px;overflow:hidden;display:flex">'+
-              '<div title="Rebaños '+s.rebanos+'" style="width:'+(s.rebanos/max*100)+'%;background:#1F4E79"></div><div title="Nuevos del día '+s.nuevos+'" style="width:'+(s.nuevos/max*100)+'%;background:#16A34A"></div><div title="Niños '+(s.ninos||0)+'" style="width:'+((s.ninos||0)/max*100)+'%;background:#93C5FD"></div></div>'+
+              [['Hombres',s.rebH,CELEB_COL.H],['Mujeres',s.rebM,CELEB_COL.M],['Rebaños sin distinguir',s.rebSin,CELEB_COL.sin],['Nuevos del día',s.nuevos,CELEB_COL.nuevos],['Niños (NG)',s.ninos||0,CELEB_COL.ninos]].map(function(g){
+                return g[1]?'<div title="'+g[0]+' '+g[1]+'" style="width:'+(g[1]/max*100)+'%;background:'+g[2]+'"></div>':''; }).join('')+'</div>'+
             '<div style="width:120px;text-align:right;color:#374151;white-space:nowrap"><strong>'+s.total+'</strong>'+(s.cobertura!==null?' · '+s.cobertura+'% id.':'')+'</div></div>';
         }).join('')+
-        '<div style="font-size:11px;color:#6B7280;margin-top:6px">Azul: Rebaños (incluye maestros en salas, una sola vez) · verde: Nuevos del día · celeste: Niños · ⭐ celebración especial · "% id." = cobertura de la carga nominal.</div></div>';
+        '<div style="font-size:11px;color:#6B7280;margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 12px">'+
+          '<span>'+celebPunto(CELEB_COL.H)+'Hombres</span><span>'+celebPunto(CELEB_COL.M)+'Mujeres</span><span>'+celebPunto(CELEB_COL.sin)+'Sin distinguir (no identificados / numérica)</span>'+
+          '<span>'+celebPunto(CELEB_COL.nuevos)+'Nuevos del día</span><span>'+celebPunto(CELEB_COL.ninos)+'Niños (NG)</span></div>'+
+        '<div style="font-size:11px;color:#6B7280;margin-top:4px">Rebaños incluye a los maestros en salas (una sola vez) · ⭐ celebración especial · "% id." = cobertura de la carga nominal. Pasá el dedo o el mouse por la barra para ver cada número.</div></div>';
     }
   }
   if(canCelebAusencias()){

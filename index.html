@@ -769,7 +769,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzs';
+const APP_VERSION = '2026-08-24-zzt';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -6645,6 +6645,8 @@ function cuentaGrupoValido(groupId, role, m){
 function rolCuenta(){
   var r=currentUser&&currentUser.role;
   if(!r) return r;
+  // Función de cuenta que ya no existe (se eliminó en Configuración → Funciones): no da accesos
+  if(r!=='super_admin'&&(S.roles||[]).length&&!(S.roles||[]).some(function(x){return x.id===r;})) return funcionBaseId();
   var m=getLinkedMember();
   if(cuentaRolValido(r,m)) return r;
   return funcionBaseId();
@@ -12611,12 +12613,16 @@ async function cfgDeleteRole(id){
   var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
   S.roles=S.roles.filter(r=>r.id!==id);
   S.members.forEach(m=>{ if((m.roles||[]).includes(id)){ m.roles=m.roles.filter(rid=>rid!==id); funcionBaseSiVacio(m); } });
+  // También su fila de Permisos, para que no quede ningún acceso colgado de una Función que ya no existe
+  var permAnt=PERMISOS[id]; if(permAnt!==undefined) delete PERMISOS[id];
   await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
+  if(permAnt!==undefined) await savePermisos();
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     if(role) S.roles.push(role);
     afectados.forEach(function(a){ a.m.roles=a.roles; });
+    if(permAnt!==undefined){ PERMISOS[id]=permAnt; await savePermisos(); }
     await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
     alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
     return;

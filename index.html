@@ -718,7 +718,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzh';
+const APP_VERSION = '2026-08-24-zzi';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -2654,18 +2654,21 @@ async function ngSaveRecord(){
       m=S.members.find(function(x){return fullName(x).toLowerCase()===nombreBuscado.toLowerCase();});
     }
     if(m&&!m.grupoId){
-      vinculosPrevios.push(m);
+      vinculosPrevios.push({m:m,tenia:Object.prototype.hasOwnProperty.call(m,'grupoId'),grupoId:m.grupoId,_ts:m._ts});
       m.grupoId=cid;
-      await nvAplicarParticipando(m);
+      m._ts=Date.now();
       membersUpdated=true;
     }
   }
-  if(membersUpdated){
+  // Participando automático: quienes estuvieron en este encuentro y ya suman N asistencias
+  var fotosEtapa=sinEnc?[]:nvParticipandoAplicar(nvIdsDeRegistro(rec));
+  if(membersUpdated||fotosEtapa.length){
     await saveK(SK.members,S.members);
     try{
       if(typeof window.fbUpload==='function') await window.fbUpload(true);
     }catch(e){
-      vinculosPrevios.forEach(function(m){ m.grupoId=null; });
+      nvRevertirEtapas(fotosEtapa);
+      vinculosPrevios.forEach(function(v){ if(v.tenia) v.m.grupoId=v.grupoId; else delete v.m.grupoId; if(v._ts===undefined) delete v.m._ts; else v.m._ts=v._ts; });
       await saveK(SK.members,S.members);
       alert('El encuentro se guardó, pero no se pudo vincular a las Personas Nuevas con la Comunidad. Verificá tu conexión y volvé a intentarlo desde Rebaños.');
     }
@@ -4136,6 +4139,87 @@ async function cfgSaveEtiquetas(){
   etqAplicarSelects();
   showToast('✅ Etiquetas guardadas','#16A34A');
 }
+// ── Configuración → 🌱 Conexión ──
+function cfgRenderConexion(wrap){
+  function filaNum(id,txt,val,min,max,ayuda){
+    return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:220px"><div style="font-size:13px;color:#1F2937;font-weight:600">'+txt+'</div><div style="font-size:11.5px;color:#6B7280">'+ayuda+'</div></div>'+
+      '<input type="number" id="'+id+'" min="'+min+'" max="'+max+'" step="1" value="'+val+'" style="width:72px;text-align:center"></div>';
+  }
+  wrap.innerHTML='<div style="font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:6px">🌱 Conexión · Nuevos Contactos</div>'+
+    '<div class="card" style="margin-bottom:.75rem">'+
+      filaNum('cfg-nv-alerta','Alerta de atraso (días sin contactar)',nvDiasAlerta(),1,30,'Un Nuevo en Ingresado se marca ⏰ Atrasado al pasar estos días desde su ingreso.')+
+      filaNum('cfg-nv-semanas','Semanas del período por defecto',nvSemanasPeriodo(),1,52,'Conexión abre mostrando las últimas N semanas ISO (de lunes a domingo).')+
+      filaNum('cfg-nv-asist','Asistencias para pasar a Participando',nvAsistParticipando(),1,20,'Presente en Grupos de Vida o Comunidades NG desde su ingreso, sumando ambos (no hace falta que sean seguidas). Las visitas cargadas por nombre también cuentan.')+
+      '<button class="btn btn-primary" onclick="cfgSaveConexion()">💾 Guardar</button>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div style="font-weight:700;color:#1F4E79;font-size:13px;margin-bottom:4px">🔄 Recalcular etapas con la regla de asistencias</div>'+
+      '<div style="font-size:12px;color:#6B7280;margin-bottom:10px;line-height:1.5">Revisa a todos los Nuevos: con '+nvAsistParticipando()+' o más asistencias pasan a <strong>Participando</strong>; quienes figuran Participando y no llegan pasan a <strong>Contactado</strong>. Primero se muestra el informe (no cambia nada); después podés aplicarlo. Cada cambio queda en el historial de etapas como "Sistema (recálculo de asistencias)".</div>'+
+      '<button class="btn" onclick="cfgNvVerRecalculo()">🔍 Ver informe (solo lee)</button>'+
+      '<div id="cfg-nv-recalc" style="margin-top:12px"></div>'+
+    '</div>';
+}
+async function cfgSaveConexion(){
+  if(!isSuperAdmin()) return;
+  function leer(id,min,max,nombre){
+    var v=String(document.getElementById(id)?.value||'').trim(), n=parseInt(v,10);
+    if(!/^\d+$/.test(v)||n<min||n>max){ alert(nombre+': tiene que ser un número entero entre '+min+' y '+max+'.'); return null; }
+    return n;
+  }
+  var al=leer('cfg-nv-alerta',1,30,'Alerta de atraso'); if(al===null) return;
+  var se=leer('cfg-nv-semanas',1,52,'Semanas del período'); if(se===null) return;
+  var as=leer('cfg-nv-asist',1,20,'Asistencias para Participando'); if(as===null) return;
+  var snapHome=JSON.stringify(S.homeConfig||{}), prevAlerta=localStorage.getItem('gdv_nv_dias_alerta');
+  S.homeConfig=Object.assign({},S.homeConfig||{},{nvSemanasPeriodo:se,nvAsistParticipando:as,_ts:Date.now()});
+  try{
+    await saveK(SK.homeConfig,S.homeConfig);
+    await saveK('gdv_nv_dias_alerta',al);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    S.homeConfig=JSON.parse(snapHome);
+    try{ await saveK(SK.homeConfig,S.homeConfig); }catch(e2){}
+    try{ if(prevAlerta===null) localStorage.removeItem('gdv_nv_dias_alerta'); else localStorage.setItem('gdv_nv_dias_alerta',prevAlerta); }catch(e3){}
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Configuración de Conexión guardada','#16A34A');
+  var w=document.getElementById('cfg-content'); if(w) cfgRenderConexion(w);
+}
+function cfgNvVerRecalculo(){
+  var el=document.getElementById('cfg-nv-recalc'); if(!el) return;
+  var inf=nvRecalculoInforme();
+  if(!inf.length){ el.innerHTML='<div style="padding:10px;color:#16A34A;font-weight:600">✅ Todos los Nuevos ya están en la etapa que les corresponde. No hay nada para aplicar.</div>'; return; }
+  var sube=inf.filter(function(x){return x.a==='Participando';}).length, baja=inf.length-sube;
+  el.innerHTML='<div style="font-size:12.5px;color:#374151;margin-bottom:8px"><strong>'+inf.length+'</strong> cambio'+(inf.length!==1?'s':'')+': '+sube+' pasan a Participando · '+baja+' vuelven a Contactado.</div>'+
+    '<div style="max-height:360px;overflow:auto;border:1px solid #E5E7EB;border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'+
+    '<thead><tr style="background:#F9FAFB;text-align:left"><th style="padding:6px 8px">Persona</th><th style="padding:6px 8px">Ingreso</th><th style="padding:6px 8px;text-align:center">Asistencias</th><th style="padding:6px 8px">Cambio</th></tr></thead><tbody>'+
+    inf.map(function(x){
+      return '<tr style="border-top:1px solid #F3F4F6"><td style="padding:6px 8px">'+svcEsc(listName(x.m))+'</td><td style="padding:6px 8px;color:#6B7280">'+svcEsc(x.m.fechaRegistro||'sin fecha')+'</td>'+
+        '<td style="padding:6px 8px;text-align:center">'+x.asist+' de '+nvAsistParticipando()+'</td>'+
+        '<td style="padding:6px 8px">'+svcEsc(x.de)+' → <strong style="color:'+(x.a==='Participando'?'#065F46':'#1E40AF')+'">'+svcEsc(x.a)+'</strong></td></tr>';
+    }).join('')+'</tbody></table></div>'+
+    '<div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-primary" onclick="cfgNvAplicarRecalculo()">✅ Aplicar estos '+inf.length+' cambios</button></div>';
+}
+async function cfgNvAplicarRecalculo(){
+  if(!isSuperAdmin()) return;
+  var inf=nvRecalculoInforme();
+  if(!inf.length){ cfgNvVerRecalculo(); return; }
+  if(!confirm('Se van a cambiar las etapas de '+inf.length+' persona'+(inf.length!==1?'s':'')+' según la regla de '+nvAsistParticipando()+' asistencias.\n\n¿Continuar?')) return;
+  var fotos=[];
+  inf.forEach(function(x){ var f=nvFotoEtapa(x.m); if(nvAplicarEtapaRegla(x.m,true)) fotos.push(f); });
+  try{
+    await saveK(SK.members,S.members);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    nvRevertirEtapas(fotos);
+    try{ await saveK(SK.members,S.members); }catch(e2){}
+    alert('No se pudo guardar en la nube. No se aplicó ningún cambio. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Recálculo aplicado: '+fotos.length+' cambio'+(fotos.length!==1?'s':''),'#16A34A');
+  cfgNvVerRecalculo();
+}
 // Largo mínimo de comentarios y motivos en Rebaños, Nuevos Contactos y Campañas
 var COMENT_MIN=12;
 function comentMsg(){ return 'El comentario debe tener al menos '+COMENT_MIN+' caracteres.'; }
@@ -5591,6 +5675,7 @@ function buildConfigHTML(){
       <button class="btn btn-sm" id="cfg-tab-ng" onclick="configTab('ng',this)">🌱 Nuevas Generaciones</button>
       <button class="btn btn-sm" id="cfg-tab-ministerios" onclick="configTab('ministerios',this)">🤝 Propósitos</button>
       <button class="btn btn-sm" id="cfg-tab-campanas" onclick="configTab('campanas',this)">🌳 Campañas</button>
+      <button class="btn btn-sm" id="cfg-tab-conexion" onclick="configTab('conexion',this)">🌱 Conexión</button>
       <button class="btn btn-sm" id="cfg-tab-modulos" onclick="configTab('modulos',this)">📱 Módulos</button>
       <button class="btn btn-sm" id="cfg-tab-home" onclick="configTab('home',this)">🏠 Home</button>
       <button class="btn btn-sm" id="cfg-tab-etiquetas" onclick="configTab('etiquetas',this)">🏷️ Etiquetas</button>
@@ -5657,6 +5742,8 @@ function configTab(sub, btn){
     cfgRenderModulos(wrap);
   } else if(sub==='home'){
     cfgRenderHomeConfig(wrap);
+  } else if(sub==='conexion'){
+    cfgRenderConexion(wrap);
   } else if(sub==='etiquetas'){
     cfgRenderEtiquetas(wrap);
   } else if(sub==='usuarios'){
@@ -6235,19 +6322,26 @@ async function ngSaveComunidad(){
 async function ngDeleteComunidad(id){
   var ng=S.ngComunidades.find(function(x){return Number(x.id)===Number(id);});
   if(!ng) return;
-  // Check for members using this community as group
-  var withMembers=S.members.filter(function(m){
-    return Number(m.grupoId)===Number(id)||(m.grupoIds||[]).map(Number).includes(Number(id));
+  // Eliminar = desafectar (igual que un Grupo de Vida): líderes y colaboradores pierden la Función NG
+  // (si no están en otra Comunidad activa), los integrantes activos pasan a Sin Asignar y las cuentas
+  // de usuario dejan de tener esta Comunidad. El historial de asistencia no se toca.
+  var integrantesNg=S.members.filter(function(m){
+    return m.estado!=='Baja' && (Number(m.grupoId)===Number(id)||(m.grupoIds||[]).map(Number).includes(Number(id)));
   });
-  if(withMembers.length>0){
-    alert('La comunidad "'+ng.name+'" tiene '+withMembers.length+' miembro'+(withMembers.length>1?'s':'')+' asignado'+(withMembers.length>1?'s':'')+'. Quitálos antes de eliminarla.');
-    return;
-  }
-  if(!confirm('¿Eliminar la comunidad "'+ng.name+'"? Esta acción no se puede deshacer.')) return;
-  // Quienes lideraban o colaboraban en esta Comunidad pierden la Función NG (si no están en otra activa)
+  var lineasNg=[
+    inactLineaPersonas('Líderes',ng.liderIds||[]),
+    inactLineaPersonas('Colaboradores/as',ng.colaboradorIds||[]),
+    integrantesNg.length?'• Los integrantes actuales ('+integrantesNg.length+') pasan a estar Sin Asignar.':'',
+    inactLineaCuentas(ng.id)
+  ].filter(Boolean);
+  if(!confirm('Se va a eliminar la Comunidad "'+ng.name+'".\n\n'
+    +(lineasNg.length?'También quedarán desafectadas las personas vinculadas:\n'+lineasNg.join('\n')+'\n\n':'')
+    +'Su actividad en Agenda deja de repetirse. El historial de asistencia no se toca.\n'
+    +'Esta acción no se puede deshacer.\n\n¿Continuar?')) return;
   var involucradosFn=(ng.liderIds||[]).concat(ng.colaboradorIds||[]);
   var snapFunciones=funcionesAutoSnapshot(involucradosFn);
   funcionesAutoAdoptar(involucradosFn);
+  var fotosIntNg=gdvDesasignarIntegrantes(id);
   S.ngComunidades=S.ngComunidades.filter(function(x){return Number(x.id)!==Number(id);});
   funcionesAutoReconciliar(involucradosFn);
   var fotosCuentas=cuentasSincronizar(involucradosFn,id);
@@ -6264,6 +6358,8 @@ async function ngDeleteComunidad(id){
     showToast('✅ Comunidad eliminada','#16A34A');
   }catch(e){
     S.ngComunidades.push(ng);
+    gdvRevertirIntegrantes(fotosIntNg);
+    try{ var tk='_tomb_'+SK.ngComunidades, tl=JSON.parse(localStorage.getItem(tk)||'[]'); localStorage.setItem(tk,JSON.stringify(tl.filter(function(t){return Number(t.id)!==Number(id);}))); }catch(_e){}
     funcionesAutoRevertir(snapFunciones);
     cuentasRevertir(fotosCuentas);
     if(tocoEventos) S.eventos=JSON.parse(snapshotEventosStr);
@@ -13207,20 +13303,23 @@ async function gdvSaveRecord(){
       m=S.members.find(function(x){return fullName(x).toLowerCase()===nombreBuscado.toLowerCase();});
     }
     if(m&&!m.grupoId){
-      vinculosPrevios.push(m);
+      vinculosPrevios.push({m:m,tenia:Object.prototype.hasOwnProperty.call(m,'grupoId'),grupoId:m.grupoId,_ts:m._ts});
       m.grupoId=gid; // Assign to this group
-      await nvAplicarParticipando(m);
+      m._ts=Date.now();
       membersUpdated=true;
     }
   }
-  if(membersUpdated){
+  // Participando automático: quienes estuvieron en este encuentro y ya suman N asistencias
+  var fotosEtapa=sinEncuentro?[]:nvParticipandoAplicar(nvIdsDeRegistro(rec));
+  if(membersUpdated||fotosEtapa.length){
     await saveK(SK.members,S.members);
     try{
       if(typeof window.fbUpload==='function') await window.fbUpload(true);
     }catch(e){
-      vinculosPrevios.forEach(function(m){ m.grupoId=null; });
+      nvRevertirEtapas(fotosEtapa);
+      vinculosPrevios.forEach(function(v){ if(v.tenia) v.m.grupoId=v.grupoId; else delete v.m.grupoId; if(v._ts===undefined) delete v.m._ts; else v.m._ts=v._ts; });
       await saveK(SK.members,S.members);
-      alert('El encuentro se guardó, pero no se pudo vincular a las Personas Nuevas con el Grupo. Verificá tu conexión y volvé a intentarlo desde Rebaños.');
+      alert('El encuentro se guardó, pero no se pudo actualizar a las Personas Nuevas (vínculo con el Grupo / paso a Participando). Verificá tu conexión; se completa solo en el próximo guardado o al abrir Conexión.');
     }
   }
 
@@ -16141,17 +16240,20 @@ function openNuevos(){
   var elH=document.getElementById('nv-fil-hasta'); if(elH) elH.value=rd.hasta;
   renderNuevos();
   setTimeout(nvCumplesBanner, 100);
+  // Participando automático: deja al día a quien ya llegó a N asistencias (solo con permiso de gestión)
+  nvParticipandoPonerAlDia().then(function(n){ if(n){ renderNuevos(); showToast('🌱 '+n+' persona'+(n!==1?'s pasaron':' pasó')+' a Participando por asistencias','#16A34A'); } });
 }
 
-// Rango por defecto de Nuevos Contactos: la semana ISO en curso + las dos anteriores
-// (3 semanas en total) — mismo criterio que la ventana de carga del resto de la app.
+// Rango por defecto de Conexión: las últimas N semanas ISO (N en Configuración → Conexión, defecto 3):
+// del lunes de hace N−1 semanas al domingo de la semana actual.
 function nvRangoDefault(){
   var hoy=new Date(); hoy.setHours(0,0,0,0);
   var dow=hoy.getDay();
   var diffALunes=(dow===0?-6:1-dow);
   var lunesEstaSemana=new Date(hoy); lunesEstaSemana.setDate(hoy.getDate()+diffALunes);
-  var lunesLimite=new Date(lunesEstaSemana); lunesLimite.setDate(lunesEstaSemana.getDate()-14);
-  return {desde:dateToStr(lunesLimite), hasta:dateToStr(hoy)};
+  var lunesLimite=new Date(lunesEstaSemana); lunesLimite.setDate(lunesEstaSemana.getDate()-7*(nvSemanasPeriodo()-1));
+  var domingo=new Date(lunesEstaSemana); domingo.setDate(lunesEstaSemana.getDate()+6);
+  return {desde:dateToStr(lunesLimite), hasta:dateToStr(domingo)};
 }
 
 function nvVerTodos(){
@@ -16206,7 +16308,7 @@ function buildNuevosHTML(){
       <div><label class="field-label">Desde</label><input type="date" id="nv-fil-desde" onchange="renderNuevos()"></div>
       <div><label class="field-label">Hasta</label><input type="date" id="nv-fil-hasta" onchange="renderNuevos()"></div>
       <button class="btn btn-sm" onclick="nvVerTodos()" title="Ignora las fechas y muestra todos los Nuevos Contactos">Todos</button>
-      <button class="btn btn-sm" onclick="nvResetRango()" title="Volver a las últimas 3 semanas">🔄</button>
+      <button class="btn btn-sm" onclick="nvResetRango()" title="Volver a las últimas ${nvSemanasPeriodo()} semanas">🔄</button>
       ${canEliminarNuevos()?`<button class="btn btn-sm" onclick="dupAbrirPanel('nuevos')" style="background:#FFFBEB;border-color:#FCD34D;color:#92400E;font-weight:600">🔍 Posibles duplicados (${dupContar('nuevos')})</button>`:''}
     </div>
     <div style="display:flex;gap:6px;margin-bottom:1rem;align-items:center;flex-wrap:nowrap">
@@ -16240,9 +16342,6 @@ function buildNuevosHTML(){
         <span style="font-size:14px;font-weight:600;color:#1F4E79">
           Nuevos activos: <span id="nv-count" style="color:#16A34A">0</span>
         </span>
-        ${isSuperAdmin()?`<span style="font-size:12px;color:#374151;display:flex;align-items:center;gap:4px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:4px 8px">⚙️ Alertar tras
-          <input type="number" min="1" max="30" value="${nvDiasAlerta()}" onchange="nvSetDiasAlerta(this.value)" style="width:48px;padding:3px 6px;font-size:12px">
-          días sin contactar</span>`:''}
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
         <button class="btn btn-sm" onclick="gdvShowQRModal()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">
@@ -16575,17 +16674,159 @@ function nvSubEstadoBadge(m){
   const s=map[est]||map.Ingresado;
   return `<span style="background:${s.bg};color:${s.color};font-size:11px;padding:3px 10px;border-radius:99px;font-weight:600">${s.icon} ${est}</span>`;
 }
-// Transición automática Ingresado/Contactado → Participando en cuanto tiene Grupo asignado
-async function nvAplicarParticipando(m){
-  if(!m || m.condicion!=='Nuevo') return false;
-  if(!m.grupoId) return false;
-  if(m.subEstado==='Participando') return false;
-  const de=m.subEstado||'Ingresado';
-  m.subEstado='Participando';
-  if(!m.subEstadoHistorial) m.subEstadoHistorial=[];
-  m.subEstadoHistorial.push({de,a:'Participando',autor:'Sistema (grupo asignado)',fecha:new Date().toISOString()});
+// ── Configuración de Conexión (Configuración → 🌱 Conexión) ──
+var NV_SEM_DEF=3, NV_ASIST_DEF=3;
+function nvSemanasPeriodo(){ var n=parseInt(S.homeConfig&&S.homeConfig.nvSemanasPeriodo,10); return (n>=1&&n<=52)?n:NV_SEM_DEF; }
+function nvAsistParticipando(){ var n=parseInt(S.homeConfig&&S.homeConfig.nvAsistParticipando,10); return (n>=1&&n<=20)?n:NV_ASIST_DEF; }
+
+// ── Participando automático ──
+// Un Nuevo pasa solo a Participando cuando suma N asistencias (Configuración, defecto 3) en Grupos de
+// Vida y Comunidades NG, contadas desde su fecha de ingreso, sumando ambos (no hace falta que sean
+// seguidas). Cuenta cada encuentro una sola vez: Presente en la lista, o cargado como visita por nombre
+// ("Nuevos" en GdV/NG y visitas de otro grupo en GdV) cuando el nombre corresponde a una sola persona.
+// Asignar un Grupo ya NO pasa a Participando. A Participando no se pasa a mano.
+var _nvAsistCache={firma:null,idx:null,t:0};
+function nvAsistFirma(){
+  function cuenta(arr){ var n=0,mx=0; (arr||[]).forEach(function(r){ if(!r) return; n++; var t=Number(r._ts)||0; if(t>mx) mx=t; }); return n+':'+mx; }
+  return cuenta(S.records)+'|'+cuenta(S.ngRecords)+'|'+cuenta(S.members);
+}
+// Índice: memberId → lista ordenada de {f:'AAAA-MM-DD', nuevo:bool} (uno por encuentro en el que estuvo;
+// nuevo=true si figuró como visita "Nuevo" en ese encuentro)
+function nvAsistIndice(){
+  var ahora=Date.now();
+  if(_nvAsistCache.idx&&ahora-_nvAsistCache.t<500) return _nvAsistCache.idx;
+  var firma=nvAsistFirma();
+  if(_nvAsistCache.firma===firma&&_nvAsistCache.idx){ _nvAsistCache.t=ahora; return _nvAsistCache.idx; }
+  var idx={}, porNombre=null;
+  function idNomAsist(nom){
+    if(!porNombre){
+      porNombre={};
+      (S.members||[]).forEach(function(m){ if(!m) return; var k=normName(fullName(m)); porNombre[k]=(porNombre[k]===undefined)?m.id:null; });
+    }
+    var v=porNombre[normName(nom)]; return v==null?null:v;
+  }
+  function procAsist(recs,conOtros){
+    (recs||[]).forEach(function(r){
+      if(!r||r.sinEncuentro||!r.fecha) return;
+      var vistos={};
+      function suma(id,nuevo){
+        if(id==null||id==='') return; var k=String(id);
+        if(vistos[k]){ if(nuevo) vistos[k].nuevo=true; return; }
+        vistos[k]={f:r.fecha,nuevo:!!nuevo}; (idx[k]||(idx[k]=[])).push(vistos[k]);
+      }
+      var a=r.asistencia||{};
+      Object.keys(a).forEach(function(mid){ if(a[mid]&&a[mid].state==='presente') suma(mid); });
+      (r.visitsNew||[]).forEach(function(v){ suma((v&&typeof v==='object')?v.id:idNomAsist(String(v||'')),true); });
+      if(conOtros) (r.visitsOther||[]).forEach(function(v){ suma((v&&typeof v==='object')?v.id:idNomAsist(String(v||''))); });
+    });
+  }
+  procAsist(S.records,true);
+  procAsist(S.ngRecords,false);
+  Object.keys(idx).forEach(function(k){ idx[k].sort(function(x,y){return x.f<y.f?-1:x.f>y.f?1:0;}); });
+  _nvAsistCache={firma:firma,idx:idx,t:ahora};
+  return idx;
+}
+// Asistencias de una persona desde su ingreso (sin fecha de ingreso: todas). Se cuenta desde el lunes de
+// la semana ISO del ingreso, porque el encuentro se suele cargar días después de que ocurrió (y el alta
+// desde la carga queda con la fecha del día). Figurar como visita "Nuevo" es su llegada: cuenta aunque el
+// encuentro sea hasta 3 semanas anterior al ingreso (la ventana de carga de asistencias).
+function nvAsistencias(m){
+  if(!m) return 0;
+  var l=nvAsistIndice()[String(m.id)]||[];
+  var d=nvFechaRegDate(m);
+  if(!d) return l.length;
+  var lun=new Date(d); lun.setDate(d.getDate()-((d.getDay()+6)%7));
+  var desde=dateToStr(lun);
+  var lunNuevo=new Date(lun); lunNuevo.setDate(lun.getDate()-21); // ventana de carga: hasta 3 semanas antes
+  var desdeNuevo=dateToStr(lunNuevo);
+  return l.filter(function(e){return e.f>=desde||(e.nuevo&&e.f>=desdeNuevo);}).length;
+}
+function nvEsNuevoActivo(m){ return !!m&&m.condicion==='Nuevo'&&m.estado!=='Baja'; }
+// Etapa que le corresponde por la regla. recalculo=true también baja a Contactado a quien figura
+// Participando sin llegar a N (recálculo hacia atrás); en el uso diario la regla solo sube.
+function nvEtapaPorRegla(m,recalculo){
+  if(!nvEsNuevoActivo(m)) return null;
+  var act=m.subEstado||'Ingresado', n=nvAsistencias(m), min=nvAsistParticipando();
+  if(n>=min) return 'Participando';
+  if(recalculo&&act==='Participando') return 'Contactado';
+  return act;
+}
+// Aplica la regla a una persona (en memoria). Devuelve true si cambió. Historial con concat (copy-on-write).
+function nvAplicarEtapaRegla(m,recalculo){
+  var a=nvEtapaPorRegla(m,recalculo), de=m&&(m.subEstado||'Ingresado');
+  if(!a||a===de) return false;
+  var n=nvAsistencias(m);
+  m.subEstado=a;
+  m.subEstadoHistorial=(m.subEstadoHistorial||[]).concat([{de:de,a:a,
+    autor:recalculo?'Sistema (recálculo de asistencias)':'Sistema — '+n+' asistencia'+(n!==1?'s':''),
+    fecha:new Date().toISOString(),comentario:n+' de '+nvAsistParticipando()+' asistencias'}]);
   m._ts=Date.now();
   return true;
+}
+// Foto exacta de los campos que toca la regla, para revertir si falla la nube
+function nvFotoEtapa(m){
+  return {m:m,tenia:{subEstado:Object.prototype.hasOwnProperty.call(m,'subEstado'),subEstadoHistorial:Object.prototype.hasOwnProperty.call(m,'subEstadoHistorial')},
+    subEstado:m.subEstado,subEstadoHistorial:m.subEstadoHistorial,_ts:m._ts};
+}
+function nvRevertirEtapas(fotos){
+  (fotos||[]).forEach(function(f){
+    ['subEstado','subEstadoHistorial'].forEach(function(k){ if(f.tenia[k]) f.m[k]=f[k]; else delete f.m[k]; });
+    if(f._ts===undefined) delete f.m._ts; else f.m._ts=f._ts;
+  });
+}
+// Sube a Participando a quienes ya llegaron (de una lista de ids, o a todos los Nuevos). Devuelve fotos.
+function nvParticipandoAplicar(ids){
+  var set=ids?{}:null; if(ids) ids.forEach(function(x){ if(x!=null) set[String(x)]=1; });
+  var fotos=[];
+  (S.members||[]).forEach(function(m){
+    if(!nvEsNuevoActivo(m)) return;
+    if(set&&!set[String(m.id)]) return;
+    var f=nvFotoEtapa(m);
+    if(nvAplicarEtapaRegla(m,false)) fotos.push(f);
+  });
+  return fotos;
+}
+// Ids de las personas que figuran en un registro de asistencia (lista + visitas por nombre)
+function nvIdsDeRegistro(r){
+  var ids=Object.keys((r&&r.asistencia)||{});
+  ((r&&r.visitsNew)||[]).concat((r&&r.visitsOther)||[]).forEach(function(v){
+    if(v&&typeof v==='object'){ if(v.id!=null) ids.push(String(v.id)); return; }
+    var k=normName(String(v||'')), hits=(S.members||[]).filter(function(m){return normName(fullName(m))===k;});
+    if(hits.length===1) ids.push(String(hits[0].id));
+  });
+  return ids;
+}
+// Recálculo hacia atrás: informe (solo lee) de quiénes cambiarían y por qué
+function nvRecalculoInforme(){
+  var out=[];
+  (S.members||[]).forEach(function(m){
+    if(!nvEsNuevoActivo(m)) return;
+    var de=m.subEstado||'Ingresado', a=nvEtapaPorRegla(m,true);
+    if(a&&a!==de) out.push({m:m,de:de,a:a,asist:nvAsistencias(m)});
+  });
+  out.sort(function(x,y){ return x.a===y.a?listName(x.m).localeCompare(listName(y.m)):(x.a<y.a?-1:1); });
+  return out;
+}
+// Mientras se usa la pantalla de Conexión: quien tenga permiso de gestión deja al día las subidas
+// pendientes (p. ej. por un registro editado). Si la nube falla, se revierte en silencio y se reintenta luego.
+var _nvParticipandoEnCurso=false;
+async function nvParticipandoPonerAlDia(){
+  if(_nvParticipandoEnCurso) return 0;
+  if(!(isSuperAdmin()||(typeof canGestionarNuevos==='function'&&canGestionarNuevos()))) return 0;
+  var fotos=nvParticipandoAplicar(null);
+  if(!fotos.length) return 0;
+  _nvParticipandoEnCurso=true;
+  try{
+    await saveK(SK.members,S.members);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    nvRevertirEtapas(fotos);
+    try{ await saveK(SK.members,S.members); }catch(e2){}
+    _nvParticipandoEnCurso=false;
+    return 0;
+  }
+  _nvParticipandoEnCurso=false;
+  return fotos.length;
 }
 
 function renderNuevos(){
@@ -16713,7 +16954,7 @@ function renderNuevos(){
               <span style="cursor:pointer;text-decoration:underline dotted;color:#1F2937" onclick="nvOpenActions(${m.id})">${fullName(m)}</span>
               ${origenBadge}${atrasado?' <span style="background:#FEE2E2;color:#991B1B;font-size:10px;padding:1px 7px;border-radius:99px;font-weight:700">⏰ Atrasado</span>':''}
             </div>
-            ${esNuevo?nvSubEstadoBadge(m):'<span style="background:#F3F4F6;color:#6B7280;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;flex-shrink:0">📁 Histórico</span>'}
+            ${esNuevo?'<span style="display:flex;align-items:center;gap:6px;flex-shrink:0">'+((m.subEstado||'Ingresado')!=='Participando'?`<span style="font-size:11px;color:#6B7280" title="Asistencias en GdV / NG desde su ingreso">${nvAsistencias(m)} de ${nvAsistParticipando()} asist.</span>`:'')+nvSubEstadoBadge(m)+'</span>':'<span style="background:#F3F4F6;color:#6B7280;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;flex-shrink:0">📁 Histórico</span>'}
           </div>
           <div style="font-size:12px;color:#6B7280;margin-top:3px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
             ${memberGroups.length?memberGroups.map(gr=>`<span style="color:#374151">${gr.name}</span>`).join(' · '):'<span style="color:#F59E0B">Sin grupo</span>'}
@@ -16806,8 +17047,13 @@ function nvOpenPromote(id){
   const esNuevoActivo=!isHistorico&&m.condicion==='Nuevo';
   if(subWrap) subWrap.style.display=esNuevoActivo?'block':'none';
   if(esNuevoActivo){
-    if(subSelect) subSelect.value=m.subEstado||'Ingresado';
-    if(subInfo) subInfo.textContent=m.contactadoPor?`Contactado por ${m.contactadoPor}`:'';
+    if(subSelect){
+      subSelect.value=m.subEstado||'Ingresado';
+      // A Participando no se pasa a mano: es automático por asistencias
+      Array.prototype.forEach.call(subSelect.options,function(o){ if(o.value==='Participando') o.disabled=(m.subEstado||'Ingresado')!=='Participando'; });
+    }
+    var asistTxt=nvAsistencias(m)+' de '+nvAsistParticipando()+' asistencias (pasa sola a Participando)';
+    if(subInfo) subInfo.textContent=(m.contactadoPor?`Contactado por ${m.contactadoPor} · `:'')+asistTxt;
   }
   etqAplicarSelects();
   const selCond=document.getElementById('nv-promote-select');
@@ -16843,7 +17089,7 @@ function nvConfirmarGestion(){
   if(nuevoGrupoId!==(m.grupoId||null)){
     m.grupoId=nuevoGrupoId;
     nvHuboCambioGrupo=true;
-    if(m.grupoId) nvAplicarParticipando(m);
+    // Asignar un Grupo ya no cambia la etapa: Participando depende de las asistencias (nvAplicarEtapaRegla)
   }
   const isHistorico=m.condicion==='Historico'||m.estado==='Baja';
   if(isHistorico) return nvGuardarComentario(); // Re-activar tiene su propio botón
@@ -16977,6 +17223,7 @@ async function nvCambiarSubEstadoManual(nuevoSubEstado){
   const txtComentario=(document.getElementById('nv-comentario-txt')?.value||'').trim();
   if(txtComentario&&txtComentario.length<COMENT_MIN){ alert(comentMsg()); return; }
   const anterior=m.subEstado||'Ingresado';
+  if(nuevoSubEstado==='Participando'&&anterior!=='Participando'){ alert('A Participando se pasa sola al sumar '+nvAsistParticipando()+' asistencias en Grupos de Vida o Comunidades NG.'); return; }
   var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   m.subEstado=nuevoSubEstado;
   if(nuevoSubEstado==='Contactado'&&anterior!=='Contactado'){
@@ -17259,17 +17506,17 @@ async function nvGuardarEditar(){
   m.dni=(document.getElementById('nv-edit-dni')?.value||'').trim();
   var grupoVals=nvGetGrupoIdFromVal(document.getElementById('nv-edit-grupo')?.value||'');
   m.grupoId=grupoVals.grupoId;
-  await nvAplicarParticipando(m);
   if(isSuperAdmin()){
     const fechaVal=document.getElementById('nv-edit-fecha')?.value.trim();
     if(fechaVal) m.fechaRegistro=fechaVal;
   }
+  nvAplicarEtapaRegla(m,false); // con la fecha de ingreso ya actualizada
   m._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
   await saveK(SK.members,S.members);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    Object.assign(m,snapshot);
+    nvRestaurarExacto(m,snapshot);
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -18502,12 +18749,11 @@ async function nvConfirmarEsMismaPersona(existenteId){
     var snapshot=Object.assign({},existente);
     existente.grupoId=nuevoGrupoId;
     existente._ts=Date.now();
-    await nvAplicarParticipando(existente);
     await saveK(SK.members,S.members);
     try{
       if(typeof window.fbUpload==='function') await window.fbUpload(true);
     }catch(e){
-      Object.assign(existente,snapshot);
+      nvRestaurarExacto(existente,snapshot);
       await saveK(SK.members,S.members);
       alert('No se pudo vincular en la nube. Verificá tu conexión e intentá de nuevo.');
       return;

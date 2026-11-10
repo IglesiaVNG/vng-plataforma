@@ -769,7 +769,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzn';
+const APP_VERSION = '2026-08-24-zzo';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -4200,7 +4200,7 @@ function cfgRenderEtiquetas(wrap){
       if(k==='cat:Reconectar'){
         h+='<div style="display:flex;align-items:center;gap:8px;margin:-2px 0 8px;padding:6px 10px;background:#FFF7ED;border-radius:8px">'+
           '<div style="flex:1;font-size:12px;color:#9A3412">Se asigna sola a Miembros y Concurrentes que no participan de Grupos de Vida, Comunidades NG, Discipulado ni Celebraciones (nominales) durante</div>'+
-          '<input type="number" id="etq-recon-semanas" min="1" max="52" step="1" value="'+reconSemanas()+'" style="width:64px;text-align:center"> <span style="font-size:12px;color:#9A3412">semanas ISO seguidas</span></div>';
+          '<input type="number" id="etq-recon-semanas" min="1" max="52" step="1" value="'+reconSemanas()+'" style="width:64px;text-align:center"> <span style="font-size:12px;color:#9A3412">semanas ISO seguidas (también en Configuración → 🌱 Conexión)</span></div>';
       }
     });
     h+='</div>';
@@ -4243,8 +4243,9 @@ function cfgRenderConexion(wrap){
   wrap.innerHTML='<div style="font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:6px">🌱 Conexión · Nuevos Contactos</div>'+
     '<div class="card" style="margin-bottom:.75rem">'+
       filaNum('cfg-nv-alerta','Alerta de atraso (días sin contactar)',nvDiasAlerta(),1,30,'Un Nuevo en Ingresado se marca ⏰ Atrasado al pasar estos días desde su ingreso.')+
-      filaNum('cfg-nv-semanas','Semanas del período por defecto',nvSemanasPeriodo(),1,52,'Conexión abre mostrando las últimas N semanas ISO (de lunes a domingo).')+
+      filaNum('cfg-nv-semanas','Semanas de ingreso que muestra Conexión al abrir',nvSemanasPeriodo(),1,52,'Solo el filtro de fechas inicial: Conexión abre mostrando a quienes ingresaron en las últimas N semanas ISO (de lunes a domingo). No cambia etapas ni categorías.')+
       filaNum('cfg-nv-asist','Asistencias para pasar a Participando',nvAsistParticipando(),1,20,'Presente en Grupos de Vida o Comunidades NG desde su ingreso, sumando ambos (no hace falta que sean seguidas). Las visitas cargadas por nombre también cuentan.')+
+      filaNum('cfg-nv-recon','Semanas ISO de inasistencia para pasar a <strong>'+svcEsc(etqCat('Reconectar'))+'</strong>',reconSemanas(),1,52,'Miembros y Concurrentes que no participan de Grupos de Vida, Comunidades NG ni Discipulado durante estas semanas seguidas. Es el mismo valor que en Configuración → Etiquetas.')+
       cfgNvRespAutoHTML()+
       '<button class="btn btn-primary" onclick="cfgSaveConexion()">💾 Guardar</button>'+
     '</div>'+
@@ -4281,12 +4282,13 @@ async function cfgSaveConexion(){
   var al=leer('cfg-nv-alerta',1,30,'Alerta de atraso'); if(al===null) return;
   var se=leer('cfg-nv-semanas',1,52,'Semanas del período'); if(se===null) return;
   var as=leer('cfg-nv-asist',1,20,'Asistencias para Participando'); if(as===null) return;
+  var rs=leer('cfg-nv-recon',1,52,'Semanas de inasistencia para '+etqCat('Reconectar')); if(rs===null) return;
   var ra={activo:!!document.getElementById('cfg-nv-ra-activo')?.checked,
     mujerId:parseInt(document.getElementById('cfg-nv-ra-mujer')?.value)||null,
     hombreId:parseInt(document.getElementById('cfg-nv-ra-hombre')?.value)||null};
   if(ra.activo&&!ra.mujerId&&!ra.hombreId){ alert('Para activar el Responsable automático elegí al menos una persona (Mujeres u Hombres).'); return; }
   var snapHome=JSON.stringify(S.homeConfig||{}), prevAlerta=localStorage.getItem('gdv_nv_dias_alerta');
-  S.homeConfig=Object.assign({},S.homeConfig||{},{nvSemanasPeriodo:se,nvAsistParticipando:as,nvRespAuto:ra,_ts:Date.now()});
+  S.homeConfig=Object.assign({},S.homeConfig||{},{nvSemanasPeriodo:se,nvAsistParticipando:as,reconectarSemanas:rs,nvRespAuto:ra,_ts:Date.now()});
   try{
     await saveK(SK.homeConfig,S.homeConfig);
     await saveK('gdv_nv_dias_alerta',al);

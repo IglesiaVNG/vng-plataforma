@@ -718,7 +718,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zze';
+const APP_VERSION = '2026-08-24-zzg';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -4102,7 +4102,7 @@ function cfgRenderEtiquetas(wrap){
       h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="flex:1;font-size:12.5px;color:#6B7280">'+svcEsc(ETQ_DEF[k])+'</div><input type="text" class="etq-inp" data-k="'+svcEsc(k)+'" maxlength="40" value="'+svcEsc(cur)+'" placeholder="'+svcEsc(ETQ_DEF[k])+'" style="flex:1"></div>';
       if(k==='cat:Reconectar'){
         h+='<div style="display:flex;align-items:center;gap:8px;margin:-2px 0 8px;padding:6px 10px;background:#FFF7ED;border-radius:8px">'+
-          '<div style="flex:1;font-size:12px;color:#9A3412">Se asigna sola a Miembros y Concurrentes que no participan de Grupos de Vida, Comunidades NG ni Celebraciones (nominales) durante</div>'+
+          '<div style="flex:1;font-size:12px;color:#9A3412">Se asigna sola a Miembros y Concurrentes que no participan de Grupos de Vida, Comunidades NG, Discipulado ni Celebraciones (nominales) durante</div>'+
           '<input type="number" id="etq-recon-semanas" min="1" max="52" step="1" value="'+reconSemanas()+'" style="width:64px;text-align:center"> <span style="font-size:12px;color:#9A3412">semanas ISO seguidas</span></div>';
       }
     });
@@ -4652,7 +4652,7 @@ function categoriaMotivoRegla(m){
 // ── Categoría automática "Reconectar" ──
 // Miembros y Concurrentes (Bautizados y No Bautizados) que no participan durante N semanas ISO seguidas
 // (N = S.homeConfig.reconectarSemanas, por defecto 3, configurable en Config → Etiquetas).
-// Solo cuentan las semanas CON DATO de esa persona: figura en un registro real de Grupo de Vida o de Comunidad NG
+// Solo cuentan las semanas CON DATO de esa persona: figura en un registro real de Grupo de Vida, Comunidad NG o Discipulado
 // (o, más adelante, de una Celebración nominal). "Sin encuentro", grupos que no cargaron y semanas en pausa se saltean.
 // Presente en cualquier registro de la semana (incluidas las visitas a otro grupo) = semana con participación.
 // Le gana a la regla de Comprometido y a la Categoría puesta a mano; se quita sola cuando vuelve a participar.
@@ -4664,7 +4664,7 @@ var RECON_FUENTES_EXTRA=[];
 var _reconCache={firma:null,idx:null};
 function reconFirma(){
   function f(arr){ var n=0,mx=0; (arr||[]).forEach(function(r){ if(!r) return; n++; var t=Number(r._ts)||0; if(t>mx) mx=t; }); return n+':'+mx; }
-  return f(S.records)+'|'+f(S.ngRecords)+'|'+f(S.members)+'|'+today()+'|'+RECON_FUENTES_EXTRA.length;
+  return f(S.records)+'|'+f(S.ngRecords)+'|'+f(S.discRecords)+'|'+f(S.members)+'|'+today()+'|'+RECON_FUENTES_EXTRA.length;
 }
 // Índice: memberId → { 'AAAA-MM-DD' (lunes de la semana ISO): false (ausente) | 'AAAA-MM-DD' (fecha en que estuvo presente) }
 function reconIndice(){
@@ -4700,6 +4700,7 @@ function reconIndice(){
   }
   proc(S.records,true);
   proc(S.ngRecords,false);
+  proc(S.discRecords,false);
   RECON_FUENTES_EXTRA.forEach(function(fn){ try{ (fn()||[]).forEach(function(x){ if(x) marca(x.memberId,x.fecha,!!x.presente); }); }catch(e){ console.warn('Reconectar: fuente extra',e); } });
   _reconCache={firma:firma,idx:idx,t:ahora};
   return idx;
@@ -5421,11 +5422,12 @@ async function saSaveMember(){
   let esNuevo=false;
   if(saEditingMemberId){
     target=S.members.find(x=>Number(x.id)===Number(saEditingMemberId));
-    if(target){ snapshotPrevio=Object.assign({},target); Object.assign(target,data); cambioReg(target,'condicion',snapshotPrevio.condicion,data.condicion); } // Estado no se toca acá — se cambia solo con Dar de baja/Reactivar
+    if(target){ snapshotPrevio=Object.assign({},target); Object.assign(target,data); cambioReg(target,'condicion',snapshotPrevio.condicion,data.condicion); nvAsegurarDatosNuevo(target); } // Estado no se toca acá — se cambia solo con Dar de baja/Reactivar
   } else {
     esNuevo=true;
     if(!nvConfirmarAltaSiHayParecido(nombre,apellido,data.tel)) return;
-    target={id:Date.now(),estado:'Activo',...data};
+    target=Object.assign({id:Date.now(),estado:'Activo'},data,altaFirma('Rebaños'));
+    nvAsegurarDatosNuevo(target);
     S.members.push(target);
   }
 
@@ -5437,7 +5439,7 @@ async function saSaveMember(){
     if(esNuevo){
       S.members=S.members.filter(function(m){return m.id!==target.id;});
     } else if(target&&snapshotPrevio){
-      Object.assign(target,snapshotPrevio);
+      nvRestaurarExacto(target,snapshotPrevio); // también borra los campos que no existían (fecha de ingreso puesta recién)
       cambioRestaurarA(target,snapshotPrevio.cambios);
     }
     await saveK(SK.members,S.members);
@@ -5517,6 +5519,7 @@ async function saQuickToggleEstado(id){
   const prevCondicionAnterior=m.condicionAnterior;
   const prevTs=m._ts;
   const prevCambios=m.cambios;
+  const prevNuevo={fechaRegistro:m.fechaRegistro,subEstado:m.subEstado,subEstadoHistorial:m.subEstadoHistorial};
   m.estado=nuevoEstado;
   // Baja y Histórico son el mismo concepto — se sincronizan juntos
   if(nuevoEstado==='Baja'){
@@ -5525,6 +5528,7 @@ async function saQuickToggleEstado(id){
   } else {
     m.condicion=m.condicionAnterior||'Asistente NO Bautizado';
     m.condicionAnterior=null;
+    nvAsegurarDatosNuevo(m);
   }
   m.estadoHistorial=m.estadoHistorial||[];
   m.estadoHistorial.push({
@@ -5551,6 +5555,7 @@ async function saQuickToggleEstado(id){
     m.condicion=prevCondicion;
     m.condicionAnterior=prevCondicionAnterior;
     m._ts=prevTs;
+    Object.keys(prevNuevo).forEach(function(k){ if(prevNuevo[k]===undefined) delete m[k]; else m[k]=prevNuevo[k]; });
     cambioRestaurarA(m,prevCambios);
     m.estadoHistorial.pop();
     await saveK(SK.members,S.members);
@@ -14177,7 +14182,9 @@ async function gdvSaveMember(){
   } else {
     if(!nvConfirmarAltaSiHayParecido(nombre,apellido,data.tel)) return;
     nuevoId=Date.now();
-    S.members.push({id:nuevoId,...data});
+    var nuevoGdv=Object.assign({id:nuevoId},data,{condicion:'Nuevo',subEstado:'Ingresado',subEstadoHistorial:[],fechaRegistro:todayAA()},altaFirma('Grupos de Vida'),{_ts:Date.now()});
+    cambioReg(nuevoGdv,'condicion','','Nuevo','Alta desde Grupo de Vida');
+    S.members.push(nuevoGdv);
   }
   await saveK(SK.members,S.members);
   try{
@@ -17794,6 +17801,7 @@ async function nvAplicarGraduacion(m, destino){
     m.condicion='Nuevo';
     m.subEstado='Ingresado';
     m.subEstadoHistorial=[{de:'Campaña',a:'Ingresado',autor:currentUser?.name||'Sistema',fecha:new Date().toISOString(),comentario:'Graduado desde Campaña'}];
+    nvAsegurarDatosNuevo(m);
   } else {
     cambioReg(m,'estado',m.estado||'Activo','Baja',motivo);
     cambioReg(m,'condicion',condPrev,'Historico',motivo);
@@ -17807,6 +17815,19 @@ async function nvAplicarGraduacion(m, destino){
 }
 // Deja a la persona EXACTAMENTE como estaba en la foto: restaura los valores y borra los campos
 // que no existían (ej: m.cambios creado por la graduación). Object.assign solo no los borra.
+// Toda persona que queda como Nuevo necesita fecha de ingreso (DD/MM/AA) y sub-estado para el circuito de Conexión.
+// Solo completa lo que falta: nunca pisa una fecha ya cargada (p. ej. la de una Campaña). Devuelve true si cambió algo.
+function nvAsegurarDatosNuevo(m){
+  if(!m||m.condicion!=='Nuevo') return false;
+  var cambio=false;
+  if(!m.fechaRegistro){ m.fechaRegistro=todayAA(); cambio=true; }
+  if(!m.subEstado){ m.subEstado='Ingresado'; if(!m.subEstadoHistorial) m.subEstadoHistorial=[]; cambio=true; }
+  return cambio;
+}
+// Quién y cuándo dio de alta una ficha (solo en altas nuevas)
+function altaFirma(origen){
+  return {origen:origen,cargadoPor:(currentUser&&currentUser.name)||'',ts:new Date().toISOString()};
+}
 function nvRestaurarExacto(m, foto){
   Object.keys(m).forEach(function(k){ if(!Object.prototype.hasOwnProperty.call(foto,k)) delete m[k]; });
   Object.assign(m, foto);

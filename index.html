@@ -718,7 +718,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzd';
+const APP_VERSION = '2026-08-24-zze';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -1583,6 +1583,21 @@ function esPersonaNuevaEnRegistro(memberId, fecha, state, mapaPrimerasFechas){
   return mapa[memberId]===fecha;
 }
 
+// Lista para tomar asistencia en un Grupo de Vida: integrantes + facilitador/es (cuentan como cualquier otro)
+function gdvMiembrosAsistencia(gid){
+  var g=(S.groups||[]).find(function(x){return Number(x.id)===Number(gid);});
+  var lista=groupMembers(gid), ids=new Set(lista.map(function(m){return Number(m.id);}));
+  if(g) [g.facId,g.facId2].forEach(function(fid){
+    if(!fid||ids.has(Number(fid))) return;
+    var f=(S.members||[]).find(function(m){return m&&Number(m.id)===Number(fid);});
+    if(f&&f.estado!=='Baja'){ lista.push(f); ids.add(Number(fid)); }
+  });
+  return lista;
+}
+function gdvEsFacilitadorDe(gid,mid){
+  var g=(S.groups||[]).find(function(x){return Number(x.id)===Number(gid);});
+  return !!g&&(Number(g.facId)===Number(mid)||Number(g.facId2)===Number(mid));
+}
 function groupMembers(gid){
   return S.members.filter(m=>m.estado==='Activo' && (Number(m.grupoId)===Number(gid) || (m.grupoIds||[]).map(Number).includes(Number(gid))));
 }
@@ -3881,6 +3896,7 @@ function buildMiembrosHTML(){
         <option value="">Todas las Categorías</option>
         <option value="Participante">Participante</option>
         <option value="Comprometido">Comprometido</option>
+        <option value="Reconectar">Reconectar</option>
         <option value="Baja">Histórico</option>
       </select>
     </div>
@@ -4062,7 +4078,7 @@ function saCondicionBadgeM(m){
 }
 // ── Etiquetas editables (Config → Etiquetas): solo cambian el NOMBRE que se ve; los valores guardados no se tocan ──
 var ETQ_DEF={'cond:todas':'Todas las condiciones','cond:Miembro':'Miembro','cond:Asistente Bautizado':'Concurrente Bautizado','cond:Asistente NO Bautizado':'Concurrente No Bautizado','cond:Historico':'Histórico',
-  'cat:todas':'Todas las Categorías','cat:Participante':'Asistente','cat:Comprometido':'Comprometido','cat:Historico':'Histórico'};
+  'cat:todas':'Todas las Categorías','cat:Participante':'Asistente','cat:Comprometido':'Comprometido','cat:Reconectar':'Reconectar','cat:Historico':'Histórico'};
 function etq(k){ var e=S.homeConfig&&S.homeConfig.etiquetas; var v=e&&e[k]; return (typeof v==='string'&&v.trim())?v.trim():(ETQ_DEF[k]||k); }
 function etqCond(c){ return ETQ_DEF['cond:'+c]!==undefined?etq('cond:'+c):(c||'—'); }
 function etqCat(c){ return etq('cat:'+(c==='Histórico'?'Historico':c)); }
@@ -4072,11 +4088,11 @@ function etqAplicarSelects(){
   aplicar('sa-mfil-condicion',cond);
   aplicar('sa-mf-condicion',function(v){ return v===''?null:(ETQ_DEF['cond:'+v]!==undefined?etq('cond:'+v):null); });
   aplicar('nv-promote-select',function(v){ if(v==='Miembro') return '⭐ Promover a '+etq('cond:Miembro'); if(v==='Asistente Bautizado'||v==='Asistente NO Bautizado') return '✅ Promover a '+etq('cond:'+v); return null; });
-  aplicar('sa-mfil-estado',function(v){ return v===''?etq('cat:todas'):v==='Participante'?etq('cat:Participante'):v==='Comprometido'?etq('cat:Comprometido'):v==='Baja'?etq('cat:Historico'):null; });
+  aplicar('sa-mfil-estado',function(v){ return v===''?etq('cat:todas'):v==='Participante'?etq('cat:Participante'):v==='Comprometido'?etq('cat:Comprometido'):v==='Reconectar'?etq('cat:Reconectar'):v==='Baja'?etq('cat:Historico'):null; });
 }
 function cfgRenderEtiquetas(wrap){
   var grupos=[['Condiciones (filtro y fichas de Rebaños)',['cond:todas','cond:Miembro','cond:Asistente Bautizado','cond:Asistente NO Bautizado','cond:Historico']],
-              ['Categorías (filtro y ficha de Rebaños)',['cat:todas','cat:Participante','cat:Comprometido','cat:Historico']]];
+              ['Categorías (filtro y ficha de Rebaños)',['cat:todas','cat:Participante','cat:Comprometido','cat:Reconectar','cat:Historico']]];
   var h='<div style="font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:6px">🏷️ Etiquetas</div>'+
     '<div style="font-size:12px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#F9FAFB;border-radius:8px">Acá cambiás cómo se <strong>llaman</strong> las Condiciones y Categorías en pantalla. Los datos de las personas no se modifican y las reglas siguen siendo las mismas. Dejá un campo vacío para volver al nombre original.</div>';
   grupos.forEach(function(g){
@@ -4084,6 +4100,11 @@ function cfgRenderEtiquetas(wrap){
     g[1].forEach(function(k){
       var cur=(S.homeConfig&&S.homeConfig.etiquetas&&S.homeConfig.etiquetas[k])||'';
       h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="flex:1;font-size:12.5px;color:#6B7280">'+svcEsc(ETQ_DEF[k])+'</div><input type="text" class="etq-inp" data-k="'+svcEsc(k)+'" maxlength="40" value="'+svcEsc(cur)+'" placeholder="'+svcEsc(ETQ_DEF[k])+'" style="flex:1"></div>';
+      if(k==='cat:Reconectar'){
+        h+='<div style="display:flex;align-items:center;gap:8px;margin:-2px 0 8px;padding:6px 10px;background:#FFF7ED;border-radius:8px">'+
+          '<div style="flex:1;font-size:12px;color:#9A3412">Se asigna sola a Miembros y Concurrentes que no participan de Grupos de Vida, Comunidades NG ni Celebraciones (nominales) durante</div>'+
+          '<input type="number" id="etq-recon-semanas" min="1" max="52" step="1" value="'+reconSemanas()+'" style="width:64px;text-align:center"> <span style="font-size:12px;color:#9A3412">semanas ISO seguidas</span></div>';
+      }
     });
     h+='</div>';
   });
@@ -4094,8 +4115,15 @@ async function cfgSaveEtiquetas(){
   if(!isSuperAdmin()) return;
   var et={};
   document.querySelectorAll('.etq-inp').forEach(function(i){ var v=(i.value||'').trim(); if(v&&v!==ETQ_DEF[i.getAttribute('data-k')]) et[i.getAttribute('data-k')]=v; });
+  var extra={};
+  var semInp=document.getElementById('etq-recon-semanas');
+  if(semInp){
+    var semV=String(semInp.value||'').trim(), semN=parseInt(semV,10);
+    if(!/^\d+$/.test(semV)||semN<1||semN>52){ alert('Las semanas de '+etqCat('Reconectar')+' tienen que ser un número entero entre 1 y 52.'); return; }
+    extra.reconectarSemanas=semN;
+  }
   var snapshot=JSON.stringify(S.homeConfig||{});
-  S.homeConfig=Object.assign({},S.homeConfig||{},{etiquetas:et,_ts:Date.now()});
+  S.homeConfig=Object.assign({},S.homeConfig||{},extra,{etiquetas:et,_ts:Date.now()});
   try{
     await saveK(SK.homeConfig,S.homeConfig);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
@@ -4128,6 +4156,7 @@ function saCategoriaBadge(m){
   var c=categoriaDe(m);
   if(c==='Comprometido') return '<span style="background:#EDE9FE;color:#5B21B6;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;white-space:nowrap">'+etqCat(c)+'</span>';
   if(c==='Histórico') return '<span class="badge b-muted">'+etqCat(c)+'</span>';
+  if(c==='Reconectar') return '<span style="background:#FFEDD5;color:#9A3412;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;white-space:nowrap">'+etqCat(c)+'</span>';
   return '<span class="badge b-ok">'+etqCat(c)+'</span>';
 }
 function saCondicionBadge(condicion){
@@ -4388,7 +4417,7 @@ function servicioReconciliar(){
     if(tocado) m.servicio=hist;
     var cat=categoriaDe(m), antes=m.catUlt||'Participante';
     if(cat!==antes){
-      if(!base){ var motivo=cat==='Comprometido'?categoriaMotivoRegla(m):(cat==='Histórico'?'pasó a Histórico':'ya no cumple la regla de Comprometido'); var e2=cambioReg(m,'categoria',antes,cat,motivo,true); if(e2) mias.push(e2); }
+      if(!base){ var motivo=cat==='Reconectar'?reconMotivo(m):cat==='Histórico'?'pasó a Histórico':antes==='Reconectar'?reconMotivoSalida(m):cat==='Comprometido'?categoriaMotivoRegla(m):'ya no cumple la regla de Comprometido'; var e2=cambioReg(m,'categoria',antes,cat,motivo,true); if(e2) mias.push(e2); }
       m.catUlt=cat; tocado=true;
     }
     if(tocado){ m._ts=Date.now(); undo.push({m:m,prev:prev,mias:mias}); }
@@ -4620,9 +4649,187 @@ function categoriaMotivoRegla(m){
   if((S.areasServicio||[]).some(function(a){return svcAreaActiva(a)&&(a.equipo||[]).some(function(e){return Number(e.personaId)===id&&(e.rol==='Coordinador/a'||e.rol==='Colaborador/a');});})) r.push('Área de servicio');
   return r.length?r.join(', '):null;
 }
+// ── Categoría automática "Reconectar" ──
+// Miembros y Concurrentes (Bautizados y No Bautizados) que no participan durante N semanas ISO seguidas
+// (N = S.homeConfig.reconectarSemanas, por defecto 3, configurable en Config → Etiquetas).
+// Solo cuentan las semanas CON DATO de esa persona: figura en un registro real de Grupo de Vida o de Comunidad NG
+// (o, más adelante, de una Celebración nominal). "Sin encuentro", grupos que no cargaron y semanas en pausa se saltean.
+// Presente en cualquier registro de la semana (incluidas las visitas a otro grupo) = semana con participación.
+// Le gana a la regla de Comprometido y a la Categoría puesta a mano; se quita sola cuando vuelve a participar.
+var RECON_CONDS=['Miembro','Asistente Bautizado','Asistente NO Bautizado'];
+var RECON_SEM_DEF=3;
+function reconSemanas(){ var n=parseInt(S.homeConfig&&S.homeConfig.reconectarSemanas,10); return (n>=1&&n<=52)?n:RECON_SEM_DEF; }
+// Fuentes adicionales (p. ej. Celebraciones nominales): cada una devuelve [{memberId, fecha, presente}]
+var RECON_FUENTES_EXTRA=[];
+var _reconCache={firma:null,idx:null};
+function reconFirma(){
+  function f(arr){ var n=0,mx=0; (arr||[]).forEach(function(r){ if(!r) return; n++; var t=Number(r._ts)||0; if(t>mx) mx=t; }); return n+':'+mx; }
+  return f(S.records)+'|'+f(S.ngRecords)+'|'+f(S.members)+'|'+today()+'|'+RECON_FUENTES_EXTRA.length;
+}
+// Índice: memberId → { 'AAAA-MM-DD' (lunes de la semana ISO): false (ausente) | 'AAAA-MM-DD' (fecha en que estuvo presente) }
+function reconIndice(){
+  // La firma recorre todos los registros: dentro de una misma pasada de dibujo (≈ medio segundo) se reutiliza
+  var ahora=Date.now();
+  if(_reconCache.idx&&ahora-(_reconCache.t||0)<500) return _reconCache.idx;
+  var firma=reconFirma(); if(_reconCache.firma===firma&&_reconCache.idx){ _reconCache.t=ahora; return _reconCache.idx; }
+  var idx={}, porNombre=null, hoyWk=getWeekKey(today());
+  function marca(mid,fecha,pres){
+    if(mid==null||!fecha) return;
+    var wk=getWeekKey(fecha); if(!wk||wk>hoyWk) return;
+    var k=String(mid), o=idx[k]||(idx[k]={});
+    if(pres){ if(!o[wk]||fecha>o[wk]) o[wk]=fecha; }
+    else if(o[wk]===undefined) o[wk]=false;
+  }
+  function idPorNombre(nom){
+    if(!porNombre){
+      porNombre={};
+      (S.members||[]).forEach(function(m){ if(!m) return; var k=normName(fullName(m)); porNombre[k]=(porNombre[k]===undefined)?m.id:null; });
+    }
+    var v=porNombre[normName(nom)]; return v==null?null:v;
+  }
+  function proc(recs,conVisitas){
+    (recs||[]).forEach(function(r){
+      if(!r||r.sinEncuentro||!r.fecha) return;
+      var a=r.asistencia||{};
+      Object.keys(a).forEach(function(mid){ if(a[mid]) marca(mid,r.fecha,a[mid].state==='presente'); });
+      if(conVisitas) (r.visitsOther||[]).forEach(function(v){
+        var id=(v&&typeof v==='object')?v.id:idPorNombre(String(v||''));
+        if(id!=null) marca(id,r.fecha,true);
+      });
+    });
+  }
+  proc(S.records,true);
+  proc(S.ngRecords,false);
+  RECON_FUENTES_EXTRA.forEach(function(fn){ try{ (fn()||[]).forEach(function(x){ if(x) marca(x.memberId,x.fecha,!!x.presente); }); }catch(e){ console.warn('Reconectar: fuente extra',e); } });
+  _reconCache={firma:firma,idx:idx,t:ahora};
+  return idx;
+}
+function reconEvaluable(m){ return !!m&&m.estado!=='Baja'&&RECON_CONDS.indexOf(m.condicion)>=0; }
+function reconPausaActiva(m){
+  var h=today(), act=null;
+  ((m&&m.reconPausas)||[]).forEach(function(p){ if(p&&p.desde&&p.hasta&&p.desde<=h&&p.hasta>=h) act=p; });
+  return act;
+}
+function reconSemanaEnPausa(m,wk){
+  return ((m&&m.reconPausas)||[]).some(function(p){ return p&&p.desde&&p.hasta&&wk>=getWeekKey(p.desde)&&wk<=getWeekKey(p.hasta); });
+}
+// null = no es Reconectar. Si lo es: {semanas:N, ultima:'AAAA-MM-DD'|null}
+function reconInfo(m){
+  if(!reconEvaluable(m)||reconPausaActiva(m)) return null;
+  var sem=reconIndice()[String(m.id)]; if(!sem) return null;
+  var n=reconSemanas();
+  var wks=Object.keys(sem).filter(function(w){ return !reconSemanaEnPausa(m,w); }).sort().reverse();
+  if(wks.length<n) return null;
+  for(var i=0;i<n;i++) if(sem[wks[i]]) return null;
+  var ult=null;
+  for(var j=n;j<wks.length;j++) if(sem[wks[j]]){ ult=sem[wks[j]]; break; }
+  return {semanas:n,ultima:ult};
+}
+function reconMotivo(m){
+  var i=reconInfo(m); if(!i) return null;
+  return i.semanas+' semana'+(i.semanas>1?'s':'')+' sin participar'+(i.ultima?' (última vez: '+fmtAA(i.ultima)+')':' (sin participación registrada)');
+}
+function reconMotivoSalida(m){
+  var pz=reconPausaActiva(m);
+  if(pz) return 'Pausa de '+etqCat('Reconectar')+' hasta el '+fmtAA(pz.hasta)+': '+pz.motivo;
+  if(!reconEvaluable(m)) return 'ya no se evalúa (cambió la Condición)';
+  return 'volvió a participar';
+}
+// Ficha de Rebaños: motivo, pausa activa o botón para pausar
+function reconFichaHtml(m){
+  if(!reconEvaluable(m)) return '';
+  var h='', i=reconInfo(m), pz=reconPausaActiva(m), puede=puedeCambiarCategoria();
+  if(i) h+='<div style="font-size:11px;color:#9A3412;margin-top:3px">'+svcEsc(reconMotivo(m))+'. Se quita sola cuando vuelva a participar.</div>';
+  if(pz){
+    h+='<div style="font-size:11.5px;color:#4B5563;margin-top:5px;background:#F3F4F6;border-radius:6px;padding:5px 8px">⏸ No es '+svcEsc(etqCat('Reconectar'))+' del '+fmtAA(pz.desde)+' al '+fmtAA(pz.hasta)+' — '+svcEsc(pz.motivo)
+      +(pz.por?' <span style="color:#9CA3AF">('+svcEsc(pz.por)+')</span>':'')
+      +(puede?' <span style="color:#1F4E79;cursor:pointer;text-decoration:underline" onclick="reconQuitarPausa('+m.id+')">Quitar</span>':'')+'</div>';
+  } else if(puede){
+    h+='<button class="btn btn-sm" style="margin-top:5px;font-size:11.5px" onclick="reconSetPausa('+m.id+')">⏸ No es '+svcEsc(etqCat('Reconectar'))+' hasta…</button>';
+  }
+  return h;
+}
+// Ventana propia (no prompt()) para pedir Desde / Hasta / Motivo de la pausa
+function reconPedirPausa(nombre){
+  return new Promise(function(resolve){
+    var ov=document.getElementById('recon-pausa-overlay'); if(ov) ov.remove();
+    ov=document.createElement('div'); ov.id='recon-pausa-overlay';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:960;display:flex;align-items:center;justify-content:center;padding:1rem';
+    var hoy=today();
+    ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:1.25rem;width:100%;max-width:420px;box-shadow:0 12px 40px rgba(0,0,0,.3)">'+
+      '<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:4px">⏸ No es '+svcEsc(etqCat('Reconectar'))+' — '+svcEsc(nombre)+'</div>'+
+      '<div style="font-size:12.5px;color:#6B7280;margin-bottom:10px">Para viajes, vacaciones o enfermedad. Las semanas de este período no cuentan como ausencia. Podés poner un "Desde" pasado si la ausencia ya empezó.</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:8px"><label style="flex:1;font-size:12.5px;color:#4B5563">Desde<input type="date" id="recon-pz-desde" value="'+hoy+'" style="width:100%;box-sizing:border-box"></label>'+
+      '<label style="flex:1;font-size:12.5px;color:#4B5563">Hasta<input type="date" id="recon-pz-hasta" min="'+hoy+'" style="width:100%;box-sizing:border-box"></label></div>'+
+      '<textarea id="recon-pz-motivo" placeholder="Motivo (mínimo '+COMENT_MIN+' caracteres)" style="width:100%;box-sizing:border-box;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;min-height:70px;resize:vertical"></textarea>'+
+      '<div id="recon-pz-err" style="display:none;font-size:12.5px;color:#DC2626;margin-top:4px"></div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn btn-sm" id="recon-pz-no">Cancelar</button><button class="btn btn-sm btn-primary" id="recon-pz-ok">Confirmar</button></div></div>';
+    document.body.appendChild(ov);
+    document.getElementById('recon-pz-no').onclick=function(){ ov.remove(); resolve(null); };
+    document.getElementById('recon-pz-ok').onclick=function(){
+      var d=document.getElementById('recon-pz-desde').value, h=document.getElementById('recon-pz-hasta').value;
+      var mo=(document.getElementById('recon-pz-motivo').value||'').trim(), err=document.getElementById('recon-pz-err'), msg='';
+      var r=reconValidarPausa(d,h,mo,today()); if(r) msg=r;
+      if(msg){ err.textContent=msg; err.style.display='block'; return; }
+      ov.remove(); resolve({desde:d,hasta:h,motivo:mo});
+    };
+  });
+}
+function reconValidarPausa(desde,hasta,motivo,hoy){
+  var re=/^\d{4}-\d{2}-\d{2}$/;
+  if(!re.test(desde||'')||!re.test(hasta||'')) return 'Completá las dos fechas.';
+  if(hasta<hoy) return 'La fecha "Hasta" no puede ser anterior a hoy.';
+  if(desde>hasta) return 'La fecha "Desde" no puede ser posterior a "Hasta".';
+  if(String(motivo||'').trim().length<COMENT_MIN) return 'El motivo es obligatorio y debe tener al menos '+COMENT_MIN+' caracteres.';
+  return '';
+}
+async function reconGuardarMiembro(m,prev,msgOk){
+  try{
+    await saveK(SK.members,S.members);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    Object.keys(prev).forEach(function(k){ if(prev[k]===undefined) delete m[k]; else m[k]=prev[k]; });
+    try{ await saveK(SK.members,S.members); }catch(e2){}
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    saShowDetail(m.id,null); return false;
+  }
+  saShowDetail(m.id,null);
+  try{ renderMiembrosStandalone(); }catch(e){}
+  showToast(msgOk,'#16A34A');
+  return true;
+}
+async function reconSetPausa(memberId){
+  if(!puedeCambiarCategoria()){ alert('No tenés permiso para cambiar la Categoría.'); return; }
+  var m=S.members.find(function(x){return Number(x.id)===Number(memberId);}); if(!m) return;
+  var d=await reconPedirPausa(fullName(m)); if(!d) return;
+  var prev={reconPausas:m.reconPausas,_ts:m._ts};
+  m.reconPausas=(m.reconPausas||[]).concat([{desde:d.desde,hasta:d.hasta,motivo:d.motivo,por:(currentUser&&currentUser.name)||'',ts:Date.now()}]);
+  m._ts=Date.now();
+  await reconGuardarMiembro(m,prev,'⏸ Pausa guardada hasta el '+fmtAA(d.hasta));
+}
+function reconAyer(){ var d=new Date(); d.setDate(d.getDate()-1); return dateToStr(d); }
+// Cierra la pausa activa ayer (o la borra si empezaba hoy o después). Las semanas ya pausadas siguen sin contar.
+function reconCerrarPausas(lista,hoy,ayer){
+  return (lista||[]).map(function(p){
+    if(!p||!(p.desde<=hoy&&p.hasta>=hoy)) return p;
+    if(p.desde>ayer) return null;
+    return Object.assign({},p,{hasta:ayer,quitada:hoy});
+  }).filter(Boolean);
+}
+async function reconQuitarPausa(memberId){
+  if(!puedeCambiarCategoria()){ alert('No tenés permiso para cambiar la Categoría.'); return; }
+  var m=S.members.find(function(x){return Number(x.id)===Number(memberId);}); if(!m||!reconPausaActiva(m)) return;
+  if(!confirm('¿Quitar la pausa de '+etqCat('Reconectar')+' de '+fullName(m)+'? Desde hoy se vuelve a evaluar su participación.')) return;
+  var prev={reconPausas:m.reconPausas,_ts:m._ts};
+  var nueva=reconCerrarPausas(m.reconPausas,today(),reconAyer());
+  if(nueva.length) m.reconPausas=nueva; else delete m.reconPausas;
+  m._ts=Date.now();
+  await reconGuardarMiembro(m,prev,'✅ Pausa quitada');
+}
 function categoriaPorRegla(m){ return categoriaMotivoRegla(m)?'Comprometido':null; }
 function categoriaDe(m){
   if(!m||m.estado==='Baja'||m.condicion==='Historico') return 'Histórico';
+  if(reconInfo(m)) return 'Reconectar'; // le gana a la manual y a la regla de Comprometido
   if(m.categoria==='Comprometido') return 'Comprometido';
   if(m.categoria==='Participante'||m.categoria==='Asistente') return 'Participante'; // 'Asistente' = nombre anterior
   return categoriaPorRegla(m)||'Participante';
@@ -4651,7 +4858,7 @@ async function saSetCategoria(memberId,valor){
     saShowDetail(memberId,null); return;
   }
   renderMiembrosStandalone();
-  showToast('✅ Categoría: '+(valor?etqCat(valor):'Automática'),'#16A34A');
+  showToast('✅ Categoría: '+(valor?etqCat(valor):'Automática')+(categoriaDe(m)==='Reconectar'?' — sigue en '+etqCat('Reconectar')+' hasta que vuelva a participar':''),'#16A34A');
 }
 function renderMiembrosStandalone(){
   etqAplicarSelects();
@@ -4709,7 +4916,7 @@ function renderMiembrosStandalone(){
   if(fRol)   members=members.filter(m=>(m.roles||[]).includes(fRol));
   if(fCond)  members=members.filter(m=>m.condicion===fCond);
   // Estado filter — Baja e Histórico son la misma situación, se agrupan juntos
-  if(fEstado==='Participante'||fEstado==='Comprometido') members=members.filter(m=>categoriaDe(m)===fEstado);
+  if(fEstado==='Participante'||fEstado==='Comprometido'||fEstado==='Reconectar') members=members.filter(m=>categoriaDe(m)===fEstado);
   else if(fEstado==='Baja') members=members.filter(m=>m.estado==='Baja'||m.condicion==='Historico');
   // '' = todos
 
@@ -4940,7 +5147,7 @@ function saShowDetail(id,event){
     saDetailLabel('Grupo', g?g.name:'<span style="color:#F59E0B">Sin grupo asignado</span>')
     + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Condición</div>${saCondicionBadgeM(m)}</div>`
     + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Estado</div><span class="badge ${m.estado==='Activo'?'b-ok':m.estado==='Baja'?'b-danger':'b-muted'}">${m.estado||'Activo'}</span></div>`
-    + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Categoría</div>${categoriaDe(m)==='Histórico'?'<span class="badge b-muted">'+etq('cat:Historico')+'</span>':(puedeCambiarCategoria()?`<select onchange="saSetCategoria(${m.id},this.value)" style="font-size:13px"><option value=""${!m.categoria?' selected':''}>Automática (${etqCat(categoriaPorRegla(m)||'Participante')})</option><option value="Participante"${(m.categoria==='Participante'||m.categoria==='Asistente')?' selected':''}>${etq('cat:Participante')}</option><option value="Comprometido"${m.categoria==='Comprometido'?' selected':''}>${etq('cat:Comprometido')}</option></select>`:'<span class="badge b-ok">'+etqCat(categoriaDe(m))+'</span>')}${(!m.categoria&&categoriaMotivoRegla(m))?'<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+categoriaMotivoRegla(m)+'</div>':''}</div>`
+    + `<div><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Categoría</div>${categoriaDe(m)==='Reconectar'?saCategoriaBadge(m)+'<div style="height:5px"></div>':''}${categoriaDe(m)==='Histórico'?'<span class="badge b-muted">'+etq('cat:Historico')+'</span>':(puedeCambiarCategoria()?`<select onchange="saSetCategoria(${m.id},this.value)" style="font-size:13px"><option value=""${!m.categoria?' selected':''}>Automática (${etqCat(categoriaPorRegla(m)||'Participante')})</option><option value="Participante"${(m.categoria==='Participante'||m.categoria==='Asistente')?' selected':''}>${etq('cat:Participante')}</option><option value="Comprometido"${m.categoria==='Comprometido'?' selected':''}>${etq('cat:Comprometido')}</option></select>`:'<span class="badge b-ok">'+etqCat(categoriaDe(m))+'</span>')}${(!m.categoria&&categoriaMotivoRegla(m))?'<div style="font-size:11px;color:#9CA3AF;margin-top:2px">'+categoriaMotivoRegla(m)+'</div>':''}${reconFichaHtml(m)}</div>`
     + saDetailLabel('Fecha de ingreso', saFmtDate(m.fechaIngreso)||'—')
     + ((m.roles||[]).length?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Función</div>${roleChips(m.roles,m.id)}</div>`:'')
     + (m.estado==='Baja'?`<div style="grid-column:1/-1"><div style="font-size:11px;color:#DC2626;margin-bottom:4px">Fecha de baja</div><div style="font-size:13px;font-weight:500;color:#DC2626">${saFmtDate(m.fechaBaja||'')}</div></div>`:'')
@@ -12575,9 +12782,9 @@ function gdvInitFacForm(){
       if(adminSel) adminSel.classList.add('hidden');
       const facGid=facGids[0]||null;
       const g=S.groups.find(x=>Number(x.id)===facGid);
-      const members=g?groupMembers(g.id):[];
+      const members=g?gdvMiembrosAsistencia(g.id):[];
       document.getElementById('gdv-group-info').textContent=g?`${g.name} — ${members.length} miembros activos`:'Sin grupo asignado. Verificá la configuración.';
-      members.forEach(m=>{gdvFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
+      members.forEach(m=>{gdvFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'}; if(g&&gdvEsFacilitadorDe(g.id,m.id)) gdvFacAtt[m.id].esFac=true;});
       gdvRenderFacMembers(members);
       // Chequear duplicado con la fecha por defecto (hoy)
       if(facGid) gdvCheckDuplicateWeek(facGid);
@@ -12634,12 +12841,12 @@ function gdvAdminGroupChanged(){
   const gid=parseInt(document.getElementById('gdv-grupo-sel').value)||null;
   if(!gid){document.getElementById('gdv-group-info').textContent='Seleccioná un grupo.';document.getElementById('gdv-members').innerHTML='';gdvFacAtt={};return;}
   const g=S.groups.find(x=>x.id===gid);
-  const members=groupMembers(gid);
+  const members=gdvMiembrosAsistencia(gid);
   document.getElementById('gdv-group-info').textContent=`${g.name} — ${members.length} miembros activos`;
   gdvFacAtt={};
   var fpaGC=document.getElementById('gdv-form-pendiente-alert');
   if(fpaGC){ fpaGC.style.display='none'; fpaGC.innerHTML=''; }
-  members.forEach(m=>{gdvFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'};});
+  members.forEach(m=>{gdvFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente'}; if(gdvEsFacilitadorDe(gid,m.id)) gdvFacAtt[m.id].esFac=true;});
   gdvRenderFacMembers(members);
   const fechaInput=document.getElementById('gdv-fecha');
   if(fechaInput){
@@ -12661,7 +12868,7 @@ function gdvRenderFacMembers(members){
   wrap.innerHTML=members.map(m=>`
     <div class="member-row">
       <span style="font-size:11px;padding:2px 7px;border-radius:4px;background:${m.genero==='H'?'#DBEAFE':'#FCE7F3'};color:${m.genero==='H'?'#1E40AF':'#9D174D'};font-weight:600;flex-shrink:0">${m.genero}</span>
-      <span class="member-name">${fullName(m)}</span>
+      <span class="member-name">${fullName(m)}${gdvFacAtt[m.id]?.esFac?' <span style="font-size:10.5px;color:#5B21B6;background:#EDE9FE;padding:1px 6px;border-radius:99px;font-weight:600">Facilitador/a</span>':''}</span>
       <button class="toggle-btn ${gdvFacAtt[m.id]?.state||'ausente'}" onclick="gdvToggleFac(${m.id},this)">${gdvFacAtt[m.id]?.state==='presente'?'Presente':'Ausente'}</button>
     </div>`).join('');
 }
@@ -22191,7 +22398,7 @@ function exportMiembrosExcel(){
   }
   if(fRol)   members=members.filter(m=>(m.roles||[]).includes(fRol));
   if(fCond)  members=members.filter(m=>m.condicion===fCond);
-  if(fEstado==='Participante'||fEstado==='Comprometido') members=members.filter(m=>categoriaDe(m)===fEstado);
+  if(fEstado==='Participante'||fEstado==='Comprometido'||fEstado==='Reconectar') members=members.filter(m=>categoriaDe(m)===fEstado);
   else if(fEstado==='Baja') members=members.filter(m=>m.estado==='Baja'||m.condicion==='Historico');
 
   const rows=members.map(m=>{

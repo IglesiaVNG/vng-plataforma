@@ -769,7 +769,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzt';
+const APP_VERSION = '2026-08-24-zzu';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -920,6 +920,9 @@ const MODULES_PERM=[
     {key:'disc_registros', label:'Ver registros'},
     {key:'disc_pasos',     label:'Configurar Pasos (Admin)'},
     {key:'disc_inscripciones', label:'Inscripciones por QR (Admin)'},
+    {key:'disc_encuentros_editar', label:'✏️ Editar y eliminar encuentros cargados (en Registros e Histórico)'},
+    {key:'disc_revertir', label:'↩️ Revertir inicio (en Cursada) y cierre (en Histórico) de una Cursada (Admin)'},
+    {key:'disc_cursos', label:'🎓 Crear, editar, deshabilitar y eliminar Cursos (Admin)'},
     {key:'disc_scope_cursada', label:'📖 Limitar a sus Cursadas asignadas'},
   ]},
   {key:'config', label:'Configuración', icon:'⚙️', screens:[
@@ -1094,7 +1097,11 @@ function permisosCompletarFaltantes(){
     // Exportar y Ver datos privados (Conexión en grilla): hasta ahora los tenía todo el que gestionaba
     // o contactaba; la consulta limitada queda para el resto.
     nuevos_exportar:     {de:'nuevos_gestionar', si:['ejecuta']},
-    nuevos_ver_privados: {de:'nuevos_contactar', si:['ejecuta']}
+    nuevos_ver_privados: {de:'nuevos_contactar', si:['ejecuta']},
+    // Discipulado (zzu): editar/eliminar encuentros antes lo tenía cualquiera que viera Registros
+    // (aun en Consulta). Acordado: solo lo heredan quienes tienen Ejecuta en Ver registros.
+    // disc_revertir y disc_cursos eran fijos de Super Admin: arrancan en Ninguno para todos.
+    disc_encuentros_editar: {de:'disc_registros', si:['ejecuta']}
   };
   // Add any DEFAULT roles missing from PERMISOS
   // Solo agregar roles completamente nuevos que no existen en absoluto
@@ -12634,8 +12641,7 @@ function cfgCloseRoleForm(){document.getElementById('cfg-role-form').classList.a
 // ════════════════════════════════════════════════════════════
 // GDV MODULE
 // ════════════════════════════════════════════════════════════
-let gdvFacAtt={},gdvVisitsOther=[],gdvVisitsNew=[],gdvVisitsNewIds=[],gdvSelectedRoles=[];
-let gdvEditingGroupId=null,gdvEditingUserId=null,gdvEditingMemberId=null,gdvEditingRoleId=null;
+let gdvFacAtt={},gdvVisitsOther=[],gdvVisitsNew=[],gdvVisitsNewIds=[];
 var _d2w=registrosRangoDefault().desde;
 let gdvFilDesde=_d2w,gdvFilHasta='',gdvFilGrupos=null,gdvFilSexo='';
 let gdvMrSortAsc=true,gdvMrVisible=20;
@@ -12826,66 +12832,6 @@ function buildGdVHTML(){
       </div>
       <div id="gdv-registros-list"></div>
     </div>
-    <div id="gdv-tab-config" class="section-tab">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.5rem">
-        <button class="btn btn-primary btn-sm" onclick="gdvConfigTab('miembros',this)" id="cfg-btn-miembros">🐑 Rebaños</button>
-        <button class="btn btn-sm" onclick="gdvConfigTab('grupos',this)" id="cfg-btn-grupos">🏘 Grupos</button>
-        <button class="btn btn-sm" onclick="gdvConfigTab('usuarios',this)" id="cfg-btn-usuarios">👤 Usuarios</button>
-        <button class="btn btn-sm" onclick="gdvConfigTab('roles',this)" id="cfg-btn-roles">🎭 Funciones</button>
-      </div>
-      <div id="gdv-config-content"></div>
-    </div>
-    <div id="gdv-tab-miembros" class="section-tab">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <span style="font-size:14px;font-weight:600;color:#1F4E79">Miembros (<span id="gdv-member-count">0</span>)</span>
-        <button class="btn btn-primary btn-sm" onclick="gdvOpenNewMember()">+ Nuevo</button>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
-        <input type="text" id="gdv-member-search" placeholder="Buscar..." onkeyup="gdvRenderMiembros()" style="flex:2;min-width:150px">
-        <select id="gdv-mfil-grupo" onchange="gdvRenderMiembros()" style="flex:1;min-width:100px"><option value="">Todos los grupos</option></select>
-        <select id="gdv-mfil-gen" onchange="gdvRenderMiembros()" style="flex:0 0 auto"><option value="">H y M</option><option value="H">H</option><option value="M">M</option></select>
-      </div>
-      <div class="card" style="padding:0;overflow:hidden"><table><thead><tr><th>Nombre</th><th>G</th><th>Grupo</th><th>Función</th><th>Estado</th><th></th></tr></thead><tbody id="gdv-member-tbody"></tbody></table></div>
-      <div id="gdv-member-form" class="card hidden" style="margin-top:1rem">
-        <div class="card-title" id="gdv-mf-title">Nuevo miembro</div>
-        <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-mf-nombre"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Apellido</label><input type="text" id="gdv-mf-apellido"></div></div>
-        <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Género</label><select id="gdv-mf-genero"><option value="H">Hombre</option><option value="M">Mujer</option></select></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label><select id="gdv-mf-grupo"></select></div></div>
-        <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label><input type="tel" id="gdv-mf-tel"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Estado</label><select id="gdv-mf-estado"><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option></select></div></div>
-        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función <span style="font-weight:400;color:#9CA3AF">(solo lectura)</span></label><div class="role-selector" id="gdv-mf-roles"></div><div style="font-size:11px;color:#9CA3AF;margin-top:4px">Se asigna desde Configuración → Usuarios, Grupos, Nuevas Generaciones o Propósitos según corresponda.</div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" onclick="gdvCloseMemberForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveMember()">Guardar</button></div>
-      </div>
-    </div>
-    <div id="gdv-tab-grupos" class="section-tab">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><span style="font-size:14px;font-weight:600;color:#1F4E79">Grupos</span><button class="btn btn-primary btn-sm" onclick="gdvOpenNewGroup()">+ Nuevo</button></div>
-      <div id="gdv-grupos-list"></div>
-      <div id="gdv-group-form" class="card hidden">
-        <div class="card-title" id="gdv-gf-title">Nuevo grupo</div>
-        <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-gf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label><select id="gdv-gf-gender"><option>Mujeres</option><option>Hombres</option><option>Mixto</option><option>Nuevas Generaciones</option></select></div></div>
-        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Facilitador</label><select id="gdv-gf-fac"></select>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseGroupForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveGroup()">Guardar</button></div>
-      </div>
-    </div>
-    <div id="gdv-tab-usuarios" class="section-tab">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><span style="font-size:14px;font-weight:600;color:#1F4E79">Usuarios</span><button class="btn btn-primary btn-sm" onclick="gdvOpenNewUser()">+ Nuevo</button></div>
-      <div id="gdv-users-list"></div>
-      <div id="gdv-user-form" class="card hidden">
-        <div class="card-title" id="gdv-uf-title">Nuevo usuario</div>
-        <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-uf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Usuario</label><input type="text" id="gdv-uf-user"></div></div>
-        <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Contraseña</label><input type="password" id="gdv-uf-pass"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Función</label><select id="gdv-uf-role" onchange="gdvToggleGroupSel()"><option value="facilitador">Facilitador</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option><option value="admin_of">Admin OF</option></select></div></div>
-        <div id="gdv-uf-group-row" style="margin-top:10px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo asignado</label><select id="gdv-uf-group"></select></div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseUserForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveUser()">Guardar</button></div>
-      </div>
-    </div>
-    <div id="gdv-tab-roles" class="section-tab">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><span style="font-size:14px;font-weight:600;color:#1F4E79">Funciones</span><button class="btn btn-primary btn-sm" onclick="gdvOpenNewRole()">+ Nuevo</button></div>
-      <div id="gdv-roles-list"></div>
-      <div id="gdv-role-form" class="card hidden">
-        <div class="card-title" id="gdv-rf-title">Nueva función</div>
-        <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-rf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Color</label><select id="gdv-rf-color"><option value="#1F4E79">Azul oscuro</option><option value="#7C3AED">Violeta</option><option value="#059669">Verde</option><option value="#D97706">Naranja</option><option value="#DC2626">Rojo</option><option value="#BE185D">Rosa</option></select></div></div>
-        <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Descripción</label><input type="text" id="gdv-rf-desc">
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseRoleForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveRole()">Guardar</button></div>
-      </div>
-    </div>
   </div>`;
 }
 
@@ -12895,7 +12841,7 @@ function gdvTab(id,btn){
     navBtns.forEach(function(b){b.classList.remove('active');});
     if(btn) btn.classList.add('active');
 
-    var allTabs=['dashboard','cargar','registros','config','mihistorial'];
+    var allTabs=['dashboard','cargar','registros','mihistorial'];
     allTabs.forEach(function(t){
       var el=document.getElementById('gdv-tab-'+t);
       if(el) el.style.display=(t===id)?'block':'none';
@@ -12908,81 +12854,9 @@ function gdvTab(id,btn){
   }catch(e){console.error('gdvTab error:',e);}
 }
 
-function gdvConfigTab(sub,btn){
-  document.querySelectorAll('[id^="cfg-btn-"]').forEach(b=>{b.className='btn btn-sm';});
-  if(btn){btn.className='btn btn-primary btn-sm';}
-  const wrap=document.getElementById('gdv-config-content');
-  if(!wrap) return;
-  if(sub==='miembros'){
-    wrap.innerHTML=gdvMiembrosHTML();
-    gdvRenderMiembros();
-  } else if(sub==='grupos'){
-    wrap.innerHTML=gdvGruposHTML();
-    gdvRenderGrupos();
-  } else if(sub==='usuarios'){
-    wrap.innerHTML=gdvUsuariosHTML();
-    gdvRenderUsuarios();
-  } else if(sub==='roles'){
-    wrap.innerHTML=gdvRolesHTML();
-    gdvRenderRoles();
-  }
-}
-
-function gdvMiembrosHTML(){return `
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-    <span style="font-size:14px;font-weight:600;color:#1F4E79">Miembros (<span id="gdv-member-count">0</span>)</span>
-    <button class="btn btn-primary btn-sm" onclick="gdvOpenNewMember()">+ Nuevo</button>
-  </div>
-  <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
-    <input type="text" id="gdv-member-search" placeholder="Buscar..." onkeyup="gdvRenderMiembros()" style="flex:2;min-width:150px">
-    <select id="gdv-mfil-grupo" onchange="gdvRenderMiembros()" style="flex:1;min-width:100px"><option value="">Todos los grupos</option></select>
-    <select id="gdv-mfil-gen" onchange="gdvRenderMiembros()" style="flex:0 0 auto"><option value="">H y M</option><option value="H">H</option><option value="M">M</option></select>
-  </div>
-  <div class="card" style="padding:0;overflow:hidden"><table><thead><tr><th>Nombre</th><th>G</th><th>Grupo</th><th>Función</th><th>Estado</th><th></th></tr></thead><tbody id="gdv-member-tbody"></tbody></table></div>
-  <div id="gdv-member-form" class="card hidden" style="margin-top:1rem">
-    <div class="card-title" id="gdv-mf-title">Nuevo miembro</div>
-    <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-mf-nombre"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Apellido</label><input type="text" id="gdv-mf-apellido"></div></div>
-    <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Género</label><select id="gdv-mf-genero"><option value="H">Hombre</option><option value="M">Mujer</option></select></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo</label><select id="gdv-mf-grupo"></select></div></div>
-    <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label><input type="tel" id="gdv-mf-tel"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Estado</label><select id="gdv-mf-estado"><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option></select></div></div>
-    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Función <span style="font-weight:400;color:#9CA3AF">(solo lectura)</span></label><div class="role-selector" id="gdv-mf-roles"></div><div style="font-size:11px;color:#9CA3AF;margin-top:4px">Se asigna desde Configuración → Usuarios, Grupos, Nuevas Generaciones o Propósitos según corresponda.</div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" onclick="gdvCloseMemberForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveMember()">Guardar</button></div>
-  </div>`;}
-
-function gdvGruposHTML(){return `
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><span style="font-size:14px;font-weight:600;color:#1F4E79">Grupos</span><button class="btn btn-primary btn-sm" onclick="gdvOpenNewGroup()">+ Nuevo</button></div>
-  <div id="gdv-grupos-list"></div>
-  <div id="gdv-group-form" class="card hidden">
-    <div class="card-title" id="gdv-gf-title">Nuevo grupo</div>
-    <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-gf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Tipo</label><select id="gdv-gf-gender"><option>Mujeres</option><option>Hombres</option><option>Mixto</option><option>Nuevas Generaciones</option></select></div></div>
-    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Facilitador</label><select id="gdv-gf-fac"></select>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseGroupForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveGroup()">Guardar</button></div>
-  </div>`;}
-
-function gdvUsuariosHTML(){return `
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><span style="font-size:14px;font-weight:600;color:#1F4E79">Usuarios del sistema</span><button class="btn btn-primary btn-sm" onclick="gdvOpenNewUser()">+ Nuevo</button></div>
-  <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400E;margin-bottom:1rem">⚠️ Los <strong>Usuarios</strong> son las cuentas de login (usuario + contraseña). Los <strong>Rebaños</strong> son las personas de la iglesia. Son cosas distintas.</div>
-  <div id="gdv-users-list"></div>
-  <div id="gdv-user-form" class="card hidden">
-    <div class="card-title" id="gdv-uf-title">Nuevo usuario</div>
-    <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre completo</label><input type="text" id="gdv-uf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Usuario (login)</label><input type="text" id="gdv-uf-user"></div></div>
-    <div class="form-row" style="margin-top:10px"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Contraseña</label><input type="password" id="gdv-uf-pass"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Función de acceso</label><select id="gdv-uf-role" onchange="gdvToggleGroupSel()"><option value="facilitador">Facilitador</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option><option value="admin_of">Admin OF</option></select></div></div>
-    <div id="gdv-uf-group-row" style="margin-top:10px"><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Grupo asignado</label><select id="gdv-uf-group"></select></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseUserForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveUser()">Guardar</button></div>
-  </div>`;}
-
-function gdvRolesHTML(){return `
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><span style="font-size:14px;font-weight:600;color:#1F4E79">Funciones del sistema</span><button class="btn btn-primary btn-sm" onclick="gdvOpenNewRole()">+ Nuevo</button></div>
-  <div id="gdv-roles-list"></div>
-  <div id="gdv-role-form" class="card hidden">
-    <div class="card-title" id="gdv-rf-title">Nueva función</div>
-    <div class="form-row"><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Nombre</label><input type="text" id="gdv-rf-name"></div><div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Color</label><select id="gdv-rf-color"><option value="#1F4E79">Azul oscuro</option><option value="#7C3AED">Violeta</option><option value="#059669">Verde</option><option value="#D97706">Naranja</option><option value="#DC2626">Rojo</option><option value="#BE185D">Rosa</option></select></div></div>
-    <label style="font-size:13px;color:#4B5563;display:block;margin:10px 0 4px">Descripción</label><input type="text" id="gdv-rf-desc">
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="gdvCloseRoleForm()">Cancelar</button><button class="btn btn-primary" onclick="gdvSaveRole()">Guardar</button></div>
-  </div>`;}
-
 function initGdV(){
   // Set initial tab visibility
-  var allTabs=['dashboard','cargar','registros','config','mihistorial'];
+  var allTabs=['dashboard','cargar','registros','mihistorial'];
   allTabs.forEach(function(t){
     var el=document.getElementById('gdv-tab-'+t);
     if(el) el.style.display='none';
@@ -14484,357 +14358,6 @@ async function gdvSaveEditRec(){
   gdvRenderRegistros();
   gdvRenderDashboard();
 }
-
-// GdV: Miembros
-function gdvRenderMiembros(){
-  const search=(document.getElementById('gdv-member-search').value||'').toLowerCase();
-  const fGrupo=parseInt(document.getElementById('gdv-mfil-grupo').value)||null;
-  const fGen=document.getElementById('gdv-mfil-gen').value;
-  const gsel=document.getElementById('gdv-mfil-grupo');
-  if(gsel.options.length<=1)S.groups.forEach(g=>{const o=document.createElement('option');o.value=g.id;o.textContent=g.name;gsel.appendChild(o);});
-  const mgsel=document.getElementById('gdv-mf-grupo');
-  if(mgsel&&mgsel.options.length===0)S.groups.forEach(g=>{const o=document.createElement('option');o.value=g.id;o.textContent=g.name;mgsel.appendChild(o);});
-  let members=[...S.members];
-  if(search)members=members.filter(m=>fullName(m).toLowerCase().includes(search));
-  if(fGrupo)members=members.filter(m=>m.grupoId===fGrupo);
-  if(fGen)members=members.filter(m=>m.genero===fGen);
-  document.getElementById('gdv-member-count').textContent=S.members.filter(m=>m.estado==='Activo').length;
-  document.getElementById('gdv-member-tbody').innerHTML=members.map(m=>{
-    const allGids=[m.grupoId,...(m.grupoIds||[])].filter(Boolean).map(Number);
-    const allAvailableGroups=[...(S.groups||[]),...(S.ngComunidades||[]).map(function(ng){return {id:ng.id,name:'🌱 '+ng.name};})];
-    const memberGroups=allGids.map(gid=>allAvailableGroups.find(x=>Number(x.id)===gid)).filter(Boolean);
-    return `<tr>
-      <td><strong>${fullName(m)}</strong></td>
-      <td><span style="background:${m.genero==='H'?'#DBEAFE':'#FCE7F3'};color:${m.genero==='H'?'#1E40AF':'#9D174D'};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${m.genero}</span></td>
-      <td style="color:#6B7280;font-size:12px">${memberGroups.length?memberGroups.map(gr=>`<div>${gr.name}</div>`).join(''):'<span style="color:#F59E0B;font-size:11px">Sin grupo</span>'}</td>
-      <td>${roleChips(m.roles||[],m.id)}</td>
-      <td><span class="badge ${m.estado==='Activo'?'b-ok':'b-muted'}">${m.estado}</span></td>
-      <td style="white-space:nowrap"><button class="btn btn-sm" onclick="gdvEditMember(${m.id})" style="margin-right:4px">✏️</button><button class="btn btn-sm btn-danger" onclick="gdvDeleteMember(${m.id})">🗑</button></td>
-    </tr>`;
-  }).join('');
-}
-
-function gdvBuildRoleSelector(selected){
-  gdvSelectedRoles=[...(selected||[])];
-  const wrap=document.getElementById('gdv-mf-roles');
-  if(!wrap) return;
-  if(!gdvSelectedRoles.length){
-    wrap.innerHTML='<div style="font-size:12px;color:#9CA3AF;font-style:italic">Sin Funciones asignadas todavía</div>';
-    return;
-  }
-  wrap.innerHTML=S.roles.filter(function(r){return gdvSelectedRoles.includes(r.id);}).map(function(r){
-    return '<div class="role-option selected" style="cursor:default">'+
-      '<span style="width:10px;height:10px;border-radius:50%;background:'+r.color+';display:inline-block;flex-shrink:0"></span>'+r.name+
-    '</div>';
-  }).join('');
-}
-function gdvOpenNewMember(){
-  gdvEditingMemberId=null;
-  document.getElementById('gdv-mf-title').textContent='Nuevo miembro';
-  ['gdv-mf-nombre','gdv-mf-apellido','gdv-mf-tel'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('gdv-mf-genero').value='H';
-  document.getElementById('gdv-mf-estado').value='Activo';
-  gdvBuildRoleSelector([]);
-  document.getElementById('gdv-member-form').classList.remove('hidden');
-}
-function gdvEditMember(id){
-  const m=S.members.find(x=>x.id===id);
-  gdvEditingMemberId=id;
-  document.getElementById('gdv-mf-title').textContent='Editar miembro';
-  document.getElementById('gdv-mf-nombre').value=m.nombre;
-  document.getElementById('gdv-mf-apellido').value=m.apellido;
-  document.getElementById('gdv-mf-genero').value=m.genero;
-  document.getElementById('gdv-mf-grupo').value=m.grupoId;
-  document.getElementById('gdv-mf-estado').value=m.estado;
-  document.getElementById('gdv-mf-tel').value=m.tel||'';
-  gdvBuildRoleSelector(m.roles||[]);
-  document.getElementById('gdv-member-form').classList.remove('hidden');
-}
-async function gdvSaveMember(){
-  const nombre=document.getElementById('gdv-mf-nombre').value.trim();
-  const apellido=document.getElementById('gdv-mf-apellido').value.trim();
-  if(!nombre){alert('Ingresá el nombre');return;}
-  const data={nombre,apellido,genero:document.getElementById('gdv-mf-genero').value,
-    grupoId:parseInt(document.getElementById('gdv-mf-grupo').value),
-    estado:document.getElementById('gdv-mf-estado').value,
-    tel:document.getElementById('gdv-mf-tel').value.trim(),
-    roles:[...gdvSelectedRoles],dir:''};
-  var esNuevo=!gdvEditingMemberId;
-  var snapshot=null, nuevoId=null;
-  if(gdvEditingMemberId){
-    var existing=S.members.find(x=>x.id===gdvEditingMemberId);
-    snapshot=Object.assign({},existing);
-    Object.assign(existing,data);
-  } else {
-    if(!nvConfirmarAltaSiHayParecido(nombre,apellido,data.tel)) return;
-    nuevoId=Date.now();
-    var nuevoGdv=Object.assign({id:nuevoId},data,{condicion:'Nuevo',subEstado:'Ingresado',subEstadoHistorial:[],fechaRegistro:todayAA()},altaFirma('Grupos de Vida'),{_ts:Date.now()});
-    cambioReg(nuevoGdv,'condicion','','Nuevo','Alta desde Grupo de Vida');
-    S.members.push(nuevoGdv);
-  }
-  await saveK(SK.members,S.members);
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    if(esNuevo){ S.members=S.members.filter(function(m){return m.id!==nuevoId;}); }
-    else { var ex2=S.members.find(function(m){return m.id===gdvEditingMemberId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
-    await saveK(SK.members,S.members);
-    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
-    return;
-  }
-  gdvCloseMemberForm();gdvRenderMiembros();
-}
-async function gdvDeleteMember(id){
-  if(!confirm('¿Eliminar?'))return;
-  var m=S.members.find(function(x){return x.id===id;});
-  S.members=S.members.filter(m=>m.id!==id);
-  addTombstone(SK.members,id);
-  await saveK(SK.members,S.members);
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    if(m) S.members.push(m);
-    await saveK(SK.members,S.members);
-    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
-    return;
-  }
-  gdvRenderMiembros();
-}
-function gdvCloseMemberForm(){document.getElementById('gdv-member-form').classList.add('hidden');gdvEditingMemberId=null;}
-
-// GdV: Grupos
-function gdvRenderGrupos(){
-  const facSel=document.getElementById('gdv-gf-fac');
-  if(facSel)facSel.innerHTML='<option value="">Sin asignar</option>'+S.users.filter(u=>u.role==='facilitador').map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
-  document.getElementById('gdv-grupos-list').innerHTML=S.groups.map(g=>{
-    const _fac1=g.facId?S.members.find(m=>m.id===g.facId):null;
-    const _fac2=g.facId2?S.members.find(m=>m.id===g.facId2):null;
-    const facName=_fac1?listName(_fac1)+(_fac2?' · '+listName(_fac2):''):'Sin facilitador';
-    const members=groupMembers(g.id);
-    const tot=members.length;
-    const mH=members.filter(m=>m.genero==='H').length;
-    const mM=members.filter(m=>m.genero==='M').length;
-    const st=tot>=10?'¡Multiplicar!':tot>=8?'Próx. multiplicar':'Activo';
-    const sc=tot>=10?'b-danger':tot>=8?'b-warn':'b-ok';
-    const tc=g.type==='Mujeres'?'#C0006A':g.type==='Hombres'?'#1565C0':'#5B5EA6';
-    return `<div class="card" style="margin-bottom:.75rem">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <div class="avatar" style="background:${tc}20;color:${tc}">${g.type==='Mujeres'?'M':g.type==='Hombres'?'H':'MX'}</div>
-        <div style="flex:1"><div style="font-weight:600;font-size:14px">${g.name}</div><div style="font-size:12px;color:#6B7280">${g.type} · ${facName}</div></div>
-        <span class="badge ${sc}">${st}</span>
-        <button class="btn btn-sm" onclick="gdvEditGroup(${g.id})">✏️</button>
-      </div>
-      <div style="font-size:12px;color:#6B7280"><span class="chip">👥 ${tot}</span>${g.type==='Mixto'?`<span class="chip" style="color:#1565C0">H:${mH}</span><span class="chip" style="color:#C0006A">M:${mM}</span>`:''}</div>
-    </div>`;
-  }).join('');
-}
-function gdvOpenNewGroup(){
-  gdvEditingGroupId=null;
-  document.getElementById('gdv-gf-title').textContent='Nuevo grupo';
-  document.getElementById('gdv-gf-name').value='';
-  document.getElementById('gdv-gf-gender').value='Mujeres';
-  document.getElementById('gdv-gf-fac').value='';
-  document.getElementById('gdv-group-form').classList.remove('hidden');
-}
-function gdvEditGroup(id){
-  const g=S.groups.find(x=>x.id===id);gdvEditingGroupId=id;
-  document.getElementById('gdv-gf-title').textContent='Editar grupo';
-  document.getElementById('gdv-gf-name').value=g.name;
-  document.getElementById('gdv-gf-gender').value=g.type;
-  document.getElementById('gdv-gf-fac').value=g.facId||'';
-  document.getElementById('gdv-group-form').classList.remove('hidden');
-}
-async function gdvSaveGroup(){
-  const name=document.getElementById('gdv-gf-name').value.trim();
-  if(!name){alert('Ingresá un nombre');return;}
-  const data={name,type:document.getElementById('gdv-gf-gender').value,facId:parseInt(document.getElementById('gdv-gf-fac').value)||null};
-  var esNuevo=!gdvEditingGroupId;
-  var snapshot=null, nuevoId=null;
-  if(gdvEditingGroupId){
-    var existing=S.groups.find(x=>x.id===gdvEditingGroupId);
-    snapshot=Object.assign({},existing);
-    Object.assign(existing,data);
-  } else {
-    nuevoId=Date.now();
-    S.groups.push({id:nuevoId,...data});
-  }
-  await saveK(SK.groups,S.groups);
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    if(esNuevo){ S.groups=S.groups.filter(function(g){return g.id!==nuevoId;}); }
-    else { var ex2=S.groups.find(function(g){return g.id===gdvEditingGroupId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
-    await saveK(SK.groups,S.groups);
-    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
-    return;
-  }
-  gdvCloseGroupForm();gdvRenderGrupos();
-}
-function gdvCloseGroupForm(){document.getElementById('gdv-group-form').classList.add('hidden');gdvEditingGroupId=null;}
-
-// GdV: Usuarios
-function gdvRenderUsuarios(){
-  const ugSel=document.getElementById('gdv-uf-group');
-  if(ugSel)ugSel.innerHTML='<option value="">Sin grupo</option>'+
-    [...(S.groups||[]), ...(S.ngComunidades||[]).map(ng=>({id:ng.id,name:'🌱 '+ng.name}))]
-    .map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
-  document.getElementById('gdv-users-list').innerHTML=S.users.map(u=>{
-    const g=S.groups.find(x=>x.id===u.groupId);
-    return `<div class="row" style="cursor:default">
-      <div class="avatar">${initials(u.name)}</div>
-      <div style="flex:1"><div style="font-weight:600;font-size:13px">${u.name}</div><div style="font-size:12px;color:#6B7280">@${u.user} · ${g?g.name:'Sin grupo'}</div></div>
-      <span class="badge ${u.role==='super_admin'?'b-danger':u.role.includes('admin')?'b-info':'b-muted'}">${u.role}</span>
-      <button class="btn btn-sm" onclick="gdvEditUser(${u.id})">✏️</button>
-      ${u.id!==currentUser.id?`<button class="btn btn-sm btn-danger" onclick="gdvDeleteUser(${u.id})">🗑</button>`:''}
-    </div>`;
-  }).join('');
-}
-function gdvOpenNewUser(){
-  gdvEditingUserId=null;document.getElementById('gdv-uf-title').textContent='Nuevo usuario';
-  ['gdv-uf-name','gdv-uf-user','gdv-uf-pass'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('gdv-uf-role').value='facilitador';
-  document.getElementById('gdv-uf-group').value='';
-  document.getElementById('gdv-uf-group-row').style.display='block';
-  document.getElementById('gdv-user-form').classList.remove('hidden');
-}
-function gdvEditUser(id){
-  const u=S.users.find(x=>x.id===id);gdvEditingUserId=id;
-  document.getElementById('gdv-uf-title').textContent='Editar usuario';
-  document.getElementById('gdv-uf-name').value=u.name;
-  document.getElementById('gdv-uf-user').value=u.user;
-  document.getElementById('gdv-uf-pass').value='';
-  document.getElementById('gdv-uf-pass').placeholder='Dejar vacío para no cambiarla';
-  document.getElementById('gdv-uf-role').value=u.role;
-  document.getElementById('gdv-uf-group').value=u.groupId||'';
-  gdvToggleGroupSel();
-  document.getElementById('gdv-user-form').classList.remove('hidden');
-}
-function gdvToggleGroupSel(){
-  const r=document.getElementById('gdv-uf-role').value;
-  document.getElementById('gdv-uf-group-row').style.display=r==='facilitador'?'block':'none';
-}
-async function gdvSaveUser(){
-  const name=document.getElementById('gdv-uf-name').value.trim();
-  const user=document.getElementById('gdv-uf-user').value.trim();
-  const pass=document.getElementById('gdv-uf-pass').value;
-  const role=document.getElementById('gdv-uf-role').value;
-  const groupId=parseInt(document.getElementById('gdv-uf-group').value)||null;
-  if(!name||!user||(!gdvEditingUserId&&!pass)){alert('Completá todos los campos');return;}
-  var esNuevo=!gdvEditingUserId;
-  var snapshot=null, nuevoId=null;
-  if(gdvEditingUserId){
-    var existing=S.users.find(x=>x.id===gdvEditingUserId);
-    snapshot=Object.assign({},existing);
-    Object.assign(existing,{name,user,role,groupId});
-    if(pass){ await pwAsignar(existing,pass); cifInvalidarLocal(existing); if(currentUser&&Number(existing.id)===Number(currentUser.id)) delete existing.debeCambiarPass; else existing.debeCambiarPass=true; }
-  } else {
-    nuevoId=Date.now();
-    var nuG={id:nuevoId,name,user,role,groupId};
-    await pwAsignar(nuG,pass); nuG.debeCambiarPass=true;
-    S.users.push(nuG);
-  }
-  await saveK(SK.users,S.users);
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    if(esNuevo){ S.users=S.users.filter(function(u){return u.id!==nuevoId;}); }
-    else { var ex2=S.users.find(function(u){return u.id===gdvEditingUserId;}); if(ex2&&snapshot) pwRestaurar(ex2,snapshot); }
-    await saveK(SK.users,S.users);
-    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
-    return;
-  }
-  gdvCloseUserForm();gdvRenderUsuarios();
-}
-async function gdvDeleteUser(id){
-  if(!confirm('¿Eliminar?'))return;
-  var u=S.users.find(function(x){return x.id===id;});
-  S.users=S.users.filter(u=>u.id!==id);
-  await saveK(SK.users,S.users);
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    if(u) S.users.push(u);
-    await saveK(SK.users,S.users);
-    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
-    return;
-  }
-  gdvRenderUsuarios();
-}
-function gdvCloseUserForm(){document.getElementById('gdv-user-form').classList.add('hidden');gdvEditingUserId=null;}
-
-// GdV: Roles
-function gdvRenderRoles(){
-  document.getElementById('gdv-roles-list').innerHTML=S.roles.map(r=>`
-    <div class="row" style="cursor:default">
-      <span style="width:14px;height:14px;border-radius:50%;background:${r.color};display:inline-block;flex-shrink:0"></span>
-      <div style="flex:1"><div style="font-weight:600;font-size:13px">${r.name}</div>${r.desc?`<div style="font-size:12px;color:#6B7280">${r.desc}</div>`:''}</div>
-      <span class="badge b-muted">${S.members.filter(m=>(m.roles||[]).includes(r.id)).length} miembros</span>
-      <button class="btn btn-sm" onclick="gdvEditRole('${r.id}')">✏️</button>
-      ${esFuncionAutomatica(r.id)?'<span class="badge b-muted" title="Se asigna y se retira sola según las asignaciones activas">Automática</span>':`<button class="btn btn-sm btn-danger" onclick="gdvDeleteRole('${r.id}')">🗑</button>`}
-    </div>`).join('');
-}
-function gdvOpenNewRole(){
-  gdvEditingRoleId=null;document.getElementById('gdv-rf-title').textContent='Nueva función';
-  document.getElementById('gdv-rf-name').value='';document.getElementById('gdv-rf-desc').value='';
-  document.getElementById('gdv-rf-color').value='#1F4E79';
-  document.getElementById('gdv-role-form').classList.remove('hidden');
-}
-function gdvEditRole(id){
-  const r=S.roles.find(x=>x.id===id);gdvEditingRoleId=id;
-  document.getElementById('gdv-rf-title').textContent='Editar función';
-  document.getElementById('gdv-rf-name').value=r.name;
-  document.getElementById('gdv-rf-desc').value=r.desc||'';
-  document.getElementById('gdv-rf-color').value=r.color;
-  document.getElementById('gdv-role-form').classList.remove('hidden');
-}
-async function gdvSaveRole(){
-  const name=document.getElementById('gdv-rf-name').value.trim();
-  if(!name){alert('Ingresá nombre');return;}
-  const color=document.getElementById('gdv-rf-color').value;
-  const desc=document.getElementById('gdv-rf-desc').value.trim();
-  var esNuevo=!gdvEditingRoleId;
-  var snapshot=null, nuevoRoleId=null;
-  if(gdvEditingRoleId){
-    var existing=S.roles.find(x=>x.id===gdvEditingRoleId);
-    snapshot=Object.assign({},existing);
-    Object.assign(existing,{name,color,desc});
-  } else {
-    nuevoRoleId=name.toLowerCase().replace(/\s+/g,'_')+Date.now();
-    S.roles.push({id:nuevoRoleId,name,color,desc});
-  }
-  await saveK(SK.roles,S.roles);
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    if(esNuevo){ S.roles=S.roles.filter(function(r){return r.id!==nuevoRoleId;}); }
-    else { var ex2=S.roles.find(function(r){return r.id===gdvEditingRoleId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
-    await saveK(SK.roles,S.roles);
-    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
-    return;
-  }
-  gdvCloseRoleForm();gdvRenderRoles();
-}
-async function gdvDeleteRole(id){
-  if(esFuncionAutomatica(id)){ avisoFuncionAutomatica(id); return; }
-  if(!confirm('¿Eliminar este rol?'))return;
-  var role=S.roles.find(function(r){return r.id===id;});
-  var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
-  S.roles=S.roles.filter(r=>r.id!==id);
-  S.members.forEach(m=>{ if((m.roles||[]).includes(id)){ m.roles=m.roles.filter(rid=>rid!==id); funcionBaseSiVacio(m); } });
-  await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    if(role) S.roles.push(role);
-    afectados.forEach(function(a){ a.m.roles=a.roles; });
-    await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
-    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
-    return;
-  }
-  gdvRenderRoles();
-}
-function gdvCloseRoleForm(){document.getElementById('gdv-role-form').classList.add('hidden');gdvEditingRoleId=null;}
-
 // ════════════════════════════════════════════════════════════
 // OF MODULE — v2 con Materias, Alumnos desde Miembros, Fechas
 // ════════════════════════════════════════════════════════════
@@ -20079,6 +19602,10 @@ function canAccessDisc(){
 function canAdminDisc(){
   return isSuperAdmin()||canEjecutar('disc_pasos');
 }
+// Acciones de Discipulado que antes estaban fijas en el código (zzu): ahora por la matriz
+function canEditarEncuentrosDisc(){ return isSuperAdmin()||canEjecutar('disc_encuentros_editar'); }
+function canRevertirDisc(){ return isSuperAdmin()||canEjecutar('disc_revertir'); }
+function canCursosDisc(){ return isSuperAdmin()||canEjecutar('disc_cursos'); }
 
 function openDiscipulado(){
   document.getElementById('screen-home').classList.add('hidden');
@@ -20093,8 +19620,8 @@ function buildDiscipuladoHTML(){
   return `<div class="gdv-app">
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
       <button id="disc-tab-dashboard" class="btn btn-primary btn-sm" onclick="discTab('dashboard',this)">📊 Dashboard</button>
-      ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-cursos" class="btn btn-sm" onclick="discTab('cursos',this)">🎓 Cursos</button>`:''}
-      ${(canAdminDisc()||hasRole('super_admin'))?`<button id="disc-tab-pasos" class="btn btn-sm" onclick="discTab('cursada',this)">📋 Cursada</button>`:''}
+      ${(canAdminDisc()||canCursosDisc())?`<button id="disc-tab-cursos" class="btn btn-sm" onclick="discTab('cursos',this)">🎓 Cursos</button>`:''}
+      ${canAdminDisc()?`<button id="disc-tab-pasos" class="btn btn-sm" onclick="discTab('cursada',this)">📋 Cursada</button>`:''}
       ${(isSuperAdmin()||canEjecutar('disc_inscripciones'))?`<button id="disc-tab-inscripciones" class="btn btn-sm" onclick="discTab('inscripciones',this)">📝 Inscripciones${discCountPendientes()?` <span style="background:#DC2626;color:#fff;border-radius:999px;padding:1px 7px;font-size:10px;margin-left:2px">${discCountPendientes()}</span>`:''}</button>`:''}
       ${(isSuperAdmin()||canEjecutar('disc_cargar'))?`<button id="disc-tab-cargar" class="btn btn-sm" onclick="discTab('cargar',this)">✏️ Cargar Asistencia</button>`:''}
       ${(isSuperAdmin()||canScreen('disc_registros'))?`<button id="disc-tab-registros" class="btn btn-sm" onclick="discTab('registros',this)">📄 Registros</button>`:''}
@@ -20858,7 +20385,7 @@ async function discCerrarCursada(cursadaId){
 
 // Super Admin: deshacer el Cierre de una Cursada — vuelve a Activo y saca las Formaciones auto-marcadas por ese cierre
 async function discRevertirCierre(cursadaId){
-  if(!hasRole('super_admin')) return;
+  if(!canRevertirDisc()) return;
   var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
   if(!cursada) return;
   if(cursada.estado!=='Completado'){ showToast('Esta cursada no está cerrada','#D97706'); return; }
@@ -20893,7 +20420,7 @@ async function discRevertirCierre(cursadaId){
 
 // Super Admin: deshacer el Inicio de una Cursada (por error) — la elimina y desvincula los encuentros ya cargados
 async function discRevertirInicio(cursadaId){
-  if(!hasRole('super_admin')) return;
+  if(!canRevertirDisc()) return;
   var cursada=(S.discCursadas||[]).find(function(c){return c.id===cursadaId;});
   if(!cursada) return;
   if(cursada.estado!=='Activo'){ showToast('Esta cursada ya no está en curso','#D97706'); return; }
@@ -20928,9 +20455,9 @@ async function discRevertirInicio(cursadaId){
   if(c) discRenderCursada(c);
 }
 
-function discRenderHistorico(c){var fP=document.getElementById('hist-fil-paso')?document.getElementById('hist-fil-paso').value:'';var fA=document.getElementById('hist-fil-anio')?document.getElementById('hist-fil-anio').value:'';var fI=document.getElementById('hist-fil-id')?document.getElementById('hist-fil-id').value.trim().toLowerCase():'';var done=(S.discCursadas||[]).filter(function(cu){if(cu.estado!=='Completado')return false;if(fP&&String(cu.pasoId)!==fP)return false;if(fA&&String(cu.anio)!==fA)return false;if(fI&&!(cu.label||'').toLowerCase().includes(fI))return false;return true;}).sort(function(a,b){return b.id-a.id;});var pOpts=S.discPasos.map(function(p){return '<option value="'+p.id+'"'+(fP===String(p.id)?' selected':'')+'>'+p.nombre+'</option>';}).join('');var anios=[...new Set((S.discCursadas||[]).filter(function(c){return c.estado==='Completado';}).map(function(c){return c.anio;}))].sort(function(a,b){return b-a;});var aOpts=anios.map(function(a){return '<option value="'+a+'"'+(fA===String(a)?' selected':'')+'>'+a+'</option>';}).join('');c.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center"><select id="hist-fil-paso" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los pasos</option>'+pOpts+'</select><select id="hist-fil-anio" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los años</option>'+aOpts+'</select><input id="hist-fil-id" oninput="discRenderHistorico(document.getElementById(\'disc-content\'))" placeholder="Buscar ID (ej: 1/2026)" value="'+fI+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;width:160px"><span style="font-size:12px;color:#6B7280">'+done.length+' resultado'+(done.length!==1?'s':'')+'</span></div><div id="hist-results"></div>';if(!done.length){document.getElementById('hist-results').innerHTML='<div class="empty" style="padding:2rem">No hay cursadas que coincidan.</div>';return;}var html='';done.forEach(function(cursada){var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&r.asistencia&&!r.sinEncuentro;});var total=recs.length;var stats=cursada.miembros.map(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return null;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;return {m:m,asist:asist,pct:pct,ok:pct>=75};}).filter(Boolean);var nOk=stats.filter(function(x){return x.ok;}).length;var origenH=discContarOrigenMiembros(cursada);html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #9CA3AF"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+cursada.label+'</div><div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+discDiscipuladoresLabel(cursada)+'</strong> · Inicio: '+(cursada.fechaInicio||'—')+' · Cierre: '+(cursada.fechaCierre||'—')+(cursada.miembros.length?' · '+origenH.qr+' por QR · '+origenH.manual+' manual'+(origenH.manual!==1?'es':''):'')+'</div></div><span class="badge b-muted">Completada</span>'+(hasRole('super_admin')?'<button class="btn btn-sm" onclick="discRevertirCierre('+cursada.id+')" style="color:#D97706;margin-left:6px" title="Vuelve la cursada a Activo">↩️ Revertir</button>':'')+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+cursada.miembros.length+'</span><span class="stat-lbl">Alumnos</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+total+'</span><span class="stat-lbl">Encuentros</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem;color:#16A34A">'+nOk+'/'+cursada.miembros.length+'</span><span class="stat-lbl">Completados</span></div></div>';stats.forEach(function(s){var bc=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;flex:1">'+fullName(s.m)+'</span><div style="flex:2;min-width:120px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#6B7280">'+s.asist+'/'+total+' enc.</span><strong style="color:'+bc+'">'+s.pct+'%</strong></div><div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+bc+';width:'+s.pct+'%"></div></div></div><span style="font-size:11px;padding:3px 10px;border-radius:6px;'+(s.ok?'background:#D1FAE5;color:#065F46':'background:#FEE2E2;color:#991B1B')+'">'+( s.ok?'✅ Completado':'❌ No completó')+'</span></div>';});if(recs.length){html+='<details style="margin-top:1rem"><summary style="font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;padding:6px 0">Ver encuentros ('+recs.length+')</summary><div style="margin-top:8px">';recs.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(r){var pres=Object.values(r.asistencia||{}).filter(function(a){return a&&a.state==='presente';}).length;var editBtn=hasRole('super_admin')?'<button class="btn btn-sm" onclick="discEditRecord('+r.id+')" style="font-size:10px;padding:2px 8px">✏️</button>':'';html+='<div style="padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:12px;display:flex;justify-content:space-between;align-items:center"><span>'+(fmtAA(r.fecha)||r.fecha)+' — '+r.capitulo+'</span><div style="display:flex;align-items:center;gap:8px"><span style="color:#6B7280">'+pres+' presentes</span>'+editBtn+'</div></div>';});html+='</div></details>';}html+='</div>';});document.getElementById('hist-results').innerHTML=html;}
+function discRenderHistorico(c){var fP=document.getElementById('hist-fil-paso')?document.getElementById('hist-fil-paso').value:'';var fA=document.getElementById('hist-fil-anio')?document.getElementById('hist-fil-anio').value:'';var fI=document.getElementById('hist-fil-id')?document.getElementById('hist-fil-id').value.trim().toLowerCase():'';var done=(S.discCursadas||[]).filter(function(cu){if(cu.estado!=='Completado')return false;if(fP&&String(cu.pasoId)!==fP)return false;if(fA&&String(cu.anio)!==fA)return false;if(fI&&!(cu.label||'').toLowerCase().includes(fI))return false;return true;}).sort(function(a,b){return b.id-a.id;});var pOpts=S.discPasos.map(function(p){return '<option value="'+p.id+'"'+(fP===String(p.id)?' selected':'')+'>'+p.nombre+'</option>';}).join('');var anios=[...new Set((S.discCursadas||[]).filter(function(c){return c.estado==='Completado';}).map(function(c){return c.anio;}))].sort(function(a,b){return b-a;});var aOpts=anios.map(function(a){return '<option value="'+a+'"'+(fA===String(a)?' selected':'')+'>'+a+'</option>';}).join('');c.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center"><select id="hist-fil-paso" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los pasos</option>'+pOpts+'</select><select id="hist-fil-anio" onchange="discRenderHistorico(document.getElementById(\'disc-content\'))" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB"><option value="">Todos los años</option>'+aOpts+'</select><input id="hist-fil-id" oninput="discRenderHistorico(document.getElementById(\'disc-content\'))" placeholder="Buscar ID (ej: 1/2026)" value="'+fI+'" style="font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid #D1D5DB;width:160px"><span style="font-size:12px;color:#6B7280">'+done.length+' resultado'+(done.length!==1?'s':'')+'</span></div><div id="hist-results"></div>';if(!done.length){document.getElementById('hist-results').innerHTML='<div class="empty" style="padding:2rem">No hay cursadas que coincidan.</div>';return;}var html='';done.forEach(function(cursada){var recs=S.discRecords.filter(function(r){return r.cursadaId===cursada.id&&r.asistencia&&!r.sinEncuentro;});var total=recs.length;var stats=cursada.miembros.map(function(mid){var m=S.members.find(function(x){return x.id===mid;});if(!m)return null;var asist=recs.filter(function(r){return r.asistencia[mid];}).length;var pct=total>0?Math.round(asist/total*100):0;return {m:m,asist:asist,pct:pct,ok:pct>=75};}).filter(Boolean);var nOk=stats.filter(function(x){return x.ok;}).length;var origenH=discContarOrigenMiembros(cursada);html+='<div class="card" style="margin-bottom:1.25rem;border-left:4px solid #9CA3AF"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem"><div><div style="font-size:15px;font-weight:700;color:#1F4E79">'+cursada.label+'</div><div style="font-size:12px;color:#6B7280;margin-top:3px">Discipulador: <strong>'+discDiscipuladoresLabel(cursada)+'</strong> · Inicio: '+(cursada.fechaInicio||'—')+' · Cierre: '+(cursada.fechaCierre||'—')+(cursada.miembros.length?' · '+origenH.qr+' por QR · '+origenH.manual+' manual'+(origenH.manual!==1?'es':''):'')+'</div></div><span class="badge b-muted">Completada</span>'+(canRevertirDisc()?'<button class="btn btn-sm" onclick="discRevertirCierre('+cursada.id+')" style="color:#D97706;margin-left:6px" title="Vuelve la cursada a Activo">↩️ Revertir</button>':'')+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+cursada.miembros.length+'</span><span class="stat-lbl">Alumnos</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem">'+total+'</span><span class="stat-lbl">Encuentros</span></div><div class="stat" style="padding:10px"><span class="stat-val" style="font-size:1.4rem;color:#16A34A">'+nOk+'/'+cursada.miembros.length+'</span><span class="stat-lbl">Completados</span></div></div>';stats.forEach(function(s){var bc=s.pct>=75?'#16A34A':s.pct>=50?'#D97706':'#DC2626';html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;flex:1">'+fullName(s.m)+'</span><div style="flex:2;min-width:120px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:#6B7280">'+s.asist+'/'+total+' enc.</span><strong style="color:'+bc+'">'+s.pct+'%</strong></div><div class="pbar-bg"><div style="height:6px;border-radius:999px;background:'+bc+';width:'+s.pct+'%"></div></div></div><span style="font-size:11px;padding:3px 10px;border-radius:6px;'+(s.ok?'background:#D1FAE5;color:#065F46':'background:#FEE2E2;color:#991B1B')+'">'+( s.ok?'✅ Completado':'❌ No completó')+'</span></div>';});if(recs.length){html+='<details style="margin-top:1rem"><summary style="font-size:12px;font-weight:600;color:#6B7280;cursor:pointer;padding:6px 0">Ver encuentros ('+recs.length+')</summary><div style="margin-top:8px">';recs.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}).forEach(function(r){var pres=Object.values(r.asistencia||{}).filter(function(a){return a&&a.state==='presente';}).length;var editBtn=canEditarEncuentrosDisc()?'<button class="btn btn-sm" onclick="discEditRecord('+r.id+')" style="font-size:10px;padding:2px 8px">✏️</button>':'';html+='<div style="padding:6px 0;border-bottom:1px solid #F9FAFB;font-size:12px;display:flex;justify-content:space-between;align-items:center"><span>'+(fmtAA(r.fecha)||r.fecha)+' — '+r.capitulo+'</span><div style="display:flex;align-items:center;gap:8px"><span style="color:#6B7280">'+pres+' presentes</span>'+editBtn+'</div></div>';});html+='</div></details>';}html+='</div>';});document.getElementById('hist-results').innerHTML=html;}
 function discRenderCursos(c){
-  var esSuper=hasRole('super_admin');
+  var esSuper=canCursosDisc(); // crear/editar/deshabilitar Cursos: casillero disc_cursos (antes fijo Super Admin)
   var html='<div style="font-size:12px;color:#6B7280;margin-bottom:1rem;padding:8px 12px;background:#F9FAFB;border-radius:8px">'
     +'🎓 Acá se define el contenido de cada Curso: Nombre, Nivel y Capítulos. La asignación de Discipulador e Integrantes, e Iniciar/Cerrar, se hace desde la pestaña <strong>📋 Cursada</strong>.'
     +'</div>';
@@ -20957,7 +20484,6 @@ function discRenderCursos(c){
 }
 
 function discRenderCursada(c){
-  var esSuper=hasRole('super_admin');
   var html='';
   S.discPasos.forEach(function(paso){
     var isActivo=paso.estado==='Activo';
@@ -20995,7 +20521,7 @@ function discRenderCursada(c){
       }
       else{
         html+='<button class="btn btn-sm" onclick="discCerrarCursada('+cursadaActiva.id+')" style="color:#DC2626">⏹ Cerrar Cursada</button>';
-        if(esSuper) html+='<button class="btn btn-sm" onclick="discRevertirInicio('+cursadaActiva.id+')" style="color:#D97706" title="Deshace el inicio de esta cursada">↩️ Revertir inicio</button>';
+        if(canRevertirDisc()) html+='<button class="btn btn-sm" onclick="discRevertirInicio('+cursadaActiva.id+')" style="color:#D97706" title="Deshace el inicio de esta cursada">↩️ Revertir inicio</button>';
       }
     }
     if(cursadaActiva&&canAdminDisc()){
@@ -21756,7 +21282,7 @@ async function discGuardarGrupoDetalle(){
 }
 
 function discOpenModal(pasoId){
-  if(!hasRole('super_admin')){ alert('Solo Super Admin puede crear o editar Cursos.'); return; }
+  if(!canCursosDisc()){ alert('No tenés permiso para crear o editar Cursos.'); return; }
   discEditingPasoId=pasoId;
   var esNuevo=!pasoId;
   var paso=esNuevo?{nombre:'',nivel:'Inicial',capitulos:[]}:S.discPasos.find(function(p){return p.id===pasoId;});
@@ -21811,7 +21337,7 @@ function discCloseModal(){
 }
 
 async function discGuardarCurso(){
-  if(!hasRole('super_admin')) return;
+  if(!canCursosDisc()) return;
   var nombre=(document.getElementById('disc-modal-nombre')?.value||'').trim();
   var nivel=document.getElementById('disc-modal-nivel')?.value;
   var capitulos=[...document.querySelectorAll('.disc-cap-inp')].map(function(inp){return inp.value.trim();}).filter(Boolean);
@@ -21847,6 +21373,7 @@ async function discGuardarCurso(){
 }
 
 async function discToggleEstado(pasoId){
+  if(!canCursosDisc()) return;
   var paso=S.discPasos.find(function(p){return p.id===pasoId;});
   if(!paso) return;
   var prev=paso.estado;
@@ -21867,7 +21394,7 @@ async function discToggleEstado(pasoId){
 }
 
 async function discEliminarPaso(pasoId){
-  if(!hasRole('super_admin')) return;
+  if(!canCursosDisc()) return;
   var paso=(S.discPasos||[]).find(function(p){return p.id===pasoId;});
   if(!paso) return;
   var cursadasAsociadas=(S.discCursadas||[]).filter(function(cu){return cu.pasoId===pasoId;});
@@ -22252,6 +21779,7 @@ async function discGuardarAsistencia(){
 
 // ── Registros ──
 async function discDeleteRecord(id){
+  if(!canEditarEncuentrosDisc()) return;
   if(!confirm('¿Eliminar este registro? Los dashboards se actualizarán.')) return;
   var r=S.discRecords.find(function(x){return x.id===id;});
   S.discRecords=S.discRecords.filter(function(x){return x.id!==id;});
@@ -22273,6 +21801,7 @@ async function discDeleteRecord(id){
 }
 
 function discEditRecord(id){
+  if(!canEditarEncuentrosDisc()) return;
   var r=S.discRecords.find(function(x){return x.id===id;});
   if(!r) return;
   // Show edit modal
@@ -22342,6 +21871,7 @@ function discCloseEdit(){
 }
 
 async function discSaveEdit(){
+  if(!canEditarEncuentrosDisc()) return;
   var id=window._discEditId;
   var r=S.discRecords.find(function(x){return x.id===id;});
   if(!r) return;
@@ -22522,8 +22052,10 @@ function discRenderRegistrosList(){
       html+='<span class="badge b-muted">'+r.pasoNombre+'</span>';
       html+=grupoLbl;
       html+='<span style="flex:1;font-size:13px;color:#92400E">⏸ Sin encuentro'+(r.motivo?' — '+r.motivo:'')+'</span>';
-      html+='<button class="btn btn-sm" onclick="discEditRecord('+r.id+')">✏️</button>';
-      html+='<button class="btn btn-sm btn-danger" onclick="discDeleteRecord('+r.id+')">🗑</button>';
+      if(canEditarEncuentrosDisc()){
+        html+='<button class="btn btn-sm" onclick="discEditRecord('+r.id+')">✏️</button>';
+        html+='<button class="btn btn-sm btn-danger" onclick="discDeleteRecord('+r.id+')">🗑</button>';
+      }
       html+='</div></div>';
       return;
     }
@@ -22536,8 +22068,10 @@ function discRenderRegistrosList(){
     html+=grupoLbl;
     html+='<span style="flex:1;font-size:13px;color:#6B7280">'+r.capitulo+'</span>';
     html+='<span class="badge b-ok">'+presentes+'/'+att.length+' presentes</span>';
-    html+='<button class="btn btn-sm" onclick="discEditRecord('+r.id+')">✏️</button>';
-    html+='<button class="btn btn-sm btn-danger" onclick="discDeleteRecord('+r.id+')">🗑</button>';
+    if(canEditarEncuentrosDisc()){
+      html+='<button class="btn btn-sm" onclick="discEditRecord('+r.id+')">✏️</button>';
+      html+='<button class="btn btn-sm btn-danger" onclick="discDeleteRecord('+r.id+')">🗑</button>';
+    }
     html+='</div>';
     html+='<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">';
     att.forEach(function(v){

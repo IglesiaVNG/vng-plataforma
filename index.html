@@ -80,6 +80,31 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#2E75B6}
 .nv-seg button{border:none;background:#fff;padding:5px 10px;font-size:12px;cursor:pointer;color:#374151;font-family:inherit}
 .nv-seg button+button{border-left:1px solid #E5E7EB}
 .nv-seg button.on{background:#1F4E79;color:#fff;font-weight:600}
+#nv-ficha{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:100vw;background:#fff;z-index:290;box-shadow:-8px 0 30px rgba(0,0,0,.18);overflow-y:auto;padding:14px 16px 24px}
+#nv-ficha-back{position:fixed;inset:0;z-index:289;background:rgba(0,0,0,.15)}
+.nv-pasos{display:flex;gap:4px;margin:6px 0}
+.nv-paso{flex:1;text-align:center;font-size:11.5px;font-weight:600;padding:6px 4px;border-radius:8px;background:#F3F4F6;color:#9CA3AF}
+.nv-paso.hecho{background:#E0F2FE;color:#0369A1}
+.nv-paso.act{background:#1F4E79;color:#fff}
+.nv-fsec{border-top:1px solid #F3F4F6;margin-top:12px;padding-top:10px}
+.nv-fsec h4{margin:0 0 6px;font-size:12.5px;color:#1F4E79}
+.nv-fdato{display:flex;gap:8px;font-size:12.5px;padding:2px 0}
+.nv-fdato span:first-child{color:#6B7280;min-width:120px}
+.nv-tl{border-left:2px solid #E5E7EB;margin-left:6px;padding-left:12px}
+.nv-tl-i{position:relative;padding:4px 0 8px;font-size:12.5px}
+.nv-tl-i:before{content:'';position:absolute;left:-18px;top:8px;width:9px;height:9px;border-radius:50%;background:#1F4E79}
+.nv-tl-i.com:before{background:#16A34A}
+.nv-fab{display:none}
+.nv-cards .nv-card{background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+@media (max-width:700px){
+  .nv-filtros{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .nv-filtros>*{flex-shrink:0}
+  .nv-ind-wrap{display:flex;overflow-x:auto;gap:6px}
+  .nv-ind{flex:0 0 auto;min-width:96px}
+  .nv-acc-top .nv-alta-btn{display:none}
+  .nv-fab{display:block;position:fixed;right:16px;bottom:18px;z-index:280;background:#1D4ED8;color:#fff;font-weight:700;font-size:15px;padding:12px 18px;border:none;border-radius:99px;box-shadow:0 6px 18px rgba(29,78,216,.45)}
+  #nv-ficha{width:100vw}
+}
 .nv-grid-wrap{background:#fff;border-radius:12px;overflow-x:auto;box-shadow:0 2px 12px rgba(0,0,0,.12)}
 .nv-grid td{font-size:12.5px}
 .nv-grid tr.sel td{background:#EFF6FF}
@@ -743,7 +768,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzj';
+const APP_VERSION = '2026-08-24-zzk';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -876,12 +901,14 @@ const MODULES_PERM=[
     {key:'miembros_editar',label:'Editar y agregar miembros'},
   ]},
   {key:'nuevos', label:'Nuevos Contactos', icon:'🌱', screens:[
-    {key:'nuevos', label:'Acceso a Nuevos Contactos (Ejecuta: además puede comentar cualquier contacto)'},
+    {key:'nuevos', label:'Acceso a Nuevos Contactos (Ejecuta: además puede comentar cualquier contacto). Coordinadores/as y Colaboradores/as del Área Conexión tienen sus accesos por el equipo del Área'},
     {key:'nuevos_editar',    label:'Editar los datos de un contacto'},
     {key:'nuevos_contactar', label:'Contactar (registrar el primer contacto y autoasignarse seguimiento)'},
     {key:'nuevos_gestionar', label:'Gestionar (cambiar condición, asignar seguimiento y grupo)'},
     {key:'nuevos_eliminar',  label:'Eliminar contactos (definitivo, no se puede deshacer)'},
     {key:'nuevos_mensaje_wa', label:'Editar el mensaje de WhatsApp'},
+    {key:'nuevos_exportar', label:'Exportar a Excel (Conexión y Campañas)'},
+    {key:'nuevos_ver_privados', label:'Ver datos privados: teléfono, barrio, fecha de nacimiento, motivo y comentarios (sin esto: consulta limitada)'},
   ]},
   {key:'of', label:'Orientación Familiar', icon:'👨‍👩‍👧', screens:[
     {key:'of', label:'Módulo completo'},
@@ -1059,7 +1086,11 @@ function permisosCompletarFaltantes(){
     nuevos_contactar:{de:'nuevos', si:['ejecuta']},
     nuevos_gestionar:{de:'nuevos', si:['ejecuta']},
     // Editar no tenía permiso propio: lo podía hacer cualquiera con acceso al módulo (Ver o Ejecuta)
-    nuevos_editar:   {de:'nuevos', si:['consulta','ejecuta']}
+    nuevos_editar:   {de:'nuevos', si:['consulta','ejecuta']},
+    // Exportar y Ver datos privados (Conexión en grilla): hasta ahora los tenía todo el que gestionaba
+    // o contactaba; la consulta limitada queda para el resto.
+    nuevos_exportar:     {de:'nuevos_gestionar', si:['ejecuta']},
+    nuevos_ver_privados: {de:'nuevos_contactar', si:['ejecuta']}
   };
   // Add any DEFAULT roles missing from PERMISOS
   // Solo agregar roles completamente nuevos que no existen en absoluto
@@ -1120,6 +1151,12 @@ function getPerm(roleId, screen){
     const p=PERMISOS[r]?(PERMISOS[r][screen]||'ninguno'):'ninguno';
     if((order[p]||0)>(order[best]||0)) best=p;
   });
+  // Conexión: el equipo del Área de servicio Conexión suma sus accesos (aditivo, nunca quita)
+  if(best!=='ejecuta'&&String(screen).indexOf('nuevos')===0){
+    const rc=conexionRolCuenta();
+    const pc=rc&&CONEXION_PERMISOS[rc]?(CONEXION_PERMISOS[rc][screen]||'ninguno'):'ninguno';
+    if((order[pc]||0)>(order[best]||0)) best=pc;
+  }
   return best;
 }
 
@@ -3011,6 +3048,37 @@ function canEliminarNuevos(){
 function canEditarNuevos(){
   return isSuperAdmin() || canEjecutar('nuevos_editar');
 }
+function canExportarNuevos(){
+  return isSuperAdmin() || canEjecutar('nuevos_exportar');
+}
+// Sin esto, Conexión queda en consulta limitada: no se ven teléfono, barrio, fecha de nacimiento,
+// motivo/pedido ni comentarios (solo el juego de columnas Seguimiento, sin acciones).
+function canVerPrivadosNuevos(){
+  return isSuperAdmin() || canEjecutar('nuevos_ver_privados');
+}
+// ── Equipo del Área de servicio Conexión ──
+// Coordinadores/as y Colaboradores/as de un Área ACTIVA llamada "Conexión" tienen en Nuevos Contactos
+// los accesos de su rol, además de los de sus Funciones (Diseno_Conexion_Grilla.md §7).
+var CONEXION_PERMISOS={
+  coord:{nuevos:'ejecuta',nuevos_editar:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ejecuta',nuevos_mensaje_wa:'ejecuta',nuevos_exportar:'ejecuta',nuevos_ver_privados:'ejecuta'},
+  colab:{nuevos:'ejecuta',nuevos_editar:'ejecuta',nuevos_contactar:'ejecuta',nuevos_ver_privados:'ejecuta'}
+};
+function conexionAreas(){
+  return (S.areasServicio||[]).filter(function(a){ return a&&normName(a.nombre).indexOf('conexion')===0&&svcAreaActiva(a); });
+}
+function conexionRolDe(memberId){
+  if(memberId==null) return null;
+  var rol=null;
+  conexionAreas().forEach(function(a){
+    (a.equipo||[]).forEach(function(e){
+      if(Number(e.personaId)!==Number(memberId)) return;
+      if(e.rol==='Coordinador/a') rol='coord';
+      else if(e.rol==='Colaborador/a'&&rol!=='coord') rol='colab';
+    });
+  });
+  return rol;
+}
+function conexionRolCuenta(){ var m=getLinkedMember(); return m?conexionRolDe(m.id):null; }
 function isContactar(){
   return currentUser && currentUser.role==='contactar';
 }
@@ -5199,6 +5267,7 @@ async function saEliminarComentario(memberId, ts){
   try{ nvRenderComentarios(m); }catch(_e){}
   try{ nvRenderComentariosContactar(m); }catch(_e){}
   try{ nvCampRenderComentarios(m); }catch(_e){}
+  try{ if(typeof nvFichaId!=='undefined'&&Number(nvFichaId)===Number(m.id)) nvFichaRender(); }catch(_e){}
   showToast('🗑 Comentario eliminado','#16A34A');
 }
 async function saGuardarComentario(memberId){
@@ -16256,6 +16325,8 @@ function ofExportar(){
 function openNuevos(){
   nvFiltro='nuevos'; // reset to default on every open
   nvIndFiltro=''; nvSel={}; nvAsignarDestino=null;
+  nvFichaId=null;
+  if(!window._nvResizeOk){ window._nvResizeOk=true; var _nvMov=null; window.addEventListener('resize',function(){ var mv=nvEsMovil(); if(mv!==_nvMov){ _nvMov=mv; if(document.getElementById('nv-list')) renderNuevos(); } }); }
   document.getElementById('screen-home').classList.add('hidden');
   document.getElementById('screen-app').classList.add('show');
   document.getElementById('app-topbar-title').textContent='🌱 Nuevos Contactos';
@@ -16326,11 +16397,12 @@ function buildNuevosHTML(){
 
     <div id="nv-list-section">
     <!-- Acciones principales -->
-    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:-4px 0 10px">
-      <button class="btn btn-sm" onclick="gdvShowQRModal()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">📱 QR / Formulario</button>
-      <button class="btn btn-sm" onclick="exportNuevosExcel()" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">📥 Exportar Excel</button>
-      <button onclick="nvAgregarNuevo()" style="background:#1D4ED8;color:#fff;font-weight:700;font-size:13px;padding:6px 16px;border:none;border-radius:8px;cursor:pointer">+ Alta nueva persona</button>
+    <div class="nv-acc-top" style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:-4px 0 10px">
+      ${canEditarNuevos()?`<button class="btn btn-sm" onclick="gdvShowQRModal()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">📱 QR / Formulario</button>`:''}
+      ${canExportarNuevos()?`<button class="btn btn-sm" onclick="exportNuevosExcel()" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">📥 Exportar Excel</button>`:''}
+      ${canEditarNuevos()?`<button class="nv-alta-btn" onclick="nvAgregarNuevo()" style="background:#1D4ED8;color:#fff;font-weight:700;font-size:13px;padding:6px 16px;border:none;border-radius:8px;cursor:pointer">+ Alta nueva persona</button>`:''}
     </div>
+    ${canEditarNuevos()?`<button class="nv-fab" onclick="nvAgregarNuevo()" title="Alta nueva persona">＋ Alta</button>`:''}
     <!-- Indicadores que filtran -->
     <div id="nv-indicadores" class="nv-ind-wrap"></div>
     <!-- Cumpleaños próximos -->
@@ -16360,6 +16432,9 @@ function buildNuevosHTML(){
     <!-- Grilla / Tablero -->
     <div id="nv-list"></div>
     </div>
+    <!-- Ficha lateral (no modal) -->
+    <div id="nv-ficha-back" onclick="nvFichaCerrar()" style="display:none"></div>
+    <aside id="nv-ficha" style="display:none"></aside>
 
     <!-- Dashboard de análisis (fecha de Alta/Ingreso) -->
     <div id="nv-dashboard-section" style="display:none">
@@ -16402,7 +16477,7 @@ function buildNuevosHTML(){
             </select></div>
           <button class="btn btn-sm" onclick="nvCampanaAbrirQR()" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;font-weight:600">📱 Generar QR Campaña</button>
           <button class="btn btn-sm" onclick="nvCampanaCopiarTelefonos()" style="background:#F0FDF4;border-color:#86EFAC;color:#166534;font-weight:600">📋 Copiar teléfonos</button>
-          <button class="btn btn-sm" onclick="nvExportarCampanaExcel()" style="background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600">📊 Exportar a Excel</button>
+          ${canExportarNuevos()?`<button class="btn btn-sm" onclick="nvExportarCampanaExcel()" style="background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600">📊 Exportar a Excel</button>`:''}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;padding-top:10px;border-top:1px solid #F3F4F6">
           <div><label style="font-size:12px;color:#6B7280;display:block;margin-bottom:3px">Ingresó desde</label>
@@ -16964,8 +17039,10 @@ function renderNuevos(){
   var vs=document.getElementById('nv-vista-sel');
   if(vs){ vs.style.display=r.hist?'none':''; vs.innerHTML=[['grilla','☰ Grilla'],['tablero','▦ Tablero por etapa']].map(function(v){return '<button type="button" class="'+(nvVista===v[0]?'on':'')+'" onclick="nvSetVista(\''+v[0]+'\')">'+v[1]+'</button>';}).join(''); }
   var esTablero=!r.hist&&nvVista==='tablero';
+  if(!canVerPrivadosNuevos()) nvColSet='seguimiento'; // consulta limitada: solo el juego Seguimiento
+  var movil=nvEsMovil();
   var cs=document.getElementById('nv-cols-sel');
-  if(cs){ cs.style.display=esTablero?'none':''; cs.innerHTML=[['seguimiento','Seguimiento'],['personales','Datos personales'],['origen','Origen y alta']].map(function(v){return '<button type="button" class="'+(nvColSet===v[0]?'on':'')+'" onclick="nvSetColSet(\''+v[0]+'\')">'+v[1]+'</button>';}).join(''); }
+  if(cs){ cs.style.display=(esTablero||movil||!canVerPrivadosNuevos())?'none':''; cs.innerHTML=[['seguimiento','Seguimiento'],['personales','Datos personales'],['origen','Origen y alta']].map(function(v){return '<button type="button" class="'+(nvColSet===v[0]?'on':'')+'" onclick="nvSetColSet(\''+v[0]+'\')">'+v[1]+'</button>';}).join(''); }
   // Mostrando X de Y
   var mo=document.getElementById('nv-mostrando');
   if(mo){
@@ -16984,7 +17061,25 @@ function renderNuevos(){
       (!r.hist&&hayFechas?'<div style="font-size:13px;color:#9CA3AF">Probá con "✕ Ver todo" para quitar las fechas.</div>':'')+'</div>';
     return;
   }
-  wrap.innerHTML=esTablero?nvTableroHTML(lista):nvGrillaHTML(lista,r.hist);
+  wrap.innerHTML=esTablero?nvTableroHTML(lista):movil?nvTarjetasHTML(lista,r.hist):nvGrillaHTML(lista,r.hist);
+  if(nvFichaId!=null) nvFichaRender();
+}
+function nvEsMovil(){ try{ return window.innerWidth<=700; }catch(e){ return false; } }
+// Celular: lista compacta de tarjetas (etapa, responsable, WhatsApp)
+function nvTarjetasHTML(lista,hist){
+  return '<div class="nv-cards">'+lista.map(function(m){
+    var resp=nvRespNombre(m), atr=!hist&&nvEsAtrasado(m), g=nvGruposDe(m);
+    return '<div class="nv-card"'+(atr?' style="border-left:4px solid #DC2626"':'')+'>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'+
+        '<span style="color:#1F4E79;font-weight:700;cursor:pointer" onclick="nvFichaAbrir('+m.id+')">'+nvEsc(listName(m))+'</span>'+
+        (hist?'<span class="badge b-muted">Histórico</span>':nvSubEstadoBadge(m))+'</div>'+
+      '<div style="font-size:12px;color:#6B7280;margin-top:3px">👤 '+(resp?nvEsc(resp):'<span style="color:#D97706;font-weight:700">Sin asignar</span>')+' · '+(g.length?nvEsc(g.map(function(x){return x.name;}).join(', ')):'Sin grupo')+(hist?'':' · '+nvDiasDesdeIngreso(m)+'d')+
+        (atr?' · <span style="color:#DC2626;font-weight:700">⏰ Atrasado</span>':'')+'</div>'+
+      (!hist&&canContactarNuevos()?'<div style="display:flex;gap:6px;margin-top:6px">'+
+        (m.tel&&canVerPrivadosNuevos()?'<button class="btn btn-sm" style="background:#DCFCE7;border-color:#86EFAC" onclick="nvAbrirWhatsapp('+m.id+')">💬 WhatsApp</button>':'')+
+        '<button class="btn btn-sm" style="background:#EFF6FF;border-color:#BFDBFE" onclick="nvOpenContactar('+m.id+')">📞 Registrar contacto</button></div>':'')+
+    '</div>';
+  }).join('')+'</div>';
 }
 
 function nvPuedeSeleccionar(){ return canGestionarNuevos(); }
@@ -16995,7 +17090,7 @@ function nvCeldaPersona(m,conSel){
   return '<td style="min-width:190px"><div style="display:flex;align-items:center;gap:8px">'+
     (conSel?'<input type="checkbox" '+(nvSel[m.id]?'checked':'')+' onclick="event.stopPropagation();nvToggleSel('+m.id+',this.checked)" style="width:auto;margin:0">':'')+
     '<span class="nv-av">'+nvEsc(initials(fullName(m)))+'</span><div style="min-width:0">'+
-    '<span style="cursor:pointer;color:#1F4E79;font-weight:600;text-decoration:underline dotted" onclick="nvOpenActions('+m.id+')">'+nvEsc(listName(m))+'</span>'+
+    '<span style="cursor:pointer;color:#1F4E79;font-weight:600;text-decoration:underline dotted" onclick="nvFichaAbrir('+m.id+')">'+nvEsc(listName(m))+'</span>'+
     (sub?'<div style="font-size:11px;color:#6B7280">'+sub+'</div>':'')+'</div></div></td>';
 }
 function nvCeldaIngreso(m){
@@ -17025,7 +17120,7 @@ function nvCeldaGrupo(m){
 function nvCeldaAcciones(m,hist){
   if(hist||!canContactarNuevos()) return '<td></td>';
   return '<td style="white-space:nowrap">'+
-    (m.tel?'<button class="btn btn-sm" title="Abrir WhatsApp" onclick="nvAbrirWhatsapp('+m.id+')" style="background:#DCFCE7;border-color:#86EFAC">💬</button> ':'')+
+    (m.tel&&canVerPrivadosNuevos()?'<button class="btn btn-sm" title="Abrir WhatsApp" onclick="nvAbrirWhatsapp('+m.id+')" style="background:#DCFCE7;border-color:#86EFAC">💬</button> ':'')+
     '<button class="btn btn-sm" title="Registrar contacto" onclick="nvOpenContactar('+m.id+')" style="background:#EFF6FF;border-color:#BFDBFE">📞</button></td>';
 }
 function nvGrillaHTML(lista,hist){
@@ -17060,7 +17155,7 @@ function nvTableroHTML(lista){
       (l.length?l.map(function(m){
         var g=nvGruposDe(m), t=nvUltimoContacto(m), atr=nvEsAtrasado(m), resp=nvRespNombre(m);
         return '<div class="nv-tab-card"'+(atr?' style="border-left:4px solid #DC2626"':'')+'>'+
-          '<div style="display:flex;justify-content:space-between;gap:6px"><span style="cursor:pointer;color:#1F4E79;font-weight:700;text-decoration:underline dotted" onclick="nvOpenActions('+m.id+')">'+nvEsc(listName(m))+'</span>'+
+          '<div style="display:flex;justify-content:space-between;gap:6px"><span style="cursor:pointer;color:#1F4E79;font-weight:700;text-decoration:underline dotted" onclick="nvFichaAbrir('+m.id+')">'+nvEsc(listName(m))+'</span>'+
           (atr?'<span style="background:#FEE2E2;color:#991B1B;font-size:10px;padding:1px 7px;border-radius:99px;font-weight:700;white-space:nowrap">⏰ Atrasado</span>':'')+'</div>'+
           '<div style="color:#6B7280;margin-top:2px">'+(g.length?nvEsc(g.map(function(x){return x.name;}).join(', ')):'<span style="color:#F59E0B">Sin grupo</span>')+' · '+nvDiasDesdeIngreso(m)+' días desde el ingreso</div>'+
           '<div style="margin-top:2px">👤 '+(resp?nvEsc(resp):'<span style="color:#D97706;font-weight:700">Sin asignar</span>')+(t?' · último contacto '+nvHaceDias(t):'')+'</div>'+
@@ -17100,8 +17195,8 @@ function nvAsignarResponsableAbrir(ids){
   var sIn=document.getElementById('nv-seg-search'); if(sIn) sIn.value='';
   nvOpenSeguimientoSelector();
 }
-async function nvAsignarResponsableLote(ids,respId,respNombre){
-  if(!canGestionarNuevos()) return;
+async function nvAsignarResponsableLote(ids,respId,respNombre,esAutoasignacion){
+  if(!canGestionarNuevos()&&!(esAutoasignacion&&canContactarNuevos())) return;
   var fotos=[];
   S.members.forEach(function(m){
     if(ids.indexOf(Number(m.id))<0) return;
@@ -17150,6 +17245,137 @@ async function nvCambiarEtapaLote(ids,etapa){
   }
   renderNuevos();
   showToast('✅ '+fotos.length+' persona'+(fotos.length!==1?'s pasaron':' pasó')+' a '+etapa,'#16A34A');
+}
+
+// ── Ficha lateral (Etapa 3) ──
+var nvFichaId=null;
+function nvFichaAbrir(id){ nvFichaId=Number(id); nvFichaRender(); }
+function nvFichaCerrar(){
+  nvFichaId=null;
+  var f=document.getElementById('nv-ficha'), b=document.getElementById('nv-ficha-back');
+  if(f){ f.style.display='none'; f.innerHTML=''; } if(b) b.style.display='none';
+}
+// Comentarios que se muestran en Conexión: los pastorales de Rebaños solo con su permiso
+function nvComentariosVisibles(m){
+  var pastoral=isSuperAdmin()||canScreen('comentarios_rebanos');
+  return (m.comentarios||[]).filter(function(c){ return c&&(pastoral||c.origen!=='rebanos'); });
+}
+function nvPuedeComentar(m){
+  if(!m||!currentUser||!canVerPrivadosNuevos()) return false;
+  if(isSuperAdmin()||canEjecutar('nuevos')) return true;
+  var yo=getLinkedMember();
+  return !!(yo&&m.seguimientoId&&Number(m.seguimientoId)===Number(yo.id));
+}
+// Historial de seguimiento de un Nuevo: etapas, cambios de condición/estado y comentarios, del más nuevo al más viejo
+function nvHistorialNuevo(m,conComentarios){
+  var ev=[];
+  (m.subEstadoHistorial||[]).forEach(function(h){
+    if(!h) return; var t=Date.parse(h.fecha)||0;
+    ev.push({t:t,tipo:'etapa',txt:'Etapa: '+(h.de||'—')+' → <strong>'+nvEsc(h.a)+'</strong>',autor:h.autor,det:h.comentario});
+  });
+  (m.cambios||[]).forEach(function(c){
+    if(!c||c.auto&&c.tipo==='categoria') return;
+    var nom={condicion:'Condición',estado:'Estado',categoria:'Categoría'}[c.tipo]||c.tipo;
+    var f=function(v){ return c.tipo==='condicion'?etqCond(v):v; };
+    ev.push({t:Number(c.ts)||0,tipo:'cambio',txt:nom+': '+nvEsc(f(c.de)||'—')+' → <strong>'+nvEsc(f(c.a)||'—')+'</strong>',autor:c.autor,det:c.motivo});
+  });
+  if(conComentarios) nvComentariosVisibles(m).forEach(function(c){
+    ev.push({t:Number(c.ts)||0,tipo:'com',txt:'💬 '+nvEsc(c.texto).replace(/\n/g,'<br>'),autor:c.autor,com:c});
+  });
+  var fr=nvFechaRegDate(m);
+  if(fr) ev.push({t:fr.getTime(),tipo:'alta',txt:'🌱 Ingreso'+(m.origen?' · '+nvEsc(m.origen):''),autor:m.cargadoPor||''});
+  ev.sort(function(a,b){return b.t-a.t;});
+  return ev;
+}
+function nvFichaRender(){
+  var f=document.getElementById('nv-ficha'), back=document.getElementById('nv-ficha-back');
+  if(!f) return;
+  var m=S.members.find(function(x){return Number(x.id)===Number(nvFichaId);});
+  if(!m){ nvFichaCerrar(); return; }
+  var priv=canVerPrivadosNuevos(), esNuevo=nvEsNuevoActivo(m), hist=!esNuevo;
+  var et=m.subEstado||'Ingresado', idxEt=NV_ETAPAS.indexOf(et);
+  var e=nvEdad(m), resp=nvRespNombre(m), g=nvGruposDe(m), yo=getLinkedMember();
+  var h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+      '<div><div style="font-size:17px;font-weight:800;color:#1F4E79">'+nvEsc(fullName(m))+'</div>'+
+      '<div style="font-size:12px;color:#6B7280">'+[e!==null?e+' años':'',m.genero==='H'?'Hombre':m.genero==='M'?'Mujer':'',hist?'📁 '+etqCond('Historico'):''].filter(Boolean).join(' · ')+'</div></div>'+
+      '<button onclick="nvFichaCerrar()" style="background:none;border:none;font-size:22px;color:#9CA3AF;cursor:pointer;line-height:1" title="Cerrar">✕</button></div>';
+  if(esNuevo){
+    h+='<div class="nv-pasos">'+NV_ETAPAS.map(function(x,i){ return '<div class="nv-paso'+(i<idxEt?' hecho':i===idxEt?' act':'')+'">'+(i<idxEt?'✓ ':'')+x+'</div>'; }).join('')+'</div>'+
+      '<div style="font-size:12px;color:#6B7280">'+nvAsistencias(m)+' de '+nvAsistParticipando()+' asistencias en GdV / NG'+(et==='Participando'?'':' · pasa sola a Participando')+(nvEsAtrasado(m)?' · <span style="color:#DC2626;font-weight:700">⏰ Atrasado</span>':'')+'</div>';
+  }
+  // Acciones
+  var acc=[];
+  if(esNuevo&&canContactarNuevos()){
+    if(m.tel&&priv) acc.push('<button class="btn btn-sm" style="background:#DCFCE7;border-color:#86EFAC" onclick="nvAbrirWhatsapp('+m.id+')">💬 WhatsApp</button>');
+    acc.push('<button class="btn btn-sm" style="background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvOpenContactar('+m.id+')">📞 Registrar contacto</button>');
+  }
+  if(canEditarNuevos()) acc.push('<button class="btn btn-sm" onclick="nvAbrirEditar('+m.id+')">✏️ Editar datos</button>');
+  if(canGestionarNuevos()) acc.push('<button class="btn btn-sm btn-primary" onclick="nvOpenPromote('+m.id+')">'+(hist?'♻️ Re-activar / Gestionar':'Pasar a '+etqCond('Asistente Bautizado')+' / '+etqCond('Miembro')+' →')+'</button>');
+  if(canEliminarNuevos()) acc.push('<button class="btn btn-sm" style="color:#DC2626;border-color:#FECACA" onclick="nvEliminarContacto('+m.id+')">🗑️ Eliminar</button>');
+  if(acc.length) h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+acc.join('')+'</div>';
+  // Responsable
+  var respAcc='';
+  if(esNuevo&&canGestionarNuevos()) respAcc='<button class="btn btn-sm" onclick="nvAsignarResponsableAbrir(['+m.id+'])">'+(resp?'Cambiar':'Asignar')+'</button>';
+  else if(esNuevo&&canContactarNuevos()&&!m.seguimientoId&&yo) respAcc='<button class="btn btn-sm" onclick="nvAutoasignarme('+m.id+')">🙋 Autoasignarme</button>';
+  h+='<div class="nv-fsec"><h4>👤 Responsable</h4><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:13px;'+(resp?'':'color:#D97706;font-weight:700')+'">'+(resp?nvEsc(resp):'⏳ Sin asignar')+'</span>'+respAcc+'</div></div>';
+  // Datos
+  function dato(k,v){ return '<div class="nv-fdato"><span>'+k+'</span><span>'+(v?nvEsc(v):'<span style="color:#9CA3AF">—</span>')+'</span></div>'; }
+  h+='<div class="nv-fsec"><h4>📋 Datos</h4>'+
+    (priv?dato('Teléfono',m.tel)+dato('Barrio / Ciudad',m.dir)+dato('F. nacimiento',m.fnac):'')+
+    dato('Grupo / Comunidad',g.map(function(x){return x.name;}).join(', ')||'Sin grupo')+
+    dato('Ingreso',(m.fechaRegistro||'')+(nvFechaRegDate(m)?' ('+nvHaceDias(nvFechaRegDate(m).getTime())+')':''))+
+    dato('Origen',m.origen)+dato('Cómo nos conoció',m.comoNosConocio)+dato('Cargado por',m.cargadoPor)+
+    (priv?dato('Motivo / pedido',m.motivoContacto):'')+
+    (priv?'':'<div style="font-size:11px;color:#9CA3AF;margin-top:4px">🔒 Consulta limitada: teléfono, barrio, fecha de nacimiento, motivo y comentarios no se muestran.</div>')+
+  '</div>';
+  // Línea de tiempo + nuevo comentario
+  var ev=nvHistorialNuevo(m,priv);
+  h+='<div class="nv-fsec"><h4>🕓 Seguimiento</h4>';
+  if(nvPuedeComentar(m)) h+='<textarea id="nv-ficha-com" placeholder="Nuevo comentario (mínimo '+COMENT_MIN+' caracteres)…" style="width:100%;min-height:60px;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;resize:vertical"></textarea>'+
+    '<div style="display:flex;justify-content:flex-end;margin:6px 0 10px"><button class="btn btn-sm btn-primary" id="nv-ficha-com-btn" onclick="nvFichaGuardarComentario('+m.id+')">💬 Guardar comentario</button></div>';
+  h+=ev.length?'<div class="nv-tl">'+ev.map(function(x){
+      return '<div class="nv-tl-i'+(x.tipo==='com'?' com':'')+'">'+(x.com&&isSuperAdmin()?comentarioBotonBorrar(m,x.com):'')+
+        '<div>'+x.txt+'</div>'+(x.det?'<div style="color:#6B7280;font-style:italic">'+nvEsc(x.det)+'</div>':'')+
+        '<div style="font-size:11px;color:#9CA3AF">'+(x.autor?nvEsc(x.autor)+' · ':'')+(x.t?new Date(x.t).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'')+'</div></div>';
+    }).join('')+'</div>':'<div style="font-size:12px;color:#9CA3AF">Sin movimientos todavía.</div>';
+  h+='</div>';
+  // Conservar lo que se estaba escribiendo si la ficha se redibuja
+  var prev=document.getElementById('nv-ficha-com'), txtPrev=prev?prev.value:'';
+  f.innerHTML=h; f.style.display='block'; if(back) back.style.display='block';
+  var nuevo=document.getElementById('nv-ficha-com'); if(nuevo&&txtPrev) nuevo.value=txtPrev;
+}
+async function nvFichaGuardarComentario(id){
+  var m=S.members.find(function(x){return Number(x.id)===Number(id);});
+  if(!m||!nvPuedeComentar(m)){ alert('No tenés permiso para comentar.'); return; }
+  var el=document.getElementById('nv-ficha-com'), txt=((el&&el.value)||'').trim();
+  if(!txt){ showToast('Escribí el comentario primero','#D97706'); return; }
+  if(txt.length<COMENT_MIN){ alert(comentMsg()); return; }
+  var btn=document.getElementById('nv-ficha-com-btn'); if(btn) btn.disabled=true;
+  var antes=m.comentarios, tenia=Object.prototype.hasOwnProperty.call(m,'comentarios'), prevTs=m._ts;
+  m.comentarios=(m.comentarios||[]).concat([{texto:txt,autor:(currentUser&&currentUser.name)||'Sistema',ts:Date.now(),origen:'conexion'}]);
+  m._ts=Date.now();
+  try{
+    await saveK(SK.members,S.members);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    if(tenia) m.comentarios=antes; else delete m.comentarios;
+    if(prevTs===undefined) delete m._ts; else m._ts=prevTs;
+    try{ await saveK(SK.members,S.members); }catch(e2){}
+    if(btn) btn.disabled=false;
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  if(el) el.value='';
+  renderNuevos(); nvFichaRender();
+  showToast('💬 Comentario guardado','#16A34A');
+}
+async function nvAutoasignarme(id){
+  if(!canContactarNuevos()) return;
+  var yo=getLinkedMember(); if(!yo){ alert('Tu cuenta no está vinculada a una persona de Rebaños.'); return; }
+  var m=S.members.find(function(x){return Number(x.id)===Number(id);}); if(!m) return;
+  if(m.seguimientoId){ alert('Ya tiene responsable.'); return; }
+  var gl=nvGruposDe(yo).map(function(x){return x.name;}).join(', ');
+  await nvAsignarResponsableLote([Number(id)],yo.id,fullName(yo)+(gl?' — '+gl:''),true);
 }
 
 // Popup de acciones (Editar/Contactar/Gestionar/Eliminar) — se abre al clickear el Nombre
@@ -17845,7 +18071,7 @@ function nvSetFiltro(filtro, btn){
   if(listSection) listSection.style.display='block';
   if(dashSection) dashSection.style.display='none';
   if(campSection) campSection.style.display='none';
-  nvFiltro=filtro; nvSel={}; nvIndFiltro='';
+  nvFiltro=filtro; nvSel={}; nvIndFiltro=''; nvFichaCerrar();
   renderNuevos();
 }
 
@@ -18106,6 +18332,8 @@ async function nvAbrirWhatsapp(id){
   window.open('https://wa.me/'+telWA+(msg?('?text='+encodeURIComponent(msg)):''),'_blank');
   var c=document.getElementById('nv-campana-list');
   if(c) nvRenderCampana();
+  var nvl=document.getElementById('nv-list-section');
+  if(nvl&&nvl.style.display!=='none') renderNuevos();
 }
 
 async function nvGuardarMensajeWA(){
@@ -18131,6 +18359,7 @@ async function nvGuardarMensajeWA(){
 }
 
 function nvExportarCampanaExcel(){
+  if(!canExportarNuevos()){ alert('No tenés permiso para exportar.'); return; }
   var camp=nvCampanaActual();
   if(!camp){ showToast('Elegí una Campaña primero','#D97706'); return; }
   var contactos=nvCampanaContactosFiltrados();
@@ -22867,6 +23096,7 @@ function exportToExcel(rows, columns, filename){
 }
 
 function exportNuevosExcel(lista){
+  if(!canExportarNuevos()){ alert('No tenés permiso para exportar.'); return; }
   // Sin lista: exporta lo que muestra la grilla (pestaña, período, filtros e indicador)
   let members=Array.isArray(lista)?lista:nvListaFiltrada().lista;
   const rows=members.map(m=>{

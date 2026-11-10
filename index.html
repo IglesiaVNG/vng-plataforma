@@ -453,7 +453,7 @@ try {
 
 // ── Keys grouped by document (max ~900KB each) ──
 const KEY_GROUPS = {
-  'config':  ['gdv_u5','gdv_g5','gdv_roles5','gdv_qr_actualizar'], // gdv_permisos se maneja via fbSavePermisos con su propio timestamp
+  'config':  ['gdv_u5','gdv_g5','_tomb_gdv_roles5','gdv_roles5','gdv_qr_actualizar'], // Funciones (gdv_roles5): merge por id+_ts con tombstone desde zzw; // gdv_permisos se maneja via fbSavePermisos con su propio timestamp
   'members': ['_tomb_gdv_m5','gdv_m5'],
   'records': ['_tomb_gdv_r5','gdv_r5'],
   'disc':    ['_tomb_gdv_disc_pasos','gdv_disc_pasos','_tomb_gdv_disc_records','gdv_disc_records','_tomb_gdv_disc_cursadas','gdv_disc_cursadas','_tomb_gdv_disc_inscripciones','gdv_disc_inscripciones'],
@@ -496,8 +496,8 @@ window.fbUpload = async function(force) {
   // como una sola operación atómica): si otro dispositivo escribe justo en el medio,
   // Firestore reintenta solo esta operación con los datos frescos — así dos guardados
   // casi simultáneos (aunque sean de grupos o módulos distintos) nunca se pisan entre sí.
-  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes','gdv_ministerios','gdv_areas_servicio','gdv_celebraciones','gdv_celeb_marcas'];
-  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes','gdv_ministerios':'_tomb_gdv_ministerios','gdv_areas_servicio':'_tomb_gdv_areas_servicio','gdv_celebraciones':'_tomb_gdv_celebraciones'};
+  const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes','gdv_ministerios','gdv_areas_servicio','gdv_celebraciones','gdv_celeb_marcas','gdv_roles5'];
+  const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes','gdv_ministerios':'_tomb_gdv_ministerios','gdv_areas_servicio':'_tomb_gdv_areas_servicio','gdv_celebraciones':'_tomb_gdv_celebraciones','gdv_roles5':'_tomb_gdv_roles5'};
   const TOMB_KEYS=Object.values(TOMB_MAP);
   try {
     const uploadTs=Date.now();
@@ -517,7 +517,7 @@ window.fbUpload = async function(force) {
           });
           keys.forEach(function(k){
             if(MERGE_KEYS.includes(k) && cloudData[k]!==undefined){
-              localStorage.setItem(k, mergeByTs(localStorage.getItem(k), cloudData[k], TOMB_MAP[k]));
+              localStorage.setItem(k, mergeByTs(localStorage.getItem(k), cloudData[k], TOMB_MAP[k], k==='gdv_roles5'?{descartarLocalesSinTs:true}:undefined));
             }
             if(k==='gdv_celeb_marcas') celebPurgarMarcasLS();
           });
@@ -557,8 +557,12 @@ window.fbUpload = async function(force) {
 // ── Download: read all docs and merge to localStorage ──
 // Merge genérico por id+_ts: gana el registro más reciente de cada id
 // Funciona para members, records, discRecords, ngRecords, etc.
-function mergeByTs(localStr, cloudStr, tombKey){
+// opts.descartarLocalesSinTs: un registro que está SOLO en este dispositivo y no tiene _ts es una copia
+// vieja de algo que en la nube ya no existe (se borró antes de que hubiera tombstones) — no se resucita.
+// Se usa para las Funciones (gdv_roles5): todo alta o edición de Función lleva _ts desde zzw.
+function mergeByTs(localStr, cloudStr, tombKey, opts){
   try{
+    const descartarSinTs=!!(opts&&opts.descartarLocalesSinTs);
     const local=JSON.parse(localStr||'[]');
     const cloud=JSON.parse(cloudStr||'[]');
     const tombIds=new Set();
@@ -581,7 +585,7 @@ function mergeByTs(localStr, cloudStr, tombKey){
       const l=localMap[id];
       const c=cloudMap[id];
       if(!l){ merged.push(c); return; }
-      if(!c){ merged.push(l); return; }
+      if(!c){ if(descartarSinTs&&!l._ts) return; merged.push(l); return; }
       // Ambos existen: gana el más reciente por _ts
       const lTs=parseInt(l._ts||l.ts&&new Date(l.ts).getTime()||'0');
       const cTs=parseInt(c._ts||c.ts&&new Date(c.ts).getTime()||'0');
@@ -731,8 +735,8 @@ window.fbDownload = async function() {
               var fbTs=parseInt(data['_ts']||'0');
               var localTs=parseInt(localStorage.getItem('_local_ts_'+k)||'0');
               // Arrays que se mergean registro a registro por _ts (nunca pisar en bloque)
-              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes','gdv_ministerios','gdv_areas_servicio','gdv_celebraciones','gdv_celeb_marcas'];
-              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes','gdv_ministerios':'_tomb_gdv_ministerios','gdv_areas_servicio':'_tomb_gdv_areas_servicio','gdv_celebraciones':'_tomb_gdv_celebraciones'};
+              const MERGE_KEYS=['gdv_m5','gdv_r5','gdv_disc_records','gdv_disc_cursadas','gdv_disc_inscripciones','gdv_ng_records','gdv_checklists','gdv_checklist_tareas','gdv_checklist_secciones','gdv_formularios','gdv_form_respuestas','gdv_form_analisis','gdv_eventos','gdv_campanas','gdv_ng5','gdv_disc_pasos','of5_cursadas','gdv_oracion_motivos','gdv_oracion_mensajes','gdv_ministerios','gdv_areas_servicio','gdv_celebraciones','gdv_celeb_marcas','gdv_roles5'];
+              const TOMB_MAP={'gdv_m5':'_tomb_gdv_m5','gdv_r5':'_tomb_gdv_r5','gdv_disc_records':'_tomb_gdv_disc_records','gdv_disc_cursadas':'_tomb_gdv_disc_cursadas','gdv_disc_inscripciones':'_tomb_gdv_disc_inscripciones','gdv_ng_records':'_tomb_gdv_ng_records','gdv_checklists':'_tomb_gdv_checklists','gdv_checklist_tareas':'_tomb_gdv_checklist_tareas','gdv_checklist_secciones':'_tomb_gdv_checklist_secciones','gdv_formularios':'_tomb_gdv_formularios','gdv_form_respuestas':'_tomb_gdv_form_respuestas','gdv_form_analisis':'_tomb_gdv_form_analisis','gdv_eventos':'_tomb_gdv_eventos','gdv_campanas':'_tomb_gdv_campanas','gdv_ng5':'_tomb_gdv_ng5','gdv_disc_pasos':'_tomb_gdv_disc_pasos','of5_cursadas':'_tomb_of5_cursadas','gdv_oracion_motivos':'_tomb_gdv_oracion_motivos','gdv_oracion_mensajes':'_tomb_gdv_oracion_mensajes','gdv_ministerios':'_tomb_gdv_ministerios','gdv_areas_servicio':'_tomb_gdv_areas_servicio','gdv_celebraciones':'_tomb_gdv_celebraciones','gdv_roles5':'_tomb_gdv_roles5'};
               const TOMB_KEYS=Object.values(TOMB_MAP);
               if(TOMB_KEYS.includes(k)){
                 // Tombstones: siempre mezclar (unión por id, gana el más reciente) — deben
@@ -740,7 +744,7 @@ window.fbDownload = async function() {
                 localStorage.setItem(k, mergeTombstones(localStorage.getItem(k), data[k]));
               } else if(MERGE_KEYS.includes(k)){
                 // Siempre mergear por id+ts, independientemente del timestamp del documento
-                localStorage.setItem(k, mergeByTs(localStorage.getItem(k), data[k], TOMB_MAP[k]));
+                localStorage.setItem(k, mergeByTs(localStorage.getItem(k), data[k], TOMB_MAP[k], k==='gdv_roles5'?{descartarLocalesSinTs:true}:undefined));
                 if(k==='gdv_celeb_marcas') celebPurgarMarcasLS();
               } else if(k==='gdv_u5'){
                 localStorage.setItem(k, fbTs>=localTs ? mergeUsersCif(data[k], localStorage.getItem(k)) : mergeUsersCif(localStorage.getItem(k), data[k]));
@@ -827,7 +831,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzv';
+const APP_VERSION = '2026-08-24-zzw';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -1460,7 +1464,8 @@ function funcionesAutoAsegurarDefs(){
     return !actuales.some(function(r){return r.id===d.id;});
   });
   if(faltan.length){
-    S.roles=actuales.concat(faltan.map(function(d){return Object.assign({},d);}));
+    var ahoraTs=Date.now(); // con _ts: si no, el merge de Funciones la descartaría como copia vieja
+    S.roles=actuales.concat(faltan.map(function(d){return Object.assign({},d,{_ts:ahoraTs});}));
     console.warn('[FUNCIONES] Re-creadas definiciones faltantes:', faltan.map(function(d){return d.id;}).join(', '));
   }
   return faltan.map(function(d){return d.id;});
@@ -1680,8 +1685,9 @@ async function initStorage(){
   // Run permissions migration for any new keys
   await migratePermisos();
   missingRoles.forEach(function(nr){
+    if(funcionEliminadaAProposito(nr.id)) return; // se eliminó desde Configuración → no re-crearla
     if(!S.roles.find(function(r){return r.id===nr.id;})){
-      S.roles.push(nr); migrated=true;
+      S.roles=S.roles.concat([Object.assign({},nr,{_ts:Date.now()})]); migrated=true;
     }
   });
   if(migrated) await saveK(SK.roles,S.roles);
@@ -12681,46 +12687,25 @@ async function cfgSaveRole(){
   if(cfgEditingRoleId){
     var existing=S.roles.find(x=>x.id===cfgEditingRoleId);
     snapshot=Object.assign({},existing);
-    Object.assign(existing,{name,color,desc});
+    Object.assign(existing,{name,color,desc,_ts:Date.now()});
   } else {
     nuevoRoleId=name.toLowerCase().replace(/\s+/g,'_')+Date.now();
-    S.roles.push({id:nuevoRoleId,name,color,desc});
+    S.roles=S.roles.concat([{id:nuevoRoleId,name,color,desc,_ts:Date.now()}]);
   }
   await saveK(SK.roles,S.roles);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     if(esNuevo){ S.roles=S.roles.filter(function(r){return r.id!==nuevoRoleId;}); }
-    else { var ex2=S.roles.find(function(r){return r.id===cfgEditingRoleId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
+    else { var ex2=S.roles.find(function(r){return r.id===cfgEditingRoleId;}); if(ex2&&snapshot) funcionRestaurarExacto(ex2,snapshot); }
     await saveK(SK.roles,S.roles);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
   cfgCloseRoleForm();cfgRenderRoles();
 }
-async function cfgDeleteRole(id){
-  if(esFuncionAutomatica(id)){ avisoFuncionAutomatica(id); return; }
-  if(!confirm('¿Eliminar este rol? Se quitará de todos los miembros.'))return;
-  var role=S.roles.find(function(r){return r.id===id;});
-  var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
-  S.roles=S.roles.filter(r=>r.id!==id);
-  S.members.forEach(m=>{ if((m.roles||[]).includes(id)){ m.roles=m.roles.filter(rid=>rid!==id); funcionBaseSiVacio(m); } });
-  // También su fila de Permisos, para que no quede ningún acceso colgado de una Función que ya no existe
-  var permAnt=PERMISOS[id]; if(permAnt!==undefined) delete PERMISOS[id];
-  await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
-  if(permAnt!==undefined) await savePermisos();
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    if(role) S.roles.push(role);
-    afectados.forEach(function(a){ a.m.roles=a.roles; });
-    if(permAnt!==undefined){ PERMISOS[id]=permAnt; await savePermisos(); }
-    await saveK(SK.roles,S.roles);await saveK(SK.members,S.members);
-    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
-    return;
-  }
-  cfgRenderRoles();
-}
+// Código viejo (sin botón que lo llame): delega en la única función de eliminar Funciones.
+async function cfgDeleteRole(id){ return funcionEliminar(id, cfgRenderRoles); }
 function cfgCloseRoleForm(){document.getElementById('cfg-role-form').classList.add('hidden');cfgEditingRoleId=null;}
 
 // ════════════════════════════════════════════════════════════
@@ -19271,17 +19256,17 @@ async function saveRoleModal(){
   if(roleModalEditingId){
     var existing=S.roles.find(x=>x.id===roleModalEditingId);
     snapshot=Object.assign({},existing);
-    Object.assign(existing,{name,color,desc});
+    Object.assign(existing,{name,color,desc,_ts:Date.now()});
   } else {
     nuevoId=name.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')+Date.now();
-    S.roles.push({id:nuevoId,name,color,desc});
+    S.roles=S.roles.concat([{id:nuevoId,name,color,desc,_ts:Date.now()}]);
   }
   await saveK(SK.roles,S.roles);
   try{
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     if(esNuevo){ S.roles=S.roles.filter(function(r){return r.id!==nuevoId;}); }
-    else { var ex2=S.roles.find(function(r){return r.id===roleModalEditingId;}); if(ex2&&snapshot) Object.assign(ex2,snapshot); }
+    else { var ex2=S.roles.find(function(r){return r.id===roleModalEditingId;}); if(ex2&&snapshot) funcionRestaurarExacto(ex2,snapshot); }
     await saveK(SK.roles,S.roles);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
@@ -19374,26 +19359,87 @@ async function rmCambiar(memberId,agregar){
   try{ if(typeof cfgRenderRoles==='function') cfgRenderRoles(); }catch(_e){}
 }
 
-async function deleteRoleGlobal(id, callback){
-  if(esFuncionAutomatica(id)){ avisoFuncionAutomatica(id); return; }
-  const r=S.roles.find(x=>x.id===id);
-  if(!confirm(`¿Eliminar el rol "${r?.name}"? Se quitará de todos los miembros.`)) return;
-  var afectados=S.members.filter(function(m){return (m.roles||[]).includes(id);}).map(function(m){return {m:m,roles:m.roles.slice()};});
-  S.roles=S.roles.filter(x=>x.id!==id);
-  S.members.forEach(m=>{ if((m.roles||[]).includes(id)){ m.roles=m.roles.filter(rid=>rid!==id); funcionBaseSiVacio(m); } });
-  await saveK(SK.roles,S.roles);
-  await saveK(SK.members,S.members);
-  try{
-    if(typeof window.fbUpload==='function') await window.fbUpload(true);
-  }catch(e){
-    if(r) S.roles.push(r);
-    afectados.forEach(function(a){ a.m.roles=a.roles; });
-    await saveK(SK.roles,S.roles);
-    await saveK(SK.members,S.members);
-    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
-    return;
+async function deleteRoleGlobal(id, callback){ return funcionEliminar(id, callback); }
+
+// ── Eliminar una Función (zzw) ──
+// Única forma de eliminar una Función. Para que un dispositivo desactualizado no la vuelva a traer:
+//  • tombstone en _tomb_gdv_roles5 (las Funciones se fusionan por id+_ts desde zzw);
+//  • a cada persona que la tenía se le sube el _ts (si no, el merge de personas le devuelve la Función);
+//  • su fila de Permisos se borra EN LA NUBE con fbSavePermisos (fbUpload no sube gdv_permisos).
+// Orden: primero Permisos (si falla, no se tocó nada más), después Funciones + personas. Si falla la
+// segunda parte, se revierte todo, incluida la fila de Permisos.
+function funcionEliminadaAProposito(id){
+  try{ return JSON.parse(localStorage.getItem('_tomb_'+SK.roles)||'[]').some(function(t){ return String(t.id)===String(id); }); }
+  catch(_e){ return false; }
+}
+// Restaura un objeto a una foto exacta: también borra los campos que la foto no tenía (ej: _ts nuevo).
+function funcionRestaurarExacto(obj, foto){
+  Object.keys(obj).forEach(function(k){ if(!Object.prototype.hasOwnProperty.call(foto,k)) delete obj[k]; });
+  Object.assign(obj, foto);
+}
+function funcionQuitarTombstoneLocal(id){
+  var tk='_tomb_'+SK.roles, lista=[];
+  try{ lista=JSON.parse(localStorage.getItem(tk)||'[]'); }catch(_e){}
+  localStorage.setItem(tk, JSON.stringify(lista.filter(function(t){ return String(t.id)!==String(id); })));
+}
+async function funcionEliminar(id, callback){
+  if(esFuncionAutomatica(id)){ avisoFuncionAutomatica(id); return false; }
+  var r=(S.roles||[]).find(function(x){return x.id===id;});
+  if(!r) return false;
+  if(id==='super_admin'){ alert('La Función Super Admin no se puede eliminar.'); return false; }
+  if(id===funcionBaseId()){ alert('"'+r.name+'" es la Función Base (la tiene quien no tiene otra). No se puede eliminar.'); return false; }
+  var nAf=(S.members||[]).filter(function(m){return (m.roles||[]).includes(id);}).length;
+  if(!confirm('¿Eliminar la Función "'+r.name+'"?'+(nAf?'\n\nSe quitará a '+nAf+' persona'+(nAf!==1?'s':'')+'.':'')+'\nTambién se borra su fila de Permisos.')) return false;
+
+  var rolesAnt=S.roles;
+  var fotos=(S.members||[]).filter(function(m){return (m.roles||[]).includes(id)||(m.rolesAuto||[]).includes(id)||(m.rolesManuales||[]).includes(id);})
+    .map(function(m){ return {m:m, foto:JSON.parse(JSON.stringify(m))}; });
+  var permAnt=(PERMISOS&&PERMISOS[id]!==undefined)?PERMISOS[id]:undefined;
+
+  // 1) Permisos en la nube
+  if(permAnt!==undefined){
+    delete PERMISOS[id];
+    await savePermisos();
+    try{
+      var ts1=await window.fbSavePermisos(localStorage.getItem('gdv_permisos'));
+      localStorage.setItem('_local_ts_gdv_permisos', String(ts1));
+    }catch(e){
+      PERMISOS[id]=permAnt; await savePermisos();
+      alert('No se pudo eliminar (Permisos no se guardaron en la nube). Verificá tu conexión e intentá de nuevo.');
+      return false;
+    }
   }
+  // 2) Función + personas
+  var ahora=Date.now();
+  S.roles=rolesAnt.filter(function(x){return x.id!==id;}); // copy-on-write
+  addTombstone(SK.roles, id);
+  fotos.forEach(function(f){
+    var m=f.m;
+    m.roles=(m.roles||[]).filter(function(x){return x!==id;});
+    if(m.rolesAuto) m.rolesAuto=m.rolesAuto.filter(function(x){return x!==id;});
+    if(m.rolesManuales) m.rolesManuales=m.rolesManuales.filter(function(x){return x!==id;});
+    m._ts=ahora;
+    funcionBaseSiVacio(m);
+  });
+  await saveK(SK.roles,S.roles); await saveK(SK.members,S.members);
+  try{
+    await window.fbUpload(true);
+  }catch(e){
+    S.roles=rolesAnt;
+    funcionQuitarTombstoneLocal(id);
+    fotos.forEach(function(f){ funcionRestaurarExacto(f.m, f.foto); });
+    await saveK(SK.roles,S.roles); await saveK(SK.members,S.members);
+    if(permAnt!==undefined){
+      PERMISOS[id]=permAnt; await savePermisos();
+      try{ var ts2=await window.fbSavePermisos(localStorage.getItem('gdv_permisos')); localStorage.setItem('_local_ts_gdv_permisos', String(ts2)); }
+      catch(_e2){ console.warn('No se pudo restaurar la fila de Permisos en la nube:', _e2); }
+    }
+    alert('No se pudo eliminar. Verificá tu conexión e intentá de nuevo.');
+    return false;
+  }
+  showToast('🗑 Función "'+r.name+'" eliminada','#1F4E79');
   if(callback) callback();
+  return true;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -23056,7 +23102,8 @@ async function importarTodo(event){
       S.groups  = backup.gdv.groups  || [];
       S.records = backup.gdv.records || [];
       S.members = backup.gdv.members || [];
-      S.roles   = backup.gdv.roles   || [];
+      var _tsRest=Date.now();
+      S.roles   = (backup.gdv.roles   || []).map(function(r){ return Object.assign({},r,{_ts:_tsRest}); }); // _ts: el merge de Funciones no las descarta
       await saveK(SK.users,   S.users);
       await saveK(SK.groups,  S.groups);
       await saveK(SK.records, S.records);
@@ -24306,9 +24353,9 @@ function celebEquipoCuentasHTML(){
   });
   if(!filas.length) return '<div class="card" style="margin-bottom:.75rem"><div style="font-weight:700;color:#1F4E79;font-size:13px">⛪ Cuentas del equipo de Conexión</div><div style="font-size:12.5px;color:#92400E;margin-top:4px">No hay un Área de servicio activa "Conexión" con Coordinadores/as o Colaboradores/as.</div></div>';
   return '<div class="card" style="margin-bottom:.75rem"><div style="font-weight:700;color:#1F4E79;font-size:13px;margin-bottom:4px">⛪ Cuentas del equipo de Conexión</div>'+
-    '<div style="font-size:12px;color:#6B7280;margin-bottom:8px">Para cargar Asistencia Celebraciones cada integrante necesita un usuario <strong>vinculado a su persona</strong> (Configuración → Usuarios). Así recibe su Función automática.</div>'+
+    '<div style="font-size:12px;color:#6B7280;margin-bottom:8px">Solo necesita usuario quien vaya a <strong>anotar</strong> Asistencia Celebraciones o trabajar en Conexión. Si lo tiene, conviene que esté <strong>vinculado a su persona</strong> (Configuración → Usuarios) para recibir su Función automática.</div>'+
     filas.map(function(f){
-      var b=f.estado==='ok'?'<span style="color:#166534">✅ usuario vinculado</span>':f.estado==='nombre'?'<span style="color:#B45309">⚠️ usuario sin vincular (coincide por nombre)</span>':'<span style="color:#DC2626">❌ sin usuario</span>';
+      var b=f.estado==='ok'?'<span style="color:#166534">✅ usuario vinculado</span>':f.estado==='nombre'?'<span style="color:#B45309">⚠️ usuario sin vincular (coincide por nombre)</span>':'<span style="color:#6B7280">— sin cuenta (solo si va a anotar)</span>';
       return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:4px 0;border-top:1px solid #F3F4F6;flex-wrap:wrap"><span>'+svcEsc(f.nombre)+' <span style="color:#6B7280">· '+svcEsc(f.rol)+'</span></span>'+b+'</div>';
     }).join('')+'</div>';
 }

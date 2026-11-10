@@ -972,7 +972,8 @@ const MODULES_PERM=[
     {key:'nuevos_ver_privados', label:'Ver datos privados: teléfono, barrio, fecha de nacimiento, motivo y comentarios (sin esto: consulta limitada)'},
   ]},
   {key:'celeb', label:'Asistencia Celebraciones', icon:'⛪', screens:[
-    {key:'celeb_cargar',     label:'Cargar asistencia (nominal o numérica) y cerrarla'},
+    {key:'celeb_cargar',     label:'Cargar asistencia (nominal, y numérica con su cierre)'},
+    {key:'celeb_cerrar',     label:'🔒 Cerrar y reabrir una carga nominal (con varios anotadores)'},
     {key:'celeb_historico',  label:'Ver el Histórico de celebraciones'},
     {key:'celeb_editar',     label:'Editar una celebración ya cerrada (agregar/quitar personas, corregir números)'},
     {key:'celeb_ausencias',  label:'Ver la alerta de ausencias ("No lo vemos hace N domingos")'},
@@ -1043,7 +1044,7 @@ const DEFAULT_PERMISOS={
   disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   // Funciones automáticas del equipo del Área Conexión (se pueden ajustar en Configuración → Permisos)
-  conexion_coord: {nuevos:'ejecuta',nuevos_editar:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_mensaje_wa:'ejecuta',nuevos_exportar:'ejecuta',nuevos_ver_privados:'ejecuta',celeb_cargar:'ejecuta',celeb_historico:'ejecuta',celeb_editar:'ejecuta',celeb_ausencias:'ejecuta',celeb_dashboard:'ejecuta'},
+  conexion_coord: {nuevos:'ejecuta',nuevos_editar:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_mensaje_wa:'ejecuta',nuevos_exportar:'ejecuta',nuevos_ver_privados:'ejecuta',celeb_cargar:'ejecuta',celeb_cerrar:'ejecuta',celeb_historico:'ejecuta',celeb_editar:'ejecuta',celeb_ausencias:'ejecuta',celeb_dashboard:'ejecuta'},
   conexion_colab: {nuevos:'ejecuta',nuevos_editar:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ninguno',nuevos_eliminar:'ninguno',nuevos_mensaje_wa:'ninguno',nuevos_exportar:'ninguno',nuevos_ver_privados:'ejecuta',celeb_cargar:'ejecuta',celeb_historico:'ejecuta',celeb_dashboard:'ejecuta'},
   contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_contactar:'ejecuta',nuevos_gestionar:'ninguno',nuevos_eliminar:'ninguno'}
 };
@@ -4001,6 +4002,7 @@ function renderModulesGrid(){
   }).join('');
   // Render upcoming birthdays and events
   setTimeout(renderHomeCumples, 50);
+  setTimeout(function(){ if(typeof celebAutoCerrarYAvisar==='function') celebAutoCerrarYAvisar(); }, 3000);
   setTimeout(renderHomeEventosEspeciales, 50);
   setTimeout(renderHomeActividadesGrupos, 50);
 }
@@ -4331,6 +4333,8 @@ function cfgRenderConexion(wrap){
       cfgNvRespAutoHTML()+
       '<div style="font-weight:700;color:#1F4E79;font-size:13px;margin:14px 0 8px;padding-top:10px;border-top:1px solid #E5E7EB">⛪ Asistencia Celebraciones</div>'+
       filaNum('cfg-celeb-ausN','Domingos sin venir para la alerta de ausencias',celebAusenciasN(),1,12,'"No lo vemos hace N domingos". Solo cuentan los domingos con asistencia nominal cerrada (los numéricos no cuentan como ausencia).')+
+      filaNum('cfg-celeb-cuadA','Cuadrar Nuevos: días antes del domingo',celebCuadAntes(),0,14,'Desde cuándo se ofrecen Nuevos para vincular a un domingo (0 = desde el mismo domingo).')+
+      filaNum('cfg-celeb-cuadH','Cuadrar Nuevos: días hábiles después del domingo',celebCuadHabiles(),0,20,'Hasta cuándo (lunes a viernes; 3 = hasta el miércoles). Se puede ampliar en cada caso desde la ventana de cuadre.')+
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap"><div style="flex:1;min-width:220px"><div style="font-size:13px;color:#1F2937;font-weight:600">Horario habitual de la celebración</div><div style="font-size:11.5px;color:#6B7280">Se propone al iniciar una carga. Se puede cambiar en cada celebración.</div></div>'+
         '<input type="time" id="cfg-celeb-hora" value="'+svcEsc(celebHorarioDef())+'" style="width:110px"></div>'+
       '<button class="btn btn-primary" onclick="cfgSaveConexion()">💾 Guardar</button>'+
@@ -4375,10 +4379,12 @@ async function cfgSaveConexion(){
     hombreId:parseInt(document.getElementById('cfg-nv-ra-hombre')?.value)||null};
   if(ra.activo&&!ra.mujerId&&!ra.hombreId){ alert('Para activar el Responsable automático elegí al menos una persona (Mujeres u Hombres).'); return; }
   var caN=leer('cfg-celeb-ausN',1,12,'Domingos para la alerta de ausencias'); if(caN===null) return;
+  var cqA=leer('cfg-celeb-cuadA',0,14,'Cuadrar Nuevos: días antes'); if(cqA===null) return;
+  var cqH=leer('cfg-celeb-cuadH',0,20,'Cuadrar Nuevos: días hábiles después'); if(cqH===null) return;
   var caH=String(document.getElementById('cfg-celeb-hora')?.value||'').trim();
   if(!/^\d{2}:\d{2}$/.test(caH)){ alert('Horario habitual de la celebración: elegí una hora válida.'); return; }
   var snapHome=JSON.stringify(S.homeConfig||{}), prevAlerta=localStorage.getItem('gdv_nv_dias_alerta');
-  S.homeConfig=Object.assign({},S.homeConfig||{},{nvSemanasPeriodo:se,nvAsistParticipando:as,reconectarSemanas:rs,nvRespAuto:ra,celebAusenciasN:caN,celebHorarioDef:caH,_ts:Date.now()});
+  S.homeConfig=Object.assign({},S.homeConfig||{},{nvSemanasPeriodo:se,nvAsistParticipando:as,reconectarSemanas:rs,nvRespAuto:ra,celebAusenciasN:caN,celebCuadAntes:cqA,celebCuadHabiles:cqH,celebHorarioDef:caH,_ts:Date.now()});
   try{
     await saveK(SK.homeConfig,S.homeConfig);
     await saveK('gdv_nv_dias_alerta',al);
@@ -23216,11 +23222,17 @@ function tryRestoreSession(){
 var CELEB_AUS_DEF=3, CELEB_HORA_DEF='10:30', CELEB_SYNC_MS=2500;
 var CELEB_CONDICIONES=['Miembro','Asistente Bautizado','Asistente NO Bautizado','Nuevo'];
 function celebAusenciasN(){ var n=parseInt(S.homeConfig&&S.homeConfig.celebAusenciasN,10); return (n>=1&&n<=12)?n:CELEB_AUS_DEF; }
+function celebCuadAntes(){ var n=parseInt(S.homeConfig&&S.homeConfig.celebCuadAntes,10); return (n>=0&&n<=14)?n:0; }
+function celebCuadHabiles(){ var n=parseInt(S.homeConfig&&S.homeConfig.celebCuadHabiles,10); return (n>=0&&n<=20)?n:3; }
+// Suma n días hábiles (lunes a viernes) a una fecha 'AAAA-MM-DD'
+function celebSumarHabiles(fecha,n){ var d=parseLocalDate(fecha); while(n>0){ d.setDate(d.getDate()+1); var w=d.getDay(); if(w!==0&&w!==6) n--; } return dateToStr(d); }
+function celebRestarDias(fecha,n){ var d=parseLocalDate(fecha); d.setDate(d.getDate()-n); return dateToStr(d); }
 function celebHorarioDef(){ var h=String((S.homeConfig&&S.homeConfig.celebHorarioDef)||''); return /^\d{2}:\d{2}$/.test(h)?h:CELEB_HORA_DEF; }
 
 // ── Permisos ──
 function canCelebCargar(){    return isSuperAdmin()||canEjecutar('celeb_cargar'); }
 function canCelebEditar(){    return isSuperAdmin()||canEjecutar('celeb_editar'); }
+function canCelebCerrar(){    return isSuperAdmin()||canEjecutar('celeb_cerrar'); }
 function canCelebHistorico(){ return isSuperAdmin()||canScreen('celeb_historico')||canCelebEditar(); }
 function canCelebAusencias(){ return isSuperAdmin()||canScreen('celeb_ausencias'); }
 function canCelebDashboard(){ return isSuperAdmin()||canScreen('celeb_dashboard'); }
@@ -23277,11 +23289,15 @@ function celebMarcaDe(celebId,memberId){ return (S.celebMarcas||[]).find(functio
 
 // ── Niños del domingo: si hay registro de las salas NG para esa fecha, manda ese (nunca dos fuentes) ──
 function celebNinosNG(fecha){
-  var hay=false, total=0, maestros={};
+  var hay=false, total=0, maestros={}, semana=getWeekKey(fecha);
   (S.ngRecords||[]).forEach(function(r){
-    if(!r||r.fecha!==fecha||r.sinEncuentro) return;
+    if(!r||r.sinEncuentro||!r.fecha) return;
     var ng=(S.ngComunidades||[]).find(function(x){return Number(x.id)===Number(r.comunidadId);});
     if(!ng||ngCategoriaDeTipo(ng.tipo)!=='Niños') return;
+    // NG ya propone como fecha el día de la sala, aunque se cargue días después. Si quedó con otra
+    // fecha de la misma semana y la sala es de domingo (o no tiene día), igual se toma.
+    var coincide=r.fecha===fecha||(getWeekKey(r.fecha)===semana&&(!ng.dia||ng.dia==='Domingo'));
+    if(!coincide) return;
     hay=true;
     Object.entries(r.asistencia||{}).forEach(function(e){
       if(!e[1]||e[1].state!=='presente') return;
@@ -23293,8 +23309,23 @@ function celebNinosNG(fecha){
 }
 // Nuevos cargados en Conexión con fecha de registro de ese día (formulario / QR existente)
 function celebNuevosCargados(fecha){
-  var aa=fmtAA(fecha);
-  return (S.members||[]).filter(function(m){ return m&&m.condicion!=='Campaña'&&m.fechaRegistro&&fmtAA(m.fechaRegistro)===aa; });
+  var ids=celebNuevosDiaIds(fecha);
+  return (S.members||[]).filter(function(m){ return m&&ids.indexOf(Number(m.id))>=0; });
+}
+// ids de los Nuevos de ese domingo: fecha de registro = ese día (sin Campaña) + los vinculados a mano
+// desde el Histórico (c.nuevosIds), para los que se cargaron en Conexión días después.
+function celebNuevosDiaIds(fecha){
+  var aa=fmtAA(fecha), out=[];
+  (S.members||[]).forEach(function(m){ if(m&&m.condicion!=='Campaña'&&m.fechaRegistro&&fmtAA(m.fechaRegistro)===aa) out.push(Number(m.id)); });
+  celebDeFecha(fecha).forEach(function(c){ (c.nuevosIds||[]).forEach(function(id){ id=Number(id); if(out.indexOf(id)<0&&(S.members||[]).some(function(m){return Number(m.id)===id;})) out.push(id); }); });
+  return out;
+}
+// Domingo al que ya está asignado un Nuevo (por fecha de registro o vinculado), o '' si ninguno
+function celebDomingoDeNuevo(m){
+  var reg=celebNormFecha(m.fechaRegistro);
+  if(reg&&(S.celebraciones||[]).some(function(c){return c&&c.fecha===reg;})) return reg;
+  var c=(S.celebraciones||[]).find(function(c){ return c&&(c.nuevosIds||[]).map(Number).indexOf(Number(m.id))>=0; });
+  return c?c.fecha:'';
 }
 function celebNum(v){ var n=parseInt(v,10); return isNaN(n)||n<0?0:n; }
 
@@ -23302,51 +23333,59 @@ function celebNum(v){ var n=parseInt(v,10); return isNaN(n)||n<0?0:n; }
 // en numérica se resta "Estuvieron en ambas".
 function celebStatsDomingo(fecha){
   var cels=celebDeFecha(fecha);
-  var set={}, noIdent=0, nuevosExtra=0, numerico=0, declarados=0, ninosManual=0, hayManual=false, hayNominal=false, especial=false, abiertas=0;
-  var regAA=fmtAA(fecha);
+  var M={}, noIdent=0, declNom=0, declNum=0, numTot=0, ninosManual=0, hayManual=false, hayNominal=false, especial=false, abiertas=0;
   cels.forEach(function(c){
     if(c.estado!=='cerrada') abiertas++;
     if(c.especial) especial=true;
-    declarados+=celebNum(c.nuevosDeclarados);
     if(c.ninosManual!==undefined&&c.ninosManual!==null&&c.ninosManual!==''){ hayManual=true; ninosManual+=celebNum(c.ninosManual); }
-    if(c.modo==='numerico'){ numerico+=Math.max(0,celebNum(c.totalAuditorio)-celebNum(c.enAmbas)); return; }
+    if(c.modo==='numerico'){ numTot+=Math.max(0,celebNum(c.totalAuditorio)-celebNum(c.enAmbas)); declNum+=celebNum(c.nuevosDeclarados); return; }
     hayNominal=true;
-    var pres=celebPresentesDe(c);
-    pres.forEach(function(id){ set[id]=true; });
+    celebPresentesDe(c).forEach(function(id){ M[id]=true; });
     noIdent+=celebNum(c.noIdentificados);
-    // Nuevos del día que el anotador declaró pero que no estaban en la lista para marcar
-    var nuevosMarcados=pres.filter(function(id){ var m=(S.members||[]).find(function(x){return Number(x.id)===id;}); return m&&m.fechaRegistro&&fmtAA(m.fechaRegistro)===regAA; }).length;
-    nuevosExtra+=Math.max(0,celebNum(c.nuevosDeclarados)-nuevosMarcados);
+    declNom+=celebNum(c.nuevosDeclarados);
   });
-  var identificados=Object.keys(set).length;
-  var nominalTotal=identificados+noIdent+nuevosExtra;
-  var auditorio=nominalTotal+numerico;
+  var nd=celebNuevosDiaIds(fecha), ids=Object.keys(M).map(Number);
+  var nuevosMarcados=ids.filter(function(id){return nd.indexOf(id)>=0;}).length;
+  // Nominal: Nuevos del día = lo declarado, o los marcados/vinculados si son más; Rebaños = el resto de los marcados + no identificados
+  var nuevosNom=hayNominal?Math.max(declNom,nuevosMarcados):0;
+  var rebNom=hayNominal?(ids.length-nuevosMarcados+noIdent):0;
+  // Numérica: los presentes del auditorio ya incluyen a los Nuevos declarados
+  var nuevosNum=Math.min(declNum,numTot), rebNum=numTot-nuevosNum;
   var ng=celebNinosNG(fecha);
   var ninos=ng.hay?ng.total:(hayManual?ninosManual:null);
-  // Maestros/líderes presentes en su sala: cuentan una sola vez. Si además se los marcó en el
-  // auditorio ya están en "identificados"; si no, se suman aparte.
-  var maestrosSala=(ng.maestrosIds||[]).filter(function(id){ return !set[id]; }).length;
-  var cargados=celebNuevosCargados(fecha).length;
-  return {fecha:fecha,cels:cels,identificados:identificados,noIdent:noIdent,nuevosExtra:nuevosExtra,numerico:numerico,
-    auditorio:auditorio,ninos:ninos,ninosFuente:ng.hay?'ng':(hayManual?'manual':''),maestrosSala:maestrosSala,total:auditorio+(ninos||0)+maestrosSala,
-    cobertura:hayNominal&&nominalTotal>0?Math.round(identificados/nominalTotal*100):null,hayNominal:hayNominal,
+  // Maestros presentes en su sala: cuentan una sola vez (si además se los marcó, ya están en Rebaños)
+  var maestrosSala=(ng.maestrosIds||[]).filter(function(id){ return !M[id]; }).length;
+  var rebanos=rebNom+rebNum+maestrosSala, nuevos=nuevosNom+nuevosNum;
+  var declarados=declNom+declNum, cargados=nd.length;
+  return {fecha:fecha,cels:cels,identificados:ids.length,noIdent:noIdent,numerico:numTot,
+    rebanos:rebanos,nuevos:nuevos,ninos:ninos,ninosFuente:ng.hay?'ng':(hayManual?'manual':''),maestrosSala:maestrosSala,
+    auditorio:rebNom+rebNum+nuevos,total:rebanos+nuevos+(ninos||0),
+    cobertura:hayNominal&&(rebNom+nuevosNom)>0?Math.round(ids.length/(rebNom+nuevosNom)*100):null,hayNominal:hayNominal,
     nuevosDeclarados:declarados,nuevosCargados:cargados,nuevosPendientes:Math.max(0,declarados-cargados),
-    especial:especial,abiertas:abiertas,presentesIds:Object.keys(set).map(Number)};
+    especial:especial,abiertas:abiertas,presentesIds:ids};
 }
 function celebDomingos(){ var f={}; (S.celebraciones||[]).forEach(function(c){ if(c&&c.fecha) f[c.fecha]=true; }); return Object.keys(f).sort().reverse(); }
-function celebCuadreHTML(st){
+function celebCuadreHTML(st,clic){
   if(!st.nuevosDeclarados) return '';
-  if(st.nuevosPendientes>0) return '<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#FEF3C7;color:#92400E;font-size:11.5px;font-weight:600">🌱 Nuevos pendientes de cuadrar: '+st.nuevosPendientes+' de '+st.nuevosDeclarados+'</span>';
-  return '<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#DCFCE7;color:#166534;font-size:11.5px;font-weight:600">🌱 Nuevos cuadrados: '+st.nuevosDeclarados+'</span>';
+  var on=clic&&canCelebEditar()?' onclick="celebCuadrarNuevos(\''+st.fecha+'\')" style="cursor:pointer;':' style="';
+  if(st.nuevosPendientes>0) return '<span'+on+'display:inline-block;padding:2px 8px;border-radius:999px;background:#FEF3C7;color:#92400E;font-size:11.5px;font-weight:600" title="'+(clic&&canCelebEditar()?'Tocar para vincular a los Nuevos cargados en Conexión':'')+'">🌱 Nuevos pendientes de cuadrar: '+st.nuevosPendientes+' de '+st.nuevosDeclarados+(clic&&canCelebEditar()?' ›':'')+'</span>';
+  return '<span'+on+'display:inline-block;padding:2px 8px;border-radius:999px;background:#DCFCE7;color:#166534;font-size:11.5px;font-weight:600">🌱 Nuevos cuadrados: '+st.nuevosCargados+' de '+st.nuevosDeclarados+'</span>';
+}
+function celebLineaTotales(st){
+  var ninos=st.ninos===null?'<span style="color:#B45309" title="Sale del registro de las salas en Nuevas Generaciones (aparece solo cuando se carga) o del número manual del cierre">⏳ sin cargar</span>':'<strong>'+st.ninos+'</strong>'+(st.ninosFuente==='ng'?' <span style="color:#6B7280">(salas NG)</span>':'');
+  return 'Total <strong>'+st.total+'</strong> · Rebaños <strong>'+st.rebanos+'</strong>'+(st.maestrosSala?' <span style="color:#6B7280">(incl. '+st.maestrosSala+' maestro'+(st.maestrosSala!==1?'s':'')+' en salas)</span>':'')+
+    ' · Nuevos del día <strong>'+st.nuevos+'</strong> · Niños '+ninos+(st.cobertura!==null?' · Identificados '+st.identificados+' ('+st.cobertura+'%)':'');
 }
 
 // ── Índice de presencias por persona (domingos con asistencia nominal) ──
 function celebIndicePresencias(){
   var idx={};
+  function add(id,f){ var l=idx[id]||(idx[id]=[]); if(l.indexOf(f)<0) l.push(f); }
   (S.celebraciones||[]).forEach(function(c){
     if(!c||c.modo!=='nominal') return;
-    celebPresentesDe(c).forEach(function(id){ var l=idx[id]||(idx[id]=[]); if(l.indexOf(c.fecha)<0) l.push(c.fecha); });
+    celebPresentesDe(c).forEach(function(id){ add(id,c.fecha); });
   });
+  celebDomingos().forEach(function(f){ celebNuevosDiaIds(f).forEach(function(id){ add(id,f); }); });
   Object.keys(idx).forEach(function(k){ idx[k].sort().reverse(); });
   return idx;
 }
@@ -23395,6 +23434,7 @@ function openCeleb(){
   // Abre en Carga si hay una celebración abierta y puede cargar; si no, en la primera pestaña
   var abierta=(S.celebraciones||[]).some(function(c){return c&&c.estado==='abierta';});
   celebTab(canCelebCargar()&&abierta?'carga':tabs[0][0]);
+  celebAutoCerrarYAvisar();
 }
 function celebTab(t){
   celebTabActual=t;
@@ -23467,7 +23507,7 @@ async function celebNuevaCarga(){
 }
 
 // ── Carga nominal (pantalla oscura) ──
-var celebCarga={cerrando:false,id:null,vista:'pormarcar',buscar:'',agrupar:false,orden:null,pend:{},timer:null,sincronizando:false,error:false,unsub:null,wake:null};
+var celebCarga={cerrando:false,genero:'',pendObj:{},id:null,vista:'pormarcar',buscar:'',agrupar:false,orden:null,pend:{},timer:null,sincronizando:false,error:false,unsub:null,wake:null};
 function celebEntrarCarga(id){
   var c=celebGet(id);
   if(!c||c.estado!=='abierta'){ alert('Esa carga ya no está abierta.'); celebRefrescarTab(); return; }
@@ -23490,10 +23530,13 @@ function celebEntrarCarga(id){
         '<button onclick="celebSalirCarga()" style="background:none;border:1px solid #1F2933;color:#6B7280;border-radius:8px;padding:6px 10px;font-size:13px">← Salir</button>'+
         '<div style="text-align:center;flex:1;min-width:0"><div style="font-size:12px;color:#4B5563">'+svcEsc(celebFechaTxt(c.fecha))+' · '+svcEsc(c.horario)+'</div>'+
           '<div style="font-size:17px;color:#9CA3AF;font-weight:600">Marcados: <span id="celeb-cnt">0</span></div></div>'+
-        '<button onclick="celebAbrirCierre(\''+c.id+'\')" style="background:#0F2A1B;border:1px solid #14532D;color:#86EFAC;border-radius:8px;padding:6px 10px;font-size:13px">Cerrar asistencia</button>'+
+        (canCelebCerrar()?'<button onclick="celebAbrirCierre(\''+c.id+'\')" style="background:#0F2A1B;border:1px solid #14532D;color:#86EFAC;border-radius:8px;padding:6px 10px;font-size:13px">Cerrar asistencia</button>'
+          :'<button onclick="celebAbrirConfirmar(\''+c.id+'\')" style="background:#0F2A1B;border:1px solid #14532D;color:#86EFAC;border-radius:8px;padding:6px 10px;font-size:13px">✅ Terminé</button>')+
       '</div>'+
       '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">'+
         '<input id="celeb-buscar" type="search" placeholder="Buscar por nombre…" oninput="celebCarga.buscar=this.value;celebRenderLista()" autocomplete="off" style="flex:1;background:#0D1117;border:1px solid #1F2933;color:#9CA3AF;border-radius:8px;padding:9px 10px;font-size:15px">'+
+        '<select id="celeb-genero" onchange="celebSetGenero(this.value)" style="background:#0D1117;border:1px solid #1F2933;color:#9CA3AF;border-radius:8px;padding:8px 6px;font-size:13px;width:auto">'+
+          '<option value="">Todos</option><option value="H">Hombres</option><option value="M">Mujeres</option></select>'+
         '<label style="font-size:12px;color:#4B5563;white-space:nowrap"><input type="checkbox" onchange="celebCarga.agrupar=this.checked;celebRenderLista()" style="width:auto;margin-right:4px">por GdV</label>'+
       '</div>'+
       '<div style="display:flex;gap:6px;margin-top:8px">'+
@@ -23504,6 +23547,8 @@ function celebEntrarCarga(id){
     '</div>'+
     '<div id="celeb-lista" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch"></div>';
   document.body.appendChild(ov);
+  try{ celebCarga.genero=localStorage.getItem('celeb_genero_'+(currentUser&&currentUser.id))||''; }catch(e){ celebCarga.genero=''; }
+  var selG=document.getElementById('celeb-genero'); if(selG) selG.value=celebCarga.genero;
   celebRenderLista();
   // Escucha en vivo: lo que marcan los demás aparece/desaparece solo
   try{ if(celebCarga.unsub) celebCarga.unsub(); }catch(e){}
@@ -23532,14 +23577,49 @@ function celebOnRemoto(){
   if(!celebCarga.id) return;
   var c=celebGet(celebCarga.id);
   if(!c||c.estado!=='abierta'){
-    var pend=Object.keys(celebCarga.pend).length;
+    // Marcas de este celular que no llegaron antes del cierre: se nombran para poder corregirlas
+    var perdidas=Object.keys(celebCarga.pendObj).filter(function(k){ return celebCarga.pendObj[k].tipo!=='conf'; }).map(function(k){ var mk=celebCarga.pendObj[k]; return (mk.presente?'✓ ':'✗ ')+celebNombreDe(mk.memberId); });
+    celebCarga.pend={}; celebCarga.pendObj={};
     celebCortarCarga();
-    alert(c?('La asistencia fue cerrada'+(c.cerradaPorNombre?' por '+c.cerradaPorNombre:'')+'.'+(pend?' ⚠️ '+pend+' marca'+(pend!==1?'s':'')+' tuya'+(pend!==1?'s':'')+' no llegó a tiempo: avisale a quien la cerró para que la corrija desde el Histórico.':'')):'Esta celebración fue eliminada.');
+    if(!c) alert('Esta celebración fue eliminada.');
+    else alert('La asistencia fue cerrada'+(c.cerradaPorNombre?' por '+c.cerradaPorNombre:'')+'.'+
+      (perdidas.length?'\n\n⚠️ Estas marcas tuyas no llegaron a tiempo:\n'+perdidas.join('\n')+'\n\nAvisale a un/a Coordinador/a: puede reabrir la carga o corregirla desde el Histórico.':'\n\nSi se cerró antes de tiempo, un/a Coordinador/a puede reabrirla desde el Histórico.'));
     celebRefrescarTab();
     return;
   }
   celebRenderLista();
 }
+function celebSetGenero(g){
+  celebCarga.genero=g||'';
+  var selG=document.getElementById('celeb-genero'); if(selG&&selG.value!==celebCarga.genero) selG.value=celebCarga.genero;
+  try{ localStorage.setItem('celeb_genero_'+(currentUser&&currentUser.id),celebCarga.genero); }catch(e){}
+  celebRenderLista();
+}
+// Filtro del anotador: quien no tiene género cargado aparece en las dos listas (para que nadie quede afuera)
+function celebPasaGenero(m){ var g=celebCarga.genero; return !g||m.genero===g||(m.genero!=='H'&&m.genero!=='M'); }
+// Anotadores de esta carga: quién marcó, cuántos y cuándo fue su último toque
+function celebConfsDe(c){ return (S.celebMarcas||[]).filter(function(mk){ return mk&&mk.tipo==='conf'&&String(mk.celebId)===String(c.id); }); }
+function celebAnotadores(c){
+  var por={};
+  function ent(id){ var k=String(id||'?'); return por[k]||(por[k]={id:id,marcas:0,ultimo:0,conf:null}); }
+  (S.celebMarcas||[]).forEach(function(mk){
+    if(!mk||String(mk.celebId)!==String(c.id)) return;
+    if(mk.tipo==='conf'){ ent(mk.por).conf=mk; return; }
+    var a=ent(mk.por);
+    if(mk.presente) a.marcas++;
+    if(Number(mk._ts)>a.ultimo) a.ultimo=Number(mk._ts);
+  });
+  return Object.keys(por).map(function(k){
+    var a=por[k], u=(S.users||[]).find(function(x){return String(x.id)===String(a.id);});
+    a.nombre=u&&u.name?u.name:(a.conf&&a.conf.porNombre)||(currentUser&&String(currentUser.id)===String(a.id)?currentUser.name:'Usuario '+a.id);
+    a.yo=currentUser&&String(currentUser.id)===String(a.id);
+    // Confirmó si su confirmación es posterior a su último toque (si siguió marcando, vuelve a "sin confirmar")
+    a.confirmo=!!(a.conf&&Number(a.conf._ts)>=a.ultimo);
+    if(!a.ultimo&&a.conf) a.ultimo=Number(a.conf._ts);
+    return a;
+  }).sort(function(x,y){return y.ultimo-x.ultimo;});
+}
+function celebHace(ts){ var s=Math.max(0,Math.round((Date.now()-ts)/1000)); return s<60?'hace '+s+' s':s<3600?'hace '+Math.round(s/60)+' min':'hace '+Math.round(s/3600)+' h'; }
 function celebRenderLista(){
   var c=celebGet(celebCarga.id); var wrap=document.getElementById('celeb-lista'); if(!c||!wrap) return;
   var presentes=celebPresentesDe(c), pset={}; presentes.forEach(function(id){pset[id]=true;});
@@ -23548,9 +23628,11 @@ function celebRenderLista(){
   var pob=celebPoblacion();
   // Marcados que hoy no están en la lista (ej. pasaron a Histórico): igual se muestran en Marcados
   presentes.forEach(function(id){ if(!pob.some(function(m){return Number(m.id)===id;})){ var m=(S.members||[]).find(function(x){return Number(x.id)===id;}); if(m) pob.push(m); } });
+  var totalMarcados=pob.filter(function(m){return pset[Number(m.id)];}).length;
+  pob=pob.filter(celebPasaGenero);
   var marcados=pob.filter(function(m){return pset[Number(m.id)];});
   var porMarcar=pob.filter(function(m){return !pset[Number(m.id)];});
-  document.getElementById('celeb-cnt').textContent=marcados.length;
+  document.getElementById('celeb-cnt').textContent=totalMarcados+(celebCarga.genero?' · '+marcados.length+' '+celebCarga.genero:'');
   document.getElementById('celeb-cnt-pm').textContent=porMarcar.length;
   document.getElementById('celeb-cnt-m').textContent=marcados.length;
   ['pormarcar','marcados'].forEach(function(v){ var b=document.getElementById('celeb-v-'+v); if(b){ var on=celebCarga.vista===v; b.style.background=on?'#111827':'transparent'; b.style.color=on?'#D1D5DB':'#4B5563'; } });
@@ -23566,6 +23648,7 @@ function celebRenderLista(){
   function celebFila(m){
     var extra=[];
     if(m.condicion==='Nuevo') extra.push('🌱');
+    if(celebCarga.genero&&m.genero!=='H'&&m.genero!=='M') extra.push('<span style="font-size:11px;color:#4B5563">sin género</span>');
     if(otras[Number(m.id)]) extra.push('<span style="font-size:11px;color:#4B5563">también '+svcEsc(otras[Number(m.id)])+'</span>');
     var gdv=celebCarga.agrupar?'':celebGdvDe(m);
     return '<div onclick="celebTocar('+Number(m.id)+')" style="padding:14px 14px;border-bottom:1px solid #0F141A;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;user-select:none">'+
@@ -23591,7 +23674,7 @@ function celebTocar(memberId){
   var mk={id:c.id+'_'+memberId,celebId:c.id,memberId:Number(memberId),presente:presente,por:currentUser.id,_ts:Date.now()};
   S.celebMarcas=(S.celebMarcas||[]).filter(function(x){return x&&x.id!==mk.id;}).concat([mk]);
   saveK(SK.celebMarcas,S.celebMarcas);
-  celebCarga.pend[mk.id]=mk._ts;
+  celebCarga.pend[mk.id]=mk._ts; celebCarga.pendObj[mk.id]=mk;
   celebRenderLista();
   celebProgramarSync();
 }
@@ -23607,7 +23690,7 @@ async function celebSyncAhora(){
   var t0=Date.now();
   try{
     await window.fbCelebSync();
-    Object.keys(celebCarga.pend).forEach(function(k){ if(celebCarga.pend[k]<t0) delete celebCarga.pend[k]; });
+    Object.keys(celebCarga.pend).forEach(function(k){ if(celebCarga.pend[k]<t0){ delete celebCarga.pend[k]; delete celebCarga.pendObj[k]; } });
     celebCarga.error=false;
   }catch(e){
     console.warn('celebSyncAhora:', e);
@@ -23621,7 +23704,10 @@ async function celebSyncAhora(){
 function celebPintarSync(){
   var el=document.getElementById('celeb-sync'); if(!el) return;
   var n=Object.keys(celebCarga.pend).length;
-  el.textContent=celebCarga.error?'⚠️ sin conexión — '+n+' pendiente'+(n!==1?'s':'')+', se reintenta solo':n?'⏳ '+n+' pendiente'+(n!==1?'s':''):'✓ sincronizado';
+  var txt=celebCarga.error?'⚠️ sin conexión — '+n+' pendiente'+(n!==1?'s':'')+', se reintenta solo':n?'⏳ '+n+' pendiente'+(n!==1?'s':''):'✓ sincronizado';
+  var c=celebGet(celebCarga.id), an=c?celebAnotadores(c).filter(function(a){return !a.yo;}):[];
+  if(an.length) txt='Anotando también: '+an.map(function(a){return a.nombre.split(' ')[0]+(a.confirmo?' (✅ terminó)':' ('+celebHace(a.ultimo)+')');}).join(', ')+' · '+txt;
+  el.textContent=txt;
   el.style.color=celebCarga.error?'#B45309':'#4B5563';
 }
 
@@ -23640,25 +23726,104 @@ function celebAbrirCierre(id,nueva){
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:960;display:flex;align-items:center;justify-content:center;padding:1rem';
   function celebCampo(idc,txt,ayuda,val){ return '<div style="margin-bottom:10px"><label style="font-size:13px;font-weight:600;display:block">'+txt+'</label>'+(ayuda?'<div style="font-size:11.5px;opacity:.7;margin-bottom:3px">'+ayuda+'</div>':'')+
     '<input type="number" inputmode="numeric" min="0" step="1" id="'+idc+'" value="'+(val===undefined||val===null?'':val)+'" style="width:110px"></div>'; }
-  var nuevosHoy=celebNuevosCargados(fecha).length;
+  var nuevosHoy=celebNuevosCargados(fecha).length, sumas=c?celebSumasConf(c):{noIdent:null,nuevos:null};
   ov.innerHTML=(dark?'<style>.celeb-oscuro input[type=number],.celeb-oscuro input[type=text],.celeb-oscuro textarea{background:#161B22!important;color:#C9CED6!important;border:1px solid #30363D!important}.celeb-oscuro .btn:not(.btn-primary){background:#161B22;color:#9CA3AF;border-color:#30363D}</style>':'')+'<div style="background:'+(dark?'#0D1117':'#fff')+';color:'+(dark?'#C9CED6':'#1F2937')+';border-radius:14px;padding:1.25rem;width:100%;max-width:420px;max-height:92vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.4)">'+
     '<div style="font-size:15px;font-weight:700;margin-bottom:2px">'+(numerica?'Carga numérica':'Cerrar asistencia')+'</div>'+
     '<div style="font-size:12.5px;opacity:.75;margin-bottom:12px">'+svcEsc(celebFechaTxt(fecha))+' · '+svcEsc(hora)+(numerica?'':' · <strong>'+nMarc+'</strong> marcado'+(nMarc!==1?'s':''))+'</div>'+
+    (numerica?'':celebCierreAnotadoresHTML(c,dark))+
     (numerica?celebCampo('celeb-c-total','Presentes en el auditorio','Nuevos incluidos. Sin niños ni maestros de las salas.',''):'')+
-    celebCampo('celeb-c-nuevos','Nuevos del día (cantidad)','Se cargan por el formulario / QR de Conexión. Hoy hay '+nuevosHoy+' cargado'+(nuevosHoy!==1?'s':'')+' con esta fecha.',c?c.nuevosDeclarados:'')+
-    (numerica?'':celebCampo('celeb-c-noid','Otros presentes no identificados','Personas que estuvieron pero no se pudieron marcar.',c?c.noIdentificados:''))+
+    celebCampo('celeb-c-nuevos','Nuevos del día (cantidad)','Se cargan por el formulario / QR de Conexión. Hoy hay '+nuevosHoy+' cargado'+(nuevosHoy!==1?'s':'')+' con esta fecha.'+(sumas.nuevos!=null?' Los anotadores sumaron '+sumas.nuevos+'.':''),c?(c.nuevosDeclarados!=null&&c.nuevosDeclarados!==''?c.nuevosDeclarados:sumas.nuevos):'')+
+    (numerica?'':celebCampo('celeb-c-noid','Otros presentes no identificados','Personas que estuvieron pero no se pudieron marcar.'+(sumas.noIdent!=null?' Los anotadores sumaron '+sumas.noIdent+'.':''),c?(c.noIdentificados!=null&&c.noIdentificados!==''?c.noIdentificados:sumas.noIdent):''))+
     (ng.hay?'<div style="margin-bottom:10px;font-size:13px"><strong>Niños:</strong> '+ng.total+' <span style="opacity:.7">(de las salas de Nuevas Generaciones)</span></div>'
            :celebCampo('celeb-c-ninos','Niños (sin salas)','Solo si los chicos se quedaron en la celebración. Si hubo salas, dejalo vacío: el número sale de Nuevas Generaciones.',c?c.ninosManual:''))+
     (numerica&&otrasMismoDia?celebCampo('celeb-c-ambas','Estuvieron en ambas celebraciones (opcional)','Se resta del total del domingo para contar personas únicas.',''):'')+
     '<div style="margin-bottom:10px"><label style="font-size:13px;font-weight:600;display:block;margin-bottom:3px">Observación</label><textarea id="celeb-c-obs" style="width:100%;box-sizing:border-box;min-height:54px;font-size:14px">'+svcEsc(c?c.observacion||'':'')+'</textarea></div>'+
     '<label style="font-size:13px;cursor:pointer;display:block;margin-bottom:6px"><input type="checkbox" id="celeb-c-esp" '+(c&&c.especial?'checked':'')+' style="width:auto;margin-right:6px">Celebración especial (bautismos, aniversario, feriado…)</label>'+
     '<input type="text" id="celeb-c-espm" placeholder="¿Qué tuvo de especial?" value="'+svcEsc(c?c.especialMotivo||'':'')+'" style="width:100%;box-sizing:border-box;margin-bottom:10px">'+
-    (numerica?'':'<div style="font-size:11.5px;opacity:.75;margin-bottom:10px;padding:8px;border-radius:8px;background:'+(dark?'#161B22':'#F9FAFB')+'">Antes de cerrar, confirmá que los demás anotadores terminaron de marcar. Después se puede corregir desde el Histórico.</div>')+
+
     '<div id="celeb-c-err" style="display:none;font-size:12.5px;color:#DC2626;margin-bottom:8px"></div>'+
     '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" onclick="document.getElementById(\'celeb-cierre-ov\').remove()">Cancelar</button>'+
     '<button class="btn btn-sm btn-primary" id="celeb-c-ok">'+(numerica?'Guardar y cerrar':'Cerrar asistencia')+'</button></div></div>';
   document.body.appendChild(ov);
   document.getElementById('celeb-c-ok').onclick=function(){ celebConfirmarCierre(id,nueva); };
+}
+function celebCierreAnotadoresHTML(c,dark){
+  var an=celebAnotadores(c), otros=an.filter(function(a){return !a.yo;});
+  var sinConf=otros.filter(function(a){return !a.confirmo;});
+  var recientes=sinConf.filter(function(a){return Date.now()-a.ultimo<3*60*1000;});
+  var h='<div style="font-size:12px;margin-bottom:10px;padding:8px 10px;border-radius:8px;background:'+(sinConf.length?(dark?'#2A1F06':'#FEF3C7'):(dark?'#0F2A1B':'#DCFCE7'))+'">';
+  if(an.length) h+='<div style="font-weight:600;margin-bottom:3px">Anotadores de esta carga</div>'+an.map(function(a){
+    return '<div>'+(a.yo?'👤':a.confirmo?'✅':'⏳')+' '+svcEsc(a.nombre)+(a.yo?' (vos)':'')+' · '+a.marcas+' marcado'+(a.marcas!==1?'s':'')+
+      (a.confirmo?' · confirmó '+celebHace(a.conf._ts)+(a.conf.noIdent!=null||a.conf.nuevos!=null?' ('+[a.conf.noIdent!=null?a.conf.noIdent+' no ident.':'',a.conf.nuevos!=null?a.conf.nuevos+' nuevos':''].filter(Boolean).join(', ')+')':''):' · último toque '+celebHace(a.ultimo))+'</div>'; }).join('');
+  if(recientes.length) h+='<div style="margin-top:6px;font-weight:600;color:'+(dark?'#FBBF24':'#92400E')+'">⚠️ '+recientes.map(function(a){return svcEsc(a.nombre.split(' ')[0]);}).join(' y ')+' marcó hace menos de 3 minutos y no confirmó.</div>';
+  else if(otros.length&&!sinConf.length) h+='<div style="margin-top:6px;font-weight:600">Todos los anotadores confirmaron.</div>';
+  h+='<div style="margin-top:6px;opacity:.8">Si se cierra antes de tiempo, se puede <strong>reabrir</strong> desde el Histórico.</div>';
+  if(sinConf.length) h+='<label style="display:block;margin-top:8px;font-weight:600;cursor:pointer"><input type="checkbox" id="celeb-c-conf" style="width:auto;margin-right:6px">Confirmo que los demás anotadores terminaron</label>';
+  return h+'</div>';
+}
+// "✅ Terminé": el anotador confirma su parte (sin cerrar la celebración) y puede sumar lo de su sector
+function celebAbrirConfirmar(id){
+  var c=celebGet(id); if(!c||c.estado!=='abierta') return;
+  var mia=celebConfsDe(c).find(function(x){return String(x.por)===String(currentUser.id);});
+  var mios=(S.celebMarcas||[]).filter(function(mk){return mk&&mk.tipo!=='conf'&&String(mk.celebId)===String(c.id)&&String(mk.por)===String(currentUser.id)&&mk.presente;}).length;
+  var ov=document.getElementById('celeb-cierre-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='celeb-cierre-ov'; ov.className='celeb-oscuro';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:960;display:flex;align-items:center;justify-content:center;padding:1rem';
+  function celebFilaConf(idc,txt,ayuda,val){ return '<div style="margin-bottom:10px"><label style="font-size:13px;font-weight:600;display:block">'+txt+'</label><div style="font-size:11.5px;opacity:.7;margin-bottom:3px">'+ayuda+'</div><input type="number" inputmode="numeric" min="0" step="1" id="'+idc+'" value="'+(val==null?'':val)+'" style="width:110px"></div>'; }
+  ov.innerHTML='<style>.celeb-oscuro input[type=number]{background:#161B22!important;color:#C9CED6!important;border:1px solid #30363D!important}.celeb-oscuro .btn:not(.btn-primary){background:#161B22;color:#9CA3AF;border-color:#30363D}</style>'+
+    '<div style="background:#0D1117;color:#C9CED6;border-radius:14px;padding:1.25rem;width:100%;max-width:400px;box-shadow:0 12px 40px rgba(0,0,0,.4)">'+
+    '<div style="font-size:15px;font-weight:700;margin-bottom:2px">✅ Terminé mi parte</div>'+
+    '<div style="font-size:12.5px;opacity:.75;margin-bottom:12px">'+svcEsc(celebFechaTxt(c.fecha))+' · '+svcEsc(c.horario)+' · marcaste <strong>'+mios+'</strong></div>'+
+    celebFilaConf('celeb-cf-noid','Otros presentes no identificados en tu sector','Opcional. Se suman a los de los demás anotadores.',mia?mia.noIdent:null)+
+    celebFilaConf('celeb-cf-nuevos','Nuevos que viste en tu sector','Opcional. Se suman y se cuadran con lo que carga Conexión.',mia?mia.nuevos:null)+
+    '<div style="font-size:11.5px;opacity:.75;margin-bottom:10px;padding:8px;border-radius:8px;background:#161B22">La asistencia la cierra un/a Coordinador/a, o se cierra sola al terminar el día. Si después marcás a alguien más, volvé a confirmar.</div>'+
+    '<div id="celeb-cf-err" style="display:none;font-size:12.5px;color:#F87171;margin-bottom:8px"></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" onclick="document.getElementById(\'celeb-cierre-ov\').remove()">Seguir marcando</button>'+
+    '<button class="btn btn-sm btn-primary" id="celeb-cf-ok" onclick="celebConfirmarParte(\''+c.id+'\')">Confirmar</button></div></div>';
+  document.body.appendChild(ov);
+}
+async function celebConfirmarParte(id){
+  var c=celebGet(id); var err=document.getElementById('celeb-cf-err');
+  function fallo(m){ if(err){ err.textContent=m; err.style.display='block'; } }
+  if(!c||c.estado!=='abierta'){ fallo('Esta carga ya no está abierta.'); return; }
+  var a=celebLeerNum('celeb-cf-noid',false,'No identificados'), b=celebLeerNum('celeb-cf-nuevos',false,'Nuevos');
+  if(!a.ok){ fallo(a.msg); return; } if(!b.ok){ fallo(b.msg); return; }
+  var conf={id:c.id+'_conf_'+currentUser.id,celebId:c.id,tipo:'conf',por:currentUser.id,porNombre:celebUsuarioNombre(),noIdent:a.v,nuevos:b.v,_ts:Date.now()};
+  var prev=S.celebMarcas;
+  S.celebMarcas=(S.celebMarcas||[]).filter(function(x){return x&&x.id!==conf.id;}).concat([conf]);
+  var btn=document.getElementById('celeb-cf-ok'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  try{
+    await saveK(SK.celebMarcas,S.celebMarcas);
+    if(typeof window.fbCelebSync!=='function') throw new Error('Sin conexión con la nube');
+    await window.fbCelebSync(); // también sube las marcas pendientes de este celular
+  }catch(e){
+    S.celebMarcas=prev; await saveK(SK.celebMarcas,S.celebMarcas);
+    if(btn){ btn.disabled=false; btn.textContent='Confirmar'; }
+    fallo('No se pudo confirmar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  celebLeerLS(); celebCarga.pend={}; celebCarga.pendObj={};
+  var ov=document.getElementById('celeb-cierre-ov'); if(ov) ov.remove();
+  celebCortarCarga();
+  showToast('✅ Gracias, tu parte quedó confirmada','#16A34A');
+  celebRefrescarTab();
+}
+// Consolidación común al cierre manual y al automático: presentes, confirmaciones y números de los anotadores
+function celebConsolidar(c,datos,porId,porNombre,ahora){
+  var confs=celebConfsDe(c), sumNo=0, sumNu=0, hayNo=false, hayNu=false;
+  confs.forEach(function(x){ if(x.noIdent!=null){ hayNo=true; sumNo+=celebNum(x.noIdent); } if(x.nuevos!=null){ hayNu=true; sumNu+=celebNum(x.nuevos); } });
+  var base={};
+  if(hayNo&&(c.noIdentificados==null||c.noIdentificados==='')) base.noIdentificados=sumNo;
+  if(hayNu&&(c.nuevosDeclarados==null||c.nuevosDeclarados==='')) base.nuevosDeclarados=sumNu;
+  return Object.assign({},c,base,datos||{},{estado:'cerrada',presentes:celebPresentesDe(c),
+    confirmaciones:confs.map(function(x){return {por:x.por,porNombre:x.porNombre,ts:x._ts,noIdent:x.noIdent,nuevos:x.nuevos};}),
+    cerradaPor:porId,cerradaPorNombre:porNombre,cerradaTs:ahora,_ts:ahora});
+}
+// Sumas de lo que confirmaron los anotadores (para proponer en el cierre)
+function celebSumasConf(c){
+  var no=null, nu=null;
+  celebConfsDe(c).forEach(function(x){ if(x.noIdent!=null) no=(no||0)+celebNum(x.noIdent); if(x.nuevos!=null) nu=(nu||0)+celebNum(x.nuevos); });
+  return {noIdent:no,nuevos:nu};
 }
 function celebLeerNum(idc,obligatorio,nombre){
   var el=document.getElementById(idc); if(!el) return {ok:true,v:undefined};
@@ -23684,6 +23849,8 @@ async function celebConfirmarCierre(id,nueva){
   var errEl=document.getElementById('celeb-c-err');
   function celebFallo(msg){ if(errEl){ errEl.textContent=msg; errEl.style.display='block'; } else alert(msg); }
   var r=celebLeerCierre(!id); if(r.err){ celebFallo(r.err); return; }
+  if(id&&!canCelebCerrar()){ celebFallo('No tenés permiso para cerrar esta carga. La cierra un/a Coordinador/a.'); return; }
+  var conf=document.getElementById('celeb-c-conf'); if(conf&&!conf.checked){ celebFallo('Tildá "Confirmo que los demás anotadores terminaron" para cerrar.'); return; }
   var btn=document.getElementById('celeb-c-ok'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
   function habilitar(){ if(btn){ btn.disabled=false; btn.textContent=id?'Cerrar asistencia':'Guardar y cerrar'; } }
   var prevC=S.celebraciones, prevM=S.celebMarcas, ahora=Date.now();
@@ -23700,7 +23867,7 @@ async function celebConfirmarCierreInt(id,nueva,r,habilitar,celebFallo,prevC,pre
     catch(e){ habilitar(); celebFallo('No se pudo sincronizar con la nube. Verificá tu conexión e intentá de nuevo. La asistencia sigue abierta.'); return; }
     var c=celebGet(id);
     if(!c||c.estado!=='abierta'){ habilitar(); celebFallo('Esta carga ya no está abierta (la cerró otra persona).'); return; }
-    nuevo=Object.assign({},c,r.datos,{estado:'cerrada',presentes:celebPresentesDe(c),cerradaPor:currentUser.id,cerradaPorNombre:celebUsuarioNombre(),cerradaTs:ahora,_ts:ahora});
+    nuevo=celebConsolidar(c,r.datos,currentUser.id,celebUsuarioNombre(),ahora);
     S.celebraciones=S.celebraciones.map(function(x){return x.id===id?nuevo:x;});
   } else {
     var nid=celebIdDe(nueva.fecha,nueva.horario);
@@ -23722,12 +23889,48 @@ async function celebConfirmarCierreInt(id,nueva,r,habilitar,celebFallo,prevC,pre
     return;
   }
   celebLeerLS();
-  if(id) celebCarga.pend={};
+  if(id){ celebCarga.pend={}; celebCarga.pendObj={}; }
   var ov=document.getElementById('celeb-cierre-ov'); if(ov) ov.remove();
   if(id) celebCortarCarga();
   var st=celebStatsDomingo(nuevo.fecha);
   showToast('✅ Asistencia cerrada'+(st.nuevosPendientes?' — Nuevos pendientes de cuadrar: '+st.nuevosPendientes+' de '+st.nuevosDeclarados:''),'#16A34A');
   celebTab(canCelebHistorico()?'historico':'carga');
+}
+
+// ── Cierre automático: una carga nominal que sigue abierta cuando ya terminó su fecha se cierra sola ──
+// No hay servidor: lo hace el primer celular con acceso a la carga que abre la app después de ese día
+// (trae antes lo último de la nube). Si falla, no avisa ni cambia nada: se reintenta la próxima vez.
+var celebAutoCorriendo=false;
+async function celebAutoCerrarVencidas(){
+  if(celebAutoCorriendo||!currentUser||celebCarga.id) return 0;
+  if(!(canCelebCargar()||canCelebCerrar())) return 0;
+  function vencidas(){ return (S.celebraciones||[]).filter(function(c){ return c&&c.estado==='abierta'&&c.modo==='nominal'&&c.fecha<today(); }); }
+  if(!vencidas().length||typeof window.fbCelebSync!=='function'||typeof window.fbUpload!=='function') return 0;
+  celebAutoCorriendo=true;
+  try{
+    try{ await window.fbCelebSync(); celebLeerLS(); }catch(e){ return 0; }
+    var venc=vencidas(); if(!venc.length) return 0;
+    var ahora=Date.now(), prevC=S.celebraciones, prevM=S.celebMarcas, ids=venc.map(function(c){return c.id;});
+    S.celebraciones=S.celebraciones.map(function(c){
+      if(ids.indexOf(c.id)<0) return c;
+      var n=celebConsolidar(c,null,null,'Cierre automático (fin del día)',ahora);
+      n.ediciones=(c.ediciones||[]).concat([{por:null,porNombre:'Sistema',ts:ahora,detalle:'Cierre automático al terminar el día ('+n.presentes.length+' presentes'+(n.confirmaciones.length?', '+n.confirmaciones.length+' confirmación'+(n.confirmaciones.length!==1?'es':''):'')+')'}]);
+      return n;
+    });
+    try{
+      await saveK(SK.celebraciones,S.celebraciones);
+      await window.fbUpload(true);
+    }catch(e){
+      S.celebraciones=prevC; S.celebMarcas=prevM;
+      await saveK(SK.celebraciones,S.celebraciones); await saveK(SK.celebMarcas,S.celebMarcas);
+      return 0;
+    }
+    celebLeerLS();
+    return ids.length;
+  }finally{ celebAutoCorriendo=false; }
+}
+function celebAutoCerrarYAvisar(){
+  try{ celebAutoCerrarVencidas().then(function(n){ if(n){ showToast('⛪ '+n+' asistencia'+(n!==1?'s quedaron cerradas':' quedó cerrada')+' automáticamente (terminó su día)','#1F4E79'); celebRefrescarTab(); } }).catch(function(){}); }catch(e){}
 }
 
 // ── Histórico ──
@@ -23745,9 +23948,8 @@ function celebRenderHistorico(el){
     h+='<div class="card" style="margin-bottom:.6rem">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">'+
         '<div><div style="font-weight:700;color:#1F4E79">'+svcEsc(celebFechaTxt(f))+(st.especial?' <span title="Celebración especial">⭐</span>':'')+'</div>'+
-        '<div style="font-size:12.5px;color:#374151;margin-top:2px">Auditorio <strong>'+st.auditorio+'</strong> · Niños <strong>'+(st.ninos===null?'—':st.ninos)+'</strong>'+(st.ninosFuente==='ng'?' <span style="color:#6B7280">(salas NG)</span>':'')+(st.maestrosSala?' · Maestros en salas <strong>'+st.maestrosSala+'</strong>':'')+' · Total <strong>'+st.total+'</strong>'+
-          (st.cobertura!==null?' · Identificados '+st.identificados+' ('+st.cobertura+'%)':'')+'</div></div>'+
-        '<div>'+celebCuadreHTML(st)+'</div></div>'+
+        '<div style="font-size:12.5px;color:#374151;margin-top:2px">'+celebLineaTotales(st)+'</div></div>'+
+        '<div>'+celebCuadreHTML(st,true)+'</div></div>'+
       st.cels.map(function(c){
         var n=c.modo==='nominal'?celebPresentesDe(c).length:celebNum(c.totalAuditorio);
         return '<div onclick="celebVerDetalle(\''+c.id+'\')" style="margin-top:8px;padding:8px 10px;border:1px solid #E5E7EB;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;flex-wrap:wrap">'+
@@ -23758,6 +23960,99 @@ function celebRenderHistorico(el){
       }).join('')+'</div>';
   });
   el.innerHTML=h;
+}
+// ── Cuadrar Nuevos: vincular a este domingo a los Nuevos que Conexión cargó otro día ──
+// Candidatos: registrados entre 7 días antes y 28 días después, que no estén ya asignados a otro domingo.
+// No cambia nada de la persona en Conexión (su fecha de registro queda igual): el vínculo vive en la celebración.
+var celebCuad={fecha:null,sel:{}};
+function celebCuadrarNuevos(fecha,desdeStr,hastaStr){
+  if(!canCelebEditar()) return;
+  var cels=celebDeFecha(fecha); if(!cels.length) return;
+  var st=celebStatsDomingo(fecha), aa=fmtAA(fecha);
+  desdeStr=desdeStr||celebRestarDias(fecha,celebCuadAntes()); hastaStr=hastaStr||celebSumarHabiles(fecha,celebCuadHabiles());
+  var desde=parseLocalDate(desdeStr), hasta=parseLocalDate(hastaStr);
+  var vinc=[]; cels.forEach(function(c){ (c.nuevosIds||[]).forEach(function(id){ if(vinc.indexOf(Number(id))<0) vinc.push(Number(id)); }); });
+  // Al cambiar Desde/Hasta se conservan los tildes ya hechos
+  if(!(celebCuad&&celebCuad.fecha===fecha&&document.getElementById('celeb-cuad-ov'))){ celebCuad={fecha:fecha,sel:{}}; vinc.forEach(function(id){ celebCuad.sel[id]=true; }); }
+  var porFecha=[], cand=[];
+  (S.members||[]).forEach(function(m){
+    if(!m||m.condicion==='Campaña'||!m.fechaRegistro) return;
+    if(fmtAA(m.fechaRegistro)===aa){ porFecha.push(m); return; }
+    var f=celebNormFecha(m.fechaRegistro); if(!f) return;
+    var fd=parseLocalDate(f); if(fd<desde||fd>hasta) return;
+    var asig=celebDomingoDeNuevo(m);
+    if(asig&&asig!==fecha) return;
+    cand.push(m);
+  });
+  // Los ya vinculados a este domingo se muestran siempre, aunque queden fuera de las fechas
+  vinc.forEach(function(id){ if(!cand.some(function(m){return Number(m.id)===id;})){ var m=(S.members||[]).find(function(x){return Number(x.id)===id;}); if(m) cand.push(m); } 
+  });
+  cand.sort(function(a,b){ return celebNormFecha(a.fechaRegistro).localeCompare(celebNormFecha(b.fechaRegistro))||listName(a).localeCompare(listName(b)); });
+  var ov=document.getElementById('celeb-cuad-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='celeb-cuad-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:950;display:flex;align-items:center;justify-content:center;padding:1rem';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:1.25rem;width:100%;max-width:460px;max-height:90vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.3)">'+
+    '<div style="font-size:15px;font-weight:700;color:#1F4E79;margin-bottom:2px">🌱 Cuadrar Nuevos · '+svcEsc(celebFechaTxt(fecha))+'</div>'+
+    '<div style="font-size:12.5px;color:#6B7280;margin-bottom:10px">Declarados: <strong>'+st.nuevosDeclarados+'</strong>. Tildá a quienes vinieron ese domingo pero Conexión cargó otro día. Su fecha de registro en Conexión no cambia.</div>'+
+    (porFecha.length?'<div style="font-size:12.5px;margin-bottom:8px"><strong>Ya cuentan (registrados ese día):</strong> '+porFecha.map(function(m){return svcEsc(listName(m));}).join(', ')+'</div>':'')+
+    '<div style="font-weight:600;font-size:13px;margin-bottom:4px">Registrados en otra fecha</div>'+
+    '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px;font-size:12px;color:#6B7280">'+
+      '<div>Desde<br><input type="date" id="celeb-cuad-d" value="'+desdeStr+'" onchange="celebCuadrarNuevos(\''+fecha+'\',this.value,document.getElementById(\'celeb-cuad-h\').value)"></div>'+
+      '<div>Hasta<br><input type="date" id="celeb-cuad-h" value="'+hastaStr+'" onchange="celebCuadrarNuevos(\''+fecha+'\',document.getElementById(\'celeb-cuad-d\').value,this.value)"></div>'+
+      '<div style="padding-bottom:4px">('+celebCuadHabiles()+' días hábiles por defecto)</div></div>'+
+    '<div style="max-height:300px;overflow:auto;border:1px solid #F3F4F6;border-radius:8px">'+(cand.length?cand.map(function(m){
+      return '<label style="display:flex;gap:8px;align-items:center;padding:7px 8px;border-bottom:1px solid #F9FAFB;font-size:13px;cursor:pointer"><input type="checkbox" '+(celebCuad.sel[m.id]?'checked':'')+' onchange="celebCuadTilde('+Number(m.id)+',this.checked)" style="width:auto">'+
+        '<span style="flex:1">'+svcEsc(listName(m))+'</span><span style="color:#6B7280;font-size:12px">registro '+svcEsc(fmtAA(m.fechaRegistro))+'</span></label>';
+    }).join(''):'<div style="padding:10px;color:#9CA3AF;font-size:13px">No hay Nuevos cargados cerca de esa fecha sin asignar. Si falta alguien, primero cargalo en Conexión.</div>')+'</div>'+
+    '<div id="celeb-cuad-cnt" style="font-size:12.5px;margin-top:8px"></div>'+
+    '<div id="celeb-cuad-err" style="display:none;font-size:12.5px;color:#DC2626;margin-top:6px"></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn btn-sm" onclick="document.getElementById(\'celeb-cuad-ov\').remove()">Cancelar</button>'+
+    '<button class="btn btn-sm btn-primary" id="celeb-cuad-ok" onclick="celebGuardarCuadre()">💾 Guardar</button></div></div>';
+  document.body.appendChild(ov);
+  celebCuadContar(porFecha.length,st.nuevosDeclarados);
+}
+function celebCuadContar(nFecha,decl){
+  var el=document.getElementById('celeb-cuad-cnt'); if(!el) return;
+  if(nFecha===undefined){ nFecha=el._nf; decl=el._dc; } else { el._nf=nFecha; el._dc=decl; }
+  var n=nFecha+Object.keys(celebCuad.sel).length, pend=Math.max(0,decl-n);
+  el.innerHTML=pend?'<span style="color:#92400E">Quedarían <strong>'+pend+'</strong> pendiente'+(pend!==1?'s':'')+' ('+n+' de '+decl+').</span>':'<span style="color:#166534">✅ Quedaría cuadrado ('+n+' de '+decl+').</span>';
+}
+function celebCuadTilde(id,on){ if(on) celebCuad.sel[id]=true; else delete celebCuad.sel[id]; celebCuadContar(); }
+async function celebGuardarCuadre(){
+  if(!canCelebEditar()) return;
+  var fecha=celebCuad.fecha, cels=celebDeFecha(fecha); if(!cels.length) return;
+  var errEl=document.getElementById('celeb-cuad-err');
+  var nuevos=Object.keys(celebCuad.sel).map(Number), antes=[];
+  cels.forEach(function(c){ (c.nuevosIds||[]).forEach(function(id){ if(antes.indexOf(Number(id))<0) antes.push(Number(id)); }); });
+  var mas=nuevos.filter(function(x){return antes.indexOf(x)<0;}), menos=antes.filter(function(x){return nuevos.indexOf(x)<0;});
+  if(!mas.length&&!menos.length){ document.getElementById('celeb-cuad-ov').remove(); return; }
+  var det=['Nuevos vinculados'+(mas.length?' +'+mas.length+' ('+mas.map(celebNombreDe).join(', ')+')':'')+(menos.length?' −'+menos.length+' ('+menos.map(celebNombreDe).join(', ')+')':'')];
+  var ahora=Date.now(), destino=cels[0].id, prev=S.celebraciones;
+  // El vínculo vive en la primera celebración del domingo; se saca de las demás
+  S.celebraciones=S.celebraciones.map(function(c){
+    if(c.fecha!==fecha) return c;
+    var n=Object.assign({},c);
+    if(c.id===destino){ n.nuevosIds=nuevos; n.ediciones=(c.ediciones||[]).concat([{por:currentUser.id,porNombre:celebUsuarioNombre(),ts:ahora,detalle:det[0]}]); n._ts=ahora; }
+    else if((c.nuevosIds||[]).length){ delete n.nuevosIds; n._ts=ahora; }
+    else return c;
+    return n;
+  });
+  var btn=document.getElementById('celeb-cuad-ok'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  try{
+    await saveK(SK.celebraciones,S.celebraciones);
+    if(typeof window.fbUpload!=='function') throw new Error('Sin conexión con la nube');
+    await window.fbUpload(true);
+  }catch(e){
+    S.celebraciones=prev; await saveK(SK.celebraciones,S.celebraciones);
+    if(btn){ btn.disabled=false; btn.textContent='💾 Guardar'; }
+    if(errEl){ errEl.textContent='No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.'; errEl.style.display='block'; }
+    return;
+  }
+  celebLeerLS();
+  document.getElementById('celeb-cuad-ov').remove();
+  var st=celebStatsDomingo(fecha);
+  showToast(st.nuevosPendientes?'🌱 Guardado — quedan '+st.nuevosPendientes+' pendiente'+(st.nuevosPendientes!==1?'s':''):'✅ Nuevos cuadrados','#16A34A');
+  celebRefrescarTab();
 }
 function celebHistFiltro(){
   var el=document.getElementById('celeb-content'); if(!el) return;
@@ -23777,13 +24072,14 @@ function celebVerDetalle(id){
     '<button class="btn btn-sm" onclick="document.getElementById(\'celeb-det-ov\').remove()">✕</button></div>'+
     celebDato('Modalidad',c.modo==='nominal'?'Nominal':'Numérica')+celebDato('Estado',c.estado==='abierta'?'Abierta':'Cerrada'+(c.cerradaPorNombre?' por '+svcEsc(c.cerradaPorNombre):'')+(c.cerradaTs?' el '+nvFmtFechaMs(c.cerradaTs):''))+
     (c.modo==='numerico'?celebDato('Presentes en el auditorio',celebNum(c.totalAuditorio))+celebDato('Estuvieron en ambas',c.enAmbas):celebDato('Marcados',pres.length)+celebDato('No identificados',c.noIdentificados))+
-    celebDato('Nuevos del día (declarados)',c.nuevosDeclarados)+celebDato('Niños (manual)',c.ninosManual)+
-    celebDato('Celebración especial',c.especial?('Sí'+(c.especialMotivo?' — '+svcEsc(c.especialMotivo):'')):'')+celebDato('Observación',c.observacion?svcEsc(c.observacion):'')+
+    celebDato('Nuevos del día (declarados)',c.nuevosDeclarados)+celebDato('Nuevos vinculados desde Conexión',(c.nuevosIds||[]).length?(c.nuevosIds||[]).map(celebNombreDe).map(svcEsc).join(', '):'')+celebDato('Niños (manual)',c.ninosManual)+
+    celebDato('Anotadores',(c.confirmaciones||[]).length?(c.confirmaciones||[]).map(function(x){return svcEsc(x.porNombre||'')+' ✅'+(x.noIdent!=null?' '+x.noIdent+' no ident.':'')+(x.nuevos!=null?' '+x.nuevos+' nuevos':'');}).join(' · '):'')+celebDato('Celebración especial',c.especial?('Sí'+(c.especialMotivo?' — '+svcEsc(c.especialMotivo):'')):'')+celebDato('Observación',c.observacion?svcEsc(c.observacion):'')+
     (c.modo==='nominal'?'<div style="font-weight:600;font-size:13px;margin:10px 0 4px">Presentes ('+pres.length+')</div><div style="font-size:12.5px;color:#374151;line-height:1.6;max-height:220px;overflow:auto;border:1px solid #F3F4F6;border-radius:8px;padding:6px 8px">'+(pres.length?pres.map(function(p){return svcEsc(p.n);}).join('<br>'):'—')+'</div>':'')+
     ((c.ediciones||[]).length?'<div style="font-weight:600;font-size:13px;margin:10px 0 4px">Ediciones</div>'+c.ediciones.slice().reverse().map(function(e){return '<div style="font-size:12px;color:#374151;padding:4px 0;border-top:1px solid #F3F4F6"><span style="color:#6B7280">'+nvFmtFechaMs(e.ts)+' · '+svcEsc(e.porNombre||'')+':</span> '+svcEsc(e.detalle||'')+'</div>';}).join(''):'')+
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">'+
       (isSuperAdmin()?'<button class="btn btn-sm" style="color:#DC2626;border-color:#FECACA" onclick="celebEliminar(\''+c.id+'\')">🗑 Eliminar</button>':'')+
       (c.estado==='abierta'&&canCelebCargar()?'<button class="btn btn-sm btn-primary" onclick="document.getElementById(\'celeb-det-ov\').remove();celebEntrarCarga(\''+c.id+'\')">▶ Continuar carga</button>':'')+
+      (c.estado==='cerrada'&&c.modo==='nominal'&&canCelebCerrar()?'<button class="btn btn-sm" onclick="celebReabrir(\''+c.id+'\')">↩️ Reabrir carga</button>':'')+
       (c.estado==='cerrada'&&canCelebEditar()?'<button class="btn btn-sm btn-primary" onclick="celebAbrirEdicion(\''+c.id+'\')">✏️ Editar</button>':'')+
     '</div></div>';
   document.body.appendChild(ov);
@@ -23876,6 +24172,34 @@ async function celebGuardarEdicion(){
   showToast('✅ Celebración corregida','#16A34A');
   celebRefrescarTab();
 }
+// Reabre una carga nominal cerrada (ej.: se cerró antes de que otro anotador terminara). Los presentes
+// vuelven a ser marcas vivas y los anotadores pueden seguir; los datos del cierre quedan para el próximo cierre.
+async function celebReabrir(id){
+  if(!canCelebCerrar()) return;
+  var c=celebGet(id); if(!c||c.estado!=='cerrada'||c.modo!=='nominal') return;
+  if(!confirm('¿Reabrir la carga del '+celebFechaTxt(c.fecha)+' '+c.horario+'? Los '+(c.presentes||[]).length+' presentes quedan marcados y se puede seguir marcando. Después hay que volver a cerrarla.')) return;
+  var ahora=Date.now(), prevC=S.celebraciones, prevM=S.celebMarcas;
+  var n=Object.assign({},c,{estado:'abierta',_ts:ahora});
+  ['presentes','cerradaPor','cerradaPorNombre','cerradaTs'].forEach(function(k){ delete n[k]; });
+  n.ediciones=(c.ediciones||[]).concat([{por:currentUser.id,porNombre:celebUsuarioNombre(),ts:ahora,detalle:'Carga reabierta'+(c.cerradaPorNombre?' (la había cerrado '+c.cerradaPorNombre+')':'')}]);
+  var marcas=(c.presentes||[]).map(function(mid){ return {id:c.id+'_'+mid,celebId:c.id,memberId:Number(mid),presente:true,por:c.cerradaPor||currentUser.id,_ts:ahora}; });
+  S.celebraciones=S.celebraciones.map(function(x){return x.id===id?n:x;});
+  S.celebMarcas=(S.celebMarcas||[]).filter(function(x){return String(x.celebId)!==String(id);}).concat(marcas);
+  try{
+    await saveK(SK.celebraciones,S.celebraciones); await saveK(SK.celebMarcas,S.celebMarcas);
+    if(typeof window.fbUpload!=='function') throw new Error('Sin conexión con la nube');
+    await window.fbUpload(true);
+  }catch(e){
+    S.celebraciones=prevC; S.celebMarcas=prevM;
+    await saveK(SK.celebraciones,S.celebraciones); await saveK(SK.celebMarcas,S.celebMarcas);
+    alert('No se pudo reabrir en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  celebLeerLS();
+  var ov=document.getElementById('celeb-det-ov'); if(ov) ov.remove();
+  showToast('↩️ Carga reabierta — se puede seguir marcando','#16A34A');
+  if(canCelebCargar()) celebEntrarCarga(id); else celebRefrescarTab();
+}
 async function celebEliminar(id){
   if(!isSuperAdmin()) return;
   var c=celebGet(id); if(!c) return;
@@ -23909,21 +24233,21 @@ function celebRenderDashboard(el){
     if(!doms.length) h+='<div class="card" style="margin-bottom:.75rem"><div class="empty" style="padding:1rem;color:#9CA3AF">Todavía no hay celebraciones cargadas.</div></div>';
     else{
       var sts=doms.map(celebStatsDomingo), ult=sts[0], max=Math.max.apply(null,sts.map(function(s){return s.total;}).concat([1]));
-      var tarj=[['🙌','Auditorio',ult.auditorio],['🧒','Niños',ult.ninos===null?'—':ult.ninos],['⛪','Total',ult.total],['🔎','Identificados',ult.cobertura===null?'—':ult.cobertura+'%'],['🌱','Nuevos',ult.nuevosDeclarados]];
+      var tarj=[['⛪','Total',ult.total],['🐑','Rebaños',ult.rebanos],['🌱','Nuevos del día',ult.nuevos],['🧒','Niños',ult.ninos===null?'⏳':ult.ninos],['🔎','Identificados',ult.cobertura===null?'—':ult.cobertura+'%']];
       h+='<div style="font-size:13px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);margin-bottom:6px">Último domingo cargado: <strong>'+svcEsc(celebFechaTxt(ult.fecha))+'</strong>'+(ult.especial?' ⭐':'')+(ult.abiertas?' (con carga abierta)':'')+'</div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:.75rem">'+tarj.map(function(t){
           return '<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:12px 8px;text-align:center"><div style="font-size:1.2rem">'+t[0]+'</div><div style="font-size:20px;font-weight:700;color:#1F4E79">'+t[2]+'</div><div style="font-size:11.5px;color:#6B7280">'+t[1]+'</div></div>';
         }).join('')+'</div>'+
-        (ult.nuevosDeclarados?'<div style="margin-bottom:.75rem">'+celebCuadreHTML(ult)+'</div>':'')+
+        (ult.nuevosDeclarados?'<div style="margin-bottom:.75rem">'+celebCuadreHTML(ult,true)+'</div>':'')+
         '<div class="card" style="margin-bottom:.75rem"><div style="font-weight:700;color:#1F4E79;font-size:13px;margin-bottom:8px">Últimos domingos</div>'+
         sts.map(function(s){
           return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12.5px">'+
             '<div style="width:92px;color:#374151;white-space:nowrap">'+fmtAA(s.fecha)+(s.especial?' ⭐':'')+'</div>'+
             '<div style="flex:1;background:#F3F4F6;border-radius:6px;height:16px;overflow:hidden;display:flex">'+
-              '<div title="Auditorio" style="width:'+(s.auditorio/max*100)+'%;background:#1F4E79"></div><div title="Niños y maestros en salas" style="width:'+(((s.ninos||0)+s.maestrosSala)/max*100)+'%;background:#93C5FD"></div></div>'+
+              '<div title="Rebaños '+s.rebanos+'" style="width:'+(s.rebanos/max*100)+'%;background:#1F4E79"></div><div title="Nuevos del día '+s.nuevos+'" style="width:'+(s.nuevos/max*100)+'%;background:#16A34A"></div><div title="Niños '+(s.ninos||0)+'" style="width:'+((s.ninos||0)/max*100)+'%;background:#93C5FD"></div></div>'+
             '<div style="width:120px;text-align:right;color:#374151;white-space:nowrap"><strong>'+s.total+'</strong>'+(s.cobertura!==null?' · '+s.cobertura+'% id.':'')+'</div></div>';
         }).join('')+
-        '<div style="font-size:11px;color:#6B7280;margin-top:6px">Azul oscuro: auditorio · celeste: niños y maestros en salas (cada persona cuenta una vez) · ⭐ celebración especial · "% id." = cobertura de la carga nominal.</div></div>';
+        '<div style="font-size:11px;color:#6B7280;margin-top:6px">Azul: Rebaños (incluye maestros en salas, una sola vez) · verde: Nuevos del día · celeste: Niños · ⭐ celebración especial · "% id." = cobertura de la carga nominal.</div></div>';
     }
   }
   if(canCelebAusencias()){

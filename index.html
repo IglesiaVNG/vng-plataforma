@@ -23346,8 +23346,10 @@ function celebStatsDomingo(fecha){
   });
   var nd=celebNuevosDiaIds(fecha), ids=Object.keys(M).map(Number);
   var nuevosMarcados=ids.filter(function(id){return nd.indexOf(id)>=0;}).length;
-  // Nominal: Nuevos del día = lo declarado, o los marcados/vinculados si son más; Rebaños = el resto de los marcados + no identificados
-  var nuevosNom=hayNominal?Math.max(declNom,nuevosMarcados):0;
+  // Nominal: los Nuevos del día salen SOLOS de Conexión (registrados ese domingo o vinculados), estén o no marcados
+  // (la persona nueva no está en la lista). Lo declarado por los anotadores es solo control: manda si vieron más.
+  // Rebaños = los marcados que no son Nuevos del día + no identificados.
+  var nuevosNom=hayNominal?Math.max(declNom,nd.length):0;
   var rebNom=hayNominal?(ids.length-nuevosMarcados+noIdent):0;
   // Numérica: los presentes del auditorio ya incluyen a los Nuevos declarados
   var nuevosNum=Math.min(declNum,numTot), rebNum=numTot-nuevosNum;
@@ -23735,7 +23737,7 @@ function celebAbrirCierre(id,nueva){
     '<div style="font-size:12.5px;opacity:.75;margin-bottom:12px">'+svcEsc(celebFechaTxt(fecha))+' · '+svcEsc(hora)+(numerica?'':' · <strong>'+nMarc+'</strong> marcado'+(nMarc!==1?'s':''))+'</div>'+
     (numerica?'':celebCierreAnotadoresHTML(c,dark))+
     (numerica?celebCampo('celeb-c-total','Presentes en el auditorio','Nuevos incluidos. Sin niños ni maestros de las salas.',''):'')+
-    celebCampo('celeb-c-nuevos','Nuevos del día (cantidad)','Se cargan por el formulario / QR de Conexión. Hoy hay '+nuevosHoy+' cargado'+(nuevosHoy!==1?'s':'')+' con esta fecha.'+(sumas.nuevos!=null?' Los anotadores sumaron '+sumas.nuevos+'.':''),c?(c.nuevosDeclarados!=null&&c.nuevosDeclarados!==''?c.nuevosDeclarados:sumas.nuevos):'')+
+    celebCampo('celeb-c-nuevos',numerica?'Nuevos del día (cantidad)':'Nuevos que vieron (opcional, de control)',numerica?'De los presentes, cuántos son Nuevos. Se cuadra con lo que carga Conexión (hoy hay '+nuevosHoy+' con esta fecha).':'En nominal los Nuevos salen solos de Conexión (hoy hay '+nuevosHoy+' cargado'+(nuevosHoy!==1?'s':'')+' con esta fecha). Completalo solo para controlar: si vieron más, queda el aviso de cuadre.'+(sumas.nuevos!=null?' Los anotadores sumaron '+sumas.nuevos+'.':''),c?(c.nuevosDeclarados!=null&&c.nuevosDeclarados!==''?c.nuevosDeclarados:sumas.nuevos):'')+
     (numerica?'':celebCampo('celeb-c-noid','Otros presentes no identificados','Personas que estuvieron pero no se pudieron marcar.'+(sumas.noIdent!=null?' Los anotadores sumaron '+sumas.noIdent+'.':''),c?(c.noIdentificados!=null&&c.noIdentificados!==''?c.noIdentificados:sumas.noIdent):''))+
     (ng.hay?'<div style="margin-bottom:10px;font-size:13px"><strong>Niños:</strong> '+ng.total+' <span style="opacity:.7">(de las salas de Nuevas Generaciones)</span></div>'
            :celebCampo('celeb-c-ninos','Niños (sin salas)','Solo si los chicos se quedaron en la celebración. Si hubo salas, dejalo vacío: el número sale de Nuevas Generaciones.',c?c.ninosManual:''))+
@@ -23778,7 +23780,7 @@ function celebAbrirConfirmar(id){
     '<div style="font-size:15px;font-weight:700;margin-bottom:2px">✅ Terminé mi parte</div>'+
     '<div style="font-size:12.5px;opacity:.75;margin-bottom:12px">'+svcEsc(celebFechaTxt(c.fecha))+' · '+svcEsc(c.horario)+' · marcaste <strong>'+mios+'</strong></div>'+
     celebFilaConf('celeb-cf-noid','Otros presentes no identificados en tu sector','Opcional. Se suman a los de los demás anotadores.',mia?mia.noIdent:null)+
-    celebFilaConf('celeb-cf-nuevos','Nuevos que viste en tu sector','Opcional. Se suman y se cuadran con lo que carga Conexión.',mia?mia.nuevos:null)+
+    celebFilaConf('celeb-cf-nuevos','Nuevos que viste en tu sector','Opcional, de control: los Nuevos salen solos de Conexión. Si se vieron más de los cargados, queda el aviso de cuadre.',mia?mia.nuevos:null)+
     '<div style="font-size:11.5px;opacity:.75;margin-bottom:10px;padding:8px;border-radius:8px;background:#161B22">La asistencia la cierra un/a Coordinador/a, o se cierra sola al terminar el día. Si después marcás a alguien más, volvé a confirmar.</div>'+
     '<div id="celeb-cf-err" style="display:none;font-size:12.5px;color:#F87171;margin-bottom:8px"></div>'+
     '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" onclick="document.getElementById(\'celeb-cierre-ov\').remove()">Seguir marcando</button>'+

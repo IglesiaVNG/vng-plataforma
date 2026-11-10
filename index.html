@@ -769,7 +769,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzo';
+const APP_VERSION = '2026-08-24-zzq';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -902,7 +902,7 @@ const MODULES_PERM=[
     {key:'miembros_editar',label:'Editar y agregar miembros'},
   ]},
   {key:'nuevos', label:'Nuevos Contactos', icon:'🌱', screens:[
-    {key:'nuevos', label:'Acceso a Nuevos Contactos (Ejecuta: además puede comentar cualquier contacto). Coordinadores/as y Colaboradores/as del Área Conexión tienen sus accesos por el equipo del Área'},
+    {key:'nuevos', label:'Acceso a Nuevos Contactos (Ejecuta: además puede comentar cualquier contacto). Coordinadores/as y Colaboradores/as del Área Conexión reciben las Funciones automáticas Coordinador/a Conexión y Colaborador/a Conexión'},
     {key:'nuevos_editar',    label:'Editar los datos de un contacto'},
     {key:'nuevos_contactar', label:'Contactar (registrar el primer contacto y autoasignarse seguimiento)'},
     {key:'nuevos_gestionar', label:'Gestionar (cambiar condición, asignar seguimiento y grupo)'},
@@ -972,6 +972,9 @@ const DEFAULT_PERMISOS={
   disc_n1     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   disc_n2     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
   disc_n3     : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ninguno',of:'ninguno',config:'ninguno',disc_dashboard:'consulta',disc_cargar:'ejecuta',disc_registros:'consulta',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ejecuta',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno'},
+  // Funciones automáticas del equipo del Área Conexión (se pueden ajustar en Configuración → Permisos)
+  conexion_coord: {nuevos:'ejecuta',nuevos_editar:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ninguno',nuevos_mensaje_wa:'ejecuta',nuevos_exportar:'ejecuta',nuevos_ver_privados:'ejecuta'},
+  conexion_colab: {nuevos:'ejecuta',nuevos_editar:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ninguno',nuevos_eliminar:'ninguno',nuevos_mensaje_wa:'ninguno',nuevos_exportar:'ninguno',nuevos_ver_privados:'ejecuta'},
   contactar   : {gdv_dashboard:'ninguno',gdv_cargar:'ninguno',gdv_registros:'ninguno',miembros_ver:'ninguno',miembros_editar:'ninguno',nuevos:'ejecuta',of:'ninguno',config:'ninguno',disc_dashboard:'ninguno',disc_cargar:'ninguno',disc_registros:'ninguno',disc_pasos:'ninguno',disc_inscripciones:'ninguno',disc_scope_cursada:'ninguno',gdv_scope_grupo:'ninguno',ng_dashboard:'ninguno',ng_cargar:'ninguno',ng_registros:'ninguno',ng_scope_grupo:'ninguno',agenda_ver:'ninguno',agenda_crear:'ninguno',equipo_ver:'ninguno',equipo_crear:'ninguno',formularios_ver:'ninguno',formularios_crear:'ninguno',nuevos_contactar:'ejecuta',nuevos_gestionar:'ninguno',nuevos_eliminar:'ninguno'}
 };
 
@@ -1099,8 +1102,8 @@ function permisosCompletarFaltantes(){
   (S.roles||[]).forEach(function(role){
     if(!PERMISOS[role.id]){
       // Rol nuevo sin configuración: inicializar todo en 'ninguno'
-      var emptyPerms={};
-      SCREENS.forEach(function(s){ emptyPerms[s.key||s]='ninguno'; });
+      var emptyPerms={}, defRol=DEFAULT_PERMISOS[role.id]||{};
+      SCREENS.forEach(function(s){ emptyPerms[s.key||s]=defRol[s.key||s]||'ninguno'; });
       PERMISOS[role.id]=emptyPerms;
       needsSave=true;
     } else {
@@ -1152,12 +1155,6 @@ function getPerm(roleId, screen){
     const p=PERMISOS[r]?(PERMISOS[r][screen]||'ninguno'):'ninguno';
     if((order[p]||0)>(order[best]||0)) best=p;
   });
-  // Conexión: el equipo del Área de servicio Conexión suma sus accesos (aditivo, nunca quita)
-  if(best!=='ejecuta'&&String(screen).indexOf('nuevos')===0){
-    const rc=conexionRolCuenta();
-    const pc=rc&&CONEXION_PERMISOS[rc]?(CONEXION_PERMISOS[rc][screen]||'ninguno'):'ninguno';
-    if((order[pc]||0)>(order[best]||0)) best=pc;
-  }
   return best;
 }
 
@@ -1376,7 +1373,9 @@ function funcionesAutoDefs(){
     {id:'facilitador',              name:'Facilitador',    color:'#059669', desc:'Lidera un Grupo de Vida'},
     {id:'lider',                    name:'Líder',          color:'#0369A1', desc:'Liderazgo de área'},
     {id:'colaborador1783645248659', name:'Colaborador NG', color:'#0D9488', desc:'Colabora en una Comunidad de Nuevas Generaciones (automática)'},
-    {id:'coord_area',               name:'Coordinador/a de Área', color:'#B45309', desc:'Coordina un Área de servicio o Proyecto (automática)'}
+    {id:'coord_area',               name:'Coordinador/a de Área', color:'#B45309', desc:'Coordina un Área de servicio o Proyecto (automática)'},
+    {id:'conexion_coord',           name:'Coordinador/a Conexión', color:'#15803D', desc:'Coordinador/a del Área de servicio Conexión (automática)'},
+    {id:'conexion_colab',           name:'Colaborador/a Conexión', color:'#4D7C0F', desc:'Colaborador/a del Área de servicio Conexión (automática)'}
   ];
 }
 // Agrega a S.roles las definiciones que falten (copy-on-write). Devuelve la lista de ids agregados.
@@ -1395,7 +1394,7 @@ function esFuncionAutomatica(id){
 }
 function avisoFuncionAutomatica(id){
   var r=(S.roles||[]).find(function(x){return x.id===id;});
-  alert('"'+(r?r.name:id)+'" es una Función automática: la tiene quien está asignado a un Grupo, Comunidad o Propósito activo, y se pierde sola al dejarlo. No se puede eliminar.\n\nPodés cambiarle el nombre, el color o la descripción con ✏️.');
+  alert('"'+(r?r.name:id)+'" es una Función automática: la tiene quien está asignado a un Grupo, Comunidad, Área o Propósito activo, y se pierde sola al dejarlo. No se puede eliminar.\n\nPodés cambiarle el nombre, el color o la descripción con ✏️.');
 }
 
 const DEFAULT_GROUPS=[
@@ -1668,6 +1667,10 @@ function groupMembers(gid){
 // Los roles de acceso al sistema (Pastor, Admin GdV, etc.) no tienen un área específica.
 function getRoleContexto(memberId, roleId){
   var id=Number(memberId);
+  if(roleId==='conexion_coord'||roleId==='conexion_colab'){
+    var ac=conexionAreas().map(function(a){return a.nombre;});
+    if(ac.length) return ac.join(', ');
+  }
   if(roleId==='coord_area'){
     var areasC=(S.areasServicio||[]).filter(function(a){return svcAreaActiva(a)&&(a.equipo||[]).some(function(e){return e.rol==='Coordinador/a'&&Number(e.personaId)===id;});}).map(function(a){return a.nombre;});
     if(areasC.length) return areasC.join(', ');
@@ -3058,12 +3061,9 @@ function canVerPrivadosNuevos(){
   return isSuperAdmin() || canEjecutar('nuevos_ver_privados');
 }
 // ── Equipo del Área de servicio Conexión ──
-// Coordinadores/as y Colaboradores/as de un Área ACTIVA llamada "Conexión" tienen en Nuevos Contactos
-// los accesos de su rol, además de los de sus Funciones (Diseno_Conexion_Grilla.md §7).
-var CONEXION_PERMISOS={
-  coord:{nuevos:'ejecuta',nuevos_editar:'ejecuta',nuevos_contactar:'ejecuta',nuevos_gestionar:'ejecuta',nuevos_eliminar:'ejecuta',nuevos_mensaje_wa:'ejecuta',nuevos_exportar:'ejecuta',nuevos_ver_privados:'ejecuta'},
-  colab:{nuevos:'ejecuta',nuevos_editar:'ejecuta',nuevos_contactar:'ejecuta',nuevos_ver_privados:'ejecuta'}
-};
+// Coordinadores/as y Colaboradores/as de un Área ACTIVA llamada "Conexión" reciben las Funciones
+// automáticas "Coordinador/a Conexión" / "Colaborador/a Conexión"; sus accesos se ajustan en
+// Configuración → Permisos como cualquier Función.
 function conexionAreas(){
   return (S.areasServicio||[]).filter(function(a){ return a&&normName(a.nombre).indexOf('conexion')===0&&svcAreaActiva(a); });
 }
@@ -3079,7 +3079,6 @@ function conexionRolDe(memberId){
   });
   return rol;
 }
-function conexionRolCuenta(){ var m=getLinkedMember(); return m?conexionRolDe(m.id):null; }
 function isContactar(){
   return currentUser && currentUser.role==='contactar';
 }
@@ -3168,17 +3167,20 @@ var FUNC_AUTO_FAC='facilitador';
 var FUNC_AUTO_LIDER_NG='lider';
 var FUNC_AUTO_COLAB_NG='colaborador1783645248659';
 var FUNC_AUTO_COORD_AREA='coord_area';
-var FUNC_AUTO_IDS=[FUNC_AUTO_FAC,FUNC_AUTO_LIDER_NG,FUNC_AUTO_COLAB_NG,FUNC_AUTO_COORD_AREA];
+var FUNC_AUTO_CONEX_COORD='conexion_coord';
+var FUNC_AUTO_CONEX_COLAB='conexion_colab';
+var FUNC_AUTO_IDS=[FUNC_AUTO_FAC,FUNC_AUTO_LIDER_NG,FUNC_AUTO_COLAB_NG,FUNC_AUTO_COORD_AREA,FUNC_AUTO_CONEX_COORD,FUNC_AUTO_CONEX_COLAB];
 // Un Área cuenta como activa si ella y su Propósito no están Inactivos.
 function svcAreaActiva(a){
   if(!a||a.estado==='Inactivo') return false;
   if(a.propositoId){ var p=(S.ministerios||[]).find(function(x){return Number(x.id)===Number(a.propositoId);}); if(p&&p.estado==='Inactivo') return false; }
   return true;
 }
-// Coordinadores/as de una lista de Áreas (ids de persona, sin repetir).
+// Personas de una lista de Áreas con Función automática posible (Coordinadores/as y Colaboradores/as,
+// estos últimos por Conexión), sin repetir. Reconciliar de más no cambia nada (es idempotente).
 function svcCoordIds(areas){
   var out=[];
-  (areas||[]).forEach(function(a){ ((a&&a.equipo)||[]).forEach(function(e){ if(e.rol==='Coordinador/a'&&out.indexOf(Number(e.personaId))<0) out.push(Number(e.personaId)); }); });
+  (areas||[]).forEach(function(a){ ((a&&a.equipo)||[]).forEach(function(e){ if((e.rol==='Coordinador/a'||e.rol==='Colaborador/a')&&out.indexOf(Number(e.personaId))<0) out.push(Number(e.personaId)); }); });
   return out;
 }
 // "Líder Propósito": Función creada desde Configuración (id generado). La tienen automáticamente
@@ -3228,6 +3230,9 @@ function funcionesAutoDeseadas(memberId){
     if(!svcAreaActiva(a)) return;
     if((a.equipo||[]).some(function(e){return e.rol==='Coordinador/a'&&String(e.personaId)===k;})) out.add(FUNC_AUTO_COORD_AREA);
   });
+  // Equipo del Área Conexión (activa): Coordinador/a Conexión / Colaborador/a Conexión
+  var rc=conexionRolDe(memberId);
+  if(rc==='coord') out.add(FUNC_AUTO_CONEX_COORD); else if(rc==='colab') out.add(FUNC_AUTO_CONEX_COLAB);
   var lp=funcLiderPropositoId();
   if(lp!==null) (S.ministerios||[]).forEach(function(mn){
     if(mn.estado==='Inactivo') return;
@@ -16623,7 +16628,8 @@ function buildNuevosHTML(){
           <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">DNI <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
             <input type="text" id="nv-edit-dni" placeholder="Ej: 12345678" maxlength="9" inputmode="numeric" onkeypress="return /[0-9]/.test(event.key)" style="width:100%"></div>
           <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Grupo / Comunidad <span style="font-weight:400;color:#9CA3AF">(opcional)</span></label>
-            <select id="nv-edit-grupo" style="width:100%"><option value="">— Sin asignar —</option></select></div>
+            <select id="nv-edit-grupo" style="width:100%"><option value="">— Sin asignar —</option></select>
+            <div id="nv-edit-grupo-lock" style="display:none;font-size:11px;color:#9CA3AF;margin-top:3px">🔒 El Grupo lo asigna quien tiene permiso de Gestionar</div></div>
         </div>
         <div style="margin-top:8px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">¿Cómo nos conoció?</label>
           <select id="nv-edit-como" style="width:100%">
@@ -17169,7 +17175,8 @@ function nvTarjetasHTML(lista,hist){
   }).join('')+'</div>';
 }
 
-function nvPuedeSeleccionar(){ return canGestionarNuevos(); }
+// Selección múltiple (tildes + barra azul): por ahora solo Super Admin (decidido 10/11/26: confundía y se podía usar mal)
+function nvPuedeSeleccionar(){ return isSuperAdmin(); }
 function nvCeldaPersona(m,conSel){
   return '<td style="min-width:190px"><div style="display:flex;align-items:center;gap:8px">'+
     (conSel?'<input type="checkbox" '+(nvSel[m.id]?'checked':'')+' onclick="event.stopPropagation();nvToggleSel('+m.id+',this.checked)" style="width:auto;margin:0">':'')+
@@ -17254,6 +17261,7 @@ function nvSelTodos(on){ nvSel={}; if(on) nvListaFiltrada().lista.forEach(functi
 function nvSelIds(){ return Object.keys(nvSel).map(Number); }
 function nvRenderSelBar(){
   var bar=document.getElementById('nv-sel-bar'); if(!bar) return;
+  if(!nvPuedeSeleccionar()) nvSel={};
   var ids=nvSelIds();
   if(!ids.length||nvFiltro==='historico'){ bar.style.display='none'; bar.innerHTML=''; return; }
   bar.style.display='flex';
@@ -17309,7 +17317,7 @@ async function nvAsignarResponsableLote(ids,respId,respNombre,esAutoasignacion){
   showToast(respId==null?'✅ Responsable quitado ('+fotos.length+')':'✅ Responsable asignado a '+fotos.length+' persona'+(fotos.length!==1?'s':''),'#16A34A');
 }
 async function nvCambiarEtapaLote(ids,etapa){
-  if(!etapa||!canGestionarNuevos()) return;
+  if(!etapa||!nvPuedeSeleccionar()) return;
   if(etapa==='Participando'){ alert('A Participando se pasa sola al sumar '+nvAsistParticipando()+' asistencias.'); return; }
   var objetivo=S.members.filter(function(m){return ids.indexOf(Number(m.id))>=0&&nvEsNuevoActivo(m);});
   var part=objetivo.filter(function(m){return m.subEstado==='Participando';});
@@ -17445,7 +17453,6 @@ function nvFichaRender(){
   var respAcc='';
   if(esNuevo&&canGestionarNuevos()) respAcc='<span style="display:flex;gap:6px"><button class="btn btn-sm" onclick="nvAsignarResponsableAbrir(['+m.id+'])">'+(resp?'Cambiar':'Asignar')+'</button>'+
     (m.seguimientoId?'<button class="btn btn-sm" style="color:#B91C1C;border-color:#FECACA" onclick="nvQuitarResponsable(['+m.id+'])">Quitar</button>':'')+'</span>';
-  else if(esNuevo&&canContactarNuevos()&&!m.seguimientoId&&yo) respAcc='<button class="btn btn-sm" onclick="nvAutoasignarme('+m.id+')">🙋 Autoasignarme</button>';
   h+='<div class="nv-fsec"><h4>👤 Responsable</h4><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:13px;'+(resp?'':'color:#D97706;font-weight:700')+'">'+(resp?nvEsc(resp):'⏳ Sin asignar')+'</span>'+respAcc+'</div></div>';
   // Datos
   function dato(k,v){ return '<div class="nv-fdato"><span>'+k+'</span><span>'+(v?nvEsc(v):'<span style="color:#9CA3AF">—</span>')+'</span></div>'; }
@@ -17497,14 +17504,6 @@ async function nvFichaGuardarComentario(id){
   if(el) el.value='';
   renderNuevos(); nvFichaRender();
   showToast('💬 Comentario guardado','#16A34A');
-}
-async function nvAutoasignarme(id){
-  if(!canContactarNuevos()) return;
-  var yo=getLinkedMember(); if(!yo){ alert('Tu cuenta no está vinculada a una persona de Rebaños.'); return; }
-  var m=S.members.find(function(x){return Number(x.id)===Number(id);}); if(!m) return;
-  if(m.seguimientoId){ alert('Ya tiene responsable.'); return; }
-  var gl=nvGruposDe(yo).map(function(x){return x.name;}).join(', ');
-  await nvAsignarResponsableLote([Number(id)],yo.id,fullName(yo)+(gl?' — '+gl:''),true);
 }
 
 // Popup de acciones (Editar/Contactar/Gestionar/Eliminar) — se abre al clickear el Nombre
@@ -18017,6 +18016,10 @@ function nvAbrirEditar(id){
   document.getElementById('nv-edit-motivo').value=m.motivoContacto||'';
   const dniEditEl=document.getElementById('nv-edit-dni'); if(dniEditEl) dniEditEl.value=m.dni||'';
   nvBuildGrupoSelector('nv-edit-grupo', nvGetGrupoValFromMember(m));
+  // Editar = datos personales; asignar Grupo es Gestionar
+  var gSel=document.getElementById('nv-edit-grupo'), gLock=document.getElementById('nv-edit-grupo-lock');
+  if(gSel) gSel.disabled=!canGestionarNuevos();
+  if(gLock) gLock.style.display=canGestionarNuevos()?'none':'block';
   // Fecha ingreso - only editable by Super Admin
   const fechaWrap=document.getElementById('nv-edit-fecha-wrap');
   const fechaInput=document.getElementById('nv-edit-fecha');
@@ -18047,8 +18050,10 @@ async function nvGuardarEditar(){
   m.comoNosConocio=document.getElementById('nv-edit-como').value;
   m.motivoContacto=document.getElementById('nv-edit-motivo').value.trim();
   m.dni=(document.getElementById('nv-edit-dni')?.value||'').trim();
-  var grupoVals=nvGetGrupoIdFromVal(document.getElementById('nv-edit-grupo')?.value||'');
-  m.grupoId=grupoVals.grupoId;
+  if(canGestionarNuevos()){ // asignar Grupo es Gestionar; Editar solo toca datos personales
+    var grupoVals=nvGetGrupoIdFromVal(document.getElementById('nv-edit-grupo')?.value||'');
+    m.grupoId=grupoVals.grupoId;
+  }
   if(isSuperAdmin()){
     const fechaVal=document.getElementById('nv-edit-fecha')?.value.trim();
     if(fechaVal) m.fechaRegistro=fechaVal;

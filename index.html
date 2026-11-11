@@ -24637,21 +24637,24 @@ function finPendientesDe(mes){ return (S.finMovs||[]).filter(function(m){ return
 function finApertura(){ var c=finConfig(); var v=c?finDecV('a',c):null; return (v&&v.saldos)||null; }
 function finCero(){ var o={}; finCuentas().forEach(function(c){ o[c.id]=0; }); return o; }
 // Totales del mes: por tipo, por cuenta y por categoría
-function finTotalesMes(mes){
-  var t={ingreso:0,egreso:0,porCuenta:{},porCat:{ingreso:{},egreso:{}},resumen:false};
+function finTotalesMes(mes,area){
+  var t={ingreso:0,egreso:0,porCuenta:{},porCat:{ingreso:{},egreso:{}},porArea:{},resumen:false,sinDetalleArea:false};
   finCuentas().forEach(function(c){ t.porCuenta[c.id]={ing:0,egr:0}; });
   var r=finMesRec(mes);
   if(r&&r.modalidad==='resumen'){
-    t.resumen=true; var d=finDecV('x',r);
+    t.resumen=true; t.porCuenta=null;
+    if(area){ t.sinDetalleArea=true; return t; }
+    var d=finDecV('x',r);
     if(d&&d.resumen){
       ['ingreso','egreso'].forEach(function(tp){ var o=d.resumen[tp]||{}; for(var k in o){ var n=finNum(o[k])||0; t.porCat[tp][k]=(t.porCat[tp][k]||0)+n; t[tp]+=n; } });
     }
-    t.porCuenta=null;
     return t;
   }
   finMovsDe(mes).forEach(function(x){
-    var n=finNum(x.d.monto)||0, tp=x.d.tipo==='egreso'?'egreso':'ingreso';
+    if(!finAreaEnFiltro(x.d.area,area)) return;
+    var n=finNum(x.d.monto)||0, tp=x.d.tipo==='egreso'?'egreso':'ingreso', ar=x.d.area||'gen';
     t[tp]+=n; t.porCat[tp][x.d.categoria]=(t.porCat[tp][x.d.categoria]||0)+n;
+    if(!t.porArea[ar]) t.porArea[ar]={ingreso:0,egreso:0}; t.porArea[ar][tp]+=n;
     if(!t.porCuenta[x.d.cuenta]) t.porCuenta[x.d.cuenta]={ing:0,egr:0};
     if(tp==='ingreso') t.porCuenta[x.d.cuenta].ing+=n; else t.porCuenta[x.d.cuenta].egr+=n;
   });
@@ -24859,10 +24862,9 @@ function finValidarMov(d){
 }
 function finAreaNombre(ref){
   if(!ref||ref==='gen') return 'General / Iglesia';
-  var id=Number(String(ref).slice(1));
-  if(ref[0]==='p'){ var p=(S.ministerios||[]).find(function(x){ return Number(x.id)===id; }); return p?p.nombre:'(Propósito eliminado)'; }
-  if(ref[0]==='a'){ var a=(S.areasServicio||[]).find(function(x){ return Number(x.id)===id; }); return a?a.nombre:'(Área eliminada)'; }
-  return ref;
+  var x=finAreasLista().find(function(a){ return a.ref===ref; });
+  if(x) return x.nombre;
+  return ref[0]==='p'?'(Propósito eliminado)':ref[0]==='a'?'(Área eliminada)':'(eliminada)';
 }
 async function finGuardarMov(){
   if(finVista.ocupado) return;
@@ -25176,33 +25178,38 @@ function finSelMes(onchange){
 function finSetMes(v){ finVista.mes=v; finVista.form=null; finRender(); }
 function finKpi(lbl,val,color){ return '<div class="fin-card"><div class="fin-lbl">'+lbl+'</div><div style="font-size:24px;font-weight:700;margin-top:6px;color:'+(color||'#111827')+'">'+val+'</div></div>'; }
 function finHtmlDashboard(){
-  var mes=finVista.mes, t=finTotalesMes(mes), memo={}, fin=finSaldoFin(mes,memo), ini=finSaldoIni(mes,memo)||finCero();
+  var mes=finVista.mes, area=finVista.filtro.area||'', t=finTotalesMes(mes,area), memo={}, fin=finSaldoFin(mes,memo), ini=finSaldoIni(mes,memo)||finCero();
   var pend=finPendientesDe(mes).length, h='';
-  h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">'+finSelMes('finSetMes(this.value)')
-    +(pend?'<span style="font-size:12px;background:#FEF3C7;color:#92400E;padding:4px 10px;border-radius:999px;font-weight:600">'+pend+' pendiente(s) de revisión</span>':'')+'</div>';
+  h+='<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">'
+    +'<label class="fin-fl">Área / Proyecto<select class="fin-in" style="width:auto;max-width:320px" onchange="finVista.filtro.area=this.value;finRender()">'+finOptsAreas(area,true)+'</select></label>'
+    +finSelMes('finSetMes(this.value)').replace('flex-direction:row;align-items:center;gap:8px','')
+    +(pend?'<span style="font-size:12px;background:#FEF3C7;color:#92400E;padding:6px 10px;border-radius:999px;font-weight:600">'+pend+' pendiente(s) de revisión</span>':'')+'</div>';
+  if(area) h+='<div style="font-size:12.5px;color:#4B5563;margin-bottom:8px">Mostrando solo <strong>'+svcEsc(finAreaNombre(area))+'</strong>'+(area[0]==='p'?' (con sus Áreas y Proyectos)':'')+'. Los saldos de las cuentas son siempre de toda la Tesorería.'+(t.sinDetalleArea?' Este mes es resumen: no tiene detalle por Área.':'')+'</div>';
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px">'
     +finKpi('Ingresos del mes',finFmt(t.ingreso),'#166534')+finKpi('Egresos del mes',finFmt(t.egreso),'#B91C1C')
-    +finKpi('Resultado',(t.ingreso-t.egreso>=0?'+ ':'')+finFmt(t.ingreso-t.egreso),'#1F4E79')+finKpi('Saldo total',finFmt(finSuma(fin)))+'</div>';
-  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin-bottom:12px">';
+    +finKpi('Resultado',(t.ingreso-t.egreso>=0?'+ ':'')+finFmt(t.ingreso-t.egreso),'#1F4E79')+finKpi('Saldo total (todas las cuentas)',finFmt(finSuma(fin)))+'</div>';
+  // Gráficos
+  var meses=finMeses().slice(0,6).reverse();
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px;margin-bottom:12px">';
+  h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">Ingresos y egresos por mes</div>'+finGraficoMeses(meses,area)
+    +'<div style="font-size:11.5px;color:#4B5563;margin-top:6px">R = mes resumen. Pasá el mouse por un mes para ver los importes.</div></div>';
+  h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">'+(area?'Por Área / Proyecto (dentro del filtro)':'Por Área / Proyecto')+'</div>'+(t.resumen?'<div style="font-size:13px;color:#6B7280">Mes resumen: sin detalle por Área / Proyecto.</div>':finGraficoAreas(t))+'</div>';
+  h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">Egresos por categoría</div>'+finBarrasH(finCatItems(t,'egreso'),FIN_C_EGR,'Sin egresos en este mes.')+'</div>';
+  h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">Ingresos por categoría</div>'+finBarrasH(finCatItems(t,'ingreso'),FIN_C_ING,'Sin ingresos en este mes.')+'</div>';
+  h+='</div>';
+  // Tablas (los números exactos)
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">';
+  var tc=finTotalesMes(mes);
   h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">Saldo por cuenta</div><div class="fin-tw"><table class="fin-t"><thead><tr><th>Cuenta</th><th class="fin-n">Inicial</th>'
-    +(t.porCuenta?'<th class="fin-n">Ingresos</th><th class="fin-n">Egresos</th>':'')+'<th class="fin-n">'+(finMesCerrado(mes)?'Final':'Actual')+'</th></tr></thead><tbody>'
-    +finCuentas().map(function(c){ var pc=t.porCuenta&&t.porCuenta[c.id];
-      return '<tr><td>'+svcEsc(c.nombre)+'</td><td class="fin-n">'+finFmtSimple(ini[c.id])+'</td>'+(t.porCuenta?'<td class="fin-n">'+finFmtSimple(pc?pc.ing:0)+'</td><td class="fin-n">'+finFmtSimple(pc?pc.egr:0)+'</td>':'')+'<td class="fin-n" style="font-weight:700">'+finFmtSimple(fin[c.id])+'</td></tr>'; }).join('')
-    +'</tbody></table></div>'+(t.resumen?'<div style="font-size:12px;color:#4B5563;margin-top:6px">Mes resumen: los totales son por categoría, sin detalle por cuenta.</div>':'')+'</div>';
+    +(tc.porCuenta?'<th class="fin-n">Ingresos</th><th class="fin-n">Egresos</th>':'')+'<th class="fin-n">'+(finMesCerrado(mes)?'Final':'Actual')+'</th></tr></thead><tbody>'
+    +finCuentas().map(function(c){ var pc=tc.porCuenta&&tc.porCuenta[c.id];
+      return '<tr><td>'+svcEsc(c.nombre)+'</td><td class="fin-n">'+finFmtSimple(ini[c.id])+'</td>'+(tc.porCuenta?'<td class="fin-n">'+finFmtSimple(pc?pc.ing:0)+'</td><td class="fin-n">'+finFmtSimple(pc?pc.egr:0)+'</td>':'')+'<td class="fin-n" style="font-weight:700">'+finFmtSimple(fin[c.id])+'</td></tr>'; }).join('')
+    +'</tbody></table></div>'+(tc.resumen?'<div style="font-size:12px;color:#4B5563;margin-top:6px">Mes resumen: los totales son por categoría, sin detalle por cuenta.</div>':'')+'</div>';
   var cats=[]; ['ingreso','egreso'].forEach(function(tp){ for(var k in t.porCat[tp]) cats.push({tp:tp,id:k,n:t.porCat[tp][k]}); });
   cats.sort(function(a,b){ return b.n-a.n; });
   h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:8px">Por categoría</div><div class="fin-tw"><table class="fin-t"><thead><tr><th>Categoría</th><th class="fin-n">Ingreso</th><th class="fin-n">Egreso</th></tr></thead><tbody>'
     +(cats.length?cats.map(function(c){ return '<tr><td>'+svcEsc(finCatNombre(c.tp,c.id))+'</td><td class="fin-n">'+(c.tp==='ingreso'?finFmtSimple(c.n):'—')+'</td><td class="fin-n">'+(c.tp==='egreso'?finFmtSimple(c.n):'—')+'</td></tr>'; }).join(''):'<tr><td colspan="3" style="color:#6B7280">Sin movimientos en este mes.</td></tr>')
     +'</tbody></table></div></div></div>';
-  // Últimos 6 meses
-  var ms=finMeses().slice(0,6).reverse(), max=1, datos=ms.map(function(m){ var tt=finTotalesMes(m); max=Math.max(max,tt.ingreso,tt.egreso); return {m:m,t:tt}; });
-  if(ms.length>1){
-    h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:10px">Últimos meses (resumen y detallados juntos)</div>'
-      +'<div style="display:flex;align-items:flex-end;gap:18px;height:150px;padding:0 8px" role="img" aria-label="Ingresos y egresos por mes">'
-      +datos.map(function(x){ var hi=Math.round(x.t.ingreso/max*110), he=Math.round(x.t.egreso/max*110);
-        return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px" title="'+finMesNombre(x.m)+': ingresos '+finFmt(x.t.ingreso)+' · egresos '+finFmt(x.t.egreso)+'"><div style="display:flex;gap:4px;align-items:flex-end;height:115px"><div style="width:18px;height:'+hi+'px;background:#16A34A;border-radius:4px 4px 0 0"></div><div style="width:18px;height:'+he+'px;background:#DC2626;border-radius:4px 4px 0 0"></div></div><span style="font-size:11px;color:#4B5563">'+MESES[+x.m.slice(5,7)-1].slice(0,3)+' · '+(x.t.resumen?'R':'D')+'</span></div>'; }).join('')
-      +'</div><div style="font-size:12px;color:#4B5563;margin-top:8px">Verde ingresos · rojo egresos · R = mes resumen · D = mes detallado</div></div>';
-  }
   return h;
 }
 function finHtmlPendientes(){
@@ -25321,10 +25328,22 @@ function finDatosForm(){
   else if(f.id){ var m=(S.finMovs||[]).find(function(x){ return Number(x.id)===Number(f.id); }); d=(m&&finDecV('m',m))||{}; }
   return d;
 }
-function finOptsAreas(sel){
-  return '<option value="gen">General / Iglesia</option>'
-    +(S.ministerios||[]).filter(function(p){ return p&&p.estado!=='Inactivo'; }).map(function(p){ return '<option value="p'+p.id+'"'+(sel==='p'+p.id?' selected':'')+'>Propósito · '+svcEsc(p.nombre)+'</option>'; }).join('')
-    +(S.areasServicio||[]).filter(function(a){ return svcAreaActiva(a); }).map(function(a){ return '<option value="a'+a.id+'"'+(sel==='a'+a.id?' selected':'')+'>'+svcEsc(a.tipo||'Área')+' · '+svcEsc(a.nombre)+'</option>'; }).join('');
+function finOptsAreas(sel,paraFiltro){
+  var l=finAreasLista(), grupos=[], porGrupo={};
+  l.forEach(function(x){
+    var ok=paraFiltro?!x.oculta||x.ref===sel:((x.activa&&!x.oculta)||x.ref===sel);
+    if(!ok) return;
+    if(!porGrupo[x.grupo]){ porGrupo[x.grupo]=[]; grupos.push(x.grupo); }
+    porGrupo[x.grupo].push(x);
+  });
+  var h=(paraFiltro?'<option value="">Todas</option>':'')+'<option value="gen"'+(sel==='gen'||(!paraFiltro&&!sel)?' selected':'')+'>General / Iglesia</option>';
+  grupos.forEach(function(g){
+    h+='<optgroup label="'+svcEsc(g)+'">'+porGrupo[g].map(function(x){
+      var txt=x.tipo==='Propósito'?(paraFiltro?x.nombre+' (todo el Propósito)':x.nombre+' (general)'):(x.tipo==='Tesorería'?x.nombre:'  '+x.nombre+' · '+x.tipo);
+      return '<option value="'+x.ref+'"'+(x.ref===sel?' selected':'')+'>'+svcEsc(txt)+(x.activa?'':' (inactiva)')+'</option>';
+    }).join('')+'</optgroup>';
+  });
+  return h;
 }
 function finOptsCat(tipo,sel){
   return '<option value="">Elegí…</option>'+finCategorias(tipo).filter(function(c){ return c.activa!==false||c.id===sel; }).map(function(c){ return '<option value="'+c.id+'"'+(sel===c.id?' selected':'')+'>'+svcEsc(c.nombre)+'</option>'; }).join('');
@@ -25396,6 +25415,113 @@ function finHtmlHistorial(d){
     var a=x.antes||{};
     return '<div style="padding:3px 0">'+new Date(x.ts).toLocaleString('es-AR')+' · '+svcEsc(x.por)+' · antes: '+fmtAA(a.fecha)+' · '+(a.tipo==='egreso'?'Egreso':'Ingreso')+' · '+svcEsc(finCatNombre(a.tipo,a.categoria))+' · '+svcEsc(finMedioCuentaTxt(a.medio,a.cuenta))+' · '+finFmt(a.monto)+(a.obs?' · '+svcEsc(a.obs):'')+'</div>';
   }).join('')+'</details>';
+}
+function finAreasLista(){
+  var c=finConfig()||{}, ocultas=c.areasOcultas||[], out=[];
+  var props=(S.ministerios||[]).filter(Boolean), areas=(S.areasServicio||[]).filter(Boolean), usados={};
+  props.forEach(function(p){
+    out.push({ref:'p'+p.id,nombre:p.nombre,tipo:'Propósito',grupo:p.nombre,prop:'p'+p.id,activa:p.estado!=='Inactivo'});
+    areas.filter(function(a){ return Number(a.propositoId)===Number(p.id); }).forEach(function(a){
+      usados[a.id]=1;
+      out.push({ref:'a'+a.id,nombre:a.nombre,tipo:a.tipo==='Proyecto ministerial'?'Proyecto':'Área',grupo:p.nombre,prop:'p'+p.id,activa:svcAreaActiva(a)});
+    });
+  });
+  areas.filter(function(a){ return !usados[a.id]; }).forEach(function(a){
+    out.push({ref:'a'+a.id,nombre:a.nombre,tipo:a.tipo==='Proyecto ministerial'?'Proyecto':'Área',grupo:'Sin Propósito',prop:null,activa:svcAreaActiva(a)});
+  });
+  (c.areasPropias||[]).forEach(function(f){ out.push({ref:'f'+f.id,nombre:f.nombre,tipo:'Tesorería',grupo:'Propias de Tesorería',prop:null,activa:f.activa!==false,propia:true}); });
+  out.forEach(function(x){ x.oculta=ocultas.indexOf(x.ref)>=0; });
+  return out;
+}
+function finAreaEnFiltro(ref,filtro){
+  if(!filtro) return true;
+  ref=ref||'gen';
+  if(ref===filtro) return true;
+  if(filtro[0]==='p'&&ref[0]==='a'){ var x=finAreasLista().find(function(a){ return a.ref===ref; }); return !!(x&&x.prop===filtro); }
+  return false;
+}
+// Gráficos: azul = ingresos, naranja = egresos (par apto para daltonismo); los textos van en tinta neutra.
+var FIN_C_ING='#2a78d6', FIN_C_EGR='#eb6834';
+function finLeyenda(){
+  return '<div style="display:flex;gap:14px;font-size:12px;color:#374151;margin-bottom:8px"><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:'+FIN_C_ING+'"></span>Ingresos</span><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:'+FIN_C_EGR+'"></span>Egresos</span></div>';
+}
+function finBarrasH(items,color,vacio){
+  if(!items.length) return '<div style="font-size:13px;color:#6B7280">'+vacio+'</div>';
+  var max=Math.max.apply(null,items.map(function(x){ return x.v; }).concat([1]));
+  return '<div role="list" style="display:flex;flex-direction:column;gap:6px">'+items.map(function(x){
+    var w=Math.max(1,Math.round(x.v/max*100));
+    return '<div role="listitem" title="'+svcEsc(x.n)+': '+finFmt(x.v)+'" style="display:grid;grid-template-columns:minmax(90px,34%) 1fr;gap:8px;align-items:center;font-size:12.5px"><span style="color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+svcEsc(x.n)+'</span>'
+      +'<span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="height:12px;width:'+w+'%;background:'+color+';border-radius:0 4px 4px 0;flex-shrink:1;min-width:2px"></span><span style="color:#111827;white-space:nowrap;font-variant-numeric:tabular-nums">'+finFmtSimple(x.v)+'</span></span></div>';
+  }).join('')+'</div>';
+}
+function finGraficoMeses(meses,area){
+  var datos=meses.map(function(m){ return {m:m,t:finTotalesMes(m,area)}; }), max=1;
+  datos.forEach(function(x){ max=Math.max(max,x.t.ingreso,x.t.egreso); });
+  var alto=130;
+  return finLeyenda()+'<div role="img" aria-label="Ingresos y egresos por mes" style="display:flex;align-items:flex-end;gap:14px;height:'+(alto+34)+'px;border-bottom:1px solid #E5E7EB;padding:0 4px">'
+    +datos.map(function(x){
+      var hi=Math.round(x.t.ingreso/max*alto), he=Math.round(x.t.egreso/max*alto), sinDet=x.t.sinDetalleArea;
+      return '<div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px" title="'+finMesNombre(x.m)+(sinDet?': mes resumen, sin detalle por Área':': ingresos '+finFmt(x.t.ingreso)+' · egresos '+finFmt(x.t.egreso)+' · resultado '+finFmt(x.t.ingreso-x.t.egreso))+'">'
+        +'<div style="display:flex;gap:2px;align-items:flex-end;height:'+alto+'px">'
+        +(sinDet?'<span style="font-size:11px;color:#6B7280;align-self:center">s/d</span>':'<div style="width:16px;height:'+Math.max(hi,x.t.ingreso?2:0)+'px;background:'+FIN_C_ING+';border-radius:4px 4px 0 0"></div><div style="width:16px;height:'+Math.max(he,x.t.egreso?2:0)+'px;background:'+FIN_C_EGR+';border-radius:4px 4px 0 0"></div>')
+        +'</div><span style="font-size:11px;color:#4B5563;white-space:nowrap">'+MESES[+x.m.slice(5,7)-1].slice(0,3)+' '+x.m.slice(2,4)+(x.t.resumen?' · R':'')+'</span></div>';
+    }).join('')+'</div>';
+}
+function finCatItems(t,tp){
+  var out=[]; for(var k in t.porCat[tp]) out.push({n:finCatNombre(tp,k),v:t.porCat[tp][k]});
+  return out.sort(function(a,b){ return b.v-a.v; });
+}
+function finGraficoAreas(t){
+  var items=[]; for(var k in t.porArea) items.push({n:finAreaNombre(k),i:t.porArea[k].ingreso,e:t.porArea[k].egreso});
+  items.sort(function(a,b){ return (b.i+b.e)-(a.i+a.e); });
+  var extra=items.slice(8); items=items.slice(0,8);
+  if(extra.length) items.push({n:'Otras ('+extra.length+')',i:extra.reduce(function(s,x){ return s+x.i; },0),e:extra.reduce(function(s,x){ return s+x.e; },0)});
+  if(!items.length) return '<div style="font-size:13px;color:#6B7280">Sin movimientos en este mes.</div>';
+  var max=Math.max.apply(null,items.map(function(x){ return Math.max(x.i,x.e); }).concat([1]));
+  var barra=function(v,c){ return '<span style="display:flex;align-items:center;gap:6px"><span style="height:10px;width:'+Math.max(v?1:0,Math.round(v/max*100))+'%;min-width:'+(v?2:0)+'px;background:'+c+';border-radius:0 4px 4px 0"></span><span style="font-size:11.5px;color:#111827;font-variant-numeric:tabular-nums;white-space:nowrap">'+(v?finFmtSimple(v):'')+'</span></span>'; };
+  return finLeyenda()+'<div role="list" style="display:flex;flex-direction:column;gap:8px">'+items.map(function(x){
+    return '<div role="listitem" title="'+svcEsc(x.n)+': ingresos '+finFmt(x.i)+' · egresos '+finFmt(x.e)+'" style="display:grid;grid-template-columns:minmax(90px,34%) 1fr;gap:8px;align-items:center;font-size:12.5px"><span style="color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+svcEsc(x.n)+'</span><span style="display:flex;flex-direction:column;gap:2px;min-width:0">'+barra(x.i,FIN_C_ING)+barra(x.e,FIN_C_EGR)+'</span></div>';
+  }).join('')+'</div>';
+}
+function finHtmlAreasCfg(){
+  var l=finAreasLista(), grupos=[], porGrupo={};
+  l.forEach(function(x){ if(!porGrupo[x.grupo]){ porGrupo[x.grupo]=[]; grupos.push(x.grupo); } porGrupo[x.grupo].push(x); });
+  var h='<div class="fin-card" style="margin-bottom:12px"><div style="font-weight:700;color:#1F4E79;margin-bottom:4px">Áreas / Proyectos</div>'
+    +'<div style="font-size:12.5px;color:#4B5563;margin-bottom:10px">Se arman solos con cada Propósito y sus Áreas de servicio y Proyectos ministeriales (incluida Conexión). Lo que se cree en la app aparece acá automáticamente. Destildá lo que Tesorería no usa: deja de ofrecerse al cargar, pero se conserva en lo ya cargado. "General / Iglesia" está siempre.</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">';
+  grupos.filter(function(g){ return g!=='Propias de Tesorería'; }).forEach(function(g){
+    h+='<div><div class="fin-lbl" style="margin-bottom:6px">'+svcEsc(g)+'</div>'+porGrupo[g].map(function(x){
+      return '<label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:3px 0'+(x.tipo==='Propósito'?';font-weight:600':';padding-left:14px')+'"><input type="checkbox" id="fin-arv-'+x.ref+'"'+(x.oculta?'':' checked')+'> '+svcEsc(x.nombre)+' <span style="color:#6B7280;font-weight:400">· '+x.tipo+(x.activa?'':' · inactiva')+'</span></label>';
+    }).join('')+'</div>';
+  });
+  h+='</div><div class="fin-lbl" style="margin:14px 0 6px">Propias de Tesorería</div>'
+    +(porGrupo['Propias de Tesorería']||[]).map(function(x){ var id=x.ref.slice(1);
+      return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;max-width:520px"><label style="flex:1"><span style="position:absolute;left:-9999px">Nombre</span><input id="fin-arp-'+id+'" class="fin-in" value="'+svcEsc(x.nombre)+'"></label><label style="font-size:12px;white-space:nowrap;display:flex;gap:4px;align-items:center"><input type="checkbox" id="fin-arpact-'+id+'"'+(x.activa?' checked':'')+'> En uso</label></div>'; }).join('')
+    +'<label class="fin-fl" style="max-width:520px"><span>+ Nueva (ej. Edificio, Mantenimiento general)</span><input id="fin-arp-new" class="fin-in" placeholder="Nombre (opcional)"></label>'
+    +'<div style="margin-top:10px"><button class="btn btn-primary btn-sm" onclick="finGuardarAreas()">Guardar Áreas / Proyectos</button></div></div>';
+  return h;
+}
+async function finGuardarAreas(){
+  if(!finPuede('fin_config')){ alert('No tenés permiso para configurar Finanzas.'); return; }
+  var c=finConfig(); if(!c){ alert('Primero hay que crear la llave de Tesorería.'); return; }
+  var l=finAreasLista(), ocultas=[], bad=false;
+  l.forEach(function(x){ if(x.propia) return; var cb=document.getElementById('fin-arv-'+x.ref); if(cb&&!cb.checked) ocultas.push(x.ref); });
+  var propias=(c.areasPropias||[]).map(function(f){
+    var n=((document.getElementById('fin-arp-'+f.id)||{}).value||'').trim(); if(!n) bad=true;
+    var act=document.getElementById('fin-arpact-'+f.id);
+    return {id:f.id,nombre:n||f.nombre,activa:act?!!act.checked:f.activa!==false};
+  });
+  var nueva=((document.getElementById('fin-arp-new')||{}).value||'').trim();
+  if(nueva){
+    if(l.some(function(x){ return normName(x.nombre)===normName(nueva); })&&!confirm('Ya hay un Área / Proyecto llamado "'+nueva+'". ¿Agregarla igual?')) return;
+    propias.push({id:finAhora(),nombre:nueva,activa:true});
+  }
+  if(bad){ alert('Los nombres no pueden quedar vacíos.'); return; }
+  var ant=S.finConfig, nc=Object.assign({},c,{areasOcultas:ocultas,areasPropias:propias,_ts:finAhora(c._ts)});
+  S.finConfig=ant.map(function(x){ return x===c?nc:x; });
+  var ok=await finPersistir(function(){ S.finConfig=ant; });
+  if(!ok) return;
+  showToast('✅ Áreas / Proyectos guardadas','#16A34A'); finRender();
 }
 function finHtmlMisCargas(){
   var mias=(S.finMovs||[]).filter(function(m){ return m&&currentUser&&Number(m.creadoUid)===Number(currentUser.id); }).sort(function(a,b){ return b.creadoTs-a.creadoTs; }).slice(0,30);
@@ -25494,6 +25620,7 @@ function finHtmlConfig(){
       +'<div style="font-size:12px;color:#4B5563;margin:6px 0 10px">Se renombran como las Etiquetas: el código interno no cambia. Una categoría fuera de uso no aparece al cargar, pero se conserva en lo ya cargado.</div>'
       +'<button class="btn btn-primary btn-sm" onclick="finGuardarListas()">Guardar categorías y cuentas</button></div></div>';
   }
+  if(finPuede('fin_config')&&c) h+=finHtmlAreasCfg();
   h+='<div class="fin-card"><div style="font-weight:700;color:#1F4E79;margin-bottom:6px">Equipo</div><div style="font-size:13px;color:#374151">El equipo sale del Área de servicio <strong>Tesorería</strong>: el Coordinador/a recibe la Función automática "Coordinador/a Tesorería" y los Colaboradores/as "Colaborador/a Tesorería". Qué puede hacer cada Función se define en Configuración → Permisos (sección Finanzas). Para cambiar el equipo: Configuración → Áreas de servicio.</div></div>';
   return h;
 }

@@ -955,6 +955,7 @@ const MODULES_PERM=[
     {key:'gdv_registros',    label:'Ver registros'},
     {key:'gdv_scope_grupo',  label:'🏘 Limitar a su grupo asignado'},
     {key:'gdv_fecha_libre',  label:'🗓 Fecha Libre al cargar (no limitada a la ventana de semanas)'},
+    {key:'gdv_datos',        label:'✏️ Completar y editar datos de los integrantes de su grupo al cargar asistencia (nombre, apellido, género, celular, fecha de nacimiento, barrio)'},
   ]},
   {key:'ng', label:'Nuevas Generaciones', icon:'🌱', screens:[
     {key:'ng_dashboard',   label:'Dashboard y estadísticas'},
@@ -962,6 +963,7 @@ const MODULES_PERM=[
     {key:'ng_registros',   label:'Ver registros'},
     {key:'ng_ver_todas', label:'🌱 Ver todas las comunidades (sin esto, solo las que lidera o colabora)'},
     {key:'ng_fecha_libre', label:'🗓 Fecha Libre al cargar (no limitada a la ventana de semanas)'},
+    {key:'ng_datos',       label:'✏️ Completar y editar datos de los integrantes de su comunidad al cargar asistencia (nombre, apellido, género, celular, fecha de nacimiento, barrio)'},
   ]},
   {key:'miembros', label:'Rebaños', icon:'👥', screens:[
     {key:'miembros_ver',   label:'Ver base de miembros'},
@@ -1187,7 +1189,10 @@ function permisosCompletarFaltantes(){
     // Discipulado (zzu): editar/eliminar encuentros antes lo tenía cualquiera que viera Registros
     // (aun en Consulta). Acordado: solo lo heredan quienes tienen Ejecuta en Ver registros.
     // disc_revertir y disc_cursos eran fijos de Super Admin: arrancan en Ninguno para todos.
-    disc_encuentros_editar: {de:'disc_registros', si:['ejecuta']}
+    disc_encuentros_editar: {de:'disc_registros', si:['ejecuta']},
+    // Datos de integrantes (zzx): quien carga asistencia (Ejecuta) puede completar los datos de su grupo
+    gdv_datos: {de:'gdv_cargar', si:['ejecuta']},
+    ng_datos:  {de:'ng_cargar',  si:['ejecuta']}
   };
   // Add any DEFAULT roles missing from PERMISOS
   // Solo agregar roles completamente nuevos que no existen en absoluto
@@ -2603,12 +2608,15 @@ function ngBuildAsistList(cid){
     return S.members.find(function(m){return Number(m.id)===Number(id);});
   }).filter(function(m){return m&&m.estado!=='Baja';});
   var mainMembers=members.filter(function(m){return !roleIds.has(Number(m.id));});
+  // Al refrescar la misma comunidad (ej. después de completar datos) se conservan los presentes marcados
+  var prevAtt=(window._ngAsistCid===Number(cid))?ngFacAtt:{}; window._ngAsistCid=Number(cid);
   ngFacAtt={};
   mainMembers.forEach(function(m){ngFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente',esLider:false};});
   roleMembros.forEach(function(m){
     ngFacAtt[m.id]={name:fullName(m),genero:m.genero,state:'ausente',
       esLider:liderIds.includes(Number(m.id)),esColab:colabIds.includes(Number(m.id))};
   });
+  Object.keys(ngFacAtt).forEach(function(id){ if(prevAtt[id]&&prevAtt[id].state==='presente') ngFacAtt[id].state='presente'; });
   var list=document.getElementById('ng-asist-list');
   if(!list) return;
   window.ngToggleBtn=function(id,btn){
@@ -2621,10 +2629,12 @@ function ngBuildAsistList(cid){
     var genBg=m.genero==='H'?'#DBEAFE':'#FCE7F3';
     var genCol=m.genero==='H'?'#1E40AF':'#9D174D';
     var rolBadge=rol?'<span style="font-size:10px;background:#D1FAE5;color:#065F46;padding:1px 6px;border-radius:4px;margin-left:4px">'+rol+'</span>':'';
+    var st=(ngFacAtt[m.id]&&ngFacAtt[m.id].state)||'ausente';
     return '<div class="member-row">'+
-      '<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:'+genBg+';color:'+genCol+';font-weight:600;flex-shrink:0">'+m.genero+'</span>'+
-      '<span class="member-name">'+listName(m)+rolBadge+'</span>'+
-      '<button class="toggle-btn ausente" onclick="ngToggleBtn('+m.id+',this)">Ausente</button>'+
+      '<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:'+genBg+';color:'+genCol+';font-weight:600;flex-shrink:0">'+(m.genero||'?')+'</span>'+
+      '<span class="member-name">'+listName(m)+rolBadge+datosBadge(m,'ng')+'</span>'+
+      datosLapiz(m,'ng')+
+      '<button class="toggle-btn '+st+'" onclick="ngToggleBtn('+m.id+',this)">'+(st==='presente'?'Presente':'Ausente')+'</button>'+
     '</div>';
   }
   var html='';
@@ -2639,6 +2649,7 @@ function ngBuildAsistList(cid){
     }).join('');
   }
   if(!html) html='<div style="color:#F59E0B;font-size:13px;padding:8px">No hay personas asignadas.</div>';
+  else html=datosAviso(mainMembers.concat(roleMembros),'ng')+html;
   list.innerHTML=html;
 }
 
@@ -4305,7 +4316,7 @@ function buildMiembrosHTML(){
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Fecha de nacimiento</label>
           <input type="text" id="sa-mf-fnac" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFnac(this)" style="width:120px"></div>
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">Teléfono</label>
-          <input type="tel" id="sa-mf-tel" placeholder="+54 ..."></div>
+          <input type="tel" id="sa-mf-tel" placeholder="1158179838" inputmode="numeric" maxlength="12"></div>
       </div>
       <div class="form-row" id="sa-mf-fechaingreso-row" style="display:none">
         <div><label style="font-size:13px;color:#4B5563;display:block;margin-bottom:4px">DNI <span style="color:#9CA3AF;font-weight:400">(opcional)</span></label>
@@ -4959,6 +4970,7 @@ function histEventos(m){
     if(c.tipo==='condicion') t='Condición: '+etqCond(c.de)+' → '+etqCond(c.a);
     else if(c.tipo==='categoria') t='Categoría: '+etqCat(c.de||'Participante')+' → '+etqCat(c.a)+(c.auto?' (automático)':'');
     else if(c.tipo==='estado') t='Estado: '+(c.de||'—')+' → '+(c.a||'—');
+    else if(c.tipo==='datos') t='Datos actualizados'+(c.origen?' desde '+c.origen:'')+': '+(c.a||'');
     else return;
     ev.push({tipo:c.tipo,ts:c.ts||0,f:f,texto:t,autor:c.autor||'',motivo:c.motivo||''});
   });
@@ -5832,7 +5844,7 @@ async function saSaveMember(){
     grupoId:primaryGid,
     grupoIds:saSelectedGruposExtra.filter(gid=>gid!==primaryGid),
     condicion:document.getElementById('sa-mf-condicion').value,
-    tel:document.getElementById('sa-mf-tel').value.trim(),
+    tel:telNormalizar(document.getElementById('sa-mf-tel').value),
     dir:document.getElementById('sa-mf-dir').value.trim(),
     fnac:(function(){
       var v=document.getElementById('sa-mf-fnac')?.value||'';
@@ -13280,11 +13292,14 @@ function gdvAdminGroupChanged(){
 
 function gdvRenderFacMembers(members){
   const wrap=document.getElementById('gdv-members');
+  window._gdvMiembrosLista=members||[];
   if(!members||!members.length){wrap.innerHTML='<div class="empty">Sin miembros.</div>';return;}
-  wrap.innerHTML=members.map(m=>`
+  // Datos de integrantes: aviso + marca roja "Completar" o lápiz (no cambia nada de la carga de asistencia)
+  wrap.innerHTML=datosAviso(members,'gdv')+members.map(m=>`
     <div class="member-row">
-      <span style="font-size:11px;padding:2px 7px;border-radius:4px;background:${m.genero==='H'?'#DBEAFE':'#FCE7F3'};color:${m.genero==='H'?'#1E40AF':'#9D174D'};font-weight:600;flex-shrink:0">${m.genero}</span>
-      <span class="member-name">${fullName(m)}${gdvFacAtt[m.id]?.esFac?' <span style="font-size:10.5px;color:#5B21B6;background:#EDE9FE;padding:1px 6px;border-radius:99px;font-weight:600">Facilitador/a</span>':''}</span>
+      <span style="font-size:11px;padding:2px 7px;border-radius:4px;background:${m.genero==='H'?'#DBEAFE':'#FCE7F3'};color:${m.genero==='H'?'#1E40AF':'#9D174D'};font-weight:600;flex-shrink:0">${m.genero||'?'}</span>
+      <span class="member-name">${fullName(m)}${gdvFacAtt[m.id]?.esFac?' <span style="font-size:10.5px;color:#5B21B6;background:#EDE9FE;padding:1px 6px;border-radius:99px;font-weight:600">Facilitador/a</span>':''}${datosBadge(m,'gdv')}</span>
+      ${datosLapiz(m,'gdv')}
       <button class="toggle-btn ${gdvFacAtt[m.id]?.state||'ausente'}" onclick="gdvToggleFac(${m.id},this)">${gdvFacAtt[m.id]?.state==='presente'?'Presente':'Ausente'}</button>
     </div>`).join('');
 }
@@ -16294,7 +16309,7 @@ function buildNuevosHTML(){
           <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Apellido</label><input type="text" id="nv-edit-apellido" style="width:100%"></div>
         </div>
         <div class="form-row" style="margin-top:8px">
-          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular</label><input type="tel" id="nv-edit-tel" style="width:100%"></div>
+          <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular</label><input type="tel" id="nv-edit-tel" inputmode="numeric" maxlength="12" style="width:100%"></div>
           <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Género</label>
             <select id="nv-edit-genero" style="width:100%"><option value="">—</option><option value="H">Hombre</option><option value="M">Mujer</option></select>
           </div>
@@ -17724,7 +17739,7 @@ async function nvGuardarEditar(){
   var snapshot=Object.assign({},m);
   m.nombre=document.getElementById('nv-edit-nombre').value.trim();
   m.apellido=document.getElementById('nv-edit-apellido').value.trim();
-  m.tel=document.getElementById('nv-edit-tel').value.trim();
+  m.tel=telNormalizar(document.getElementById('nv-edit-tel').value);
   m.genero=document.getElementById('nv-edit-genero').value;
   var fnacEditVal=document.getElementById('nv-edit-fnac').value.trim();
   if(fnacEditVal&&!validarFnac(fnacEditVal)){markFieldError(document.getElementById('nv-edit-fnac'),'Usá el formato dd/mm/aa (ej: 15/03/90)');alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)');return;}
@@ -18855,7 +18870,7 @@ async function nvSaveInlineForm(){
   try{
     const nombre=(document.getElementById('nv-mf-nombre')?.value||'').trim();
     const apellido=(document.getElementById('nv-mf-apellido')?.value||'').trim();
-    const cel=(document.getElementById('nv-mf-cel')?.value||'').trim();
+    const cel=telNormalizar(document.getElementById('nv-mf-cel')?.value||'');
     const fnac=(document.getElementById('nv-mf-fnac')?.value||'').trim();
     const edadVal=parseInt(document.getElementById('nv-mf-edad')?.value);
     const edadDeclarada=(edadVal>0&&edadVal<120)?edadVal:null;
@@ -22402,7 +22417,7 @@ function buildPublicDiscInscripcionForm(){
       <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Apellido *</label>
         <input type="text" id="pdi-apellido" placeholder="Tu apellido" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;box-sizing:border-box"></div>
       <div style="margin-top:10px"><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
-        <input type="tel" id="pdi-cel" placeholder="11 1234-5678" inputmode="numeric" maxlength="12" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,12)" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;box-sizing:border-box"></div>
+        <input type="tel" id="pdi-cel" placeholder="1112345678" inputmode="numeric" maxlength="12" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,12)" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px;box-sizing:border-box"></div>
       <button id="pdi-submit-btn" onclick="pdiEnviar()" style="width:100%;background:#1F4E79;color:#fff;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-top:1.25rem">
         Anotarme →
       </button>
@@ -22610,7 +22625,7 @@ function buildPublicNuevoForm(campanaId){
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
       <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular *</label>
-        <input type="tel" id="pnv-cel" placeholder="11 1234-5678" inputmode="numeric" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+        <input type="tel" id="pnv-cel" placeholder="1112345678" inputmode="numeric" maxlength="12" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
       <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Edad <span style="font-weight:400;color:#9CA3AF">(o Fecha nac.)</span></label>
         <input type="text" id="pnv-edad" placeholder="Ej: 28" maxlength="2" inputmode="numeric" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
     </div>
@@ -22676,7 +22691,7 @@ function pnvFmtFnac(el){ fmtFnac(el); }
 async function pnvEnviar(){
   var n=(document.getElementById('pnv-nombre')||{value:''}).value.trim();
   var a=(document.getElementById('pnv-apellido')||{value:''}).value.trim();
-  var cel=(document.getElementById('pnv-cel')||{value:''}).value.trim();
+  var cel=telNormalizar((document.getElementById('pnv-cel')||{value:''}).value);
   var edad=(document.getElementById('pnv-edad')||{value:''}).value.trim();
   var fnac=(document.getElementById('pnv-fnac')||{value:''}).value.trim();
   var genero=(document.getElementById('pnv-genero')||{value:''}).value;
@@ -22871,7 +22886,7 @@ function buildPublicActualizarForm(){
       <div id="pau-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Celular</label>
-          <input type="tel" id="pau-cel" placeholder="11 1234-5678" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
+          <input type="tel" id="pau-cel" placeholder="1112345678" inputmode="numeric" maxlength="12" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
         <div><label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha de nacimiento</label>
           <input type="text" id="pau-fnac" placeholder="DD/MM/AA" maxlength="8" inputmode="numeric" oninput="pnvFmtFnac(this)" style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:14px"></div>
       </div>
@@ -22916,7 +22931,7 @@ async function pauGuardar(){
     var members=JSON.parse(localStorage.getItem('gdv_m5')||'[]');
     var m=members.find(function(x){return x.id===pauSelectedId;});
     if(m){
-      m.tel=document.getElementById('pau-cel').value.trim();
+      m.tel=telNormalizar(document.getElementById('pau-cel').value);
       m.fnac=document.getElementById('pau-fnac').value.trim();
       m.dir=document.getElementById('pau-barrio').value.trim();
       m._ts=Date.now(); // Marcar edición para que mergeByTs sepa cuál es más reciente
@@ -25646,6 +25661,146 @@ function finHtmlLlaveCfg(){
     +'<div style="font-size:13px;color:#374151;margin-bottom:10px">Los permisos se dan en Configuración → Permisos. Quien tiene Ver, Editar, Revisar, Configurar, Llave o Exportar además necesita la llave, y se la entrega alguien que ya la tiene. Quien solo tiene Cargar no la necesita: carga sin ver.</div>'
     +'<div class="fin-tw"><table class="fin-t"><thead><tr><th>Usuario</th><th>Permisos de Finanzas</th><th>Llave</th><th></th></tr></thead><tbody>'+filas.join('')+'</tbody></table></div>'
     +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">'+(finAbierta()?'<button class="btn btn-sm" onclick="finRotarLlave()">Rotar la llave</button>':'')+'<span style="font-size:12px;color:#4B5563">Versión '+l.kv+(l.rotadaTs?' · rotada el '+new Date(l.rotadaTs).toLocaleDateString('es-AR')+' por '+svcEsc(l.rotadaPor||''):'')+'. Rotar = llave nueva, se vuelve a cifrar todo y la conservan solo quienes siguen con permiso. Si todos los titulares olvidan su contraseña, los datos no se recuperan: exportá periódicamente.</span></div></div>';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// DATOS DE INTEGRANTES desde la carga de asistencia (GdV y NG) — ver claude/Diseno_Datos_Integrantes.md
+// Facilitadores y Líderes completan/actualizan 6 datos de los integrantes de su grupo/comunidad, en la
+// misma ficha de Rebaños y con sus mismos formatos. Es una acción más: no bloquea la carga de asistencia.
+// Permisos por la matriz: gdv_datos / ng_datos (heredan una vez de Ejecuta en "Cargar Asistencia").
+// ════════════════════════════════════════════════════════════════════════════
+var DATOS_CAMPOS=[['nombre','Nombre'],['apellido','Apellido'],['genero','Género'],['tel','Celular'],['fnac','Fecha de nacimiento'],['dir','Barrio / Ciudad']];
+// Celular: solo números de corrido, hasta 12 (sin espacios, guiones ni otros signos)
+function telNormalizar(v){ return String(v==null?'':v).replace(/\D/g,'').slice(0,12); }
+var TEL_INPUT_IDS=['sa-mf-tel','nv-edit-tel','nv-mf-cel','pnv-cel','pau-cel','pdi-cel','dat-tel'];
+document.addEventListener('input',function(e){
+  var t=e.target; if(!t||!t.id||TEL_INPUT_IDS.indexOf(t.id)<0) return;
+  var limpio=telNormalizar(t.value); if(t.value!==limpio) t.value=limpio;
+},true);
+function datosFaltantes(m){
+  if(!m) return DATOS_CAMPOS.map(function(c){ return c[1]; });
+  return DATOS_CAMPOS.filter(function(c){
+    var v=m[c[0]];
+    if(c[0]==='genero') return v!=='H'&&v!=='M';
+    if(c[0]==='tel') return !telNormalizar(v);
+    if(c[0]==='fnac') return !String(v||'').trim()||!validarFnac(fmtAA(v)||String(v));
+    return !String(v||'').trim();
+  }).map(function(c){ return c[1]; });
+}
+function datosPuedeEditar(modulo){ return isSuperAdmin()||canEjecutar(modulo==='ng'?'ng_datos':'gdv_datos'); }
+function datosCss(){
+  if(document.getElementById('datos-css')) return;
+  var st=document.createElement('style'); st.id='datos-css';
+  st.textContent='.datos-falta{font-size:10.5px;color:#B91C1C;background:#FEE2E2;padding:1px 6px;border-radius:99px;font-weight:600;border:none;cursor:pointer;margin-left:4px;font-family:inherit;white-space:nowrap;vertical-align:middle}'
+   +'.datos-lapiz{width:32px;height:32px;flex-shrink:0;border-radius:8px;border:1px solid #E5E7EB;background:#fff;color:#4B5563;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}'
+   +'.dat-in{height:42px;border:1px solid #D1D5DB;border-radius:8px;padding:0 10px;font-size:15px;font-family:inherit;box-sizing:border-box;width:100%;background:#fff}'
+   +'.dat-in.dat-err{border:2px solid #DC2626;background:#FEF2F2}'
+   +'.dat-lb{font-size:13px;color:#374151;display:flex;flex-direction:column;gap:4px}.dat-ay{font-size:11.5px;color:#4B5563}';
+  document.head.appendChild(st);
+}
+// Marca roja (chica, como el distintivo de Facilitador/a) o lápiz si está completo
+function datosBadge(m,modulo){
+  if(!datosPuedeEditar(modulo)) return '';
+  datosCss();
+  var f=datosFaltantes(m).length; if(!f) return '';
+  return ' <button type="button" class="datos-falta" aria-label="Completar datos de '+svcEsc(fullName(m))+': faltan '+f+'" onclick="event.stopPropagation();datosAbrir('+m.id+',\''+modulo+'\')">⚠ Completar ('+f+')</button>';
+}
+function datosLapiz(m,modulo){
+  if(!datosPuedeEditar(modulo)||datosFaltantes(m).length) return '';
+  datosCss();
+  return '<button type="button" class="datos-lapiz" aria-label="Editar datos de '+svcEsc(fullName(m))+'" title="Editar datos" onclick="event.stopPropagation();datosAbrir('+m.id+',\''+modulo+'\')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"></path></svg></button>';
+}
+function datosAviso(members,modulo){
+  if(!datosPuedeEditar(modulo)) return '';
+  var n=(members||[]).filter(function(m){ return datosFaltantes(m).length; }).length;
+  if(!n) return '';
+  return '<div role="status" style="display:flex;gap:8px;align-items:center;background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:10px;padding:8px 10px;font-size:12.5px;margin-bottom:8px">'
+    +'<span aria-hidden="true">⚠</span><span><strong>'+n+' persona'+(n!==1?'s':'')+'</strong> del '+(modulo==='ng'?'grupo':'grupo')+' tiene'+(n!==1?'n':'')+' datos incompletos. Tocá la marca roja para completarlos.</span></div>';
+}
+// ¿La persona está en la lista que se está cargando? (el Facilitador/Líder solo edita a los de su grupo)
+function datosEnLista(id,modulo){
+  var att=modulo==='ng'?(typeof ngFacAtt!=='undefined'?ngFacAtt:{}):(typeof gdvFacAtt!=='undefined'?gdvFacAtt:{});
+  return !!att[id];
+}
+var datosEdit=null;
+function datosAbrir(id,modulo){
+  if(!datosPuedeEditar(modulo)){ alert('No tenés permiso para editar datos.'); return; }
+  if(!isSuperAdmin()&&!datosEnLista(id,modulo)){ alert('Solo podés editar a los integrantes del grupo que estás cargando.'); return; }
+  var m=S.members.find(function(x){ return Number(x.id)===Number(id); }); if(!m) return;
+  datosCss();
+  datosEdit={id:m.id,modulo:modulo,genero:(m.genero==='H'||m.genero==='M')?m.genero:''};
+  var falta=datosFaltantes(m), err=function(lbl){ return falta.indexOf(lbl)>=0?' dat-err':''; };
+  var barrios={}; (S.members||[]).forEach(function(x){ var b=String(x.dir||'').trim(); if(b) barrios[normName(b)]=barrios[normName(b)]||b; });
+  var ov=document.getElementById('datos-overlay'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='datos-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(17,24,39,.45);z-index:960;display:flex;align-items:flex-end;justify-content:center';
+  ov.innerHTML='<div role="dialog" aria-modal="true" aria-label="Datos de '+svcEsc(fullName(m))+'" style="background:#fff;border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:18px 16px 20px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;max-height:92vh;overflow:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><div style="font-weight:700;color:#1F4E79;font-size:16px">Datos de '+svcEsc(fullName(m))+'</div>'
+    +'<div id="dat-estado" style="font-size:12px;margin-top:2px;color:'+(falta.length?'#B91C1C':'#166534')+'">'+(falta.length?'Faltan '+falta.length+' de 6 datos · lo marcado en rojo':'Datos completos')+'</div></div>'
+    +'<button type="button" aria-label="Cerrar" onclick="datosCerrar()" style="width:36px;height:36px;border-radius:8px;border:1px solid #E5E7EB;background:#fff;font-size:18px;color:#4B5563;cursor:pointer">×</button></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="dat-lb">Nombre<input id="dat-nombre" class="dat-in'+err('Nombre')+'" value="'+svcEsc(m.nombre||'')+'"></label>'
+    +'<label class="dat-lb">Apellido<input id="dat-apellido" class="dat-in'+err('Apellido')+'" value="'+svcEsc(m.apellido||'')+'"></label></div>'
+    +'<div class="dat-ay">Corregí el nombre solo si está mal escrito: es la misma persona.</div>'
+    +'<div class="dat-lb">Género<div id="dat-genero" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+datosBotonesGenero()+'</div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1.3fr;gap:10px">'
+    +'<label class="dat-lb">Fecha de nacimiento<input id="dat-fnac" class="dat-in'+err('Fecha de nacimiento')+'" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFnac(this)" value="'+svcEsc(m.fnac?fmtAA(m.fnac):'')+'"><span class="dat-ay">Ej: 15/03/90</span></label>'
+    +'<label class="dat-lb">Celular<input id="dat-tel" type="tel" class="dat-in'+err('Celular')+'" placeholder="1158179838" maxlength="12" inputmode="numeric" value="'+svcEsc(telNormalizar(m.tel))+'"><span class="dat-ay">Solo números, sin guiones</span></label></div>'
+    +'<label class="dat-lb">Barrio / Ciudad<input id="dat-dir" class="dat-in'+err('Barrio / Ciudad')+'" placeholder="Ej: Lanús Oeste" list="dat-barrios" value="'+svcEsc(m.dir||'')+'"><datalist id="dat-barrios">'+Object.keys(barrios).sort().map(function(k){ return '<option value="'+svcEsc(barrios[k])+'">'; }).join('')+'</datalist><span class="dat-ay">Elegí uno de la lista si ya existe</span></label>'
+    +'<div style="font-size:12px;color:#4B5563;background:#F9FAFB;border-radius:8px;padding:8px">Podés guardar aunque falte algo: la marca roja sigue hasta completar los 6. Se actualiza la ficha de Rebaños.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button type="button" class="btn" style="height:46px" onclick="datosCerrar()">Cancelar</button><button type="button" id="dat-guardar" class="btn btn-primary" style="height:46px" onclick="datosGuardar()">Guardar</button></div></div>';
+  ov.addEventListener('click',function(e){ if(e.target===ov) datosCerrar(); });
+  document.body.appendChild(ov);
+  if(falta.indexOf('Género')>=0) document.getElementById('dat-genero').style.outline='2px solid #DC2626';
+}
+function datosBotonesGenero(){
+  var g=datosEdit&&datosEdit.genero;
+  var b=function(v,t){ var on=g===v; return '<button type="button" aria-pressed="'+on+'" onclick="datosSetGenero(\''+v+'\')" style="height:42px;border-radius:8px;font-family:inherit;cursor:pointer;'+(on?'border:2px solid #1F4E79;background:#EFF6FF;color:#1F4E79;font-weight:700':'border:1px solid #D1D5DB;background:#fff;color:#374151')+'">'+t+'</button>'; };
+  return b('H','Hombre')+b('M','Mujer');
+}
+function datosSetGenero(v){ if(!datosEdit) return; datosEdit.genero=v; var c=document.getElementById('dat-genero'); if(c){ c.innerHTML=datosBotonesGenero(); c.style.outline=''; } }
+function datosCerrar(){ var ov=document.getElementById('datos-overlay'); if(ov) ov.remove(); datosEdit=null; }
+async function datosGuardar(){
+  if(!datosEdit) return;
+  var modulo=datosEdit.modulo;
+  if(!datosPuedeEditar(modulo)){ alert('No tenés permiso para editar datos.'); return; }
+  var m=S.members.find(function(x){ return Number(x.id)===Number(datosEdit.id); }); if(!m){ datosCerrar(); return; }
+  var g=function(id){ var e=document.getElementById(id); return e?String(e.value||'').trim():''; };
+  var nuevo={nombre:g('dat-nombre'),apellido:g('dat-apellido'),genero:datosEdit.genero||m.genero||'',tel:telNormalizar(g('dat-tel')),fnac:g('dat-fnac'),dir:g('dat-dir')};
+  if(!nuevo.nombre){ markFieldError(document.getElementById('dat-nombre'),'El nombre no puede quedar vacío'); alert('El nombre no puede quedar vacío.'); return; }
+  if(!nuevo.apellido&&String(m.apellido||'').trim()){ markFieldError(document.getElementById('dat-apellido'),'El apellido no puede quedar vacío'); alert('El apellido no puede quedar vacío.'); return; }
+  if(nuevo.fnac&&!validarFnac(nuevo.fnac)){ markFieldError(document.getElementById('dat-fnac'),'Usá el formato dd/mm/aa (ej: 15/03/90)'); alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)'); return; }
+  if(nuevo.fnac){ var p=nuevo.fnac.split('/'), a=+p[2], hoyAA=new Date().getFullYear()%100, d=new Date((a>hoyAA?1900:2000)+a,+p[1]-1,+p[0]); if(d>new Date()){ markFieldError(document.getElementById('dat-fnac'),'La fecha no puede ser futura'); alert('La fecha de nacimiento no puede ser futura.'); return; } }
+  // Barrio: si ya existe escrito de otra forma (mayúsculas/acentos), se usa el que ya está cargado
+  if(nuevo.dir){ var ex=(S.members||[]).find(function(x){ return x!==m&&x.dir&&normName(x.dir)===normName(nuevo.dir); }); if(ex) nuevo.dir=String(ex.dir).trim(); }
+  var actual={nombre:String(m.nombre||'').trim(),apellido:String(m.apellido||'').trim(),genero:m.genero||'',tel:String(m.tel||''),fnac:m.fnac?fmtAA(m.fnac):'',dir:String(m.dir||'').trim()};
+  var cambiados=DATOS_CAMPOS.filter(function(c){ return String(nuevo[c[0]])!==String(actual[c[0]]); });
+  if(!cambiados.length){ datosCerrar(); return; }
+  var snap=Object.assign({},m), cambiosPrev=m.cambios;
+  cambiados.forEach(function(c){ m[c[0]]=nuevo[c[0]]; });
+  m._ts=Date.now();
+  m.cambios=(m.cambios||[]).concat([{tipo:'datos',de:'',a:cambiados.map(function(c){ return c[1]; }).join(', '),origen:modulo==='ng'?'Nuevas Generaciones':'Grupos de Vida',ts:m._ts,autor:(currentUser&&currentUser.name)||''}]);
+  var btn=document.getElementById('dat-guardar'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  await saveK(SK.members,S.members);
+  try{
+    if(typeof window.fbUpload!=='function') throw new Error('Sin conexión con la nube');
+    await window.fbUpload(true);
+  }catch(e){
+    nvRestaurarExacto(m,snap); cambioRestaurarA(m,cambiosPrev);
+    await saveK(SK.members,S.members);
+    if(btn){ btn.disabled=false; btn.textContent='Guardar'; }
+    alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  datosCerrar();
+  datosRefrescarLista(modulo);
+  showToast(datosFaltantes(m).length?'✅ Guardado (todavía faltan datos)':'✅ Datos completos','#16A34A');
+}
+function datosRefrescarLista(modulo){
+  if(modulo==='ng'){ if(typeof ngCurrentComunidadId!=='undefined'&&ngCurrentComunidadId) ngBuildAsistList(ngCurrentComunidadId); }
+  else if(window._gdvMiembrosLista){
+    var ids=window._gdvMiembrosLista.map(function(x){ return Number(x.id); });
+    gdvRenderFacMembers(ids.map(function(id){ return S.members.find(function(x){ return Number(x.id)===id; }); }).filter(Boolean));
+  }
 }
 
 boot();

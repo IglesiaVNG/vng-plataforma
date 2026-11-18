@@ -955,7 +955,7 @@ const MODULES_PERM=[
     {key:'gdv_registros',    label:'Ver registros'},
     {key:'gdv_scope_grupo',  label:'🏘 Limitar a su grupo asignado'},
     {key:'gdv_fecha_libre',  label:'🗓 Fecha Libre al cargar (no limitada a la ventana de semanas)'},
-    {key:'gdv_datos',        label:'✏️ Completar y editar datos de los integrantes de su grupo al cargar asistencia (nombre, apellido, género, celular, fecha de nacimiento, barrio)'},
+    {key:'gdv_datos',        label:'✏️ Completar los datos faltantes de los integrantes de su grupo al cargar asistencia (nombre, apellido, género, celular, fecha de nacimiento, barrio). Lo ya cargado solo se ve: lo corrige Super Admin'},
   ]},
   {key:'ng', label:'Nuevas Generaciones', icon:'🌱', screens:[
     {key:'ng_dashboard',   label:'Dashboard y estadísticas'},
@@ -963,7 +963,7 @@ const MODULES_PERM=[
     {key:'ng_registros',   label:'Ver registros'},
     {key:'ng_ver_todas', label:'🌱 Ver todas las comunidades (sin esto, solo las que lidera o colabora)'},
     {key:'ng_fecha_libre', label:'🗓 Fecha Libre al cargar (no limitada a la ventana de semanas)'},
-    {key:'ng_datos',       label:'✏️ Completar y editar datos de los integrantes de su comunidad al cargar asistencia (nombre, apellido, género, celular, fecha de nacimiento, barrio)'},
+    {key:'ng_datos',       label:'✏️ Completar los datos faltantes de los integrantes de su comunidad al cargar asistencia (nombre, apellido, género, celular, fecha de nacimiento, barrio). Lo ya cargado solo se ve: lo corrige Super Admin'},
   ]},
   {key:'miembros', label:'Rebaños', icon:'👥', screens:[
     {key:'miembros_ver',   label:'Ver base de miembros'},
@@ -25698,7 +25698,7 @@ function datosCss(){
    +'.dat-lb{font-size:13px;color:#374151;display:flex;flex-direction:column;gap:4px}.dat-ay{font-size:11.5px;color:#4B5563}';
   document.head.appendChild(st);
 }
-// Marca roja (chica, como el distintivo de Facilitador/a) o lápiz si está completo
+// Marca roja (chica, como el distintivo de Facilitador/a) o lupa (solo ver) si está completo
 function datosBadge(m,modulo){
   if(!datosPuedeEditar(modulo)) return '';
   datosCss();
@@ -25708,7 +25708,7 @@ function datosBadge(m,modulo){
 function datosLapiz(m,modulo){
   if(!datosPuedeEditar(modulo)||datosFaltantes(m).length) return '';
   datosCss();
-  return '<button type="button" class="datos-lapiz" aria-label="Editar datos de '+svcEsc(fullName(m))+'" title="Editar datos" onclick="event.stopPropagation();datosAbrir('+m.id+',\''+modulo+'\')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"></path></svg></button>';
+  return '<button type="button" class="datos-lapiz" aria-label="Ver datos de '+svcEsc(fullName(m))+'" title="Ver datos" onclick="event.stopPropagation();datosAbrir('+m.id+',\''+modulo+'\')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg></button>';
 }
 function datosAviso(members,modulo){
   if(!datosPuedeEditar(modulo)) return '';
@@ -25724,56 +25724,76 @@ function datosEnLista(id,modulo){
 }
 var datosEdit=null;
 function datosAbrir(id,modulo){
-  if(!datosPuedeEditar(modulo)){ alert('No tenés permiso para editar datos.'); return; }
-  if(!isSuperAdmin()&&!datosEnLista(id,modulo)){ alert('Solo podés editar a los integrantes del grupo que estás cargando.'); return; }
+  if(!datosPuedeEditar(modulo)){ alert('No tenés permiso para ver estos datos.'); return; }
+  if(!isSuperAdmin()&&!datosEnLista(id,modulo)){ alert('Solo podés ver a los integrantes del grupo que estás cargando.'); return; }
   var m=S.members.find(function(x){ return Number(x.id)===Number(id); }); if(!m) return;
   datosCss();
-  datosEdit={id:m.id,modulo:modulo,genero:(m.genero==='H'||m.genero==='M')?m.genero:''};
-  var falta=datosFaltantes(m), err=function(lbl){ return falta.indexOf(lbl)>=0?' dat-err':''; };
+  var falta=datosFaltantes(m), editables=datosEditables(m), soloVer=!editables.length;
+  datosEdit={id:m.id,modulo:modulo,genero:(m.genero==='H'||m.genero==='M')?m.genero:'',editables:editables};
+  var ed=function(k){ return editables.indexOf(k)>=0; };
+  var err=function(lbl,k){ return ed(k)&&falta.indexOf(lbl)>=0?' dat-err':''; };
+  var ro=function(k){ return ed(k)?'':' readonly aria-readonly="true" tabindex="-1" style="background:#F3F4F6;color:#374151;border-color:#E5E7EB"'; };
   var barrios={}; (S.members||[]).forEach(function(x){ var b=String(x.dir||'').trim(); if(b) barrios[normName(b)]=barrios[normName(b)]||b; });
   var ov=document.getElementById('datos-overlay'); if(ov) ov.remove();
   ov=document.createElement('div'); ov.id='datos-overlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(17,24,39,.45);z-index:960;display:flex;align-items:flex-end;justify-content:center';
+  var aviso=soloVer
+    ?'<div style="font-size:12.5px;color:#1E3A8A;background:#EFF6FF;border-radius:8px;padding:8px">Si hay que corregir/actualizar algún dato, comunicarse con el Administrador.</div>'
+    :'<div style="font-size:12px;color:#4B5563;background:#F9FAFB;border-radius:8px;padding:8px">Completá lo que falta (en rojo). Podés guardar aunque falte algo: la marca roja sigue hasta completar los 6.<div style="font-size:12.5px;color:#1E3A8A;margin-top:6px">Si hay que corregir/actualizar algún dato, comunicarse con el Administrador.</div></div>';
   ov.innerHTML='<div role="dialog" aria-modal="true" aria-label="Datos de '+svcEsc(fullName(m))+'" style="background:#fff;border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:18px 16px 20px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;max-height:92vh;overflow:auto">'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><div style="font-weight:700;color:#1F4E79;font-size:16px">Datos de '+svcEsc(fullName(m))+'</div>'
-    +'<div id="dat-estado" style="font-size:12px;margin-top:2px;color:'+(falta.length?'#B91C1C':'#166534')+'">'+(falta.length?'Faltan '+falta.length+' de 6 datos · lo marcado en rojo':'Datos completos')+'</div></div>'
+    +'<div style="font-size:12px;margin-top:2px;color:'+(falta.length?'#B91C1C':'#166534')+'">'+(falta.length?'Faltan '+falta.length+' de 6 datos · lo marcado en rojo':'Datos completos')+'</div></div>'
     +'<button type="button" aria-label="Cerrar" onclick="datosCerrar()" style="width:36px;height:36px;border-radius:8px;border:1px solid #E5E7EB;background:#fff;font-size:18px;color:#4B5563;cursor:pointer">×</button></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="dat-lb">Nombre<input id="dat-nombre" class="dat-in'+err('Nombre')+'" value="'+svcEsc(m.nombre||'')+'"></label>'
-    +'<label class="dat-lb">Apellido<input id="dat-apellido" class="dat-in'+err('Apellido')+'" value="'+svcEsc(m.apellido||'')+'"></label></div>'
-    +'<div class="dat-ay">Corregí el nombre solo si está mal escrito: es la misma persona.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="dat-lb">Nombre<input id="dat-nombre" class="dat-in'+err('Nombre','nombre')+'" value="'+svcEsc(m.nombre||'')+'"'+ro('nombre')+'></label>'
+    +'<label class="dat-lb">Apellido<input id="dat-apellido" class="dat-in'+err('Apellido','apellido')+'" value="'+svcEsc(m.apellido||'')+'"'+ro('apellido')+'></label></div>'
     +'<div class="dat-lb">Género<div id="dat-genero" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+datosBotonesGenero()+'</div></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1.3fr;gap:10px">'
-    +'<label class="dat-lb">Fecha de nacimiento<input id="dat-fnac" class="dat-in'+err('Fecha de nacimiento')+'" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFnac(this)" value="'+svcEsc(m.fnac?fmtAA(m.fnac):'')+'"><span class="dat-ay">Ej: 15/03/90</span></label>'
-    +'<label class="dat-lb">Celular<input id="dat-tel" type="tel" class="dat-in'+err('Celular')+'" placeholder="1158179838" maxlength="12" inputmode="numeric" value="'+svcEsc(telNormalizar(m.tel))+'"><span class="dat-ay">Solo números, sin guiones</span></label></div>'
-    +'<label class="dat-lb">Barrio / Ciudad<input id="dat-dir" class="dat-in'+err('Barrio / Ciudad')+'" placeholder="Ej: Lanús Oeste" list="dat-barrios" value="'+svcEsc(m.dir||'')+'"><datalist id="dat-barrios">'+Object.keys(barrios).sort().map(function(k){ return '<option value="'+svcEsc(barrios[k])+'">'; }).join('')+'</datalist><span class="dat-ay">Elegí uno de la lista si ya existe</span></label>'
-    +'<div style="font-size:12px;color:#4B5563;background:#F9FAFB;border-radius:8px;padding:8px">Podés guardar aunque falte algo: la marca roja sigue hasta completar los 6. Se actualiza la ficha de Rebaños.</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button type="button" class="btn" style="height:46px" onclick="datosCerrar()">Cancelar</button><button type="button" id="dat-guardar" class="btn btn-primary" style="height:46px" onclick="datosGuardar()">Guardar</button></div></div>';
+    +'<label class="dat-lb">Fecha de nacimiento<input id="dat-fnac" class="dat-in'+err('Fecha de nacimiento','fnac')+'" placeholder="dd/mm/aa" maxlength="8" inputmode="numeric" oninput="fmtFnac(this)" value="'+svcEsc(m.fnac?fmtAA(m.fnac):'')+'"'+ro('fnac')+'>'+(ed('fnac')?'<span class="dat-ay">Ej: 15/03/90</span>':'')+'</label>'
+    +'<label class="dat-lb">Celular<input id="dat-tel" type="tel" class="dat-in'+err('Celular','tel')+'" placeholder="1158179838" maxlength="12" inputmode="numeric" value="'+svcEsc(ed('tel')?telNormalizar(m.tel):(m.tel||''))+'"'+ro('tel')+'>'+(ed('tel')?'<span class="dat-ay">Solo números, sin guiones</span>':'')+'</label></div>'
+    +'<label class="dat-lb">Barrio / Ciudad<input id="dat-dir" class="dat-in'+err('Barrio / Ciudad','dir')+'" placeholder="Ej: Lanús Oeste"'+(ed('dir')?' list="dat-barrios"':'')+' value="'+svcEsc(m.dir||'')+'"'+ro('dir')+'>'
+    +(ed('dir')?'<datalist id="dat-barrios">'+Object.keys(barrios).sort().map(function(k){ return '<option value="'+svcEsc(barrios[k])+'">'; }).join('')+'</datalist><span class="dat-ay">Elegí uno de la lista si ya existe</span>':'')+'</label>'
+    +aviso
+    +(soloVer
+      ?'<button type="button" class="btn" style="height:46px" onclick="datosCerrar()">Cerrar</button>'
+      :'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button type="button" class="btn" style="height:46px" onclick="datosCerrar()">Cancelar</button><button type="button" id="dat-guardar" class="btn btn-primary" style="height:46px" onclick="datosGuardar()">Guardar</button></div>')
+    +'</div>';
   ov.addEventListener('click',function(e){ if(e.target===ov) datosCerrar(); });
   document.body.appendChild(ov);
-  if(falta.indexOf('Género')>=0) document.getElementById('dat-genero').style.outline='2px solid #DC2626';
+  if(ed('genero')&&falta.indexOf('Género')>=0) document.getElementById('dat-genero').style.outline='2px solid #DC2626';
 }
 function datosBotonesGenero(){
-  var g=datosEdit&&datosEdit.genero;
-  var b=function(v,t){ var on=g===v; return '<button type="button" aria-pressed="'+on+'" onclick="datosSetGenero(\''+v+'\')" style="height:42px;border-radius:8px;font-family:inherit;cursor:pointer;'+(on?'border:2px solid #1F4E79;background:#EFF6FF;color:#1F4E79;font-weight:700':'border:1px solid #D1D5DB;background:#fff;color:#374151')+'">'+t+'</button>'; };
+  var g=datosEdit&&datosEdit.genero, puede=!!(datosEdit&&datosEdit.editables&&datosEdit.editables.indexOf('genero')>=0);
+  var b=function(v,t){ var on=g===v; return '<button type="button" aria-pressed="'+on+'"'+(puede?' onclick="datosSetGenero(\''+v+'\')"':' disabled')+' style="height:42px;border-radius:8px;font-family:inherit;'+(puede?'cursor:pointer;':'cursor:default;')+(on?'border:2px solid #1F4E79;background:#EFF6FF;color:#1F4E79;font-weight:700':'border:1px solid #D1D5DB;background:'+(puede?'#fff':'#F3F4F6')+';color:#374151')+'">'+t+'</button>'; };
   return b('H','Hombre')+b('M','Mujer');
 }
-function datosSetGenero(v){ if(!datosEdit) return; datosEdit.genero=v; var c=document.getElementById('dat-genero'); if(c){ c.innerHTML=datosBotonesGenero(); c.style.outline=''; } }
+function datosSetGenero(v){
+  if(!datosEdit||datosEdit.editables.indexOf('genero')<0) return;
+  datosEdit.genero=v; var c=document.getElementById('dat-genero'); if(c){ c.innerHTML=datosBotonesGenero(); c.style.outline=''; }
+}
+function datosEditables(m){
+  if(isSuperAdmin()) return DATOS_CAMPOS.map(function(c){ return c[0]; });
+  var falta=datosFaltantes(m);
+  return DATOS_CAMPOS.filter(function(c){ return falta.indexOf(c[1])>=0; }).map(function(c){ return c[0]; });
+}
 function datosCerrar(){ var ov=document.getElementById('datos-overlay'); if(ov) ov.remove(); datosEdit=null; }
 async function datosGuardar(){
   if(!datosEdit) return;
   var modulo=datosEdit.modulo;
   if(!datosPuedeEditar(modulo)){ alert('No tenés permiso para editar datos.'); return; }
   var m=S.members.find(function(x){ return Number(x.id)===Number(datosEdit.id); }); if(!m){ datosCerrar(); return; }
+  // Se recalcula sobre la ficha actual: nunca se pisa un dato que ya está cargado (salvo Super Admin)
+  var editables=datosEditables(m).filter(function(k){ return datosEdit.editables.indexOf(k)>=0; });
+  if(!editables.length){ datosCerrar(); return; }
+  var ed=function(k){ return editables.indexOf(k)>=0; };
   var g=function(id){ var e=document.getElementById(id); return e?String(e.value||'').trim():''; };
-  var nuevo={nombre:g('dat-nombre'),apellido:g('dat-apellido'),genero:datosEdit.genero||m.genero||'',tel:telNormalizar(g('dat-tel')),fnac:g('dat-fnac'),dir:g('dat-dir')};
-  if(!nuevo.nombre){ markFieldError(document.getElementById('dat-nombre'),'El nombre no puede quedar vacío'); alert('El nombre no puede quedar vacío.'); return; }
-  if(!nuevo.apellido&&String(m.apellido||'').trim()){ markFieldError(document.getElementById('dat-apellido'),'El apellido no puede quedar vacío'); alert('El apellido no puede quedar vacío.'); return; }
-  if(nuevo.fnac&&!validarFnac(nuevo.fnac)){ markFieldError(document.getElementById('dat-fnac'),'Usá el formato dd/mm/aa (ej: 15/03/90)'); alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)'); return; }
-  if(nuevo.fnac){ var p=nuevo.fnac.split('/'), a=+p[2], hoyAA=new Date().getFullYear()%100, d=new Date((a>hoyAA?1900:2000)+a,+p[1]-1,+p[0]); if(d>new Date()){ markFieldError(document.getElementById('dat-fnac'),'La fecha no puede ser futura'); alert('La fecha de nacimiento no puede ser futura.'); return; } }
-  // Barrio: si ya existe escrito de otra forma (mayúsculas/acentos), se usa el que ya está cargado
-  if(nuevo.dir){ var ex=(S.members||[]).find(function(x){ return x!==m&&x.dir&&normName(x.dir)===normName(nuevo.dir); }); if(ex) nuevo.dir=String(ex.dir).trim(); }
+  var nuevo={nombre:g('dat-nombre'),apellido:g('dat-apellido'),genero:datosEdit.genero||'',tel:telNormalizar(g('dat-tel')),fnac:g('dat-fnac'),dir:g('dat-dir')};
+  if(ed('nombre')&&!nuevo.nombre&&String(m.nombre||'').trim()){ markFieldError(document.getElementById('dat-nombre'),'El nombre no puede quedar vacío'); alert('El nombre no puede quedar vacío.'); return; }
+  if(ed('apellido')&&!nuevo.apellido&&String(m.apellido||'').trim()){ markFieldError(document.getElementById('dat-apellido'),'El apellido no puede quedar vacío'); alert('El apellido no puede quedar vacío.'); return; }
+  if(ed('fnac')&&nuevo.fnac&&!validarFnac(nuevo.fnac)){ markFieldError(document.getElementById('dat-fnac'),'Usá el formato dd/mm/aa (ej: 15/03/90)'); alert('Fecha de nacimiento inválida. Usá el formato dd/mm/aa (ej: 15/03/90)'); return; }
+  if(ed('fnac')&&nuevo.fnac){ var p=nuevo.fnac.split('/'), a=+p[2], hoyAA=new Date().getFullYear()%100, d=new Date((a>hoyAA?1900:2000)+a,+p[1]-1,+p[0]); if(d>new Date()){ markFieldError(document.getElementById('dat-fnac'),'La fecha no puede ser futura'); alert('La fecha de nacimiento no puede ser futura.'); return; } }
+  if(ed('dir')&&nuevo.dir){ var ex=(S.members||[]).find(function(x){ return x!==m&&x.dir&&normName(x.dir)===normName(nuevo.dir); }); if(ex) nuevo.dir=String(ex.dir).trim(); }
   var actual={nombre:String(m.nombre||'').trim(),apellido:String(m.apellido||'').trim(),genero:m.genero||'',tel:String(m.tel||''),fnac:m.fnac?fmtAA(m.fnac):'',dir:String(m.dir||'').trim()};
-  var cambiados=DATOS_CAMPOS.filter(function(c){ return String(nuevo[c[0]])!==String(actual[c[0]]); });
+  var cambiados=DATOS_CAMPOS.filter(function(c){ return ed(c[0])&&String(nuevo[c[0]])!==String(actual[c[0]])&&!(c[0]!=='nombre'&&c[0]!=='apellido'&&!nuevo[c[0]]&&!actual[c[0]]); });
   if(!cambiados.length){ datosCerrar(); return; }
   var snap=Object.assign({},m), cambiosPrev=m.cambios;
   cambiados.forEach(function(c){ m[c[0]]=nuevo[c[0]]; });

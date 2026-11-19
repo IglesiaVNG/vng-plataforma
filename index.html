@@ -66,7 +66,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#2E75B6}
 .gdv-app{max-width:720px;margin:0 auto;padding:1rem}
 .nv-app{max-width:1400px}
 .nv-app #nv-dashboard-section,.nv-app #nv-campana-section{max-width:900px;margin:0 auto}
-.nv-ind-wrap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.nv-ind-wrap{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-bottom:10px}
 .nv-ind{background:#fff;border:2px solid #E5E7EB;border-radius:12px;padding:8px 10px;cursor:pointer;text-align:left;box-shadow:0 2px 8px rgba(0,0,0,.08);font-family:inherit}
 .nv-ind:hover{border-color:#93C5FD}
 .nv-ind.on{border-color:#1D4ED8;background:#EFF6FF}
@@ -111,10 +111,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#2E75B6}
 .nv-grid tr.sel td{background:#EFF6FF}
 .nv-grid tr.atr td:first-child{box-shadow:inset 4px 0 0 #DC2626}
 .nv-av{width:30px;height:30px;border-radius:50%;background:#F0FDF4;border:2px solid #86EFAC;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#16A34A;flex-shrink:0}
-.nv-tab-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.nv-tab-cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .nv-tab-col{background:#F3F4F6;border-radius:12px;padding:8px;min-height:120px}
 .nv-tab-card{background:#fff;border-radius:10px;padding:8px 10px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);font-size:12px}
-@media (max-width:900px){.nv-ind-wrap{grid-template-columns:repeat(3,minmax(0,1fr))}.nv-tab-cols{grid-template-columns:1fr}}
+@media (max-width:900px){.nv-ind-wrap{grid-template-columns:repeat(4,minmax(0,1fr))}.nv-tab-cols{grid-template-columns:1fr}}
 .agenda-app{max-width:960px;margin:0 auto;padding:1rem}
 
 /* ── Modales que aprovechan más ancho en pantallas grandes (desktop) ── */
@@ -833,7 +833,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzx';
+const APP_VERSION = '2026-08-24-zzz';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
@@ -1097,7 +1097,7 @@ async function cleanMembers(){
     }
   });
   // Migration: legacy 'Nuevo' contacts without subEstado start as 'Ingresado'
-  const VALID_SUBESTADOS=['Ingresado','Contactado','Participando'];
+  const VALID_SUBESTADOS=['Ingresado','Bienvenida','Contactado','Participando'];
   S.members.forEach(m=>{
     if(m.condicion==='Nuevo' && !VALID_SUBESTADOS.includes(m.subEstado)){
       m.subEstado='Ingresado';
@@ -4426,7 +4426,8 @@ function cfgRenderConexion(wrap){
   }
   wrap.innerHTML='<div style="font-size:14px;font-weight:600;color:#1F4E79;margin-bottom:6px">🌱 Conexión · Nuevos Contactos</div>'+
     '<div class="card" style="margin-bottom:.75rem">'+
-      filaNum('cfg-nv-alerta','Alerta de atraso (días sin contactar)',nvDiasAlerta(),1,30,'Un Nuevo en Ingresado se marca ⏰ Atrasado al pasar estos días desde su ingreso.')+
+      filaNum('cfg-nv-alerta','Días para dar la bienvenida',nvDiasAlerta(),1,30,'Un Nuevo en Ingresado se marca ⏰ Atrasado al pasar estos días desde su ingreso sin bienvenida.')+
+      filaNum('cfg-nv-diasresp','Días para el contacto del Responsable',nvDiasContactoResp(),1,60,'Un Nuevo en Bienvenida se marca ⏰ Atrasado al pasar estos días desde la bienvenida sin que su Responsable lo contacte.')+
       filaNum('cfg-nv-semanas','Semanas de ingreso que muestra Conexión al abrir',nvSemanasPeriodo(),1,52,'Solo el filtro de fechas inicial: Conexión abre mostrando a quienes ingresaron en las últimas N semanas ISO (de lunes a domingo). No cambia etapas ni categorías.')+
       filaNum('cfg-nv-asist','Asistencias para pasar a Participando',nvAsistParticipando(),1,20,'Presente en Grupos de Vida o Comunidades NG desde su ingreso, sumando ambos (no hace falta que sean seguidas). Las visitas cargadas por nombre también cuentan.')+
       filaNum('cfg-nv-recon','Semanas ISO de inasistencia para pasar a <strong>'+svcEsc(etqCat('Reconectar'))+'</strong>',reconSemanas(),1,52,'Miembros y Concurrentes que no participan de Grupos de Vida, Comunidades NG ni Discipulado durante estas semanas seguidas. Es el mismo valor que en Configuración → Etiquetas.')+
@@ -4442,12 +4443,18 @@ function cfgRenderConexion(wrap){
     celebEquipoCuentasHTML()+
     '<div class="card">'+
       '<div style="font-weight:700;color:#1F4E79;font-size:13px;margin-bottom:4px">🔄 Recalcular etapas con la regla de asistencias</div>'+
-      '<div style="font-size:12px;color:#6B7280;margin-bottom:10px;line-height:1.5">Revisa a todos los Nuevos: con '+nvAsistParticipando()+' o más asistencias pasan a <strong>Participando</strong>; quienes figuran Participando y no llegan pasan a <strong>Contactado</strong>. Primero se muestra el informe (no cambia nada); después podés aplicarlo. Cada cambio queda en el historial de etapas como "Sistema (recálculo de asistencias)".</div>'+
+      '<div style="font-size:12px;color:#6B7280;margin-bottom:10px;line-height:1.5">Revisa a todos los Nuevos: con '+nvAsistParticipando()+' o más asistencias pasan a <strong>Participando</strong>; quienes figuran Participando y no llegan vuelven a <strong>Contactado</strong> (o a <strong>Bienvenida</strong> si su Responsable todavía no los contactó). Primero se muestra el informe (no cambia nada); después podés aplicarlo. Cada cambio queda en el historial de etapas como "Sistema (recálculo de asistencias)".</div>'+
       '<button class="btn" onclick="cfgNvVerRecalculo()">🔍 Ver informe (solo lee)</button>'+
       '<div id="cfg-nv-recalc" style="margin-top:12px"></div>'+
     '</div>'+
     '<div class="card" style="margin-top:.75rem">'+
-      '<div style="font-weight:700;color:#1F4E79;font-size:13px;margin-bottom:4px">👤 Aplicar el Responsable automático a quienes ya están en Contactado</div>'+
+      '<div style="font-weight:700;color:#5B21B6;font-size:13px;margin-bottom:4px">📨 Corrección hacia atrás · etapa Bienvenida</div>'+
+      '<div style="font-size:12px;color:#6B7280;margin-bottom:10px;line-height:1.5">Ordena a quienes se cargaron antes de que existiera la etapa Bienvenida. Contactados: si tienen un comentario de su <strong>Responsable</strong> quedan en Contactado; si no, pasan a <strong>Bienvenida</strong>. A todos se les completa quién dio la bienvenida y quién contactó (en Participando no cambia la etapa). Primero se muestra el informe (no cambia nada); podés destildar a quien no quieras tocar. Cada cambio de etapa queda en el historial como "Sistema — corrección etapa Bienvenida".</div>'+
+      '<button class="btn" onclick="cfgNvVerMigBienv()">🔍 Ver informe (solo lee)</button>'+
+      '<div id="cfg-nv-migbienv" style="margin-top:12px"></div>'+
+    '</div>'+
+    '<div class="card" style="margin-top:.75rem">'+
+      '<div style="font-weight:700;color:#1F4E79;font-size:13px;margin-bottom:4px">👤 Aplicar el Responsable automático a quienes ya están en Bienvenida o Contactado</div>'+
       '<div style="font-size:12px;color:#6B7280;margin-bottom:10px;line-height:1.5">Usa la configuración <strong>guardada</strong> de arriba (guardá primero si la cambiaste). Primero se muestra el informe (no cambia nada); después podés aplicarlo. Quienes no tienen género cargado no se tocan.</div>'+
       '<button class="btn" onclick="cfgNvVerRespAuto()">🔍 Ver informe (solo lee)</button>'+
       '<div id="cfg-nv-respauto" style="margin-top:12px"></div>'+
@@ -4458,8 +4465,8 @@ function cfgNvRespAutoHTML(){
   var miembros=(S.members||[]).filter(function(m){return m.estado!=='Baja'&&m.condicion==='Miembro';}).sort(function(a,b){return listName(a).localeCompare(listName(b));});
   function sel(id,val){ return '<select id="'+id+'" style="width:220px"><option value="">— Sin automático —</option>'+miembros.map(function(m){return '<option value="'+m.id+'"'+(Number(val)===Number(m.id)?' selected':'')+'>'+svcEsc(listName(m))+'</option>';}).join('')+'</select>'; }
   return '<div style="margin:6px 0 12px;padding:10px 12px;background:#F0F9FF;border-radius:8px">'+
-    '<label style="font-size:13px;font-weight:600;color:#1F2937;cursor:pointer"><input type="checkbox" id="cfg-nv-ra-activo" '+(ra.activo?'checked':'')+' style="width:auto;margin-right:6px">Responsable automático al pasar a Contactado</label>'+
-    '<div style="font-size:11.5px;color:#6B7280;margin:2px 0 8px">Cuando un Nuevo pasa de Ingresado a Contactado, su Responsable pasa a ser la persona elegida según su género (reemplaza al que tuviera). Si no tiene género cargado, no se cambia.</div>'+
+    '<label style="font-size:13px;font-weight:600;color:#1F2937;cursor:pointer"><input type="checkbox" id="cfg-nv-ra-activo" '+(ra.activo?'checked':'')+' style="width:auto;margin-right:6px">Responsable automático al pasar a Bienvenida</label>'+
+    '<div style="font-size:11.5px;color:#6B7280;margin:2px 0 8px">Cuando un Nuevo pasa de Ingresado a Bienvenida (primer comentario), su Responsable pasa a ser la persona elegida según su género (reemplaza al que tuviera). Si no tiene género cargado, no se cambia.</div>'+
     '<div style="display:flex;gap:12px;flex-wrap:wrap"><div><div style="font-size:12px;color:#6B7280">Mujeres</div>'+sel('cfg-nv-ra-mujer',ra.mujerId)+'</div>'+
     '<div><div style="font-size:12px;color:#6B7280">Hombres</div>'+sel('cfg-nv-ra-hombre',ra.hombreId)+'</div></div></div>';
 }
@@ -4470,7 +4477,8 @@ async function cfgSaveConexion(){
     if(!/^\d+$/.test(v)||n<min||n>max){ alert(nombre+': tiene que ser un número entero entre '+min+' y '+max+'.'); return null; }
     return n;
   }
-  var al=leer('cfg-nv-alerta',1,30,'Alerta de atraso'); if(al===null) return;
+  var al=leer('cfg-nv-alerta',1,30,'Días para dar la bienvenida'); if(al===null) return;
+  var dr=leer('cfg-nv-diasresp',1,60,'Días para el contacto del Responsable'); if(dr===null) return;
   var se=leer('cfg-nv-semanas',1,52,'Semanas del período'); if(se===null) return;
   var as=leer('cfg-nv-asist',1,20,'Asistencias para Participando'); if(as===null) return;
   var rs=leer('cfg-nv-recon',1,52,'Semanas de inasistencia para '+etqCat('Reconectar')); if(rs===null) return;
@@ -4484,7 +4492,7 @@ async function cfgSaveConexion(){
   var caH=String(document.getElementById('cfg-celeb-hora')?.value||'').trim();
   if(!/^\d{2}:\d{2}$/.test(caH)){ alert('Horario habitual de la celebración: elegí una hora válida.'); return; }
   var snapHome=JSON.stringify(S.homeConfig||{}), prevAlerta=localStorage.getItem('gdv_nv_dias_alerta');
-  S.homeConfig=Object.assign({},S.homeConfig||{},{nvSemanasPeriodo:se,nvAsistParticipando:as,reconectarSemanas:rs,nvRespAuto:ra,celebAusenciasN:caN,celebCuadAntes:cqA,celebCuadHabiles:cqH,celebHorarioDef:caH,_ts:Date.now()});
+  S.homeConfig=Object.assign({},S.homeConfig||{},{nvDiasContactoResp:dr,nvSemanasPeriodo:se,nvAsistParticipando:as,reconectarSemanas:rs,nvRespAuto:ra,celebAusenciasN:caN,celebCuadAntes:cqA,celebCuadHabiles:cqH,celebHorarioDef:caH,_ts:Date.now()});
   try{
     await saveK(SK.homeConfig,S.homeConfig);
     await saveK('gdv_nv_dias_alerta',al);
@@ -4499,11 +4507,11 @@ async function cfgSaveConexion(){
   showToast('✅ Configuración de Conexión guardada','#16A34A');
   var w=document.getElementById('cfg-content'); if(w) cfgRenderConexion(w);
 }
-// Responsable automático hacia atrás: Nuevos activos en Contactado cuyo responsable no es el que corresponde
+// Responsable automático hacia atrás: Nuevos activos en Bienvenida o Contactado cuyo responsable no es el que corresponde
 function nvRespAutoInforme(){
   var out=[], sinGenero=[];
   (S.members||[]).forEach(function(m){
-    if(!nvEsNuevoActivo(m)||m.subEstado!=='Contactado') return;
+    if(!nvEsNuevoActivo(m)||(m.subEstado!=='Contactado'&&m.subEstado!=='Bienvenida')) return;
     if(m.genero!=='M'&&m.genero!=='H'){ sinGenero.push(m); return; }
     var copia={genero:m.genero,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre};
     if(nvRespAutoAplicar(copia)) out.push({m:m,de:nvRespNombre(m),a:nvRespNombre(copia)});
@@ -4517,7 +4525,7 @@ function cfgNvVerRespAuto(){
   if(!c.activo){ el.innerHTML='<div style="padding:8px;color:#92400E">El Responsable automático está desactivado. Activalo y guardá primero.</div>'; return; }
   var inf=nvRespAutoInforme();
   var sg=inf.sinGenero.length?'<div style="font-size:12px;color:#92400E;margin-top:8px">Sin género cargado (no se tocan): '+inf.sinGenero.map(function(m){return svcEsc(listName(m));}).join(', ')+'</div>':'';
-  if(!inf.cambios.length){ el.innerHTML='<div style="padding:8px;color:#16A34A;font-weight:600">✅ Todos los Contactados ya tienen el Responsable que corresponde.</div>'+sg; return; }
+  if(!inf.cambios.length){ el.innerHTML='<div style="padding:8px;color:#16A34A;font-weight:600">✅ Todos los que están en Bienvenida o Contactado ya tienen el Responsable que corresponde.</div>'+sg; return; }
   el.innerHTML='<div style="font-size:12.5px;color:#374151;margin-bottom:8px"><strong>'+inf.cambios.length+'</strong> persona'+(inf.cambios.length!==1?'s cambian':' cambia')+' de Responsable.</div>'+
     '<div style="max-height:320px;overflow:auto;border:1px solid #E5E7EB;border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'+
     '<thead><tr style="background:#F9FAFB;text-align:left"><th style="padding:6px 8px">Persona</th><th style="padding:6px 8px">Género</th><th style="padding:6px 8px">Responsable actual</th><th style="padding:6px 8px">Pasa a</th></tr></thead><tbody>'+
@@ -4531,7 +4539,7 @@ async function cfgNvAplicarRespAuto(){
   if(!isSuperAdmin()) return;
   var inf=nvRespAutoInforme();
   if(!inf.cambios.length){ cfgNvVerRespAuto(); return; }
-  if(!confirm('Se va a cambiar el Responsable de '+inf.cambios.length+' persona'+(inf.cambios.length!==1?'s':'')+' en Contactado.\n\n¿Continuar?')) return;
+  if(!confirm('Se va a cambiar el Responsable de '+inf.cambios.length+' persona'+(inf.cambios.length!==1?'s':'')+' en Bienvenida o Contactado.\n\n¿Continuar?')) return;
   var fotos=[];
   inf.cambios.forEach(function(x){ var f=Object.assign({},x.m); if(nvRespAutoAplicar(x.m)){ x.m._ts=Date.now(); fotos.push({m:x.m,foto:f}); } });
   try{
@@ -4551,7 +4559,7 @@ function cfgNvVerRecalculo(){
   var inf=nvRecalculoInforme();
   if(!inf.length){ el.innerHTML='<div style="padding:10px;color:#16A34A;font-weight:600">✅ Todos los Nuevos ya están en la etapa que les corresponde. No hay nada para aplicar.</div>'; return; }
   var sube=inf.filter(function(x){return x.a==='Participando';}).length, baja=inf.length-sube;
-  el.innerHTML='<div style="font-size:12.5px;color:#374151;margin-bottom:8px"><strong>'+inf.length+'</strong> cambio'+(inf.length!==1?'s':'')+': '+sube+' pasan a Participando · '+baja+' vuelven a Contactado.</div>'+
+  el.innerHTML='<div style="font-size:12.5px;color:#374151;margin-bottom:8px"><strong>'+inf.length+'</strong> cambio'+(inf.length!==1?'s':'')+': '+sube+' pasan a Participando · '+baja+' vuelven a Contactado / Bienvenida.</div>'+
     '<div style="max-height:360px;overflow:auto;border:1px solid #E5E7EB;border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'+
     '<thead><tr style="background:#F9FAFB;text-align:left"><th style="padding:6px 8px">Persona</th><th style="padding:6px 8px">Ingreso</th><th style="padding:6px 8px;text-align:center">Asistencias</th><th style="padding:6px 8px">Cambio</th></tr></thead><tbody>'+
     inf.map(function(x){
@@ -4579,6 +4587,118 @@ async function cfgNvAplicarRecalculo(){
   }
   showToast('✅ Recálculo aplicado: '+fotos.length+' cambio'+(fotos.length!==1?'s':''),'#16A34A');
   cfgNvVerRecalculo();
+}
+// ── Corrección hacia atrás: etapa Bienvenida (zzz) ──
+// Comentarios que cuentan como contacto: sin los de Rebaños ni las notas automáticas de la app.
+function nvComentariosContacto(m){
+  return (m.comentarios||[]).filter(function(c){
+    if(!c||c.origen==='rebanos') return false;
+    var t=String(c.texto||'');
+    return !/^(Sub-estado cambiado|Promovido\/a de|Mantenido como Nuevo|Re-activ)/.test(t);
+  }).slice().sort(function(a,b){return (Number(a.ts)||0)-(Number(b.ts)||0);});
+}
+// Nombres con que puede figurar el Responsable como autor (su persona y los usuarios vinculados a ella)
+function nvNombresDeResponsable(respId){
+  var out={}; if(!respId) return out;
+  var r=(S.members||[]).find(function(x){return Number(x.id)===Number(respId);});
+  if(r){ out[normName(fullName(r))]=1; out[normName(listName(r))]=1; }
+  (S.users||[]).forEach(function(u){ if(Number(u.memberId)===Number(respId)&&u.name) out[normName(u.name)]=1; });
+  return out;
+}
+function nvRespTieneUsuario(respId){ return !!respId&&(S.users||[]).some(function(u){return Number(u.memberId)===Number(respId);}); }
+function nvIsoDeTs(ts){ var n=Number(ts)||0; return n?new Date(n).toISOString():null; }
+function nvMigBienvCalcular(m){
+  var et=m.subEstado||'Ingresado';
+  if(!nvEsNuevoActivo(m)||et==='Bienvenida') return null;
+  var coms=nvComentariosContacto(m);
+  if(et==='Ingresado'&&!coms.length) return null;
+  // Responsable que va a quedar (en Ingresado, el automático si no tiene)
+  var respId=m.seguimientoId||null, nuevoResp=null;
+  if(et==='Ingresado'&&!respId){ var cp={genero:m.genero}; if(nvRespAutoAplicar(cp)){ respId=cp.seguimientoId; nuevoResp=cp.seguimientoNombre; } }
+  var nombres=nvNombresDeResponsable(respId);
+  // Bienvenida: la que ya tenga; si no, el primer comentario; si no, el contacto registrado
+  var bienvCom=null, bPor=m.bienvenidaPor||null, bFecha=m.bienvenidaFecha||null;
+  if(!bFecha){
+    if(coms.length){ bienvCom=coms[0]; bPor=bienvCom.autor||'Sistema'; bFecha=nvIsoDeTs(bienvCom.ts); }
+    else if(m.contactadoFecha){ bPor=m.contactadoPor||'Sistema'; bFecha=m.contactadoFecha; }
+  } else if(coms.length&&nvIsoDeTs(coms[0].ts)===bFecha) bienvCom=coms[0];
+  var bMs=bFecha?Date.parse(bFecha):0;
+  // Contacto del Responsable: comentario suyo posterior a la bienvenida, o un paso a Contactado hecho por él
+  var cPor=null, cFecha=null;
+  var rc=coms.find(function(c){ return c!==bienvCom&&nombres[normName(c.autor||'')]&&(Number(c.ts)||0)>=bMs; });
+  if(rc){ cPor=rc.autor; cFecha=nvIsoDeTs(rc.ts); }
+  else{
+    var rh=(m.subEstadoHistorial||[]).find(function(h){ return h&&h.a==='Contactado'&&nombres[normName(h.autor||'')]; });
+    if(rh){ cPor=rh.autor; cFecha=rh.fecha; }
+  }
+  var a=et==='Participando'?'Participando':(cFecha?'Contactado':'Bienvenida');
+  var cambia=a!==et||(m.bienvenidaPor||null)!==bPor||(m.bienvenidaFecha||null)!==bFecha||(m.contactadoPor||null)!==cPor||(m.contactadoFecha||null)!==cFecha||!!nuevoResp;
+  if(!cambia) return null;
+  var respNom=nuevoResp?String(nuevoResp).split(' — ')[0]:nvRespNombre(m);
+  var motivo=a==='Contactado'?'Comentario de su Responsable ('+cPor+', '+nvFmtFechaMs(Date.parse(cFecha))+')'
+    :a==='Bienvenida'?(respId?'Sin comentario de su Responsable ('+respNom+')':'Sin Responsable asignado')
+    :'Completa quién dio la bienvenida'+(cFecha?' y quién contactó':'');
+  return {m:m,de:et,a:a,bPor:bPor,bFecha:bFecha,cPor:cPor,cFecha:cFecha,nuevoResp:!!nuevoResp,motivo:motivo,
+    aviso:(a==='Bienvenida'&&respId&&!nvRespTieneUsuario(respId))?'Su Responsable no tiene usuario vinculado: no va a poder pasarlo a Contactado':(a==='Bienvenida'&&!respId?'Asignale un Responsable':'')};
+}
+function nvMigBienvInforme(){
+  var out=[];
+  (S.members||[]).forEach(function(m){ var x=nvMigBienvCalcular(m); if(x) out.push(x); });
+  var ord={Contactado:0,Bienvenida:1,Participando:2};
+  out.sort(function(x,y){ return (ord[x.a]-ord[y.a])||listName(x.m).localeCompare(listName(y.m)); });
+  return out;
+}
+function nvMigBienvAplicar(x,ahora){
+  var m=x.m;
+  if(x.nuevoResp) nvRespAutoAplicar(m);
+  ['bienvenidaPor','bienvenidaFecha','contactadoPor','contactadoFecha'].forEach(function(k){ delete m[k]; });
+  if(x.bFecha){ m.bienvenidaPor=x.bPor; m.bienvenidaFecha=x.bFecha; }
+  if(x.cFecha){ m.contactadoPor=x.cPor; m.contactadoFecha=x.cFecha; }
+  if(x.a!==x.de){
+    m.subEstado=x.a;
+    m.subEstadoHistorial=(m.subEstadoHistorial||[]).concat([{de:x.de,a:x.a,autor:'Sistema — corrección etapa Bienvenida',fecha:ahora,comentario:x.motivo}]);
+  }
+  m._ts=Date.now();
+}
+var cfgMigBienvExcluir={};
+function cfgNvVerMigBienv(){
+  var el=document.getElementById('cfg-nv-migbienv'); if(!el) return;
+  var inf=nvMigBienvInforme();
+  if(!inf.length){ el.innerHTML='<div style="padding:10px;color:#16A34A;font-weight:600">✅ Todos los Nuevos ya están ordenados con la etapa Bienvenida. No hay nada para aplicar.</div>'; return; }
+  var c={Contactado:0,Bienvenida:0,Participando:0}; inf.forEach(function(x){ c[x.a]++; });
+  var col={Contactado:'#1E40AF',Bienvenida:'#5B21B6',Participando:'#065F46'};
+  function f(iso,por){ return iso?svcEsc(String(por||'—'))+' · '+nvFmtFechaMs(Date.parse(iso)):'<span style="color:#9CA3AF">—</span>'; }
+  el.innerHTML='<div style="font-size:12.5px;color:#374151;margin-bottom:8px"><strong>'+inf.length+'</strong> persona'+(inf.length!==1?'s':'')+': '+c.Contactado+' quedan en Contactado · '+c.Bienvenida+' pasan a Bienvenida · '+c.Participando+' en Participando (solo se completan datos).</div>'+
+    '<div style="max-height:420px;overflow:auto;border:1px solid #E5E7EB;border-radius:8px"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'+
+    '<thead><tr style="background:#F9FAFB;text-align:left"><th style="padding:6px 8px"></th><th style="padding:6px 8px">Persona</th><th style="padding:6px 8px">Etapa</th><th style="padding:6px 8px">Bienvenida</th><th style="padding:6px 8px">Contacto del Responsable</th><th style="padding:6px 8px">Motivo</th></tr></thead><tbody>'+
+    inf.map(function(x){
+      var id=x.m.id;
+      return '<tr style="border-top:1px solid #F3F4F6"><td style="padding:6px 8px"><input type="checkbox" '+(cfgMigBienvExcluir[id]?'':'checked')+' onchange="cfgMigBienvExcluir['+id+']=!this.checked" style="width:auto;margin:0" title="Destildá para no tocar a esta persona"></td>'+
+        '<td style="padding:6px 8px">'+svcEsc(listName(x.m))+'<div style="font-size:11px;color:#6B7280">Resp.: '+svcEsc(nvRespNombre(x.m)||'—')+'</div></td>'+
+        '<td style="padding:6px 8px;white-space:nowrap">'+svcEsc(x.de)+(x.a!==x.de?' → ':' · ')+'<strong style="color:'+col[x.a]+'">'+svcEsc(x.a)+'</strong></td>'+
+        '<td style="padding:6px 8px;white-space:nowrap">'+f(x.bFecha,x.bPor)+'</td><td style="padding:6px 8px;white-space:nowrap">'+f(x.cFecha,x.cPor)+'</td>'+
+        '<td style="padding:6px 8px">'+svcEsc(x.motivo)+(x.aviso?'<div style="color:#B45309;font-size:11.5px">⚠️ '+svcEsc(x.aviso)+'</div>':'')+'</td></tr>';
+    }).join('')+'</tbody></table></div>'+
+    '<div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-primary" onclick="cfgNvAplicarMigBienv()">✅ Aplicar a los tildados</button></div>';
+}
+async function cfgNvAplicarMigBienv(){
+  if(!isSuperAdmin()) return;
+  var inf=nvMigBienvInforme().filter(function(x){return !cfgMigBienvExcluir[x.m.id];});
+  if(!inf.length){ alert('No hay personas tildadas para aplicar.'); return; }
+  if(!confirm('Se van a ordenar '+inf.length+' persona'+(inf.length!==1?'s':'')+' con la etapa Bienvenida.\n\n¿Continuar?')) return;
+  var fotos=[], ahora=new Date().toISOString();
+  inf.forEach(function(x){ fotos.push({m:x.m,foto:Object.assign({},x.m)}); nvMigBienvAplicar(x,ahora); });
+  try{
+    await saveK(SK.members,S.members);
+    if(typeof window.fbUpload==='function') await window.fbUpload(true);
+  }catch(e){
+    fotos.forEach(function(f){ nvRestaurarExacto(f.m,f.foto); });
+    try{ await saveK(SK.members,S.members); }catch(e2){}
+    alert('No se pudo guardar en la nube. No se aplicó ningún cambio. Verificá tu conexión e intentá de nuevo.');
+    return;
+  }
+  showToast('✅ Corrección aplicada a '+fotos.length+' persona'+(fotos.length!==1?'s':''),'#16A34A');
+  cfgNvVerMigBienv();
 }
 // Largo mínimo de comentarios y motivos en Rebaños, Nuevos Contactos y Campañas
 var COMENT_MIN=12;
@@ -16363,6 +16483,7 @@ function buildNuevosHTML(){
           <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Sub-estado</label>
           <select id="nv-promote-subestado-select" style="width:100%">
             <option value="Ingresado">🆕 Ingresado</option>
+            <option value="Bienvenida">📨 Bienvenida</option>
             <option value="Contactado">📞 Contactado</option>
             <option value="Participando">🌱 Participando</option>
           </select>
@@ -16416,7 +16537,7 @@ function buildNuevosHTML(){
           <div style="font-size:15px;font-weight:600;color:#1F4E79" id="nv-contactar-name">—</div>
           <button onclick="nvCloseContactar()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;padding:0 4px;line-height:1" title="Cerrar">✕</button>
         </div>
-        <div style="font-size:13px;color:#6B7280;margin-bottom:.75rem">📞 Registrá el contacto — con el primer comentario pasa a Contactado automáticamente</div>
+        <div id="nv-contactar-banda"></div>
         <div id="nv-contactar-comentarios-lista" style="max-height:220px;overflow-y:auto;margin-bottom:8px;font-size:12px"></div>
         <textarea id="nv-contactar-comentario-txt" placeholder="¿Cómo fue el contacto? ¿Qué se conversó?..." style="width:100%;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;min-height:80px;resize:vertical"></textarea>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
@@ -16480,7 +16601,7 @@ function buildNuevosHTML(){
 let nvSelectedId=null;
 let nvFiltro='nuevos'; // 'nuevos' | 'historico'
 let nvDraftSeguimientoId=null, nvDraftSeguimientoNombre=null, nvDraftSeguimientoSet=false;
-const NV_SUBESTADO_ORDEN={Ingresado:0,Contactado:1,Participando:2};
+const NV_SUBESTADO_ORDEN={Ingresado:0,Bienvenida:1,Contactado:2,Participando:3};
 
 // ── Sub-estado de seguimiento (solo aplica mientras condicion==='Nuevo') ──
 function nvDiasAlerta(){
@@ -16514,13 +16635,27 @@ function nvDiasDesdeIngreso(m){
   const hoy=new Date(); hoy.setHours(0,0,0,0);
   return Math.floor((hoy-d)/(1000*60*60*24));
 }
-function nvEsAtrasado(m){
-  return (m.subEstado||'Ingresado')==='Ingresado' && nvDiasDesdeIngreso(m)>=nvDiasAlerta();
+// Días para que el Responsable contacte después de la bienvenida (Configuración → Conexión). Defecto 7.
+var NV_DIAS_RESP_DEF=7;
+function nvDiasContactoResp(){ var n=parseInt(S.homeConfig&&S.homeConfig.nvDiasContactoResp,10); return (n>=1&&n<=60)?n:NV_DIAS_RESP_DEF; }
+function nvDiasDesdeMs(ms){ if(!ms) return 0; var d=new Date(ms); d.setHours(0,0,0,0); var h=new Date(); h.setHours(0,0,0,0); return Math.max(0,Math.round((h-d)/864e5)); }
+// Atraso: Ingresado sin bienvenida pasados N días del ingreso; Bienvenida sin contacto del Responsable pasados M días.
+// Devuelve null o {dias, motivo}.
+function nvAtraso(m){
+  var et=m&&(m.subEstado||'Ingresado');
+  if(et==='Ingresado'){ var d=nvDiasDesdeIngreso(m); return d>=nvDiasAlerta()?{dias:d,motivo:'Ingresado hace '+d+' días sin bienvenida'}:null; }
+  if(et==='Bienvenida'){
+    var ms=m.bienvenidaFecha?Date.parse(m.bienvenidaFecha):0, d2=ms?nvDiasDesdeMs(ms):nvDiasDesdeIngreso(m);
+    return d2>=nvDiasContactoResp()?{dias:d2,motivo:'Bienvenida hace '+d2+' días y el Responsable todavía no lo contactó'}:null;
+  }
+  return null;
 }
+function nvEsAtrasado(m){ return !!nvAtraso(m); }
 function nvSubEstadoBadge(m){
   const est=m.subEstado||'Ingresado';
   const map={
     Ingresado:  {bg:'#FEF3C7',color:'#92400E',icon:'🆕'},
+    Bienvenida: {bg:'#EDE9FE',color:'#5B21B6',icon:'📨'},
     Contactado: {bg:'#DBEAFE',color:'#1E40AF',icon:'📞'},
     Participando:{bg:'#D1FAE5',color:'#065F46',icon:'🌱'},
   };
@@ -16532,7 +16667,7 @@ var NV_SEM_DEF=3, NV_ASIST_DEF=3;
 function nvSemanasPeriodo(){ var n=parseInt(S.homeConfig&&S.homeConfig.nvSemanasPeriodo,10); return (n>=1&&n<=52)?n:NV_SEM_DEF; }
 // Mensaje de bienvenida (WhatsApp desde Conexión). Lo editan quienes tienen nuevos_mensaje_wa.
 function nvMensajeBienvenida(){ return String((S.homeConfig&&S.homeConfig.nvMensajeBienvenida)||''); }
-// Responsable automático al pasar de Ingresado a Contactado (Configuración → 🌱 Conexión)
+// Responsable automático al pasar de Ingresado a Bienvenida (Configuración → 🌱 Conexión)
 function nvRespAutoConfig(){ var r=(S.homeConfig&&S.homeConfig.nvRespAuto)||{}; return {activo:!!r.activo,mujerId:r.mujerId||null,hombreId:r.hombreId||null}; }
 // Aplica la regla a una persona (en memoria). Devuelve true si cambió el Responsable.
 function nvRespAutoAplicar(m){
@@ -16616,7 +16751,7 @@ function nvEtapaPorRegla(m,recalculo){
   if(!nvEsNuevoActivo(m)) return null;
   var act=m.subEstado||'Ingresado', n=nvAsistencias(m), min=nvAsistParticipando();
   if(n>=min) return 'Participando';
-  if(recalculo&&act==='Participando') return 'Contactado';
+  if(recalculo&&act==='Participando') return m.contactadoFecha?'Contactado':m.bienvenidaFecha?'Bienvenida':'Contactado';
   return act;
 }
 // Aplica la regla a una persona (en memoria). Devuelve true si cambió. Historial con concat (copy-on-write).
@@ -16700,12 +16835,12 @@ async function nvParticipandoPonerAlDia(){
 // ════════════════════════════════════════════════════════════
 // CONEXIÓN EN GRILLA (Etapa 2 — Diseno_Conexion_Grilla.md)
 // ════════════════════════════════════════════════════════════
-var nvIndFiltro='';          // '' | 'Ingresado' | 'Contactado' | 'Participando' | 'atrasados' | 'sinresp'
+var nvIndFiltro='';          // '' | 'Ingresado' | 'Bienvenida' | 'Contactado' | 'Participando' | 'atrasados' | 'sinresp'
 var nvVista='grilla';        // 'grilla' | 'tablero'
 var nvColSet='seguimiento';  // 'seguimiento' | 'personales' | 'origen'
 var nvSel={};                // ids seleccionados (acciones múltiples)
 var nvAsignarDestino=null;   // ids a los que se asigna responsable desde el selector
-var NV_ETAPAS=['Ingresado','Contactado','Participando'];
+var NV_ETAPAS=['Ingresado','Bienvenida','Contactado','Participando'];
 
 function nvEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function nvGruposDe(m){
@@ -16720,6 +16855,7 @@ function nvUltimoContacto(m){
   var t=0;
   (m.comentarios||[]).forEach(function(c){ var x=Number(c&&c.ts)||0; if(x>t) t=x; });
   var cf=m.contactadoFecha?Date.parse(m.contactadoFecha):0; if(cf>t) t=cf;
+  var bf=m.bienvenidaFecha?Date.parse(m.bienvenidaFecha):0; if(bf>t) t=bf;
   var wa=Number(m.ultimoContactoWA)||0; if(wa>t) t=wa;
   return t||null;
 }
@@ -16815,6 +16951,7 @@ function renderNuevos(){
       var b=r.base, c=function(f){return b.filter(f).length;};
       var defs=[['','Nuevos activos',b.length,'#16A34A'],
         ['Ingresado','🆕 Ingresados',c(function(m){return (m.subEstado||'Ingresado')==='Ingresado';}),'#92400E'],
+        ['Bienvenida','📨 Bienvenida',c(function(m){return m.subEstado==='Bienvenida';}),'#5B21B6'],
         ['Contactado','📞 Contactados',c(function(m){return m.subEstado==='Contactado';}),'#1E40AF'],
         ['Participando','🌱 Participando',c(function(m){return m.subEstado==='Participando';}),'#065F46'],
         ['atrasados','⏰ Atrasados',c(nvEsAtrasado),'#DC2626'],
@@ -16839,7 +16976,7 @@ function renderNuevos(){
     var d1=document.getElementById('nv-fil-desde')?.value||'', d2=document.getElementById('nv-fil-hasta')?.value||'';
     var per=r.hist?'Histórico':(d1||d2)?('Ingreso '+(d1?fmtAA(d1):'…')+' a '+(d2?fmtAA(d2):'…')):'Todas las fechas';
     var total=r.hist?S.members.filter(function(m){return m.condicion==='Historico'||m.estado==='Baja';}).length:S.members.filter(function(m){return m.condicion==='Nuevo'&&m.estado!=='Baja';}).length;
-    var indTxt={'Ingresado':'Ingresados','Contactado':'Contactados','Participando':'Participando','atrasados':'Atrasados','sinresp':'Sin responsable'}[nvIndFiltro];
+    var indTxt={'Ingresado':'Ingresados','Bienvenida':'Bienvenida','Contactado':'Contactados','Participando':'Participando','atrasados':'Atrasados','sinresp':'Sin responsable'}[nvIndFiltro];
     mo.textContent='Mostrando '+lista.length+' de '+total+' · '+per+(indTxt&&!r.hist?' · '+indTxt:'');
   }
   var countEl=document.getElementById('nv-count'); if(countEl) countEl.textContent=S.members.filter(function(m){return m.condicion==='Nuevo'&&m.estado!=='Baja';}).length;
@@ -16881,6 +17018,10 @@ function nvCeldaPersona(m,conSel){
     '<span style="cursor:pointer;color:#1F4E79;font-weight:600;text-decoration:underline dotted" onclick="nvFichaAbrir('+m.id+')">'+nvEsc(listName(m))+'</span>'+
     '</div></div></td>';
 }
+function nvCeldaEdad(m){
+  var e=nvEdad(m);
+  return '<td style="white-space:nowrap">'+(e!==null?e+' años':'<span style="color:#9CA3AF" title="Sin fecha de nacimiento">—</span>')+'</td>';
+}
 function nvCeldaIngreso(m){
   return '<td style="white-space:nowrap">'+(m.fechaRegistro?nvEsc(m.fechaRegistro):'<span style="color:#9CA3AF">sin fecha</span>')+'</td>';
 }
@@ -16895,9 +17036,13 @@ function nvCeldaResp(m){
   return '<td><span'+click+'>'+(n?nvEsc(n):'⏳ Sin asignar')+'</span></td>';
 }
 function nvCeldaUltimo(m,hist){
-  var t=nvUltimoContacto(m), atr=!hist&&nvEsAtrasado(m);
-  return '<td style="white-space:nowrap">'+(t?nvFmtFechaMs(t):'<span style="color:#9CA3AF">—</span>')+
-    (atr?'<div><span style="background:#FEE2E2;color:#991B1B;font-size:10px;padding:1px 7px;border-radius:99px;font-weight:700">⏰ Atrasado</span></div>':'')+'</td>';
+  var t=nvUltimoContacto(m), at=hist?null:nvAtraso(m), sub='';
+  if(!hist&&m.subEstado==='Bienvenida'&&m.bienvenidaFecha)
+    sub='<div style="font-size:11px;color:#5B21B6">📨 Bienvenida '+nvFmtFechaMs(Date.parse(m.bienvenidaFecha))+(m.bienvenidaPor?' · '+nvEsc(String(m.bienvenidaPor).split(' ')[0]):'')+' · espera al Responsable</div>';
+  else if(!hist&&m.subEstado==='Contactado'&&m.contactadoPor)
+    sub='<div style="font-size:11px;color:#6B7280">contactó '+nvEsc(String(m.contactadoPor).split(' ')[0])+'</div>';
+  return '<td style="white-space:nowrap">'+(t?nvFmtFechaMs(t):'<span style="color:#9CA3AF">—</span>')+sub+
+    (at?'<div><span title="'+nvEsc(at.motivo)+'" style="background:#FEE2E2;color:#991B1B;font-size:10px;padding:1px 7px;border-radius:99px;font-weight:700">⏰ Atrasado · '+at.dias+' días</span></div>':'')+'</td>';
 }
 function nvCeldaGrupo(m){
   var g=nvGruposDe(m);
@@ -16923,30 +17068,32 @@ function nvGrillaHTML(lista,hist){
     filas=lista.map(function(m){
       return '<tr'+(nvSel[m.id]?' class="sel"':'')+'>'+nvCeldaPersona(m,conSel)+'<td>'+nvEsc(m.origen||'—')+'</td><td>'+nvEsc(m.comoNosConocio||'—')+'</td><td style="max-width:260px;font-style:italic;color:#374151">'+nvEsc(m.motivoContacto||'—')+'</td><td>'+nvEsc(m.cargadoPor||'—')+'</td>'+nvCeldaIngreso(m)+'</tr>'; });
   } else {
-    cols=['Ingreso','Etapa','Responsable','Último contacto','Grupo / Comunidad','Mensajes'];
+    cols=['Edad','Ingreso','Etapa','Responsable','Último contacto','Grupo / Comunidad','Mensajes'];
     filas=lista.map(function(m){
       var atr=!hist&&nvEsAtrasado(m);
-      return '<tr class="'+(nvSel[m.id]?'sel ':'')+(atr?'atr':'')+'">'+nvCeldaPersona(m,conSel)+nvCeldaIngreso(m)+nvCeldaEtapa(m,hist)+nvCeldaResp(m)+nvCeldaUltimo(m,hist)+nvCeldaGrupo(m)+nvCeldaAcciones(m,hist)+'</tr>'; });
+      return '<tr class="'+(nvSel[m.id]?'sel ':'')+(atr?'atr':'')+'">'+nvCeldaPersona(m,conSel)+nvCeldaEdad(m)+nvCeldaIngreso(m)+nvCeldaEtapa(m,hist)+nvCeldaResp(m)+nvCeldaUltimo(m,hist)+nvCeldaGrupo(m)+nvCeldaAcciones(m,hist)+'</tr>'; });
   }
   return '<div class="nv-grid-wrap"><table class="nv-grid"><thead><tr><th>'+thSel+'Persona</th>'+cols.map(function(c){return '<th>'+c+'</th>';}).join('')+'</tr></thead><tbody>'+filas.join('')+'</tbody></table></div>';
 }
 function nvTableroHTML(lista){
-  var dias=nvDiasAlerta();
-  var cab={Ingresado:['🆕 Ingresado','Contactar en '+dias+' día'+(dias!==1?'s':''),'#FEF3C7','#92400E'],
+  var dias=nvDiasAlerta(), diasR=nvDiasContactoResp();
+  var cab={Ingresado:['🆕 Ingresado','Dar la bienvenida en '+dias+' día'+(dias!==1?'s':''),'#FEF3C7','#92400E'],
+           Bienvenida:['📨 Bienvenida','Le toca al Responsable · contactar en '+diasR+' día'+(diasR!==1?'s':''),'#EDE9FE','#5B21B6'],
            Contactado:['📞 Contactado','Invitar a un grupo','#DBEAFE','#1E40AF'],
            Participando:['🌱 Participando','Acompañar la integración · se pasa sola con '+nvAsistParticipando()+' asistencias','#D1FAE5','#065F46']};
   return '<div class="nv-tab-cols">'+NV_ETAPAS.map(function(et){
     var l=lista.filter(function(m){return (m.subEstado||'Ingresado')===et;}), c=cab[et];
     return '<div class="nv-tab-col"><div style="background:'+c[2]+';color:'+c[3]+';border-radius:8px;padding:6px 10px;margin-bottom:8px"><div style="font-weight:700;font-size:13px">'+c[0]+' ('+l.length+')</div><div style="font-size:11px">'+c[1]+'</div></div>'+
       (l.length?l.map(function(m){
-        var g=nvGruposDe(m), t=nvUltimoContacto(m), atr=nvEsAtrasado(m), resp=nvRespNombre(m);
+        var g=nvGruposDe(m), t=nvUltimoContacto(m), atr=nvEsAtrasado(m), resp=nvRespNombre(m), at=nvAtraso(m);
         return '<div class="nv-tab-card"'+(atr?' style="border-left:4px solid #DC2626"':'')+'>'+
           '<div style="display:flex;justify-content:space-between;gap:6px"><span style="cursor:pointer;color:#1F4E79;font-weight:700;text-decoration:underline dotted" onclick="nvFichaAbrir('+m.id+')">'+nvEsc(listName(m))+'</span>'+
-          (atr?'<span style="background:#FEE2E2;color:#991B1B;font-size:10px;padding:1px 7px;border-radius:99px;font-weight:700;white-space:nowrap">⏰ Atrasado</span>':'')+'</div>'+
+          (atr?'<span title="'+nvEsc(at.motivo)+'" style="background:#FEE2E2;color:#991B1B;font-size:10px;padding:1px 7px;border-radius:99px;font-weight:700;white-space:nowrap">⏰ Atrasado · '+at.dias+'d</span>':'')+'</div>'+
           '<div style="color:#6B7280;margin-top:2px">'+(g.length?nvEsc(g.map(function(x){return x.name;}).join(', ')):'<span style="color:#F59E0B">Sin grupo</span>')+' · '+nvDiasDesdeIngreso(m)+' días desde el ingreso</div>'+
           '<div style="margin-top:2px">👤 '+(resp?nvEsc(resp):'<span style="color:#D97706;font-weight:700">Sin asignar</span>')+(t?' · último contacto '+nvHaceDias(t):'')+'</div>'+
           (et!=='Participando'?'<div style="color:#6B7280;margin-top:2px">'+nvAsistencias(m)+' de '+nvAsistParticipando()+' asistencias</div>':'')+
-          (et==='Ingresado'&&canContactarNuevos()?'<button class="btn btn-sm" style="margin-top:6px;background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvOpenContactar('+m.id+')">📞 Registrar contacto → Contactado</button>':'')+
+          (et==='Ingresado'&&canContactarNuevos()?'<button class="btn btn-sm" style="margin-top:6px;background:#F5F3FF;border-color:#DDD6FE;color:#5B21B6;font-weight:600" onclick="nvOpenContactar('+m.id+')">📨 Registrar bienvenida</button>':'')+
+          (et==='Bienvenida'&&nvEsResponsableYo(m)?'<button class="btn btn-sm" style="margin-top:6px;background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvFichaAbrir('+m.id+')">📞 Registrar contacto → Contactado</button>':'')+
         '</div>';
       }).join(''):'<div style="font-size:12px;color:#9CA3AF;text-align:center;padding:12px">Nadie en esta etapa</div>')+'</div>';
   }).join('')+'</div>';
@@ -16965,7 +17112,7 @@ function nvRenderSelBar(){
   bar.innerHTML='<span style="font-size:13px;color:#1E40AF;font-weight:600">'+ids.length+' seleccionado'+(ids.length!==1?'s':'')+'</span>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+
       '<button class="btn btn-sm" onclick="nvAsignarResponsableAbrir(nvSelIds())">👤 Asignar responsable</button>'+
-      '<select onchange="nvCambiarEtapaLote(nvSelIds(),this.value);this.value=\'\'" style="width:auto;font-size:12px;padding:5px 7px"><option value="">🔀 Cambiar etapa…</option><option value="Ingresado">🆕 Ingresado</option><option value="Contactado">📞 Contactado</option></select>'+
+      '<select onchange="nvCambiarEtapaLote(nvSelIds(),this.value);this.value=\'\'" style="width:auto;font-size:12px;padding:5px 7px"><option value="">🔀 Cambiar etapa…</option><option value="Ingresado">🆕 Ingresado</option><option value="Bienvenida">📨 Bienvenida</option><option value="Contactado">📞 Contactado</option></select>'+
       '<button class="btn btn-sm" onclick="nvExportarSeleccion()">📥 Exportar selección</button>'+
       '<button class="btn btn-sm" onclick="nvSel={};renderNuevos()">✕ Quitar selección</button>'+
     '</div>';
@@ -17013,6 +17160,12 @@ async function nvAsignarResponsableLote(ids,respId,respNombre,esAutoasignacion){
   renderNuevos();
   showToast(respId==null?'✅ Responsable quitado ('+fotos.length+')':'✅ Responsable asignado a '+fotos.length+' persona'+(fotos.length!==1?'s':''),'#16A34A');
 }
+// Cambio manual de etapa (Gestionar / lote): completa quién y cuándo si faltaba; Responsable automático al salir de Ingresado.
+function nvMarcarEtapaManual(m,de,a,autor,ahora,conRespAuto){
+  if((a==='Bienvenida'||a==='Contactado')&&!m.bienvenidaFecha&&de==='Ingresado'){ m.bienvenidaPor=autor; m.bienvenidaFecha=ahora; }
+  if(a==='Contactado'&&de!=='Contactado'&&!m.contactadoFecha){ m.contactadoPor=autor; m.contactadoFecha=ahora; }
+  if(de==='Ingresado'&&a!=='Ingresado'&&conRespAuto) nvRespAutoAplicar(m);
+}
 async function nvCambiarEtapaLote(ids,etapa){
   if(!etapa||!nvPuedeSeleccionar()) return;
   if(etapa==='Participando'){ alert('A Participando se pasa sola al sumar '+nvAsistParticipando()+' asistencias.'); return; }
@@ -17026,8 +17179,7 @@ async function nvCambiarEtapaLote(ids,etapa){
     fotos.push({m:m,foto:Object.assign({},m)});
     var de=m.subEstado||'Ingresado';
     m.subEstado=etapa;
-    if(etapa==='Contactado'&&!m.contactadoFecha){ m.contactadoPor=autor; m.contactadoFecha=ahora; }
-    if(etapa==='Contactado'&&de==='Ingresado') nvRespAutoAplicar(m);
+    nvMarcarEtapaManual(m,de,etapa,autor,ahora,true);
     m.subEstadoHistorial=(m.subEstadoHistorial||[]).concat([{de:de,a:etapa,autor:autor,fecha:ahora,comentario:'Cambio múltiple desde la grilla'}]);
     m._ts=Date.now();
   });
@@ -17134,13 +17286,16 @@ function nvFichaRender(){
       '<button onclick="nvFichaCerrar()" style="background:none;border:none;font-size:22px;color:#9CA3AF;cursor:pointer;line-height:1" title="Cerrar">✕</button></div>';
   if(esNuevo){
     h+='<div class="nv-pasos">'+NV_ETAPAS.map(function(x,i){ return '<div class="nv-paso'+(i<idxEt?' hecho':i===idxEt?' act':'')+'">'+(i<idxEt?'✓ ':'')+x+'</div>'; }).join('')+'</div>'+
-      '<div style="font-size:12px;color:#6B7280">'+nvAsistencias(m)+' de '+nvAsistParticipando()+' asistencias en GdV / NG'+(et==='Participando'?'':' · pasa sola a Participando')+(nvEsAtrasado(m)?' · <span style="color:#DC2626;font-weight:700">⏰ Atrasado</span>':'')+'</div>';
+      '<div style="font-size:12px;color:#6B7280">'+nvAsistencias(m)+' de '+nvAsistParticipando()+' asistencias en GdV / NG'+(et==='Participando'?'':' · pasa sola a Participando')+(nvEsAtrasado(m)?' · <span style="color:#DC2626;font-weight:700" title="'+nvEsc(nvAtraso(m).motivo)+'">⏰ Atrasado · '+nvAtraso(m).dias+' días</span>':'')+'</div>'+
+      ((m.bienvenidaFecha||m.contactadoFecha)?'<div style="font-size:12px;color:#374151;margin-top:3px">'+[
+        m.bienvenidaFecha?'📨 Bienvenida: '+nvEsc(m.bienvenidaPor||'—')+' · '+nvFmtFechaMs(Date.parse(m.bienvenidaFecha)):'',
+        m.contactadoFecha?'📞 Contactado: '+nvEsc(m.contactadoPor||'—')+' · '+nvFmtFechaMs(Date.parse(m.contactadoFecha)):''].filter(Boolean).join(' &nbsp;·&nbsp; ')+'</div>':'');
   }
   // Acciones
   var acc=[];
   if(esNuevo&&canContactarNuevos()){
     if(m.tel&&priv) acc.push('<button class="btn btn-sm nv-wa" onclick="nvAbrirWhatsapp('+m.id+')">WhatsApp</button>');
-    acc.push('<button class="btn btn-sm" style="background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvOpenContactar('+m.id+')">💬 Comentarios / registrar contacto</button>');
+    acc.push('<button class="btn btn-sm" style="background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8;font-weight:600" onclick="nvOpenContactar('+m.id+')">💬 Comentarios</button>');
   }
   if(canEditarNuevos()) acc.push('<button class="btn btn-sm" onclick="nvAbrirEditar('+m.id+')">✏️ Editar datos</button>');
   if(canGestionarNuevos()) acc.push('<button class="btn btn-sm btn-primary" onclick="nvOpenPromote('+m.id+')">'+(hist?'♻️ Re-activar / Gestionar':'Pasar a '+etqCond('Asistente Bautizado')+' / '+etqCond('Miembro')+' →')+'</button>');
@@ -17164,7 +17319,7 @@ function nvFichaRender(){
   // Línea de tiempo + nuevo comentario
   var ev=nvHistorialNuevo(m,priv);
   h+='<div class="nv-fsec"><h4>🕓 Seguimiento</h4>';
-  if(nvPuedeComentar(m)) h+='<textarea id="nv-ficha-com" placeholder="Nuevo comentario (mínimo '+COMENT_MIN+' caracteres)…" style="width:100%;min-height:60px;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;resize:vertical"></textarea>'+
+  if(nvPuedeComentar(m)) h+=nvBandaHTML(m)+'<textarea id="nv-ficha-com" placeholder="Nuevo comentario (mínimo '+COMENT_MIN+' caracteres)…" style="width:100%;min-height:60px;padding:8px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;resize:vertical"></textarea>'+
     '<div style="display:flex;justify-content:flex-end;margin:6px 0 10px"><button class="btn btn-sm btn-primary" id="nv-ficha-com-btn" onclick="nvFichaGuardarComentario('+m.id+')">💬 Guardar comentario</button></div>';
   h+=ev.length?'<div class="nv-tl">'+ev.map(function(x){
       return '<div class="nv-tl-i'+(x.tipo==='com'?' com':'')+'">'+(x.com&&isSuperAdmin()?comentarioBotonBorrar(m,x.com):'')+
@@ -17184,15 +17339,15 @@ async function nvFichaGuardarComentario(id){
   if(!txt){ showToast('Escribí el comentario primero','#D97706'); return; }
   if(txt.length<COMENT_MIN){ alert(comentMsg()); return; }
   var btn=document.getElementById('nv-ficha-com-btn'); if(btn) btn.disabled=true;
-  var antes=m.comentarios, tenia=Object.prototype.hasOwnProperty.call(m,'comentarios'), prevTs=m._ts;
+  var foto=Object.assign({},m);
   m.comentarios=(m.comentarios||[]).concat([{texto:txt,autor:(currentUser&&currentUser.name)||'Sistema',ts:Date.now(),origen:'conexion'}]);
+  var contacto=nvReglaComentario(m,txt); // misma regla que el 💬 (Bienvenida / contacto del Responsable)
   m._ts=Date.now();
   try{
     await saveK(SK.members,S.members);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    if(tenia) m.comentarios=antes; else delete m.comentarios;
-    if(prevTs===undefined) delete m._ts; else m._ts=prevTs;
+    nvRestaurarExacto(m,foto);
     try{ await saveK(SK.members,S.members); }catch(e2){}
     if(btn) btn.disabled=false;
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
@@ -17200,7 +17355,7 @@ async function nvFichaGuardarComentario(id){
   }
   if(el) el.value='';
   renderNuevos(); nvFichaRender();
-  showToast('💬 Comentario guardado','#16A34A');
+  showToast(contacto==='Bienvenida'?'📨 '+fullName(m)+' — bienvenida registrada':contacto?'📞 '+fullName(m)+' — contacto registrado':'💬 Comentario guardado',contacto?'#1D4ED8':'#16A34A');
 }
 
 // Popup de acciones (Editar/Contactar/Gestionar/Eliminar) — se abre al clickear el Nombre
@@ -17283,7 +17438,7 @@ function nvOpenPromote(id){
       Array.prototype.forEach.call(subSelect.options,function(o){ if(o.value==='Participando') o.disabled=(m.subEstado||'Ingresado')!=='Participando'; });
     }
     var asistTxt=nvAsistencias(m)+' de '+nvAsistParticipando()+' asistencias (pasa sola a Participando)';
-    if(subInfo) subInfo.textContent=(m.contactadoPor?`Contactado por ${m.contactadoPor} · `:'')+asistTxt;
+    if(subInfo) subInfo.textContent=(m.bienvenidaPor?`Bienvenida: ${m.bienvenidaPor} · `:'')+(m.contactadoPor?`Contactado por ${m.contactadoPor} · `:'')+asistTxt;
   }
   etqAplicarSelects();
   const selCond=document.getElementById('nv-promote-select');
@@ -17462,13 +17617,9 @@ async function nvCambiarSubEstadoManual(nuevoSubEstado){
   if(txtComentario&&txtComentario.length<COMENT_MIN){ alert(comentMsg()); return; }
   const anterior=m.subEstado||'Ingresado';
   if(nuevoSubEstado==='Participando'&&anterior!=='Participando'){ alert('A Participando se pasa sola al sumar '+nvAsistParticipando()+' asistencias en Grupos de Vida o Comunidades NG.'); return; }
-  var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
+  var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,bienvenidaPor:m.bienvenidaPor,bienvenidaFecha:m.bienvenidaFecha,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
   m.subEstado=nuevoSubEstado;
-  if(nuevoSubEstado==='Contactado'&&anterior!=='Contactado'){
-    m.contactadoPor=currentUser?.name||'Sistema';
-    m.contactadoFecha=new Date().toISOString();
-    if(anterior==='Ingresado'&&!nvDraftSeguimientoSet) nvRespAutoAplicar(m); // si se eligió responsable a mano en la misma acción, gana el elegido
-  }
+  nvMarcarEtapaManual(m,anterior,nuevoSubEstado,currentUser?.name||'Sistema',new Date().toISOString(),!nvDraftSeguimientoSet); // si se eligió responsable a mano en la misma acción, gana el elegido
   if(!m.subEstadoHistorial) m.subEstadoHistorial=[];
   m.subEstadoHistorial.push({de:anterior,a:nuevoSubEstado,autor:currentUser?.name||'Sistema',fecha:new Date().toISOString(),comentario:txtComentario||''});
   if(!m.comentarios) m.comentarios=[];
@@ -17480,6 +17631,7 @@ async function nvCambiarSubEstadoManual(nuevoSubEstado){
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
     Object.assign(m,snapshot);
+    ['bienvenidaPor','bienvenidaFecha','contactadoPor','contactadoFecha'].forEach(function(k){ if(m[k]===undefined) delete m[k]; });
     m._ts=snapshot._ts;
     await saveK(SK.members,S.members);
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
@@ -17497,6 +17649,8 @@ function nvOpenContactar(id){
   const nameEl=document.getElementById('nv-contactar-name');
   if(nameEl) nameEl.textContent=fullName(m);
   nvRenderComentariosContactar(m);
+  const bandaEl=document.getElementById('nv-contactar-banda');
+  if(bandaEl) bandaEl.innerHTML=nvBandaHTML(m);
   const txtEl=document.getElementById('nv-contactar-comentario-txt');
   if(txtEl) txtEl.value='';
   document.getElementById('nv-contactar-overlay').style.display='flex';
@@ -17512,7 +17666,7 @@ function nvRenderComentariosContactar(m){
   if(!lista) return;
   const coms=(m.comentarios||[]).slice().sort((a,b)=>b.ts-a.ts);
   if(!coms.length){
-    lista.innerHTML='<div style="color:#9CA3AF;padding:4px 0">Sin comentarios aún — el primero marca el contacto como realizado.</div>';
+    lista.innerHTML='<div style="color:#9CA3AF;padding:4px 0">Sin comentarios aún — el primero registra la bienvenida.</div>';
   } else {
     lista.innerHTML=coms.map(c=>`
       <div style="padding:6px 10px;background:#F9FAFB;border-radius:8px;margin-bottom:6px;border-left:3px solid #1D4ED8">${comentarioBotonBorrar(m,c)}
@@ -17522,6 +17676,56 @@ function nvRenderComentariosContactar(m){
   }
 }
 
+// Etapa Bienvenida (zzz) — reglas de los comentarios de Conexión (💬 y ficha usan las mismas):
+//  · Ingresado → Bienvenida: el primer comentario de alguien con permiso Contactar. Asigna el Responsable automático.
+//  · Bienvenida → Contactado: SOLO el comentario del Responsable (su persona vinculada = m.seguimientoId).
+//  · En Contactado / Participando los comentarios no cambian la etapa.
+function nvEsResponsableYo(m){
+  var yo=getLinkedMember();
+  return !!(yo&&m&&m.seguimientoId&&Number(yo.id)===Number(m.seguimientoId));
+}
+function nvRegistrarBienvenida(m,txt,autor,cuandoIso){
+  if(!m||!nvEsNuevoActivo(m)||(m.subEstado||'Ingresado')!=='Ingresado') return false;
+  if(!canContactarNuevos()) return false;
+  m.subEstado='Bienvenida';
+  m.bienvenidaPor=autor||(currentUser&&currentUser.name)||'Sistema';
+  m.bienvenidaFecha=cuandoIso||new Date().toISOString();
+  nvRespAutoAplicar(m); // Responsable automático por género (Configuración → Conexión)
+  m.subEstadoHistorial=(m.subEstadoHistorial||[]).concat([{de:'Ingresado',a:'Bienvenida',autor:m.bienvenidaPor,fecha:m.bienvenidaFecha,comentario:txt}]);
+  return true;
+}
+function nvRegistrarContactoResp(m,txt,autor,cuandoIso){
+  if(!m||!nvEsNuevoActivo(m)||m.subEstado!=='Bienvenida') return false;
+  if(!nvEsResponsableYo(m)) return false;
+  m.subEstado='Contactado';
+  m.contactadoPor=autor||(currentUser&&currentUser.name)||'Sistema';
+  m.contactadoFecha=cuandoIso||new Date().toISOString();
+  m.subEstadoHistorial=(m.subEstadoHistorial||[]).concat([{de:'Bienvenida',a:'Contactado',autor:m.contactadoPor,fecha:m.contactadoFecha,comentario:txt}]);
+  return true;
+}
+// Aplica la regla que corresponda a un comentario recién agregado. Devuelve 'Bienvenida' | 'Contactado' | null.
+function nvReglaComentario(m,txt){
+  if(nvRegistrarBienvenida(m,txt)) return 'Bienvenida';
+  if(nvRegistrarContactoResp(m,txt)) return 'Contactado';
+  return null;
+}
+// Texto que explica qué va a pasar con el comentario (modal 💬 y ficha)
+function nvBandaComentario(m){
+  if(!m||!nvEsNuevoActivo(m)) return null;
+  var et=m.subEstado||'Ingresado', resp=nvRespNombre(m);
+  if(et==='Ingresado') return canContactarNuevos()?{bg:'#FEF3C7',fg:'#92400E',txt:'📨 Registrá la bienvenida — con el primer comentario pasa a Bienvenida'+(nvRespAutoConfig().activo?' y se asigna el Responsable automático':'')}:null;
+  if(et==='Bienvenida'){
+    var f=m.bienvenidaFecha?nvFmtFechaMs(Date.parse(m.bienvenidaFecha)):'';
+    if(nvEsResponsableYo(m)) return {bg:'#EDE9FE',fg:'#5B21B6',txt:'📞 Sos el Responsable — con tu comentario pasa a Contactado'};
+    return {bg:'#EDE9FE',fg:'#5B21B6',txt:'📨 Bienvenida'+(f?' del '+f:'')+(m.bienvenidaPor?' ('+m.bienvenidaPor+')':'')+' · pasa a Contactado cuando comente '+(resp?'su Responsable, '+resp:'su Responsable (todavía sin asignar)')};
+  }
+  if(et==='Contactado') return {bg:'#DBEAFE',fg:'#1E40AF',txt:'📞 En seguimiento de '+(resp?'su Responsable, '+resp:'su Responsable')};
+  return null;
+}
+function nvBandaHTML(m){
+  var b=nvBandaComentario(m); if(!b) return '';
+  return '<div style="background:'+b.bg+';color:'+b.fg+';border-radius:8px;padding:7px 10px;font-size:12.5px;margin-bottom:8px">'+nvEsc(b.txt)+'</div>';
+}
 async function nvGuardarComentarioContactar(){
   if(!nvSelectedId) return;
   const m=S.members.find(x=>x.id===nvSelectedId);
@@ -17530,37 +17734,30 @@ async function nvGuardarComentarioContactar(){
   const esPrimerContacto=(m.subEstado||'Ingresado')==='Ingresado';
   if(!txt){showToast('Escribí un comentario primero','#D97706');return;}
   if(txt.length<COMENT_MIN){
-    alert(esPrimerContacto?'Para registrar el primer contacto escribí un comentario de al menos '+COMENT_MIN+' caracteres (cómo fue, qué se conversó).':comentMsg());
+    alert(esPrimerContacto?'Para registrar la bienvenida escribí un comentario de al menos '+COMENT_MIN+' caracteres.':comentMsg());
     return;
   }
-  var snapshot={grupoId:m.grupoId,seguimientoId:m.seguimientoId,seguimientoNombre:m.seguimientoNombre,subEstado:m.subEstado,contactadoPor:m.contactadoPor,contactadoFecha:m.contactadoFecha,subEstadoHistorial:(m.subEstadoHistorial||[]).slice(),comentarios:(m.comentarios||[]).slice(),_ts:m._ts};
-  if(!m.comentarios) m.comentarios=[];
-  m.comentarios.push({texto:txt,autor:currentUser?.name||'Sistema',ts:Date.now()});
-  if(esPrimerContacto){
-    m.subEstado='Contactado';
-    m.contactadoPor=currentUser?.name||'Sistema';
-    m.contactadoFecha=new Date().toISOString();
-    nvRespAutoAplicar(m); // Responsable automático por género (Configuración → Conexión)
-    if(!m.subEstadoHistorial) m.subEstadoHistorial=[];
-    m.subEstadoHistorial.push({de:'Ingresado',a:'Contactado',autor:m.contactadoPor,fecha:m.contactadoFecha,comentario:txt});
-  }
+  var foto=Object.assign({},m);
+  m.comentarios=(m.comentarios||[]).concat([{texto:txt,autor:currentUser?.name||'Sistema',ts:Date.now()}]);
+  const registro=nvReglaComentario(m,txt);
   m._ts=Date.now();
-  document.getElementById('nv-contactar-comentario-txt').value='';
-  await saveK(SK.members,S.members);
   try{
+    await saveK(SK.members,S.members);
     if(typeof window.fbUpload==='function') await window.fbUpload(true);
   }catch(e){
-    Object.assign(m,snapshot);
-    await saveK(SK.members,S.members);
+    nvRestaurarExacto(m,foto);
+    try{ await saveK(SK.members,S.members); }catch(e2){}
     alert('No se pudo guardar en la nube. Verificá tu conexión e intentá de nuevo.');
     return;
   }
-  if(esPrimerContacto){
+  document.getElementById('nv-contactar-comentario-txt').value='';
+  if(registro){
     nvCloseContactar();
     renderNuevos();
-    showToast('📞 '+fullName(m)+' — contacto registrado','#1D4ED8');
+    showToast(registro==='Bienvenida'?'📨 '+fullName(m)+' — bienvenida registrada':'📞 '+fullName(m)+' — contacto registrado','#1D4ED8');
   } else {
     nvRenderComentariosContactar(m);
+    renderNuevos();
     showToast('💬 Comentario guardado','#16A34A');
   }
 }
@@ -17956,11 +18153,13 @@ function nvRenderDashboard(){
   const promovidos=cohort.filter(m=>promovidoCondiciones.includes(m.condicion)).length;
   const historico=cohort.filter(m=>m.condicion==='Historico').length;
   const contactadosTotal=cohort.filter(m=>m.contactadoFecha).length;
+  const bienvenidaTotal=cohort.filter(m=>m.bienvenidaFecha).length;
 
   const statsEl=document.getElementById('nv-dash-stats');
   if(statsEl){
     statsEl.innerHTML=[
       {label:'Ingresaron',val:total,icon:'🆕'},
+      {label:'Bienvenida',val:bienvenidaTotal,icon:'📨'},
       {label:'Contactados',val:contactadosTotal,icon:'📞'},
       {label:'Participando',val:participando,icon:'🌱'},
       {label:'Asistente/Miembro',val:promovidos,icon:'⭐'},
@@ -17971,14 +18170,14 @@ function nvRenderDashboard(){
   // Tiempo hasta el primer contacto
   const tiemposWrap=document.getElementById('nv-dash-tiempos');
   if(tiemposWrap){
-    const conContacto=cohort.filter(m=>m.contactadoFecha);
+    const conContacto=cohort.filter(m=>m.bienvenidaFecha||m.contactadoFecha);
     if(!conContacto.length){
       tiemposWrap.innerHTML='<div class="empty">Sin contactos registrados en el período</div>';
     } else {
       const dias=conContacto.map(m=>{
         const fReg=nvFechaRegDate(m);
         if(!fReg) return null;
-        const fCon=new Date(m.contactadoFecha);
+        const fCon=new Date(m.bienvenidaFecha||m.contactadoFecha);
         return Math.max(0,Math.round((fCon-fReg)/(1000*60*60*24)));
       }).filter(d=>d!==null);
       const prom=dias.length?(dias.reduce((a,b)=>a+b,0)/dias.length):0;
@@ -17989,7 +18188,7 @@ function nvRenderDashboard(){
         {label:'Más de 7 días',min:8,max:Infinity,count:0,color:'#DC2626'},
       ];
       dias.forEach(d=>{ const b=buckets.find(b=>d>=b.min&&d<=b.max); if(b) b.count++; });
-      let html=`<div style="font-size:13px;color:#374151;margin-bottom:12px">Promedio: <strong style="color:#1F4E79">${prom.toFixed(1)} días</strong> desde el ingreso hasta el primer contacto (${dias.length} caso${dias.length!==1?'s':''})</div>`;
+      let html=`<div style="font-size:13px;color:#374151;margin-bottom:12px">Promedio: <strong style="color:#1F4E79">${prom.toFixed(1)} días</strong> desde el ingreso hasta la bienvenida (${dias.length} caso${dias.length!==1?'s':''})</div>`;
       buckets.forEach(b=>{
         const pct=dias.length?Math.round(b.count/dias.length*100):0;
         html+=`<div style="margin-bottom:8px">
@@ -23025,11 +23224,12 @@ function exportNuevosExcel(lista){
       apellido:m.apellido,
       genero:m.genero==='H'?'Hombre':m.genero==='M'?'Mujer':'-',
       grupo:memberGroups.length?memberGroups.map(gr=>gr.name).join(', '):'Sin grupo',
-      edad:m.edadDeclarada||'',
+      edad:(function(){ var e=nvEdad(m); return e!==null?e:''; })(),
       celular:m.tel||'',
       barrio:m.dir||'',
       comoNosConocio:m.comoNosConocio||'',
       subEstado:nvFiltro!=='historico'?(m.subEstado||'Ingresado'):'-',
+      bienvenidaPor:m.bienvenidaPor||'',
       contactadoPor:m.contactadoPor||'',
       seguimiento:m.seguimientoNombre||'Pendiente',
       origen:m.origen||'',
@@ -23048,6 +23248,7 @@ function exportNuevosExcel(lista){
     {key:'barrio',      label:'Barrio / Ciudad',   width:20},
     {key:'comoNosConocio',label:'Cómo nos conociste',width:24},
     {key:'subEstado',   label:'Sub-Estado',        width:14},
+    {key:'bienvenidaPor',label:'Bienvenida por',   width:18},
     {key:'contactadoPor',label:'Contactado por',   width:18},
     {key:'seguimiento', label:'Seguimiento',       width:24},
     {key:'origen',      label:'Origen',            width:16},

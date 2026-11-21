@@ -439,6 +439,28 @@ const firebaseConfig = {
 };
 
 const fbApp = initializeApp(firebaseConfig);
+
+// ── App Check (Fraud Defense / reCAPTCHA Enterprise) ──
+// Le pone un "sello" a cada pedido a Firebase para demostrar que viene de la App real.
+// Va antes de getFirestore. Se carga con import dinámico dentro de try: si falla,
+// la App sigue funcionando igual (el bloqueo solo se activa desde la consola de Firebase).
+// Clave de sitio pública, creada el 21/11/26 en Google Cloud > Fraud Defense ("VNG App Check").
+try {
+  const { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } =
+    await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js');
+  const appCheck = initializeAppCheck(fbApp, {
+    provider: new ReCaptchaEnterpriseProvider('6LdzmysuAAAAAOAwT2xLNSODe1e9DQvutZQGFZHw'),
+    isTokenAutoRefreshEnabled: true
+  });
+  console.log('Firebase: App Check iniciado');
+  // Control sin bloquear la carga: confirma en la consola si el sello se obtuvo
+  getToken(appCheck)
+    .then(function(){ console.log('Firebase: App Check sello OK'); })
+    .catch(function(e){ console.warn('Firebase: App Check sello ERROR', (e && (e.code || e.message)) || e); });
+} catch(acErr) {
+  console.error('Firebase: error App Check', acErr);
+}
+
 const db = getFirestore(fbApp);
 const auth = getAuth(fbApp);
 
@@ -833,7 +855,7 @@ console.log('Firebase: initialized OK');
 // IMPORTANTE: cambiar este valor cada vez que se publique una versión nueva del archivo
 // (alcanza con la fecha; si se publica más de una vez el mismo día, agregar una letra/número).
 // Sin este cambio, la app no se da cuenta de que hay una versión más nueva dando vueltas.
-const APP_VERSION = '2026-08-24-zzz';
+const APP_VERSION = '2026-08-24-zzz1';
 window._vngUpdating = false;
 async function fbCheckVersion(){
   try{
